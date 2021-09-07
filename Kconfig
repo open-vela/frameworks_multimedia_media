@@ -1,0 +1,53 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config MEDIA
+	tristate "Enable media"
+	default n
+
+if MEDIA
+
+config MEDIA_SERVER
+	bool "Enable media server"
+	default n
+	select EVENT_FD
+
+if MEDIA_SERVER
+
+config MEDIA_SERVER_CONFIG_PATH
+	string "Media server configure file path"
+	default "/etc/media/"
+
+config MEDIA_SERVER_STACKSIZE
+	int "Media server stack size"
+	default 81920
+
+config MEDIA_SERVER_PRIORITY
+	int "Media server priority"
+	default 245
+
+endif # MEDIA_SERVER
+
+config MEDIA_SERVER_CPUNAME
+	string "Media server CPU name"
+	depends on !MEDIA_SERVER
+	default "audio"
+
+config MEDIA_TOOL
+	bool "Media tool"
+	default n
+
+if MEDIA_TOOL
+
+config MEDIA_TOOL_STACKSIZE
+	int "Media tool stack size"
+	default DEFAULT_TASK_STACKSIZE
+
+config MEDIA_TOOL_PRIORITY
+	int "Media tool priority"
+	default 100
+
+endif # MEDIA_TOOL
+endif # MEDIA
