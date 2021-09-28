@@ -23,10 +23,10 @@ include $(APPDIR)/Make.defs
 ifneq ($(CONFIG_MEDIA),)
 
 MODULE = $(CONFIG_MEDIA_SERVER)
-CSRCS += media_proxy.c media_parcel.c
+CSRCS += media_proxy.c media_parcel.c media_client.c
 
 ifneq ($(CONFIG_MEDIA_SERVER),)
-  CSRCS    += media_graph.c media_stub.c
+  CSRCS    += media_graph.c media_stub.c media_server.c
   MAINSRC   = media_daemon.c
   PROGNAME  = $(CONFIG_MEDIA_SERVER_PROGNAME)
   PRIORITY  = $(CONFIG_MEDIA_SERVER_PRIORITY)
