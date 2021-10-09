@@ -66,14 +66,7 @@ struct mediatool_chain_s
 struct mediatool_s
 {
     struct mediatool_chain_s chain[MEDIATOOL_MAX_CHAIN];
-    int                      init;
 };
-
-/****************************************************************************
- * Public Function Prototypes
- ****************************************************************************/
-
-extern void media_server_start(void);
 
 /****************************************************************************
  * Private Function Prototypes
@@ -810,15 +803,11 @@ static int mediatool_common_cmd_quit(struct mediatool_s *media, char *pargs)
     char tmp[8];
     int i;
 
-    if (media->init) {
-        for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-            if (media->chain[i].handle) {
-                snprintf(tmp, 8, "%d", i);
-                mediatool_common_cmd_close(media, tmp);
-            }
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (media->chain[i].handle) {
+            snprintf(tmp, 8, "%d", i);
+            mediatool_common_cmd_close(media, tmp);
         }
-
-        media->init = 0;
     }
 
     return 0;
@@ -870,8 +859,6 @@ int main(int argc, char *argv[])
     char *cmd, *arg;
     char *buffer;
     int ret, len;
-
-    media_server_start();
 
     buffer = malloc(CONFIG_NSH_LINELEN);
     if (!buffer)

@@ -410,26 +410,4 @@ void media_server_dump(const char *options)
     media_server_dump_(options);
 }
 
-static void *media_server_thread(void *arg)
-{
-    extern int mediad_main(int argc, FAR char *argv[]);
-    return (void *)mediad_main(0, NULL);
-}
-
-void media_server_start(void)
-{
-    pthread_t thread;
-    int ret;
-
-    ret = pthread_create(&thread, NULL, media_server_thread, NULL);
-    assert(!ret);
-
-    /* wait media server setup */
-    usleep(100 * 1000);
-}
-
-#else
-void media_server_start(void)
-{
-}
 #endif /* MEDIA_NO_RPC */
