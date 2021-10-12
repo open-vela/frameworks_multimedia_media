@@ -39,7 +39,7 @@ void media_server_dump_(const char *options);
  ****************************************************************************/
 
 void *media_player_open_(const char *name);
-int media_player_close_(void *handle);
+int media_player_close_(void *handle, int pending_stop);
 int media_player_set_event_callback_(void *handle, void *cookie,
                                     media_event_callback event_cb);
 int media_player_prepare_(void *handle, const char *url, const char *options);
