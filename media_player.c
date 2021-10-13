@@ -207,17 +207,13 @@ int media_player_prepare_(void *handle, const char *url, const char *options)
     if (!priv)
         return -EINVAL;
 
-    ret = avfilter_process_command(priv->filter, "set_url", url, NULL, 0, 0);
-    if (ret < 0)
-        return ret;
-
     if (options) {
         ret = avfilter_process_command(priv->filter, "set_options", options, NULL, 0, 0);
         if (ret < 0)
             return ret;
     }
 
-    return avfilter_process_command(priv->filter, "prepare", NULL, NULL, 0, 0);
+    return avfilter_process_command(priv->filter, "prepare", url, NULL, 0, 0);
 }
 
 int media_player_reset_(void *handle)
