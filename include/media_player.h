@@ -62,14 +62,17 @@ void *media_player_open(const char *params);
  *  Close the player path.
  *
  * Input Parameters:
- *   handle - Playbck path to be destroyed
+ *   handle - The player path to be destroyed
+ *   pending_stop - whether pending command.
+ *                  0: close immediately
+ *                  1: pending command, close automatically after playbacek complete
  *
  * Returned Value:
  *   Zero on success; a negated errno value on failure.
  *
  ****************************************************************************/
 
-int media_player_close(void *handle);
+int media_player_close(void *handle, int pending_stop);
 
 /****************************************************************************
  * Name: media_player_set_event_callback
