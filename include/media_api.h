@@ -39,20 +39,41 @@ extern "C"
 #endif
 
 /****************************************************************************
- * Name: media_server_dump
+ * Name: media_process_command
  *
  * Description:
- *  Dump media server
+ *  Send command to media
  *
  * Input Parameters:
- *   options - dump options
+ *   target - target name
+ *   cmd    - cmd
+ *   arg    - arg
+ *   res    - response
+ *   res_len- response msg len
  *
  * Returned Value:
  *   Zero on success; a negated errno value on failure.
  *
  ****************************************************************************/
 
-void media_server_dump(const char *options);
+int media_process_command(const char *target, const char *cmd,
+                          const char *arg, char *res, int res_len);
+
+/****************************************************************************
+ * Name: media_dump
+ *
+ * Description:
+ *  Dump media
+ *
+ * Input Parameters:
+ *   options - dump options
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
+void media_dump(const char *options);
 
 #undef EXTERN
 #ifdef __cplusplus
