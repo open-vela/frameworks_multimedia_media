@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_player.c
+ * frameworks/media/media_graph.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -22,15 +22,38 @@
  * Included Files
  ****************************************************************************/
 
-#include <libavutil/opt.h>
-#include <libavfilter/avfilter.h>
-#include <libavfilter/movie_async.h>
+#include <nuttx/fs/fs.h>
 
+#include <libavdevice/avdevice.h>
+#include <libavfilter/avfilter.h>
+#include <libavfilter/internal.h>
+#include <libavfilter/movie_async.h>
+#include <libavutil/opt.h>
+
+#include <assert.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <syslog.h>
+#include <sys/eventfd.h>
+
+#include <media_api.h>
 #include "media_internal.h"
+
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+#define MAX_GRAPH_SIZE      4096
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
+
+typedef struct MediaGraphPriv {
+    AVFilterGraph *graph;
+    struct file   *filep;
+    int            fd;
+} MediaGraphPriv;
 
 typedef struct MediaPlayerPriv {
     AVFilterContext *filter;
@@ -38,7 +61,233 @@ typedef struct MediaPlayerPriv {
 } MediaPlayerPriv;
 
 /****************************************************************************
- * Private Functions
+ * Private Graph Functions
+ ****************************************************************************/
+
+static void media_graph_filter_ready(AVFilterContext *ctx)
+{
+    MediaGraphPriv *priv = ctx->graph->opaque;
+    eventfd_t val = 1;
+
+    file_write(priv->filep, &val, sizeof(eventfd_t));
+}
+
+static void media_graph_log_callback(void *avcl, int level,
+                                     const char *fmt, va_list vl)
+{
+    switch (level) {
+        case AV_LOG_PANIC:
+            level = LOG_EMERG;
+            break;
+        case AV_LOG_FATAL:
+            level = LOG_ALERT;
+            break;
+        case AV_LOG_ERROR:
+            level = LOG_ERR;
+            break;
+        case AV_LOG_WARNING:
+            level = LOG_WARNING;
+            break;
+        case AV_LOG_INFO:
+            level = LOG_INFO;
+            break;
+        case AV_LOG_VERBOSE:
+        case AV_LOG_DEBUG:
+        case AV_LOG_TRACE:
+            level = LOG_DEBUG;
+            break;
+    }
+
+    vsyslog(level, fmt, vl);
+}
+
+static int media_graph_loadgraph(MediaGraphPriv *priv, char *conf)
+{
+    char graph_desc[MAX_GRAPH_SIZE];
+    AVFilterInOut *input = NULL;
+    AVFilterInOut *output = NULL;
+    int ret;
+    int fd;
+
+    fd = open(conf, O_RDONLY | O_BINARY);
+    if (fd < 0) {
+        av_log(NULL, AV_LOG_ERROR, "%s, can't open media graph file\n", __func__);
+        return -errno;
+    }
+
+    ret = read(fd, graph_desc, MAX_GRAPH_SIZE);
+    close(fd);
+    if (ret < 0)
+        return -errno;
+    else if (ret == MAX_GRAPH_SIZE)
+        return -EFBIG;
+
+    graph_desc[ret] = 0;
+    av_log(NULL, AV_LOG_INFO, "%s, loadgraph:\n%s\n", __func__, graph_desc);
+
+    avdevice_register_all();
+    av_log_set_callback(media_graph_log_callback);
+
+    priv->graph = avfilter_graph_alloc();
+    if (!priv->graph)
+        return -ENOMEM;
+
+    ret = avfilter_graph_parse2(priv->graph, graph_desc, &input, &output);
+    if (ret < 0) {
+        av_log(NULL, AV_LOG_ERROR, "%s, media graph parse error\n", __func__);
+        goto out;
+    }
+
+    avfilter_inout_free(&input);
+    avfilter_inout_free(&output);
+
+    ret = avfilter_graph_config(priv->graph, NULL);
+    if (ret < 0) {
+        av_log(NULL, AV_LOG_ERROR, "%s, media graph config error\n", __func__);
+        goto out;
+    }
+
+    priv->graph->ready  = media_graph_filter_ready;
+    priv->graph->opaque = priv;
+
+    av_log(NULL, AV_LOG_ERROR, "%s, loadgraph succeed\n", __func__);
+    return 0;
+out:
+    avfilter_graph_free(&priv->graph);
+    return ret;
+}
+
+/****************************************************************************
+ * Public Graph Functions
+ ****************************************************************************/
+
+void *media_graph_create(void *file)
+{
+    MediaGraphPriv *priv;
+    int ret;
+
+    priv = malloc(sizeof(MediaGraphPriv));
+    if (!priv)
+        return NULL;
+
+    priv->fd = eventfd(0, 0);
+    if (priv->fd < 0)
+        goto err;
+
+    ret = fs_getfilep(priv->fd, &priv->filep);
+    if (ret < 0)
+        goto err;
+
+    ret = media_graph_loadgraph(priv, file);
+    if (ret < 0)
+        goto err;
+
+    return priv;
+err:
+    if (priv->fd > 0)
+        close(priv->fd);
+    free(priv);
+    return NULL;
+}
+
+int media_graph_destroy(void *handle)
+{
+    MediaGraphPriv *priv = handle;
+
+    if (!priv || !priv->graph)
+        return -EINVAL;
+
+    avfilter_graph_free(&priv->graph);
+    free(priv);
+
+    return 0;
+}
+
+int media_graph_get_pollfds(void *handle, struct pollfd *fds,
+                            void **cookies, int count)
+{
+    MediaGraphPriv *priv = handle;
+    int ret, nfd, i;
+
+    if (!priv || !priv->graph || !fds || count < 2)
+        return -EINVAL;
+
+    fds[0].fd     = priv->fd;
+    fds[0].events = POLLIN;
+    cookies[0]    = NULL;
+    nfd           = 1;
+
+    for (i = 0; i < priv->graph->nb_filters; i++) {
+        AVFilterContext *filter = priv->graph->filters[i];
+
+        ret = avfilter_process_command(filter, "get_pollfd", NULL,
+                (char *)&fds[nfd], sizeof(struct pollfd) * (count - nfd),
+                AV_OPT_SEARCH_CHILDREN);
+        if (ret < 0)
+            continue;
+
+        while (fds[nfd].events) {
+            cookies[nfd++] = filter;
+            if (nfd > count)
+                return -EINVAL;
+        }
+    }
+
+    return nfd;
+}
+
+int media_graph_poll_available(void *handle, struct pollfd *fd, void *cookie)
+{
+    MediaGraphPriv *priv = handle;
+    eventfd_t unuse;
+    int ret;
+
+    if (!priv || !priv->graph || !fd)
+        return -EINVAL;
+
+    if (cookie)
+        avfilter_process_command(cookie, "poll_available", NULL,
+                                 (char *)fd, sizeof(struct pollfd),
+                                 AV_OPT_SEARCH_CHILDREN);
+    else
+        eventfd_read(priv->fd, &unuse);
+
+    do {
+        ret = ff_filter_graph_run_once(priv->graph);
+    } while (ret == 0);
+
+    return 0;
+}
+
+int media_graph_process_command(void *handle, const char *target,
+                                const char *cmd, const char *arg,
+                                char *res, int res_len)
+{
+    MediaGraphPriv *priv = handle;
+
+    if (!priv || !priv->graph)
+        return -EINVAL;
+
+    return avfilter_graph_send_command(priv->graph, target, cmd, arg, res, res_len, 0);
+}
+
+void media_graph_dump(void *handle, const char *options)
+{
+    MediaGraphPriv *priv = handle;
+    char *tmp;
+
+    if (!priv || !priv->graph)
+        return;
+
+    tmp = avfilter_graph_dump_ext(priv->graph, options);
+    if (tmp) {
+        av_log(NULL, AV_LOG_INFO, "%s\n%s", __func__, tmp);
+        free(tmp);
+    }
+}
+
+/****************************************************************************
+ * Private Player Functions
  ****************************************************************************/
 
 static AVFilterContext *media_player_find(AVFilterContext *filter,
@@ -121,21 +370,21 @@ static int media_player_set_fadeinout(AVFilterContext *filter,
 }
 
 /****************************************************************************
- * Public Functions
+ * Public Player Functions
  ****************************************************************************/
 
-void *media_player_open_(const char *name)
+void *media_player_open_(void *graph, const char *name)
 {
-    AVFilterGraph *graph = media_server_get_graph_();
+    MediaGraphPriv *media = graph;
     AVFilterContext *filter;
     MediaPlayerPriv *priv;
     int ret, i;
 
-    if (!graph)
+    if (!media || !media->graph)
         return NULL;
 
-    for (i = 0; i < graph->nb_filters; i++) {
-        filter = graph->filters[i];
+    for (i = 0; i < media->graph->nb_filters; i++) {
+        filter = media->graph->filters[i];
 
         if (!filter->opaque && !strcmp(filter->filter->name, "amovie_async")) {
             if (!name || !strcmp(filter->name, name))
@@ -143,7 +392,7 @@ void *media_player_open_(const char *name)
         }
     }
 
-    if (i == graph->nb_filters)
+    if (i == media->graph->nb_filters)
         return NULL;
 
     priv = zalloc(sizeof(MediaPlayerPriv));
@@ -389,4 +638,108 @@ int media_player_get_volume_(void *handle, float *volume)
 
     *volume = priv->volume;
     return 0;
+}
+
+/****************************************************************************
+ * Public Recorder Functions
+ ****************************************************************************/
+
+void *media_recorder_open_(void *graph, const char *name)
+{
+    MediaGraphPriv *media = graph;
+    AVFilterContext *filter;
+    int ret, i;
+
+    if (!media || !media->graph)
+        return NULL;
+
+    for (i = 0; i < media->graph->nb_filters; i++) {
+        filter = media->graph->filters[i];
+
+        if (!filter->opaque && !strcmp(filter->filter->name, "amoviesink_async")) {
+            if (!name || !strcmp(filter->name, name))
+                break;
+        }
+    }
+
+    if (i == media->graph->nb_filters)
+        return NULL;
+
+    ret = avfilter_process_command(filter, "open", NULL, NULL, 0, 0);
+    if (ret < 0)
+        return NULL;
+
+    filter->opaque = filter;
+
+    return filter;
+}
+
+int media_recorder_close_(void *handle)
+{
+    AVFilterContext *filter = handle;
+    int ret;
+
+    if (!filter)
+        return -EINVAL;
+
+    ret = avfilter_process_command(filter, "close", NULL, NULL, 0, 0);
+    if (ret < 0)
+        return ret;
+
+    filter->opaque = NULL;
+    return 0;
+}
+
+int media_recorder_set_event_callback_(void *handle, void *cookie,
+                                       media_event_callback event_cb)
+{
+    AVMovieAsyncEventCookie event;
+
+    if (!handle)
+        return -EINVAL;
+
+    event.event  = event_cb;
+    event.cookie = cookie;
+
+    return avfilter_process_command(handle, "set_event", (const char *)&event, NULL, 0, 0);
+}
+
+int media_recorder_prepare_(void *handle, const char *url, const char *options)
+{
+    int ret;
+
+    if (!handle)
+        return -EINVAL;
+
+    if (options) {
+        ret = avfilter_process_command(handle, "set_options", options, NULL, 0, 0);
+        if (ret < 0)
+            return ret;
+    }
+
+    return avfilter_process_command(handle, "prepare", url, NULL, 0, 0);
+}
+
+int media_recorder_reset_(void *handle)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return avfilter_process_command(handle, "reset", NULL, NULL, 0, 0);
+}
+
+int media_recorder_start_(void *handle)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return avfilter_process_command(handle, "start", NULL, NULL, 0, 0);
+}
+
+int media_recorder_stop_(void *handle)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return avfilter_process_command(handle, "stop", NULL, NULL, 0, 0);
 }

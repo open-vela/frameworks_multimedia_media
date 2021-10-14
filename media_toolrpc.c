@@ -130,7 +130,7 @@ void *media_player_open(const char *params)
     if (!priv)
         return NULL;
 
-    priv->handle = media_player_open_(NULL);
+    priv->handle = media_player_open_(media_get_graph(), NULL);
     if (!priv->handle) {
         free(priv);
         return NULL;
@@ -321,7 +321,7 @@ void *media_recorder_open(const char *params)
     if (!priv)
         return NULL;
 
-    priv->handle = media_recorder_open_(NULL);
+    priv->handle = media_recorder_open_(media_get_graph(), NULL);
     if (!priv->handle) {
         free(priv);
         return NULL;
@@ -405,9 +405,16 @@ int media_recorder_stop(void *handle)
     return media_recorder_stop_(priv->handle);
 }
 
-void media_server_dump(const char *options)
+int media_process_command(const char *target, const char *cmd,
+                          const char *arg, char *res, int res_len)
 {
-    media_server_dump_(options);
+    return media_graph_process_command(media_get_graph(), target,
+                                       cmd, arg, res, res_len);
+}
+
+void media_dump(const char *options)
+{
+    media_graph_dump(media_get_graph(), options);
 }
 
 #endif /* MEDIA_NO_RPC */

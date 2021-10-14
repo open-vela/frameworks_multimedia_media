@@ -26,9 +26,8 @@ MODULE = $(CONFIG_MEDIA_SERVER)
 CSRCS += media_proxy.c media_parcel.c
 
 ifneq ($(CONFIG_MEDIA_SERVER),)
-  CSRCS    += media_player.c media_recorder.c
-  CSRCS    += media_policy.c
-  MAINSRC   = media_server.c
+  CSRCS    += media_graph.c media_stub.c media_policy.c
+  MAINSRC   = media_daemon.c
   PROGNAME  = mediad
   PRIORITY  = $(CONFIG_MEDIA_SERVER_PRIORITY)
   STACKSIZE = $(CONFIG_MEDIA_SERVER_STACKSIZE)

@@ -25,20 +25,34 @@
  * Included Files
  ****************************************************************************/
 
+#include <poll.h>
 #include <media_event.h>
 
 /****************************************************************************
- * Server Functions
+ * Media Functions
  ****************************************************************************/
 
-void *media_server_get_graph_(void);
-void media_server_dump_(const char *options);
+void *media_get_graph(void);
+
+/****************************************************************************
+ * Graph Functions
+ ****************************************************************************/
+
+void *media_graph_create(void *file);
+int media_graph_destroy(void *handle);
+int media_graph_get_pollfds(void *handle, struct pollfd *fds,
+                            void **cookies, int count);
+int media_graph_poll_available(void *handle, struct pollfd *fd, void *cookie);
+int media_graph_process_command(void *handle, const char *target,
+                                const char *cmd, const char *arg,
+                                char *res, int res_len);
+void media_graph_dump(void *handle, const char *options);
 
 /****************************************************************************
  * Player Functions
  ****************************************************************************/
 
-void *media_player_open_(const char *name);
+void *media_player_open_(void *graph, const char *name);
 int media_player_close_(void *handle, int pending_stop);
 int media_player_set_event_callback_(void *handle, void *cookie,
                                     media_event_callback event_cb);
@@ -61,7 +75,7 @@ int media_player_get_volume_(void *handle, float *volume);
  * Recorder Functions
  ****************************************************************************/
 
-void *media_recorder_open_(const char *name);
+void *media_recorder_open_(void *graph, const char *name);
 int media_recorder_close_(void *handle);
 int media_recorder_set_event_callback_(void *handle, void *cookie,
                                       media_event_callback event_cb);
