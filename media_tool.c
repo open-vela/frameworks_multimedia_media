@@ -198,12 +198,12 @@ static struct mediatool_cmd_s g_mediatool_cmds[] =
     {
         "send",
         mediatool_common_cmd_send,
-        "Grpph dump"
+        "Send cmd to graph"
     },
     {
         "dump",
         mediatool_server_cmd_dump,
-        "Grpph dump"
+        "Graph dump"
     },
     {
         "q",
@@ -793,12 +793,29 @@ static int mediatool_player_cmd_isplaying(struct mediatool_s *media, char *pargs
 
 static int mediatool_common_cmd_send(struct mediatool_s *media, char *pargs)
 {
-    return 0;
+    char *target;
+    char *cmd;
+    if (!strlen(pargs))
+        return -EINVAL;
+    target = pargs;
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    cmd = pargs;
+    pargs = strchr(pargs, ' ');
+    if (pargs) {
+        *pargs = 0;
+        pargs++;
+    }
+
+    return media_process_command(target, cmd, pargs, NULL, 0);
 }
 
 static int mediatool_server_cmd_dump(struct mediatool_s *media, char *pargs)
 {
-    media_server_dump((const char *)pargs);
+    media_dump(pargs);
     return 0;
 }
 
