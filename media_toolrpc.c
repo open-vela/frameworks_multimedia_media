@@ -139,7 +139,7 @@ void *media_player_open(const char *params)
     return priv;
 }
 
-int media_player_close(void *handle, int pending_stop)
+int media_player_close(void *handle)
 {
     MediaProxyPriv *priv = handle;
     int ret;
@@ -150,7 +150,7 @@ int media_player_close(void *handle, int pending_stop)
     if (priv->socket > 0)
         close(priv->socket);
 
-    ret = media_player_close_(priv->handle, pending_stop);
+    ret = media_player_close_(priv->handle);
     if (ret > 0)
         free(priv);
 

@@ -248,8 +248,15 @@ static void mediatool_event_callback(void* cookie, int event,
             __func__, chain->id, str, event, ret, __LINE__);
 }
 
-static void mediatool_common_stop_thread(struct mediatool_chain_s *chain)
+static int mediatool_common_stop_inner(struct mediatool_chain_s *chain)
 {
+    int ret = 0;
+
+    if (!chain->player)
+        ret = media_recorder_stop(chain->handle);
+
+    usleep(1000);
+
     if (chain->thread) {
 
         chain->exit = 1;
@@ -263,18 +270,6 @@ static void mediatool_common_stop_thread(struct mediatool_chain_s *chain)
         chain->buf = NULL;
         chain->fd = -1;
     }
-}
-
-static int mediatool_common_stop_inner(struct mediatool_chain_s *chain)
-{
-    int ret = 0;
-
-    if (!chain->player)
-        ret = media_recorder_stop(chain->handle);
-
-    usleep(1000);
-
-    mediatool_common_stop_thread(chain);
 
     if (chain->player)
         ret = media_player_stop(chain->handle);
@@ -374,20 +369,19 @@ static int mediatool_common_cmd_close(struct mediatool_s *media, char *pargs)
 {
     int ret;
     int id;
-    int pending_stop;
 
     if (!strlen(pargs))
         return -EINVAL;
 
-    sscanf(pargs, "%d %d", &id, &pending_stop);
+    id = atoi(pargs);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    mediatool_common_stop_thread(&media->chain[id]);
+    mediatool_common_stop_inner(&media->chain[id]);
 
     if (media->chain[id].player)
-        ret = media_player_close(media->chain[id].handle, pending_stop);
+        ret = media_player_close(media->chain[id].handle);
     else
         ret = media_recorder_close(media->chain[id].handle);
 
@@ -409,12 +403,14 @@ static int mediatool_common_cmd_reset(struct mediatool_s *media, char *pargs)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    mediatool_common_stop_thread(&media->chain[id]);
+    mediatool_common_stop_inner(&media->chain[id]);
 
     if (media->chain[id].player)
         ret = media_player_reset(media->chain[id].handle);
     else
         ret = media_recorder_reset(media->chain[id].handle);
+
+    media->chain[id].handle = NULL;
 
     return ret;
 }
