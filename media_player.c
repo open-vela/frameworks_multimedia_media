@@ -166,15 +166,18 @@ void *media_player_open_(const char *name)
     return priv;
 }
 
-int media_player_close_(void *handle)
+int media_player_close_(void *handle, int pending_stop)
 {
     MediaPlayerPriv *priv = handle;
+    char tmp[16];
     int ret;
 
     if (!priv)
         return -EINVAL;
 
-    ret = avfilter_process_command(priv->filter, "close", NULL, NULL, 0, 0);
+    snprintf(tmp, sizeof(tmp), "%d", pending_stop);
+
+    ret = avfilter_process_command(priv->filter, "close", tmp, NULL, 0, 0);
     if (ret < 0)
         return ret;
 
