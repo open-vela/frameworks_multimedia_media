@@ -21,6 +21,10 @@
 #ifndef FRAMEWORKS_MEDIA_MEDIA_INTERNAL_H
 #define FRAMEWORKS_MEDIA_MEDIA_INTERNAL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /****************************************************************************
  * Included Files
  ****************************************************************************/
@@ -87,5 +91,9 @@ int media_recorder_stop_(void *handle);
 /****************************************************************************
  * Policy Functions
  ****************************************************************************/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FRAMEWORKS_MEDIA_INTERNAL_H */
