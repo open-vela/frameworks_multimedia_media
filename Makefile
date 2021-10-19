@@ -35,6 +35,17 @@ ifneq ($(CONFIG_MEDIA_SERVER),)
   CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/ffmpeg} -DMEDIA_NO_RPC
 endif
 
+ifneq ($(CONFIG_MEDIA_POLICY),)
+  CXXEXT   := .cpp
+  CXXSRCS  += media_policy_plugin.cpp
+  CXXFLAGS += -fpermissive
+  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework}
+  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter}
+  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter/log/include}
+  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/xmlserializer}
+  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/utility}
+endif
+
 ifneq ($(CONFIG_MEDIA_TOOL),)
   MAINSRC   += media_tool.c
   CSRCS     += media_toolrpc.c
