@@ -306,7 +306,7 @@ static AVFilterContext *media_player_find(AVFilterContext *filter,
         AVFilterContext *next = filter->outputs[i]->dst;
 
         ret = media_player_find(next, name, extra);
-        if (ret < 0)
+        if (ret)
             return ret;
     }
 
@@ -456,7 +456,7 @@ int media_player_prepare_(void *handle, const char *url, const char *options)
     MediaPlayerPriv *priv = handle;
     int ret;
 
-    if (!priv)
+    if (!priv || !url)
         return -EINVAL;
 
     if (options) {
@@ -708,7 +708,7 @@ int media_recorder_prepare_(void *handle, const char *url, const char *options)
 {
     int ret;
 
-    if (!handle)
+    if (!handle || !url)
         return -EINVAL;
 
     if (options) {
