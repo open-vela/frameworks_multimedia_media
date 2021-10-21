@@ -151,7 +151,7 @@ int media_player_close(void *handle, int pending_stop)
         close(priv->socket);
 
     ret = media_player_close_(priv->handle, pending_stop);
-    if (ret > 0)
+    if (ret >= 0)
         free(priv);
 
     return ret;
@@ -342,7 +342,7 @@ int media_recorder_close(void *handle)
         close(priv->socket);
 
     ret = media_recorder_close_(priv->handle);
-    if (ret > 0)
+    if (ret >= 0)
         free(priv);
 
     return ret;
