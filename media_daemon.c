@@ -131,6 +131,9 @@ int main(int argc, char *argv[])
 
     while (1) {
         for (n = i = 0; i < ARRAY_SIZE(g_media); i++) {
+            if (!g_media[i].get)
+                continue;
+
             ret = g_media[i].get(g_media[i].handle, &priv->fds[n],
                                       &priv->ctx[n], MAX_POLLFDS - n);
             if (ret < 0) {
