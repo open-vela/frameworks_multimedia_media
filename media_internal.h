@@ -33,11 +33,51 @@ extern "C" {
 #include <media_event.h>
 
 /****************************************************************************
+ * Media Definations
+ ****************************************************************************/
+
+#define MEDIA_PROCESS_COMMAND        1
+#define MEDIA_DUMP                   2
+#define MEDIA_PLAYER_OPEN            3
+#define MEDIA_PLAYER_CLOSE           4
+#define MEDIA_PLAYER_SET_CALLBACK    5
+#define MEDIA_PLAYER_PREPARE         6
+#define MEDIA_PLAYER_RESET           7
+#define MEDIA_PLAYER_START           8
+#define MEDIA_PLAYER_STOP            9
+#define MEDIA_PLAYER_PAUSE           10
+#define MEDIA_PLAYER_SEEK            11
+#define MEDIA_PLAYER_LOOP            12
+#define MEDIA_PLAYER_ISPLAYING       13
+#define MEDIA_PLAYER_POSITION        14
+#define MEDIA_PLAYER_DURATION        15
+#define MEDIA_PLAYER_FADEIN          16
+#define MEDIA_PLAYER_FADEOUT         17
+#define MEDIA_PLAYER_SET_VOLUME      18
+#define MEDIA_PLAYER_GET_VOLUME      19
+#define MEDIA_RECORDER_OPEN          20
+#define MEDIA_RECORDER_CLOSE         21
+#define MEDIA_RECORDER_SET_CALLBACK  22
+#define MEDIA_RECORDER_PREPARE       23
+#define MEDIA_RECORDER_RESET         24
+#define MEDIA_RECORDER_START         25
+#define MEDIA_RECORDER_STOP          26
+
+/****************************************************************************
  * Media Functions
  ****************************************************************************/
 
 void *media_get_graph(void);
 void *media_get_policy(void);
+void *media_get_server(void);
+
+/****************************************************************************
+ * Stub Functions
+ ****************************************************************************/
+
+struct media_parcel;
+void media_stub_onreceive(void *cookie,
+                          struct media_parcel *in, struct media_parcel *out);
 
 /****************************************************************************
  * Graph Functions
