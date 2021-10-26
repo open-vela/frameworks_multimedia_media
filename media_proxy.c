@@ -17,3 +17,635 @@
  * under the License.
  *
  ****************************************************************************/
+
+/****************************************************************************
+ * Included Files
+ ****************************************************************************/
+
+#include <errno.h>
+#include <malloc.h>
+#include <stdio.h>
+#include <sys/un.h>
+#include <netpacket/rpmsg.h>
+#include <media_api.h>
+
+#include "media_internal.h"
+#include "media_client.h"
+
+/****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
+typedef struct MediaProxyPriv {
+    void                  *proxy;
+    uint64_t              handle;
+    int                   socket;
+    void                  *cookie;
+    media_event_callback  event;
+} MediaProxyPriv;
+
+/****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+static int media_prepare(void *handle, int32_t cmd,
+                         const char *url, const char *options)
+{
+    MediaProxyPriv *priv = handle;
+    const char *head = "listen=1:";
+    char *opt = NULL;
+    char tmp[32];
+    int32_t resp;
+    int ret;
+
+    if (!url) {
+        opt = malloc(strlen(head) + (options ? strlen(options) : 0) + 1);
+        if (!opt)
+            return -ENOMEM;
+
+        strcpy(opt, head);
+        if (options)
+            strcat(opt, options);
+
+        options = opt;
+
+#ifdef CONFIG_MEDIA_SERVER
+        snprintf(tmp, sizeof(tmp), "unix:med%llx", priv->handle);
+#else
+        snprintf(tmp, sizeof(tmp), "rpmsg:med%llx", priv->handle);
+#endif
+        url = tmp;
+    }
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%s%s", "%i",
+                                    cmd, priv->handle, url, options, &resp);
+
+    free(opt);
+    return ret < 0 ? ret : resp;
+}
+
+static ssize_t media_process_data(void *handle, bool player,
+                                  void *data, size_t len)
+{
+    MediaProxyPriv *priv = handle;
+#ifdef CONFIG_MEDIA_SERVER
+    struct sockaddr_un addr;
+#else
+    struct sockaddr_rpmsg addr;
+#endif
+    int ret;
+
+    if (!data || !len) {
+        if (priv->socket <= 0)
+            return -EINVAL;
+
+        close(priv->socket);
+        priv->socket = 0;
+        return 0;
+    }
+
+    if (priv->socket <= 0) {
+#ifdef CONFIG_MEDIA_SERVER
+        addr.sun_family = AF_UNIX;
+        snprintf(addr.sun_path, UNIX_PATH_MAX, "med%llx", priv->handle);
+        priv->socket = socket(addr.sun_family, SOCK_STREAM, 0);
+#else
+        addr.rp_family = AF_RPMSG;
+        snprintf(addr.rp_name, RPMSG_SOCKET_NAME_SIZE, "med%llx", priv->handle);
+        snprintf(addr.rp_cpu, RPMSG_SOCKET_CPU_SIZE, CONFIG_MEDIA_SERVER_CPUNAME);
+        priv->socket = socket(addr.rp_family, SOCK_STREAM, 0);
+#endif
+        if (priv->socket <= 0)
+            return -errno;
+
+        ret = connect(priv->socket, (const struct sockaddr *)&addr,
+                      sizeof(addr));
+        if (ret < 0) {
+            close(priv->socket);
+            priv->socket = 0;
+            return -errno;
+        }
+    }
+
+    if (player)
+        ret = send(priv->socket, data, len, 0);
+    else
+        ret = recv(priv->socket, data, len, 0);
+
+    return ret <= 0 ? -errno : ret;
+}
+
+static void media_proxy_event_cb(void *cookie, media_parcel *msg)
+{
+    MediaProxyPriv *priv = cookie;
+    const char *extra;
+    uint32_t event;
+    int32_t ret;
+
+    if (priv->event) {
+        media_parcel_read_scanf(msg, "%i%i%s", &event, &ret, &extra);
+        priv->event(priv->cookie, event, ret, extra);
+    }
+}
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+int media_process_command(const char *target, const char *cmd,
+                          const char *arg, char *res, int res_len)
+{
+    media_parcel in, out;
+    const char *response;
+    int32_t resp;
+    void *proxy;
+    int ret;
+
+    if (!target || !cmd)
+        return -EINVAL;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return -EINVAL;
+
+    media_parcel_init(&in);
+    media_parcel_init(&out);
+
+    ret = media_parcel_append_printf(&in, "%i%s%s%s%i", MEDIA_PROCESS_COMMAND,
+                                     target, cmd, arg, res_len);
+    if (ret < 0)
+        goto out;
+
+    ret = media_client_send_with_ack(proxy, &in, &out);
+    if (ret < 0)
+        goto out;
+
+    ret = media_parcel_read_scanf(&out, "%i%s", &resp, &response);
+    if (ret < 0)
+        goto out;
+
+    if (resp < 0)
+        goto out;
+
+    if (res_len)
+        strcpy(res, response);
+
+out:
+    media_parcel_deinit(&in);
+    media_parcel_deinit(&out);
+    media_client_disconnect(proxy);
+    return ret;
+}
+
+void media_dump(const char *options)
+{
+    media_parcel in;
+    void *proxy;
+    int ret;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return;
+
+    media_parcel_init(&in);
+
+    ret = media_parcel_append_printf(&in, "%i%s", MEDIA_DUMP, options);
+    if (ret >= 0)
+        media_client_send(proxy, &in);
+
+    media_parcel_deinit(&in);
+    media_client_disconnect(proxy);
+}
+
+void *media_player_open(const char *params)
+{
+    MediaProxyPriv *priv;
+    int ret;
+
+    priv = zalloc(sizeof(MediaProxyPriv));
+    if (!priv)
+        return NULL;
+
+    priv->proxy = media_client_connect();
+    if (!priv->proxy)
+        goto error;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%s", "%l",
+                                    MEDIA_PLAYER_OPEN, params, &priv->handle);
+    if (ret < 0 || !priv->handle)
+        goto disconnect;
+
+    return priv;
+
+disconnect:
+    media_client_disconnect(priv->proxy);
+error:
+    free(priv);
+    return NULL;
+}
+
+int media_player_close(void *handle, int pending_stop)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%i", "%i",
+                                    MEDIA_PLAYER_CLOSE, priv->handle, pending_stop, &resp);
+    if (ret < 0)
+        return ret;
+
+    if (resp < 0)
+        return resp;
+
+    ret = media_client_disconnect(priv->proxy);
+    if (ret >= 0)
+        free(priv);
+
+    return ret;
+}
+
+int media_player_set_event_callback(void *handle, void *cookie,
+                                    media_event_callback event_cb)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_set_event_cb(priv->proxy, media_proxy_event_cb, priv);
+    if (ret < 0)
+        return ret;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_PLAYER_SET_CALLBACK, priv->handle, &resp);
+
+    if (ret < 0)
+        return ret;
+
+    if (resp < 0)
+        return resp;
+
+    priv->event  = event_cb;
+    priv->cookie = cookie;
+
+    return ret;
+}
+
+int media_player_prepare(void *handle, const char *url, const char *options)
+{
+    return media_prepare(handle, MEDIA_PLAYER_PREPARE, url, options);
+}
+
+int media_player_reset(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_PLAYER_RESET, priv->handle, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+ssize_t media_player_write_data(void *handle, const void *data, size_t len)
+{
+    return media_process_data(handle, true, (void *)data, len);
+}
+
+int media_player_start(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_PLAYER_START, priv->handle, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_stop(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    if (priv->socket > 0) {
+        close(priv->socket);
+        priv->socket = 0;
+    }
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_PLAYER_STOP, priv->handle, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_pause(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_PLAYER_PAUSE, priv->handle, &resp);
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_seek(void *handle, unsigned int msec)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%i", "%i",
+                                    MEDIA_PLAYER_SEEK, priv->handle, msec, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_set_looping(void *handle, int loop)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%i", "%i",
+                                    MEDIA_PLAYER_LOOP, priv->handle, loop, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_is_playing(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t playing;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_PLAYER_ISPLAYING, priv->handle, &playing);
+    if (ret < 0)
+        return ret;
+
+    return playing;
+}
+
+int media_player_get_position(void *handle, unsigned int *msec)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv || !msec)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i%i",
+                                    MEDIA_PLAYER_POSITION, priv->handle, &resp, msec);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_get_duration(void *handle, unsigned int *msec)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv || !msec)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i%i",
+                                    MEDIA_PLAYER_DURATION, priv->handle, &resp, msec);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_set_fadein(void *handle, unsigned int msec)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%i", "%i",
+                                    MEDIA_PLAYER_FADEIN, priv->handle, msec, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_set_fadeout(void *handle, unsigned int msec)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%i", "%i",
+                                    MEDIA_PLAYER_FADEOUT, priv->handle, msec, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_set_volume(void *handle, float volume)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%f", "%i",
+                                    MEDIA_PLAYER_SET_VOLUME, priv->handle, volume, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_get_volume(void *handle, float *volume)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv || !volume)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i%f",
+                                    MEDIA_PLAYER_GET_VOLUME, priv->handle, &resp, volume);
+
+    return ret < 0 ? ret : resp;
+}
+
+void *media_recorder_open(const char *params)
+{
+    MediaProxyPriv *priv;
+    int ret;
+
+    priv = zalloc(sizeof(MediaProxyPriv));
+    if (!priv)
+        return NULL;
+
+    priv->proxy = media_client_connect();
+    if (!priv->proxy)
+        goto error;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%s", "%l",
+                                    MEDIA_RECORDER_OPEN, params, &priv->handle);
+    if (ret < 0 || !priv->handle)
+        goto disconnect;
+
+    return priv;
+
+disconnect:
+    media_client_disconnect(priv->proxy);
+error:
+    free(priv);
+    return NULL;
+}
+
+int media_recorder_close(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    if (priv->socket > 0)
+        close(priv->socket);
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_RECORDER_CLOSE, priv->handle, &resp);
+    if (ret < 0)
+        return ret;
+
+    if (resp < 0)
+        return resp;
+
+    ret = media_client_disconnect(priv->proxy);
+    if (ret >= 0)
+        free(priv);
+
+    return ret;
+}
+
+int media_recorder_set_event_callback(void *handle, void *cookie,
+                                      media_event_callback event_cb)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_set_event_cb(priv->proxy, media_proxy_event_cb, priv);
+    if (ret < 0)
+        return ret;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_RECORDER_SET_CALLBACK, priv->handle, &resp);
+    if (ret < 0)
+        return ret;
+
+    if (resp < 0)
+        return resp;
+
+    priv->event  = event_cb;
+    priv->cookie = cookie;
+
+    return ret;
+}
+
+int media_recorder_prepare(void *handle, const char *url, const char *options)
+{
+    return media_prepare(handle, MEDIA_RECORDER_PREPARE, url, options);
+}
+
+int media_recorder_reset(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_RECORDER_RESET, priv->handle, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+ssize_t media_recorder_read_data(void *handle, void *data, size_t len)
+{
+    return media_process_data(handle, false, data, len);
+}
+
+int media_recorder_start(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_RECORDER_START, priv->handle, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_recorder_stop(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    if (priv->socket > 0) {
+        close(priv->socket);
+        priv->socket = 0;
+    }
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_RECORDER_STOP, priv->handle, &resp);
+
+    return ret < 0 ? ret : resp;
+}
