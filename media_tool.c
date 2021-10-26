@@ -308,7 +308,7 @@ static int mediatool_player_cmd_open(struct mediatool_s *media, char *pargs)
     }
 
     media->chain[i].id = i;
-    media->chain[i].handle = media_player_open(0);
+    media->chain[i].handle = media_player_open(pargs);
     if (!media->chain[i].handle) {
         printf("media_player_open error\n");
         return -EINVAL;
@@ -352,7 +352,7 @@ static int mediatool_recorder_cmd_open(struct mediatool_s *media, char *pargs)
     }
 
     media->chain[i].id = i;
-    media->chain[i].handle = media_recorder_open(0);
+    media->chain[i].handle = media_recorder_open(pargs);
     if (!media->chain[i].handle) {
         printf("media_recorder_open error\n");
         return -EINVAL;
