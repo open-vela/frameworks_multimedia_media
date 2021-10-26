@@ -30,9 +30,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <media_api.h>
-
 #include "media_internal.h"
+#include "media_server.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -96,6 +95,15 @@ static MediaPoll g_media[] =
         NULL,
         media_policy_destroy,
     },
+    {
+        "media_server",
+        NULL,
+        media_stub_onreceive,
+        media_server_create,
+        media_server_get_pollfds,
+        media_server_poll_available,
+        media_server_destroy,
+    },
 };
 
 /****************************************************************************
@@ -126,6 +134,11 @@ void *media_get_graph(void)
 void *media_get_policy(void)
 {
     return media_get_handle("media_policy");
+}
+
+void *media_get_server(void)
+{
+    return media_get_handle("media_server");
 }
 
 int main(int argc, char *argv[])
@@ -174,9 +187,9 @@ int main(int argc, char *argv[])
 
             ret = g_media[priv->idx[i]].available(g_media[priv->idx[i]].handle,
                                                   &priv->fds[i], priv->ctx[i]);
-            if (ret < 0)
-                syslog(LOG_ERR, "%s, %s poll_available failed\n",
-                        __func__, g_media[priv->idx[i]].name);
+            if (ret < 0 && ret != -EAGAIN)
+                syslog(LOG_ERR, "%s, %s poll_available failed %d\n",
+                        __func__, g_media[priv->idx[i]].name, ret);
         }
     }
 

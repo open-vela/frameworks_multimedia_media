@@ -43,7 +43,7 @@ typedef struct {
     uint8_t             buf[MEDIA_PARCEL_DATA_LEN];
 } media_parcel_chunk;
 
-typedef struct {
+typedef struct media_parcel {
     media_parcel_chunk *chunk;
     media_parcel_chunk  prealloc;
     uint32_t            next;
@@ -68,7 +68,6 @@ int media_parcel_append_double(media_parcel *parcel, double val);
 int media_parcel_append_string(media_parcel *parcel, const char *str);
 int media_parcel_append_printf(media_parcel *parcel, const char *fmt, ...);
 int media_parcel_append_vprintf(media_parcel *parcel, const char *fmt, va_list *ap);
-
 
 int media_parcel_send(media_parcel *parcel, int fd, uint32_t code);
 int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset);

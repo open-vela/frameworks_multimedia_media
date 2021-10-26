@@ -21,6 +21,8 @@
 #ifndef __FRAMEWORKS_MEDIA_MEDIA_SERVER_H__
 #define __FRAMEWORKS_MEDIA_MEDIA_SERVER_H__
 
+#include <poll.h>
+
 #include "media_parcel.h"
 
 #ifdef __cplusplus
