@@ -47,7 +47,7 @@ if MEDIA_TOOL
 
 config MEDIA_TOOL_STACKSIZE
 	int "Media tool stack size"
-	default DEFAULT_TASK_STACKSIZE
+	default 16384
 
 config MEDIA_TOOL_PRIORITY
 	int "Media tool priority"
