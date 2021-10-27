@@ -35,10 +35,6 @@ config MEDIA_SERVER_CPUNAME
 	depends on !MEDIA_SERVER
 	default "audio"
 
-config MEDIA_POLICY
-	bool "Media policy"
-	default n
-
 config MEDIA_TOOL
 	bool "Media tool"
 	default n

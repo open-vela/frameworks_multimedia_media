@@ -33,9 +33,8 @@ ifneq ($(CONFIG_MEDIA_SERVER),)
   STACKSIZE = $(CONFIG_MEDIA_SERVER_STACKSIZE)
 
   CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/ffmpeg} -DMEDIA_NO_RPC
-endif
+  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework}
 
-ifneq ($(CONFIG_MEDIA_POLICY),)
   CXXEXT   := .cpp
   CXXSRCS  += media_policy_plugin.cpp
   CXXFLAGS += -fpermissive

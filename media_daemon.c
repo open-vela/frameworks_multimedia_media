@@ -83,6 +83,19 @@ static MediaPoll g_media[] =
         media_graph_poll_available,
         media_graph_destroy,
     },
+    {
+        "media_policy",
+        NULL,
+        (const char* [])
+        {
+            CONFIG_MEDIA_SERVER_CONFIG_PATH"configurations.xml",
+            CONFIG_MEDIA_SERVER_CONFIG_PATH"criteria.txt"
+        },
+        media_policy_create,
+        NULL,
+        NULL,
+        media_policy_destroy,
+    }
 };
 
 /****************************************************************************
@@ -108,6 +121,11 @@ static void *media_get_handle(const char *name)
 void *media_get_graph(void)
 {
     return media_get_handle("media_graph");
+}
+
+void *media_get_policy(void)
+{
+    return media_get_handle("media_policy");
 }
 
 int main(int argc, char *argv[])
