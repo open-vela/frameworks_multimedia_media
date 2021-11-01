@@ -20,6 +20,10 @@ config MEDIA_SERVER_CONFIG_PATH
 	string "Media server configure file path"
 	default "/etc/media/"
 
+config MEDIA_SERVER_PROGNAME
+	string "Media server name"
+	default "mediad"
+
 config MEDIA_SERVER_STACKSIZE
 	int "Media server stack size"
 	default 81920
