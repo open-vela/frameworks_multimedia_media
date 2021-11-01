@@ -39,6 +39,7 @@
 typedef struct MediaProxyPriv {
     void                  *proxy;
     uint64_t              handle;
+    int                   refs;
     int                   socket;
     void                  *cookie;
     media_event_callback  event;
@@ -81,16 +82,12 @@ static ssize_t media_process_data(void *handle, bool player,
 #else
     struct sockaddr_rpmsg addr;
 #endif
-    int ret;
+    int ret = -EINVAL;
 
-    if (!data || !len) {
-        if (priv->socket <= 0)
-            return -EINVAL;
+    if (!handle || !data || !len)
+        return ret;
 
-        close(priv->socket);
-        priv->socket = 0;
-        return 0;
-    }
+    priv->refs++;
 
     if (priv->socket <= 0) {
 #ifdef CONFIG_MEDIA_SERVER
@@ -104,23 +101,38 @@ static ssize_t media_process_data(void *handle, bool player,
         priv->socket = socket(addr.rp_family, SOCK_STREAM, 0);
 #endif
         if (priv->socket <= 0)
-            return -errno;
+            goto out;
 
         ret = connect(priv->socket, (const struct sockaddr *)&addr,
                       sizeof(addr));
-        if (ret < 0) {
-            close(priv->socket);
-            priv->socket = 0;
-            return -errno;
-        }
+        if (ret < 0)
+            goto out;
     }
 
-    if (player)
+    if (player) {
         ret = send(priv->socket, data, len, 0);
-    else
+        if (ret >= 0 && ret < len) {
+            errno = ECONNRESET;
+            ret = 0;
+        }
+    } else {
         ret = recv(priv->socket, data, len, 0);
+        if (ret == 0)
+            errno = ECONNRESET;
+    }
 
-    return ret <= 0 ? -errno : ret;
+out:
+    if (ret <= 0 && priv->socket > 0) {
+        close(priv->socket);
+        priv->socket = 0;
+
+        ret = -errno;
+    }
+
+    if (!--priv->refs)
+        free(priv);
+
+    return ret;
 }
 
 static void media_proxy_event_cb(void *cookie, media_parcel *msg)
@@ -223,6 +235,7 @@ void *media_player_open(const char *params)
     if (ret < 0 || !priv->handle)
         goto disconnect;
 
+    priv->refs = 1;
     return priv;
 
 disconnect:
@@ -250,8 +263,15 @@ int media_player_close(void *handle, int pending_stop)
         return resp;
 
     ret = media_client_disconnect(priv->proxy);
-    if (ret >= 0)
+    if (ret < 0)
+        return ret;
+
+    if (!--priv->refs) {
+        if (priv->socket)
+            close(priv->socket);
+
         free(priv);
+    }
 
     return ret;
 }
@@ -334,7 +354,7 @@ int media_player_stop(void *handle)
     if (!priv)
         return -EINVAL;
 
-    if (priv->socket > 0) {
+    if (priv->refs == 1 && priv->socket) {
         close(priv->socket);
         priv->socket = 0;
     }
@@ -514,6 +534,7 @@ void *media_recorder_open(const char *params)
     if (ret < 0 || !priv->handle)
         goto disconnect;
 
+    priv->refs = 1;
     return priv;
 
 disconnect:
@@ -532,9 +553,6 @@ int media_recorder_close(void *handle)
     if (!priv)
         return -EINVAL;
 
-    if (priv->socket > 0)
-        close(priv->socket);
-
     ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
                                     MEDIA_RECORDER_CLOSE, priv->handle, &resp);
     if (ret < 0)
@@ -544,8 +562,15 @@ int media_recorder_close(void *handle)
         return resp;
 
     ret = media_client_disconnect(priv->proxy);
-    if (ret >= 0)
+    if (ret < 0)
+        return ret;
+
+    if (!--priv->refs) {
+        if (priv->socket)
+            close(priv->socket);
+
         free(priv);
+    }
 
     return ret;
 }
@@ -627,7 +652,7 @@ int media_recorder_stop(void *handle)
     if (!priv)
         return -EINVAL;
 
-    if (priv->socket > 0) {
+    if (priv->refs == 1 && priv->socket) {
         close(priv->socket);
         priv->socket = 0;
     }
