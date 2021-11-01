@@ -319,13 +319,12 @@ static int mediatool_common_stop_inner(struct mediatool_chain_s *chain)
 
     if (!chain->player)
         ret = media_recorder_stop(chain->handle);
+    else
+        ret = media_player_stop(chain->handle);
 
     usleep(1000);
 
     mediatool_common_stop_thread(chain);
-
-    if (chain->player)
-        ret = media_player_stop(chain->handle);
 
     return ret;
 }
@@ -432,12 +431,12 @@ static int mediatool_common_cmd_close(struct mediatool_s *media, char *pargs)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    mediatool_common_stop_thread(&media->chain[id]);
-
     if (media->chain[id].player)
         ret = media_player_close(media->chain[id].handle, pending_stop);
     else
         ret = media_recorder_close(media->chain[id].handle);
+
+    mediatool_common_stop_thread(&media->chain[id]);
 
     media->chain[id].handle = NULL;
 
@@ -457,12 +456,12 @@ static int mediatool_common_cmd_reset(struct mediatool_s *media, char *pargs)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    mediatool_common_stop_thread(&media->chain[id]);
-
     if (media->chain[id].player)
         ret = media_player_reset(media->chain[id].handle);
     else
         ret = media_recorder_reset(media->chain[id].handle);
+
+    mediatool_common_stop_thread(&media->chain[id]);
 
     return ret;
 }
@@ -480,10 +479,8 @@ static void *mediatool_common_thread(void *arg)
         while (!chain->exit) {
             act = read(chain->fd, chain->buf, chain->size);
             assert(act >= 0);
-            if (act == 0) {
-                media_player_write_data(chain->handle, 0, 0);
+            if (act == 0)
                 break;
-            }
 
             tmp = chain->buf;
             while (!chain->exit && act > 0) {
@@ -512,7 +509,8 @@ static void *mediatool_common_thread(void *arg)
                 continue;
             }
 
-            assert(ret > 0);
+            if (ret <= 0)
+                goto out;
 
             act = write(chain->fd, chain->buf, ret);
             assert(act == ret);
