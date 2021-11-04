@@ -25,6 +25,11 @@ ifneq ($(CONFIG_MEDIA),)
 MODULE = $(CONFIG_MEDIA_SERVER)
 CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c
 
+ifneq ($(CONFIG_MEDIA_FOCUS),)
+  CSRCS  += media_focus.c
+  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/frameworks/utils/include}
+endif
+
 ifneq ($(CONFIG_MEDIA_SERVER),)
   CSRCS    += media_graph.c media_stub.c media_server.c media_policy.c
   MAINSRC   = media_daemon.c
