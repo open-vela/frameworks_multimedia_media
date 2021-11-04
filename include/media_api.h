@@ -26,9 +26,10 @@
  ****************************************************************************/
 
 #include <media_event.h>
+#include <media_focus.h>
 #include <media_player.h>
-#include <media_recorder.h>
 #include <media_policy.h>
+#include <media_recorder.h>
 
 #ifdef __cplusplus
 #define EXTERN extern "C"
