@@ -65,7 +65,6 @@ static int media_server_create_notify(struct media_server_priv *priv, media_parc
     struct sockaddr_un local_addr;
     struct sockaddr_rpmsg rpmsg_addr;
     struct sockaddr *addr;
-    struct pollfd pfd;
     const char *key;
     const char *rp_cpu;
     int fd;
@@ -313,13 +312,13 @@ int media_server_poll_available(void *handle, struct pollfd *fd, void *conn)
         return media_server_accept(handle, fd);
 }
 
-int media_server_notify(void *handle, void *conn, media_parcel *parcel)
+int media_server_notify(void *handle, void *cookie, media_parcel *parcel)
 {
     struct media_server_priv *priv = handle;
-    struct media_server_conn *_conn = conn;
+    struct media_server_conn *conn = cookie;
 
-    if (priv == NULL || _conn == NULL || _conn->notify_fd <= 0)
+    if (priv == NULL || conn == NULL || conn->notify_fd <= 0)
         return -EINVAL;
 
-    return media_parcel_send(parcel, _conn->notify_fd, MEDIA_PARCEL_NOTIFY);
+    return media_parcel_send(parcel, conn->notify_fd, MEDIA_PARCEL_NOTIFY);
 }
