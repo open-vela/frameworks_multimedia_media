@@ -264,11 +264,28 @@ int media_graph_process_command(void *handle, const char *target,
                                 char *res, int res_len)
 {
     MediaGraphPriv *priv = handle;
+    int i, ret = 0;
 
     if (!priv || !priv->graph)
         return -EINVAL;
 
-    return avfilter_graph_send_command(priv->graph, target, cmd, arg, res, res_len, 0);
+    for (i = 0; i < priv->graph->nb_filters; i++) {
+        AVFilterContext *filter = priv->graph->filters[i];
+
+        if (!strcmp(target, filter->name))
+            ret = avfilter_process_command(filter, cmd, arg, res, res_len, 0);
+        else {
+            const char *tmp = strchr(filter->name, '@');
+
+            if (tmp && !strncmp(tmp + 1, target, strlen(target)))
+                ret = avfilter_process_command(filter, cmd, arg, res, res_len, 0);
+        }
+
+        if (ret < 0)
+            return ret;
+    }
+
+    return 0;
 }
 
 void media_graph_dump(void *handle, const char *options)
@@ -387,7 +404,8 @@ void *media_player_open_(void *graph, const char *name)
         filter = media->graph->filters[i];
 
         if (!filter->opaque && !strcmp(filter->filter->name, "amovie_async")) {
-            if (!name || !strcmp(filter->name, name))
+            if (!name || !strcmp(filter->name, name) ||
+                !strncmp(filter->name + strlen("amovie_async@"), name, strlen(name)))
                 break;
         }
     }
@@ -657,7 +675,8 @@ void *media_recorder_open_(void *graph, const char *name)
         filter = media->graph->filters[i];
 
         if (!filter->opaque && !strcmp(filter->filter->name, "amoviesink_async")) {
-            if (!name || !strcmp(filter->name, name))
+            if (!name || !strcmp(filter->name, name) ||
+                !strncmp(filter->name + strlen("amoviesink_async@"), name, strlen(name)))
                 break;
         }
     }
