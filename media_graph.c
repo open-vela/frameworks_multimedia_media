@@ -57,6 +57,7 @@ typedef struct MediaGraphPriv {
 
 typedef struct MediaPlayerPriv {
     AVFilterContext *filter;
+    char            *name;
     float           volume;
 } MediaPlayerPriv;
 
@@ -417,8 +418,15 @@ void *media_player_open_(void *graph, const char *name)
     if (!priv)
         return NULL;
 
+    priv->name = strdup(name);
+    if (!priv->name) {
+        free(priv);
+        return NULL;
+    }
+
     ret = avfilter_process_command(filter, "open", NULL, NULL, 0, 0);
     if (ret < 0) {
+        free(priv->name);
         free(priv);
         return NULL;
     }
@@ -449,6 +457,7 @@ int media_player_close_(void *handle, int pending_stop)
         return ret;
 
     priv->filter->opaque = NULL;
+    free(priv->name);
     free(priv);
 
     return 0;
@@ -499,21 +508,31 @@ int media_player_reset_(void *handle)
 int media_player_start_(void *handle)
 {
     MediaPlayerPriv *priv = handle;
+    int ret;
 
     if (!priv)
         return -EINVAL;
 
-    return avfilter_process_command(priv->filter, "start", NULL, NULL, 0, 0);
+    ret = avfilter_process_command(priv->filter, "start", NULL, NULL, 0, 0);
+    if (ret < 0)
+        return ret;
+
+    return media_policy_increase_(priv->name, true);
 }
 
 int media_player_stop_(void *handle)
 {
     MediaPlayerPriv *priv = handle;
+    int ret;
 
     if (!priv)
         return -EINVAL;
 
-    return avfilter_process_command(priv->filter, "stop", NULL, NULL, 0, 0);
+    ret = avfilter_process_command(priv->filter, "stop", NULL, NULL, 0, 0);
+    if (ret < 0)
+        return ret;
+
+    return media_policy_decrease_(priv->name, true);
 }
 
 int media_player_pause_(void *handle)
