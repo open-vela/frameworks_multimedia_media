@@ -193,14 +193,19 @@ err_parse:
  * Public Functions for RPC
  ****************************************************************************/
 
-int media_policy_set_int_(const char *name, int value)
+int media_policy_set_int_(const char *name, int value, int apply)
 {
     MediaPolicyPriv *priv = media_get_policy();
 
     if (!priv || !priv->pfw || !name)
         return -EINVAL;
 
-    return pfwSetCriterion(priv->pfw, name, value) ? 0 : -EINVAL;
+    if (!pfwSetCriterion(priv->pfw, name, value))
+        return -EINVAL;
+    if (apply && !pfwApplyConfigurations(priv->pfw))
+        return -EINVAL;
+
+    return 0;
 }
 
 int media_policy_get_int_(const char *name, int *value)
@@ -213,14 +218,19 @@ int media_policy_get_int_(const char *name, int *value)
     return pfwGetCriterion(priv->pfw, name, value) ? 0 : -EINVAL;
 }
 
-int media_policy_set_string_(const char *name, const char *value)
+int media_policy_set_string_(const char *name, const char *value, int apply)
 {
     MediaPolicyPriv *priv = media_get_policy();
 
     if (!priv || !priv->pfw || !name)
         return -EINVAL;
 
-    return pfwSetStringCriterion(priv->pfw, name, value) ? 0 : -EINVAL;
+    if (!pfwSetStringCriterion(priv->pfw, name, value))
+        return -EINVAL;
+    if (apply && !pfwApplyConfigurations(priv->pfw))
+        return -EINVAL;
+
+    return 0;
 }
 
 int media_policy_get_string_(const char *name, char *value, size_t len)
@@ -233,7 +243,7 @@ int media_policy_get_string_(const char *name, char *value, size_t len)
     return pfwGetStringCriterion(priv->pfw, name, value, len) ? 0 : -EINVAL;
 }
 
-int media_policy_increase_(const char *name)
+int media_policy_increase_(const char *name, int apply)
 {
     MediaPolicyPriv *priv = media_get_policy();
     int value;
@@ -245,11 +255,13 @@ int media_policy_increase_(const char *name)
         return -EINVAL;
     if (!pfwSetCriterion(priv->pfw, name, value + 1))
         return -EINVAL;
+    if (apply && !pfwApplyConfigurations(priv->pfw))
+        return -EINVAL;
 
     return 0;
 }
 
-int media_policy_decrease_(const char *name)
+int media_policy_decrease_(const char *name, int apply)
 {
     MediaPolicyPriv *priv = media_get_policy();
     int value;
@@ -261,18 +273,10 @@ int media_policy_decrease_(const char *name)
         return -EINVAL;
     if (!pfwSetCriterion(priv->pfw, name, value - 1))
         return -EINVAL;
-
-    return 0;
-}
-
-int media_policy_apply_(void)
-{
-    MediaPolicyPriv *priv = media_get_policy();
-
-    if (!priv || !priv->pfw)
+    if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
 
-    return pfwApplyConfigurations(priv->pfw) ? 0 : -EINVAL;
+    return 0;
 }
 
 /****************************************************************************

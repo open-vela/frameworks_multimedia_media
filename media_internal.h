@@ -95,13 +95,12 @@ int media_recorder_stop_(void *handle);
 
 void *media_policy_create(void *file);
 int media_policy_destroy(void *handle);
-int media_policy_set_int_(const char *name, int value);
+int media_policy_set_int_(const char *name, int value, int apply);
 int media_policy_get_int_(const char *name, int *value);
-int media_policy_set_string_(const char *name, const char *value);
+int media_policy_set_string_(const char *name, const char *value, int apply);
 int media_policy_get_string_(const char *name, char *value, size_t len);
-int media_policy_increase_(const char *name);
-int media_policy_decrease_(const char *name);
-int media_policy_apply_(void);
+int media_policy_increase_(const char *name, int apply);
+int media_policy_decrease_(const char *name, int apply);
 
 #ifdef __cplusplus
 }
