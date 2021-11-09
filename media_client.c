@@ -225,3 +225,32 @@ int media_client_set_event_cb(void *handle, void *event_cb, void *cookie)
         return 0;
     return pthread_create(&priv->thread, NULL, media_client_listen_thread, (pthread_addr_t)priv);
 }
+
+int media_client_send_recieve(void *handle, const char *in_fmt, const char *out_fmt, ...)
+{
+    media_parcel in, out;
+    va_list ap;
+    int ret;
+
+    media_parcel_init(&in);
+    media_parcel_init(&out);
+
+    va_start(ap, out_fmt);
+    ret = media_parcel_append_vprintf(&in, in_fmt, &ap);
+    if (ret < 0)
+        goto out;
+
+    ret = media_client_send_with_ack(handle, &in, &out);
+    if (ret < 0)
+        goto out;
+
+    ret = media_parcel_read_vscanf(&out, out_fmt, &ap);
+
+out:
+    media_parcel_deinit(&in);
+    media_parcel_deinit(&out);
+
+    va_end(ap);
+    return ret;
+
+}
