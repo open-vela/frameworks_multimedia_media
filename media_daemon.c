@@ -83,7 +83,6 @@ static MediaPoll g_media[] =
         media_graph_poll_available,
         media_graph_destroy,
     },
-#ifdef CONFIG_PFW
     {
         "media_policy",
         NULL,
@@ -96,8 +95,7 @@ static MediaPoll g_media[] =
         NULL,
         NULL,
         media_policy_destroy,
-    }
-#endif
+    },
 };
 
 /****************************************************************************
