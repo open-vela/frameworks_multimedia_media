@@ -26,19 +26,17 @@ MODULE = $(CONFIG_MEDIA_SERVER)
 CSRCS += media_proxy.c media_parcel.c media_client.c
 
 ifneq ($(CONFIG_MEDIA_SERVER),)
-  CSRCS    += media_graph.c media_stub.c media_server.c
+  CSRCS    += media_graph.c media_stub.c media_server.c media_policy.c
   MAINSRC   = media_daemon.c
   PROGNAME  = $(CONFIG_MEDIA_SERVER_PROGNAME)
   PRIORITY  = $(CONFIG_MEDIA_SERVER_PRIORITY)
   STACKSIZE = $(CONFIG_MEDIA_SERVER_STACKSIZE)
 
   CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/ffmpeg} -DMEDIA_NO_RPC
+  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework}
 endif
 
 ifneq ($(CONFIG_PFW),)
-  CSRCS    += media_policy.c
-  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework}
-
   CXXEXT   := .cpp
   CXXSRCS  += media_policy_plugin.cpp
   CXXFLAGS += -fpermissive

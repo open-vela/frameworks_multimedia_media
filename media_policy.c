@@ -30,6 +30,8 @@
 
 #include "media_internal.h"
 
+#ifdef CONFIG_PFW
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
@@ -322,3 +324,51 @@ err:
     media_policy_destroy(priv);
     return NULL;
 }
+
+#else // CONFIG_PFW
+
+/****************************************************************************
+ * Dummy Public Functions
+ ****************************************************************************/
+
+void *media_policy_create(void *file)
+{
+    return (void *)1;
+}
+
+int media_policy_destroy(void *handle)
+{
+    return 0;
+}
+
+int media_policy_set_int_(const char *name, int value, int apply)
+{
+    return 0;
+}
+
+int media_policy_get_int_(const char *name, int *value)
+{
+    return 0;
+}
+
+int media_policy_set_string_(const char *name, const char *value, int apply)
+{
+    return 0;
+}
+
+int media_policy_get_string_(const char *name, char *value, size_t len)
+{
+    return 0;
+}
+
+int media_policy_increase_(const char *name, int apply)
+{
+    return 0;
+}
+
+int media_policy_decrease_(const char *name, int apply)
+{
+    return 0;
+}
+
+#endif
