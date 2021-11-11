@@ -419,7 +419,7 @@ void *media_player_open_(void *graph, const char *name)
         return NULL;
 
     priv->name = strdup(name);
-    if (!priv->name) {
+    if (name && !priv->name) {
         free(priv);
         return NULL;
     }
