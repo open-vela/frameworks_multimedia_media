@@ -52,27 +52,16 @@ static int media_prepare(void *handle, int32_t cmd,
                          const char *url, const char *options)
 {
     MediaProxyPriv *priv = handle;
-    const char *head = "listen=1:";
-    char *opt = NULL;
-    char tmp[32];
+    const char *opts = "listen=1";
+    char tmp[64];
     int32_t resp;
     int ret;
 
     if (!url) {
-        opt = malloc(strlen(head) + (options ? strlen(options) : 0) + 1);
-        if (!opt)
-            return -ENOMEM;
-
-        strcpy(opt, head);
-        if (options)
-            strcat(opt, options);
-
-        options = opt;
-
 #ifdef CONFIG_MEDIA_SERVER
-        snprintf(tmp, sizeof(tmp), "unix:med%llx", priv->handle);
+        snprintf(tmp, sizeof(tmp), "unix:med%llx?%s", priv->handle, opts);
 #else
-        snprintf(tmp, sizeof(tmp), "rpmsg:med%llx", priv->handle);
+        snprintf(tmp, sizeof(tmp), "rpmsg:med%llx?%s", priv->handle, opts);
 #endif
         url = tmp;
     }
@@ -80,7 +69,6 @@ static int media_prepare(void *handle, int32_t cmd,
     ret = media_client_send_recieve(priv->proxy, "%i%l%s%s", "%i",
                                     cmd, priv->handle, url, options, &resp);
 
-    free(opt);
     return ret < 0 ? ret : resp;
 }
 
