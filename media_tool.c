@@ -91,6 +91,14 @@ static int mediatool_player_cmd_fadein(struct mediatool_s *media, char *pargs);
 static int mediatool_player_cmd_fadeout(struct mediatool_s *media, char *pargs);
 static int mediatool_common_cmd_send(struct mediatool_s *media, char *pargs);
 static int mediatool_server_cmd_dump(struct mediatool_s *media, char *pargs);
+static int mediatool_policy_cmd_setint(struct mediatool_s *media, char *pargs);
+static int mediatool_policy_cmd_getint(struct mediatool_s *media, char *pargs);
+static int mediatool_policy_cmd_setstring(struct mediatool_s *media, char *pargs);
+static int mediatool_policy_cmd_getstring(struct mediatool_s *media, char *pargs);
+static int mediatool_policy_cmd_include(struct mediatool_s *media, char *pargs);
+static int mediatool_policy_cmd_exclude(struct mediatool_s *media, char *pargs);
+static int mediatool_policy_cmd_increase(struct mediatool_s *media, char *pargs);
+static int mediatool_policy_cmd_decrease(struct mediatool_s *media, char *pargs);
 static int mediatool_common_cmd_quit(struct mediatool_s *media, char *pargs);
 static int mediatool_common_cmd_help(struct mediatool_s *media, char *pargs);
 
@@ -204,6 +212,46 @@ static struct mediatool_cmd_s g_mediatool_cmds[] =
         "dump",
         mediatool_server_cmd_dump,
         "Graph dump"
+    },
+    {
+        "setint",
+        mediatool_policy_cmd_setint,
+        "set criterion value with integer"
+    },
+    {
+        "getint",
+        mediatool_policy_cmd_getint,
+        "get criterion value in integer"
+    },
+    {
+        "setstring",
+        mediatool_policy_cmd_setstring,
+        "set criterion value with string"
+    },
+    {
+        "getstring",
+        mediatool_policy_cmd_getstring,
+        "get criterion value in string"
+    },
+    {
+        "include",
+        mediatool_policy_cmd_include,
+        "include inclusive criterion values"
+    },
+    {
+        "exclude",
+        mediatool_policy_cmd_exclude,
+        "exclude inclusive criterion values"
+    },
+    {
+        "increase",
+        mediatool_policy_cmd_increase,
+        "increase criterion value by one"
+    },
+    {
+        "decrease",
+        mediatool_policy_cmd_decrease,
+        "decrease criterion value by one"
     },
     {
         "q",
@@ -817,6 +865,190 @@ static int mediatool_server_cmd_dump(struct mediatool_s *media, char *pargs)
 {
     media_dump(pargs);
     return 0;
+}
+
+static int mediatool_policy_cmd_setint(struct mediatool_s *media, char *pargs)
+{
+    char *name;
+    char *value;
+    char *apply;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+    name = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    value = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    apply = pargs;
+
+    return media_policy_set_int(name, atoi(value), atoi(apply));
+}
+
+static int mediatool_policy_cmd_getint(struct mediatool_s *media, char *pargs)
+{
+    char *name;
+    int value;
+    int ret;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+    name = pargs;
+
+    ret = media_policy_get_int(name, &value);
+    if (ret < 0)
+        return -EINVAL;
+
+    printf("get criterion %s integer value = %d\n", name, value);
+
+    return 0;
+}
+
+static int mediatool_policy_cmd_setstring(struct mediatool_s *media, char *pargs)
+{
+    char *name;
+    char *value;
+    char *apply;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+    name = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    value = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    apply = pargs;
+
+    return media_policy_set_string(name, value, atoi(apply));
+}
+
+static int mediatool_policy_cmd_getstring(struct mediatool_s *media, char *pargs)
+{
+    char *name;
+    char value[64];
+    int ret;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+    name = pargs;
+
+    ret = media_policy_get_string(name, value, sizeof(value));
+    if (ret < 0)
+        return -EINVAL;
+
+    printf("get criterion %s string value = '%s'\n", name, value);
+
+    return 0;
+}
+
+static int mediatool_policy_cmd_include(struct mediatool_s *media, char *pargs)
+{
+    char *name;
+    char *values;
+    char *apply;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+    name = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    values = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    apply = pargs;
+
+    return media_policy_include(name, values, atoi(apply));
+}
+
+static int mediatool_policy_cmd_exclude(struct mediatool_s *media, char *pargs)
+{
+    char *name;
+    char *values;
+    char *apply;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+    name = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    values = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    apply = pargs;
+
+    return media_policy_exclude(name, values, atoi(apply));
+}
+
+static int mediatool_policy_cmd_increase(struct mediatool_s *media, char *pargs)
+{
+    char *name;
+    char *apply;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+    name = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    apply = pargs;
+
+    return media_policy_increase(name, atoi(apply));
+}
+
+static int mediatool_policy_cmd_decrease(struct mediatool_s *media, char *pargs)
+{
+    char *name;
+    char *apply;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+    name = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    apply = pargs;
+
+    return media_policy_decrease(name, atoi(apply));
 }
 
 static int mediatool_common_cmd_quit(struct mediatool_s *media, char *pargs)

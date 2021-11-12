@@ -649,3 +649,176 @@ int media_recorder_stop(void *handle)
 
     return ret < 0 ? ret : resp;
 }
+
+int media_policy_set_int(const char *name, int value, int apply)
+{
+    int32_t resp;
+    void *proxy;
+    int ret;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(proxy, "%i%s%i%i", "%i", MEDIA_POLICY_SET_INT,
+                                    name, value, apply, &resp);
+
+    media_client_disconnect(proxy);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_policy_get_int(const char *name, int *value)
+{
+    int32_t resp;
+    void *proxy;
+    int ret;
+
+    if (!value)
+        return -EINVAL;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(proxy, "%i%s", "%i%i", MEDIA_POLICY_GET_INT,
+                                    name, &resp, value);
+
+    media_client_disconnect(proxy);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_policy_set_string(const char *name, const char *value, int apply)
+{
+    int32_t resp;
+    void *proxy;
+    int ret;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(proxy, "%i%s%s%i", "%i", MEDIA_POLICY_SET_STRING,
+                                    name, value, apply, &resp);
+
+    media_client_disconnect(proxy);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_policy_get_string(const char *name, char *value, int len)
+{
+    media_parcel in, out;
+    const char *response;
+    int32_t resp;
+    void *proxy;
+    int ret;
+
+    if (!value)
+        return -EINVAL;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return -EINVAL;
+
+    media_parcel_init(&in);
+    media_parcel_init(&out);
+
+    ret = media_parcel_append_printf(&in, "%i%s%i", MEDIA_POLICY_GET_STRING,
+                                     name, len);
+    if (ret < 0)
+        goto out;
+
+    ret = media_client_send_with_ack(proxy, &in, &out);
+    if (ret < 0)
+        goto out;
+
+    ret = media_parcel_read_scanf(&out, "%i%s", &resp, &response);
+    if (ret < 0)
+        goto out;
+
+    if (resp < 0)
+        goto out;
+
+    if (len)
+        strcpy(value, response);
+
+out:
+    media_parcel_deinit(&in);
+    media_parcel_deinit(&out);
+    media_client_disconnect(proxy);
+    return ret;
+}
+
+int media_policy_include(const char *name, const char *values, int apply)
+{
+    int32_t resp;
+    void *proxy;
+    int ret;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(proxy, "%i%s%s%i", "%i", MEDIA_POLICY_INCLUDE,
+                                    name, values, apply, &resp);
+
+    media_client_disconnect(proxy);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_policy_exclude(const char *name, const char *values, int apply)
+{
+    int32_t resp;
+    void *proxy;
+    int ret;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(proxy, "%i%s%s%i", "%i", MEDIA_POLICY_EXCLUDE,
+                                    name, values, apply, &resp);
+
+    media_client_disconnect(proxy);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_policy_increase(const char *name, int apply)
+{
+    int32_t resp;
+    void *proxy;
+    int ret;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(proxy, "%i%s%i", "%i", MEDIA_POLICY_INCREASE,
+                                    name, apply, &resp);
+
+    media_client_disconnect(proxy);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_policy_decrease(const char *name, int apply)
+{
+    int32_t resp;
+    void *proxy;
+    int ret;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(proxy, "%i%s%i", "%i", MEDIA_POLICY_DECREASE,
+                                    name, apply, &resp);
+
+    media_client_disconnect(proxy);
+
+    return ret < 0 ? ret : resp;
+}

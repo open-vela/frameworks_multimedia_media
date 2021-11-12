@@ -417,4 +417,45 @@ void media_dump(const char *options)
     media_graph_dump(media_get_graph(), options);
 }
 
+
+int media_policy_set_int(const char *name, int value, int apply)
+{
+    return media_policy_set_int_(name, value, apply);
+}
+
+int media_policy_get_int(const char *name, int *value)
+{
+    return media_policy_get_int_(name, value);
+}
+
+int media_policy_set_string(const char *name, const char *value, int apply)
+{
+    return media_policy_set_string_(name, value, apply);
+}
+
+int media_policy_get_string(const char *name, char *value, int len)
+{
+    return media_policy_get_string_(name, value, len);
+}
+
+int media_policy_include(const char *name, const char *values, int apply)
+{
+    return media_policy_include_(name, values, apply);
+}
+
+int media_policy_exclude(const char *name, const char *values, int apply)
+{
+    return media_policy_exclude_(name, values, apply);
+}
+
+int media_policy_increase(const char *name, int apply)
+{
+    return media_policy_increase_(name, apply);
+}
+
+int media_policy_decrease(const char *name, int apply)
+{
+    return media_policy_decrease_(name, apply);
+}
+
 #endif /* MEDIA_NO_RPC */
