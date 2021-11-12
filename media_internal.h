@@ -139,6 +139,8 @@ int media_policy_set_int_(const char *name, int value, int apply);
 int media_policy_get_int_(const char *name, int *value);
 int media_policy_set_string_(const char *name, const char *value, int apply);
 int media_policy_get_string_(const char *name, char *value, size_t len);
+int media_policy_include_(const char *name, const char *values, int apply);
+int media_policy_exclude_(const char *name, const char *values, int apply);
 int media_policy_increase_(const char *name, int apply);
 int media_policy_decrease_(const char *name, int apply);
 
