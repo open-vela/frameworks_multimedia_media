@@ -51,7 +51,7 @@ static void media_stub_event_cb(void *cookie, int event,
 void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
 {
     const char *param_s1 = NULL, *param_s2 = NULL, *param_s3 = NULL;
-    int32_t cmd = 0, param_i32 = 0, ret;
+    int32_t cmd = 0, param_i32 = 0, param_i32_1 = 0, ret;
     uint32_t param_u32 = 0;
     char *response = NULL;
     float param_flt = 0.0;
@@ -225,6 +225,63 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
         case MEDIA_RECORDER_RESET:
             media_parcel_read_scanf(in, "%l", &handle);
             ret = media_recorder_reset_((void *)(uintptr_t)handle);
+            media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_POLICY_SET_INT:
+            media_parcel_read_scanf(in, "%s%i%i", &param_s1, &param_i32, &param_i32_1);
+            ret = media_policy_set_int_(param_s1, param_i32, param_i32_1);
+            media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_POLICY_GET_INT:
+            media_parcel_read_scanf(in, "%s", &param_s1);
+            ret = media_policy_get_int_(param_s1, &param_i32);
+            media_parcel_append_printf(out, "%i%i", ret, param_i32);
+            break;
+
+        case MEDIA_POLICY_SET_STRING:
+            media_parcel_read_scanf(in, "%s%s%i", &param_s1, &param_s2, &param_i32);
+            ret = media_policy_set_string_(param_s1, param_s2, param_i32);
+            media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_POLICY_GET_STRING:
+            media_parcel_read_scanf(in, "%s%i", &param_s1, &param_i32);
+            if (param_i32 > 0) {
+                response = zalloc(param_i32);
+                if (!response) {
+                    media_parcel_append_int32(out, -ENOMEM);
+                    break;
+                }
+            }
+
+            ret = media_policy_get_string_(param_s1, response, param_i32);
+            media_parcel_append_printf(out, "%i%s", ret, response);
+            free(response);
+            break;
+
+        case MEDIA_POLICY_INCLUDE:
+            media_parcel_read_scanf(in, "%s%s%i", &param_s1, &param_s2, &param_i32);
+            ret = media_policy_include_(param_s1, param_s2, param_i32);
+            media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_POLICY_EXCLUDE:
+            media_parcel_read_scanf(in, "%s%s%i", &param_s1, &param_s2, &param_i32);
+            ret = media_policy_exclude_(param_s1, param_s2, param_i32);
+            media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_POLICY_INCREASE:
+            media_parcel_read_scanf(in, "%s%i", &param_s1, &param_i32);
+            ret = media_policy_increase_(param_s1, param_i32);
+            media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_POLICY_DECREASE:
+            media_parcel_read_scanf(in, "%s%i", &param_s1, &param_i32);
+            ret = media_policy_decrease_(param_s1, param_i32);
             media_parcel_append_printf(out, "%i", ret);
             break;
 
