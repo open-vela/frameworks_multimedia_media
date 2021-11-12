@@ -245,6 +245,36 @@ int media_policy_get_string_(const char *name, char *value, size_t len)
     return pfwGetStringCriterion(priv->pfw, name, value, len) ? 0 : -EINVAL;
 }
 
+int media_policy_include_(const char *name, const char *values, int apply)
+{
+    MediaPolicyPriv *priv = media_get_policy();
+
+    if (!priv || !priv->pfw || !name)
+        return -EINVAL;
+
+    if (!pfwIncludeStringCriterion(priv->pfw, name, values))
+        return -EINVAL;
+    if (apply && !pfwApplyConfigurations(priv->pfw))
+        return -EINVAL;
+
+    return 0;
+}
+
+int media_policy_exclude_(const char *name, const char *values, int apply)
+{
+    MediaPolicyPriv *priv = media_get_policy();
+
+    if (!priv || !priv->pfw || !name)
+        return -EINVAL;
+
+    if (!pfwExcludeStringCriterion(priv->pfw, name, values))
+        return -EINVAL;
+    if (apply && !pfwApplyConfigurations(priv->pfw))
+        return -EINVAL;
+
+    return 0;
+}
+
 int media_policy_increase_(const char *name, int apply)
 {
     MediaPolicyPriv *priv = media_get_policy();
@@ -357,6 +387,16 @@ int media_policy_set_string_(const char *name, const char *value, int apply)
 }
 
 int media_policy_get_string_(const char *name, char *value, size_t len)
+{
+    return 0;
+}
+
+int media_policy_include_(const char *name, const char *values, int apply)
+{
+    return 0;
+}
+
+int media_policy_exclude_(const char *name, const char *values, int apply)
 {
     return 0;
 }
