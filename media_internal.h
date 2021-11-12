@@ -62,6 +62,14 @@ extern "C" {
 #define MEDIA_RECORDER_RESET         24
 #define MEDIA_RECORDER_START         25
 #define MEDIA_RECORDER_STOP          26
+#define MEDIA_POLICY_SET_INT         27
+#define MEDIA_POLICY_GET_INT         28
+#define MEDIA_POLICY_SET_STRING      29
+#define MEDIA_POLICY_GET_STRING      30
+#define MEDIA_POLICY_INCLUDE         31
+#define MEDIA_POLICY_EXCLUDE         32
+#define MEDIA_POLICY_INCREASE        33
+#define MEDIA_POLICY_DECREASE        34
 
 /****************************************************************************
  * Media Functions
