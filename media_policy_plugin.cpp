@@ -66,10 +66,15 @@ public:
 protected:
     bool sendToHW(std::string& /*error*/)
     {
-        char param[paramSize] = {0};
-        blackboardRead(param, paramSize);
+        char *param = new char[paramSize];
+        if (!param)
+            return false;
 
-        media_graph_process_command(media_get_graph(), filter.c_str(), command.c_str(), param, 0, 0);
+        blackboardRead(param, paramSize);
+        media_graph_process_command(media_get_graph(),
+                                    filter.c_str(), command.c_str(), param, 0, 0);
+
+        delete [] param;
         return true;
     }
 };
@@ -103,14 +108,22 @@ private:
  * plugin entry point
  ****************************************************************************/
 
-static void PARAMETER_FRAMEWORK_PLUGIN_ENTRYPOINT_V1(CSubsystemLibrary* subsystemLibrary, core::log::Logger& logger)
+static void entrypoint(CSubsystemLibrary* subsystemLibrary, core::log::Logger& logger)
 {
-    subsystemLibrary->addElementBuilder("FFmpeg", new TLoggingElementBuilderTemplate<FFmpegSubsystem>(logger));
+    subsystemLibrary->addElementBuilder(
+        "FFmpeg",
+        new TLoggingElementBuilderTemplate<FFmpegSubsystem>(logger)
+    );
 }
 
-extern const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[] = {
-    {QUOTE(PARAMETER_FRAMEWORK_PLUGIN_ENTRYPOINT_V1), PARAMETER_FRAMEWORK_PLUGIN_ENTRYPOINT_V1}
+extern const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[] =
+{
+    {
+        QUOTE(PARAMETER_FRAMEWORK_PLUGIN_ENTRYPOINT_V1),
+        (const void*)entrypoint
+    },
 };
 
-extern int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE = sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB) /
-                                                    sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[0]);
+extern int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE =
+    sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB) /
+    sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[0]);
