@@ -75,22 +75,22 @@ static int media_server_create_notify(struct media_server_priv *priv, media_parc
     key = media_parcel_read_string(parcel);
     rp_cpu = media_parcel_read_string(parcel);
 
-    if (key == NULL || rp_cpu == NULL)
+    if (key == NULL)
         return -EINVAL;
 
-    if (rp_cpu[0] == 0){
-        family = PF_LOCAL;
-        local_addr.sun_family = AF_LOCAL;
-        strcpy(local_addr.sun_path, key);
-        addr = (struct sockaddr *)&local_addr;
-        len = sizeof(struct sockaddr_un);
-    } else {
+    if (rp_cpu) {
         family = AF_RPMSG;
         rpmsg_addr.rp_family = AF_RPMSG;
         strcpy(rpmsg_addr.rp_name, key);
         strcpy(rpmsg_addr.rp_cpu, rp_cpu);
         addr = (struct sockaddr *)&rpmsg_addr;
         len = sizeof(struct sockaddr_rpmsg);
+    } else {
+        family = PF_LOCAL;
+        local_addr.sun_family = AF_LOCAL;
+        strcpy(local_addr.sun_path, key);
+        addr = (struct sockaddr *)&local_addr;
+        len = sizeof(struct sockaddr_un);
     }
 
     fd = socket(family, SOCK_STREAM | SOCK_NONBLOCK, 0);

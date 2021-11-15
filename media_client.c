@@ -96,7 +96,7 @@ static void *media_client_listen_thread(pthread_addr_t pvarg)
     media_parcel_init(&parcel);
     media_parcel_append_string(&parcel, key);
 #ifdef CONFIG_MEDIA_SERVER
-    media_parcel_append_string(&parcel, "");
+    media_parcel_append_string(&parcel, NULL);
 #else
     getsockname(listenfd, (struct sockaddr *)&addr, &socklen);
     media_parcel_append_string(&parcel, addr.rp_cpu);
