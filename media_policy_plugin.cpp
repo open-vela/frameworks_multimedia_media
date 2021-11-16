@@ -36,29 +36,20 @@
 #define QUOTE_(x) #x
 #define QUOTE(x) QUOTE_(x)
 
-enum PolicyItemType
-{
-    MappingKeyFilter
-};
-
 /****************************************************************************
- * FFmpegFilter : send command to target filter
+ * FFmpegCommander : send commands to media graph
  ****************************************************************************/
 
-class FFmpegFilter : public CSubsystemObject
+class FFmpegCommander : public CSubsystemObject
 {
 private:
-    const std::string filter;
-    const std::string command;
     const size_t paramSize;
 
 public:
-    FFmpegFilter(const std::string& mappingValue,
+    FFmpegCommander(const std::string& mappingValue,
                  CInstanceConfigurableElement *instanceConfigurableElement,
                  const CMappingContext& context, core::log::Logger& logger)
         : CSubsystemObject(instanceConfigurableElement, logger),
-          filter(context.getItem(MappingKeyFilter)),
-          command(mappingValue),
           paramSize(getSize())
     {
     }
@@ -66,15 +57,34 @@ public:
 protected:
     bool sendToHW(std::string& /*error*/)
     {
-        char *param = new char[paramSize];
-        if (!param)
+        char *target, *cmd, *arg, *params;
+        char *outptr, *inptr;
+
+        params = new char[paramSize];
+        if (!params)
             return false;
+        blackboardRead(params, paramSize);
 
-        blackboardRead(param, paramSize);
-        media_graph_process_command(media_get_graph(),
-                                    filter.c_str(), command.c_str(), param, 0, 0);
+        target = strtok_r(params, ";", &outptr);
+        while (target) {
+            cmd = strtok_r(outptr, ",", &inptr);
+            if (!cmd) {
+                delete [] params;
+                return false;
+            }
 
-        delete [] param;
+            arg = strtok_r(NULL, ",", &inptr);
+            if (!arg) {
+                delete [] params;
+                return false;
+            }
+
+            media_graph_process_command(media_get_graph(), target, cmd, arg, 0, 0);
+
+            target = strtok_r(NULL, ";", &outptr);
+        }
+
+        delete [] params;
         return true;
     }
 };
@@ -89,13 +99,9 @@ public:
     FFmpegSubsystem(const std::string& name, core::log::Logger& logger)
         : CSubsystem(name, logger)
     {
-        addContextMappingKey("Filter");  // <- target filter's name
-
         addSubsystemObjectFactory(
-            new TSubsystemObjectFactory<FFmpegFilter>(
-                "Command",
-                (1 << MappingKeyFilter))
-            );
+            new TSubsystemObjectFactory<FFmpegCommander>("Commander", 0)
+        );
     }
 
 private:
