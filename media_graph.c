@@ -401,6 +401,9 @@ void *media_player_open_(void *graph, const char *name)
     if (!media || !media->graph)
         return NULL;
 
+    if (media_policy_get_int_(name, &ret))
+        return NULL;
+
     for (i = 0; i < media->graph->nb_filters; i++) {
         filter = media->graph->filters[i];
 
@@ -419,7 +422,7 @@ void *media_player_open_(void *graph, const char *name)
         return NULL;
 
     priv->name = strdup(name);
-    if (name && !priv->name) {
+    if (!priv->name) {
         free(priv);
         return NULL;
     }
