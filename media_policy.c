@@ -44,57 +44,53 @@
  ****************************************************************************/
 
 typedef struct MediaPolicyPriv {
-    PfwHandler   *pfw;
-    PfwCriterion *criteria;
-    int           ncriteria;
+    PfwHandler *pfw;
 } MediaPolicyPriv;
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-static void media_policy_free_criteria(MediaPolicyPriv *priv)
+static void media_policy_free_criteria(PfwCriterion *criteria, int ncriteria)
 {
     int i, j;
 
     // free criteria
-    if (priv->criteria) {
-        for (i = 0; i < priv->ncriteria; i++) {
+    if (criteria) {
+        for (i = 0; i < ncriteria; i++) {
             // free criterion names
-            if (priv->criteria[i].names) {
-                for (j = 0; priv->criteria[i].names[j]; j++)
-                    free(priv->criteria[i].names[j]);
-                free(priv->criteria[i].names);
+            if (criteria[i].names) {
+                for (j = 0; criteria[i].names[j]; j++)
+                    free(criteria[i].names[j]);
+                free(criteria[i].names);
             }
 
             // free criterion values
-            if (priv->criteria[i].values) {
-                for (j = 0; priv->criteria[i].values[j]; j++)
-                    free(priv->criteria[i].values[j]);
-                free(priv->criteria[i].values);
+            if (criteria[i].values) {
+                for (j = 0; criteria[i].values[j]; j++)
+                    free(criteria[i].values[j]);
+                free(criteria[i].values);
             }
         }
-        free(priv->criteria);
-        priv->criteria = NULL;
-        priv->ncriteria = 0;
+        free(criteria);
     }
 }
 
-static int media_policy_parse_criteria(MediaPolicyPriv *priv, const char *path)
+static int media_policy_parse_criteria(PfwCriterion **pcriteria, const char *path)
 {
     const char *delim = " \t\r\n";
     char *saveptr;
-    void *addr;
     FILE *fp;
+    PfwCriterion *criteria;
     int ret = -EINVAL;
     int i, j;
 
     if (!(fp = fopen(path, "r")))
         return -errno;
 
-    // prase criteria definition : calloc + parse + realloc
-    priv->criteria = calloc(MEDIA_CRITERIA_MAXNUM, sizeof(PfwCriterion));
-    if (!priv->criteria)
+    // prase criteria definition : calloc + parse
+    criteria = calloc(MEDIA_CRITERIA_MAXNUM, sizeof(PfwCriterion));
+    if (!criteria)
         goto err_alloc;
 
     /** one criterion definition each line
@@ -117,15 +113,15 @@ static int media_policy_parse_criteria(MediaPolicyPriv *priv, const char *path)
             goto err_parse;
 
         if (!strcmp("InclusiveCriterion", token))
-            priv->criteria[i].inclusive = true;
+            criteria[i].inclusive = true;
         else if (!strcmp("ExclusiveCriterion", token))
-            priv->criteria[i].inclusive = false;
+            criteria[i].inclusive = false;
         else
             goto err_parse;
 
-        // parse criterion names : calloc + parse + realloc
-        priv->criteria[i].names = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char *));
-        if (!priv->criteria[i].names)
+        // parse criterion names : calloc + parse
+        criteria[i].names = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char *));
+        if (!criteria[i].names)
             goto err_alloc;
 
         for (j = 0; j < MEDIA_CRITERIA_MAXNUM; j++) {
@@ -138,18 +134,12 @@ static int media_policy_parse_criteria(MediaPolicyPriv *priv, const char *path)
             }
             if (!(token = strdup(token)))
                 goto err_alloc;
-            priv->criteria[i].names[j] = token;
+            criteria[i].names[j] = token;
         }
 
-        addr = realloc(priv->criteria[i].names, (j + 1) * sizeof(char *));
-        if (addr)
-            priv->criteria[i].names = addr;
-        else
-            goto err_alloc;
-
-        // parse criterion values : calloc + parse + realloc
-        priv->criteria[i].values = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char *));
-        if (!priv->criteria[i].values)
+        // parse criterion values : calloc + parse
+        criteria[i].values = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char *));
+        if (!criteria[i].values)
             goto err_alloc;
 
         for (j = 0; j < MEDIA_CRITERIA_MAXNUM; j++) {
@@ -163,36 +153,24 @@ static int media_policy_parse_criteria(MediaPolicyPriv *priv, const char *path)
                     goto err_parse;
                 if (!(token = strtok_r(NULL, delim, &saveptr)))
                     goto err_parse;
-                priv->criteria[i].initial = atoi(token);
+                criteria[i].initial = atoi(token);
                 break; // end of initial value definition
             }
             if (!(token = strdup(token)))
                 goto err_alloc;
-            priv->criteria[i].values[j] = token;
+            criteria[i].values[j] = token;
         }
-
-        addr = realloc(priv->criteria[i].values, (j + 1) * sizeof(char *));
-        if (addr)
-            priv->criteria[i].values = addr;
-        else
-            goto err_alloc;
     }
 
-    addr = realloc(priv->criteria, i * sizeof(PfwCriterion));
-    if (addr)
-        priv->criteria = addr;
-    else
-        goto err_alloc;
-
-    priv->ncriteria = i;
     fclose(fp);
-    return 0;
+
+    *pcriteria = criteria;
+    return i; //< ncriteria
 
 err_alloc:
     ret = -ENOMEM;
 err_parse:
-    priv->ncriteria = i + 1; // parsing failed on (i + 1)'th criterion.
-    media_policy_free_criteria(priv);
+    media_policy_free_criteria(criteria, i + 1); // failed on (i + 1)'th.
     fclose(fp);
 
     return ret;
@@ -329,7 +307,6 @@ int media_policy_destroy(void *handle)
     if (!priv)
         return -EINVAL;
 
-    media_policy_free_criteria(priv);
     if (priv->pfw)
         pfwDestroy(priv->pfw);
     free(priv);
@@ -341,6 +318,8 @@ void *media_policy_create(void *files)
 {
     const char **file_paths = files;
     MediaPolicyPriv *priv;
+    PfwCriterion *criteria;
+    int ncriteria;
 
     if (!files)
         return NULL;
@@ -349,15 +328,20 @@ void *media_policy_create(void *files)
     if (!priv)
         return NULL;
 
-    if (media_policy_parse_criteria(priv, file_paths[1]) < 0)
-        goto err;
+    ncriteria = media_policy_parse_criteria(&criteria, file_paths[1]);
+    if (ncriteria <= 0)
+        goto err_parse;
     if (!(priv->pfw = pfwCreate()))
-        goto err;
-    if (!pfwStart(priv->pfw, file_paths[0], priv->criteria, priv->ncriteria, NULL))
-        goto err;
+        goto err_pfw;
+    if (!pfwStart(priv->pfw, file_paths[0], criteria, ncriteria, NULL))
+        goto err_pfw;
 
+    media_policy_free_criteria(criteria, ncriteria);
     return priv;
-err:
+
+err_pfw:
+    media_policy_free_criteria(criteria, ncriteria);
+err_parse:
     media_policy_destroy(priv);
     return NULL;
 }
