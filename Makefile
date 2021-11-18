@@ -23,7 +23,7 @@ include $(APPDIR)/Make.defs
 ifneq ($(CONFIG_MEDIA),)
 
 MODULE = $(CONFIG_MEDIA_SERVER)
-CSRCS += media_proxy.c media_parcel.c media_client.c
+CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c
 
 ifneq ($(CONFIG_MEDIA_SERVER),)
   CSRCS    += media_graph.c media_stub.c media_server.c media_policy.c

@@ -47,7 +47,7 @@ extern "C"
  *   Open one player path.
  *
  * Input Parameters:
- *   params - open params
+ *   params - open params, one of stream types defined in media_wrapper.h.
  *
  * Returned Value:
  *   Pointer to created handle or NULL on failure.
