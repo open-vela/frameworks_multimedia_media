@@ -83,6 +83,7 @@ static void media_policy_free_criteria(MediaPolicyPriv *priv)
 static int media_policy_parse_criteria(MediaPolicyPriv *priv, const char *path)
 {
     const char *delim = " \t\r\n";
+    char *saveptr;
     void *addr;
     FILE *fp;
     int ret = -EINVAL;
@@ -112,7 +113,7 @@ static int media_policy_parse_criteria(MediaPolicyPriv *priv, const char *path)
         }
 
         // parse criterion type
-        if (!(token = strtok(line, delim)))
+        if (!(token = strtok_r(line, delim, &saveptr)))
             goto err_parse;
 
         if (!strcmp("InclusiveCriterion", token))
@@ -128,16 +129,15 @@ static int media_policy_parse_criteria(MediaPolicyPriv *priv, const char *path)
             goto err_alloc;
 
         for (j = 0; j < MEDIA_CRITERIA_MAXNUM; j++) {
-            if (!(token = strtok(NULL, delim)))
+            if (!(token = strtok_r(NULL, delim, &saveptr)))
                 goto err_parse;
             if (!strcmp(":", token)) {
-                if (j > 0)
-                    break; // end of names definition
-                else
+                if (j == 0)
                     goto err_parse;
+                break; // end of names definition
             }
             if (!(token = strdup(token)))
-                goto err_parse;
+                goto err_alloc;
             priv->criteria[i].names[j] = token;
         }
 
@@ -153,14 +153,13 @@ static int media_policy_parse_criteria(MediaPolicyPriv *priv, const char *path)
             goto err_alloc;
 
         for (j = 0; j < MEDIA_CRITERIA_MAXNUM; j++) {
-            if (!(token = strtok(NULL, delim))) {
-                if (j > 0)
-                    break; // end of values definition
-                else
+            if (!(token = strtok_r(NULL, delim, &saveptr))) {
+                if (j == 0)
                     goto err_parse;
+                break; // end of values definition
             }
             if (!(token = strdup(token)))
-                goto err_parse;
+                goto err_alloc;
             priv->criteria[i].values[j] = token;
         }
 
