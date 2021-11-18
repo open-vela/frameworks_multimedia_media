@@ -158,6 +158,14 @@ static int media_policy_parse_criteria(MediaPolicyPriv *priv, const char *path)
                     goto err_parse;
                 break; // end of values definition
             }
+            if (!strcmp(":", token)) {
+                if (j == 0)
+                    goto err_parse;
+                if (!(token = strtok_r(NULL, delim, &saveptr)))
+                    goto err_parse;
+                priv->criteria[i].initial = atoi(token);
+                break; // end of initial value definition
+            }
             if (!(token = strdup(token)))
                 goto err_alloc;
             priv->criteria[i].values[j] = token;
