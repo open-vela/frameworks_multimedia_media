@@ -67,17 +67,19 @@ protected:
 
         target = strtok_r(params, ";", &outptr);
         while (target) {
-            cmd = strtok_r(outptr, ",", &inptr);
+            target = strtok_r(target, ",", &inptr);
+            if (!target) {
+                delete [] params;
+                return false;
+            }
+
+            cmd = strtok_r(NULL, ",", &inptr);
             if (!cmd) {
                 delete [] params;
                 return false;
             }
 
             arg = strtok_r(NULL, ",", &inptr);
-            if (!arg) {
-                delete [] params;
-                return false;
-            }
 
             media_graph_process_command(media_get_graph(), target, cmd, arg, 0, 0);
 
