@@ -319,6 +319,7 @@ void *media_policy_create(void *files)
     const char **file_paths = files;
     MediaPolicyPriv *priv;
     PfwCriterion *criteria;
+    PfwLogger logger = {};
     int ncriteria;
 
     if (!files)
@@ -333,7 +334,7 @@ void *media_policy_create(void *files)
         goto err_parse;
     if (!(priv->pfw = pfwCreate()))
         goto err_pfw;
-    if (!pfwStart(priv->pfw, file_paths[0], criteria, ncriteria, NULL))
+    if (!pfwStart(priv->pfw, file_paths[0], criteria, ncriteria, &logger))
         goto err_pfw;
 
     media_policy_free_criteria(criteria, ncriteria);
