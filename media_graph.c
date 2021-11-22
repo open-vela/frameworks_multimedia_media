@@ -241,7 +241,6 @@ int media_graph_poll_available(void *handle, struct pollfd *fd, void *cookie)
 {
     MediaGraphPriv *priv = handle;
     eventfd_t unuse;
-    int ret;
 
     if (!priv || !priv->graph || !fd)
         return -EINVAL;
@@ -252,6 +251,17 @@ int media_graph_poll_available(void *handle, struct pollfd *fd, void *cookie)
                                  AV_OPT_SEARCH_CHILDREN);
     else
         eventfd_read(priv->fd, &unuse);
+
+    return 0;
+}
+
+int media_graph_run_once(void *handle)
+{
+    MediaGraphPriv *priv = handle;
+    int ret;
+
+    if (!priv || !priv->graph)
+        return -EINVAL;
 
     do {
         ret = ff_filter_graph_run_once(priv->graph);

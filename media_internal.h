@@ -96,6 +96,7 @@ int media_graph_destroy(void *handle);
 int media_graph_get_pollfds(void *handle, struct pollfd *fds,
                             void **cookies, int count);
 int media_graph_poll_available(void *handle, struct pollfd *fd, void *cookie);
+int media_graph_run_once(void *handle);
 int media_graph_process_command(void *handle, const char *target,
                                 const char *cmd, const char *arg,
                                 char *res, int res_len);
