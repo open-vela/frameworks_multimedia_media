@@ -55,6 +55,7 @@ typedef int (*media_get_pollfds)(void *handle, struct pollfd *fds,
                                  void **cookies, int count);
 typedef int (*media_poll_available)(void *handle, struct pollfd *fds,
                                     void *cookies);
+typedef int (*media_run_once)(void *handle);
 typedef int (*media_destroy)(void *handle);
 
 typedef struct MediaPoll {
@@ -64,6 +65,7 @@ typedef struct MediaPoll {
     media_create         create;
     media_get_pollfds    get;
     media_poll_available available;
+    media_run_once       run_once;
     media_destroy        destroy;
 } MediaPoll;
 
@@ -80,6 +82,7 @@ static MediaPoll g_media[] =
         media_graph_create,
         media_graph_get_pollfds,
         media_graph_poll_available,
+        media_graph_run_once,
         media_graph_destroy,
     },
     {
@@ -93,6 +96,7 @@ static MediaPoll g_media[] =
         media_policy_create,
         NULL,
         NULL,
+        NULL,
         media_policy_destroy,
     },
     {
@@ -102,6 +106,7 @@ static MediaPoll g_media[] =
         media_server_create,
         media_server_get_pollfds,
         media_server_poll_available,
+        NULL,
         media_server_destroy,
     },
 };
@@ -190,6 +195,15 @@ int main(int argc, char *argv[])
             if (ret < 0 && ret != -EAGAIN)
                 syslog(LOG_ERR, "%s, %s poll_available failed %d\n",
                         __func__, g_media[priv->idx[i]].name, ret);
+        }
+
+        for (i = 0; i < ARRAY_SIZE(g_media); i++) {
+            if (!g_media[i].run_once)
+                continue;
+
+            ret = g_media[i].run_once(g_media[i].handle);
+            if (ret < 0)
+                syslog(LOG_ERR, "%s, %s run_once failed\n", __func__, g_media[i].name);
         }
     }
 
