@@ -22,6 +22,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <errno.h>
 #include "media_policy.h"
 #include "media_wrapper.h"
 
@@ -37,6 +38,7 @@
 #define MEDIA_POLICY_MUTE_MODE          "MuteMode"
 #define MEDIA_POLICY_NO_DISTURB_MODE    "NoDisturbMode"
 #define MEDIA_POLICY_DEVICES            "AvailableDevices"
+#define MEDIA_POLICY_VOLUME             "Volume"
 
 /****************************************************************************
  * Public Functions
@@ -94,20 +96,48 @@ int media_policy_get_devices_available(char *devices, int len)
 
 int media_policy_set_stream_volume(const char *stream, int volume)
 {
-    return media_policy_set_int(stream, volume, MEDIA_POLICY_APPLY);
+    char name[64];
+    int len;
+
+    len = snprintf(name, sizeof(name), "%s%s", stream, MEDIA_POLICY_VOLUME);
+    if (len >= sizeof(name))
+        return  -ENAMETOOLONG;
+
+    return media_policy_set_int(name, volume, MEDIA_POLICY_APPLY);
 }
 
 int media_policy_get_stream_volume(const char *stream, int *volume)
 {
-    return media_policy_get_int(stream, volume);
+    char name[64];
+    int len;
+
+    len = snprintf(name, sizeof(name), "%s%s", stream, MEDIA_POLICY_VOLUME);
+    if (len >= sizeof(name))
+        return  -ENAMETOOLONG;
+
+    return media_policy_get_int(name, volume);
 }
 
 int media_policy_increase_stream_volume(const char *stream)
 {
-    return media_policy_increase(stream, MEDIA_POLICY_APPLY);
+    char name[64];
+    int len;
+
+    len = snprintf(name, sizeof(name), "%s%s", stream, MEDIA_POLICY_VOLUME);
+    if (len >= sizeof(name))
+        return  -ENAMETOOLONG;
+
+    return media_policy_increase(name, MEDIA_POLICY_APPLY);
 }
 
 int media_policy_decrease_stream_volume(const char *stream)
 {
-    return media_policy_decrease(stream, MEDIA_POLICY_APPLY);
+    char name[64];
+    int len;
+
+    len = snprintf(name, sizeof(name), "%s%s", stream, MEDIA_POLICY_VOLUME);
+    if (len >= sizeof(name))
+        return  -ENAMETOOLONG;
+
+    return media_policy_decrease(name, MEDIA_POLICY_APPLY);
 }
