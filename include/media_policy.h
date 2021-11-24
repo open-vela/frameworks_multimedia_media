@@ -29,153 +29,83 @@ extern "C" {
  * Public Functions
  ****************************************************************************/
 
-/****************************************************************************
- * Name: media_policy_set_int
- *
- * Description:
- *   Set criterion with interger value.
- *   You should use wrapper functions rather than using this funtion directly.
- *
- * Input Parameters:
- *   name   - criterion name
- *   value  - new value
- *   apply  - whether apply configurations
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Set criterion with interger value.
+ * @param[in] name      criterion name
+ * @param[in] value     new integer value
+ * @param[in] apply     whether apply configurations
+ * @return Zero on success; a negated errno value on failure.
+ * @note Should use wrapper functions rather than using this directly.
+ */
 int media_policy_set_int(const char *name, int value, int apply);
 
-/****************************************************************************
- * Name: media_policy_get_int
- *
- * Description:
- *   Get criterion in interger value.
- *   You should use wrapper functions rather than using this funtion directly.
- *
- * Input Parameters:
- *   name   - criterion name
- *   value  - address to return current value
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Get criterion in interger value.
+ * @param[in] name      criterion name
+ * @param[out] value    current integer value
+ * @return Zero on success; a negated errno value on failure.
+ * @note Should use wrapper functions rather than using this directly.
+ */
 int media_policy_get_int(const char *name, int *value);
 
-/****************************************************************************
- * Name: media_policy_set_string
- *
- * Description:
- *   Get criterion with string value.
- *   You should use wrapper functions rather than using this funtion directly.
- *
- * Input Parameters:
- *   name   - criterion name
- *   value  - new value
- *   apply  - whether apply configurations
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Set criterion with string value.
+ * @param[in] name      criterion name
+ * @param[in] value     new string value
+ * @param[in] apply     whether apply configurations
+ * @return Zero on success; a negated errno value on failure.
+ * @note Should use wrapper functions rather than using this directly.
+ */
 int media_policy_set_string(const char *name, const char *value, int apply);
 
-/****************************************************************************
- * Name: media_policy_get_string
- *
- * Description:
- *   Get criterion in string value.
- *   You should use wrapper functions rather than using this funtion directly.
- *
- * Input Parameters:
- *   name   - criterion name
- *   value  - address to return current value
- *   len    - size of value
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Get criterion in string value.
+ * @param[in] name      criterion name
+ * @param[out] value    current string value
+ * @param[in] len       sizeof value
+ * @return Zero on success; a negated errno value on failure.
+ * @note Should use wrapper functions rather than using this directly.
+ */
 int media_policy_get_string(const char *name, char *value, int len);
 
-/****************************************************************************
- * Name: media_policy_include
- *
- * Description:
- *   Include(insert) inclusive criterion values.
- *   You should use wrapper functions rather than using this funtion directly.
- *
- * Input Parameters:
- *   name    - inclusive criterion name
- *   values  - new values
- *   apply   - whether apply configurations
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Include(insert) string values to InclusiveCriterion.
+ * @param[in] name      criterion name
+ * @param[in] values    string values
+ * @param[in] apply     whether apply configurations
+ * @return Zero on success; a negated errno value on failure.
+ * @note Should use wrapper functions rather than using this directly.
+ * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
+ */
 int media_policy_include(const char *name, const char *values, int apply);
 
-/****************************************************************************
- * Name: media_policy_exclude
- *
- * Description:
- *   Exclude(remove) inclusive criterion values.
- *   You should use wrapper functions rather than using this funtion directly.
- *
- * Input Parameters:
- *   name    - inclusive criterion name
- *   values  - new values
- *   apply   - whether apply configurations
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Exclude(remove) string values from InclusiveCriterion.
+ * @param[in] name      criterion name
+ * @param[in] values    string values
+ * @param[in] apply     whether apply configurations
+ * @return Zero on success; a negated errno value on failure.
+ * @note Should use wrapper functions rather than using this directly.
+ * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
+ */
 int media_policy_exclude(const char *name, const char *values, int apply);
 
-/****************************************************************************
- * Name: media_policy_increase
- *
- * Description:
- *   Increase criterion value.
- *   You should use wrapper functions rather than using this funtion directly.
- *
- * Input Parameters:
- *   name   - criterion name
- *   apply  - whether apply configurations
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Increase criterion interger value by 1.
+ * @param[in] name      criterion name
+ * @param[in] apply     whether apply configurations
+ * @return Zero on success; a negated errno value on failure.
+ * @note Should use wrapper functions rather than using this directly.
+ */
 int media_policy_increase(const char *name, int apply);
 
-/****************************************************************************
- * Name: media_policy_decrease
- *
- * Description:
- *   Decrease criterion value.
- *   You should use wrapper functions rather than using this funtion directly.
- *
- * Input Parameters:
- *   name   - criterion name
- *   apply  - whether apply configurations
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Decrease criterion interger value by 1.
+ * @param[in] name      criterion name
+ * @param[in] apply     whether apply configurations
+ * @return Zero on success; a negated errno value on failure.
+ * @note Should use wrapper functions rather than using this directly.
+ */
 int media_policy_decrease(const char *name, int apply);
 
 #ifdef __cplusplus

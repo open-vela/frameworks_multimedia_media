@@ -36,146 +36,75 @@ extern "C"
 #define EXTERN extern
 #endif
 
-/****************************************************************************
- * Name: media_recorder_open
- *
- * Description:
- *   Open one recorder path.
- *
- * Input Parameters:
- *   params - open params
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Open one recorder path.
+ * @param[in] params    open params
+ * @return Zero on success; a negated errno value on failure.
+ */
 void *media_recorder_open(const char *params);
 
-/****************************************************************************
- * Name: media_recorder_close
- *
- * Description:
- *  Close the recorder path.
- *
- * Input Parameters:
- *   handle - The recorder path
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Close the recorder path.
+ * @param[in] handle    The recorder path
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_recorder_close(void *handle);
 
-/****************************************************************************
- * Name: media_recorder_set_event_callback
- *
- * Description:
- *  Set event callback to the recorder path, the callback will be called
- *  when state changed or something user cares.
- *
- * Input Parameters:
- *   handle - The recorder path
- *   cookie - User cookie, will bring back to user when do event_cb
- *   event_cb - Event callback
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Set event callback to the recorder path, the callback will be called
+ * when state changed or something user cares.
+ * @param[in] handle    The recorder path
+ * @param[in] cookie    User cookie, will bring back to user when do event_cb
+ * @param[in] event_cb  Event callback
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_recorder_set_event_callback(void *handle, void *cookie,
                                       media_event_callback event_cb);
 
-/****************************************************************************
- * Name: media_recorder_prepare
+/**
+ * Prepare the recorder path.
+ * @param[in] handle    Current recorder path
+ * @param[in] url       Data dest recorderd to
+ * @param[in] options   Extra configure
+ *                      - If url is not NULL:options is the url addtional description
+ *                      - If url is NULL: options descript "buffer" mode:
+ *                        - "format=s16le,sample_rate=44100,channels=2"
+ *                        - "format=unknown"
  *
- * Description:
- *  Prepare the recorder path.
- *
- * Input Parameters:
- *   handle - Current recorder path
- *   url    - Data dest recorderd to
- *   options  - Extra configure
- *            If url is not NULL: options is the url addtional description
- *            If url is NULL: options descript "buffer" mode,
- *                            e.g. format=s16le,sample_rate=44100,channels=2
- *                            e.g. format=unknown
- *                            then use media_recorder_read_data() read data
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+ *                        then use media_recorder_read_data() read data
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_recorder_prepare(void *handle, const char *url, const char *options);
 
-/****************************************************************************
- * Name: media_recorder_reset
- *
- * Description:
- *  Reset the recorder path.
- *
- * Input Parameters:
- *   handle - The recorder path
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Reset the recorder path.
+ * @param[in] handle    The recorder path
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_recorder_reset(void *handle);
 
-/****************************************************************************
- * Name: media_recorder_read_data
- *
- * Description:
- *  Read recorderd data from the recorder path.
- *  This need media_recorder_prepare() url set to NULL.
- *
- * Input Parameters:
- *   handle - Current recorder path
- *   data   - Buffer will be recorderd to
- *   len    - Buffer len
- *
- * Returned Value:
- *   returned >= 0, Actly got len; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Read recorderd data from the recorder path.
+ * This need media_recorder_prepare() url set to NULL.
+ * @param[in] handle    Current recorder path
+ * @param[in] data      Buffer will be recorderd to
+ * @param[in] len       Buffer len
+ * @return returned >= 0, Actly got len; a negated errno value on failure.
+ */
 ssize_t media_recorder_read_data(void *handle, void *data, size_t len);
 
-/****************************************************************************
- * Name: media_recorder_start
- *
- * Description:
- *  Start the recorder path.
- *
- * Input Parameters:
- *   handle - Current recorder path
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Start the recorder path.
+ * @param[in] handle    Current recorder path
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_recorder_start(void *handle);
 
-/****************************************************************************
- * Name: media_recorder_stop
- *
- * Description:
- *  Stop the recorder path.
- *
- * Input Parameters:
- *   handle - Current recorder path
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Stop the recorder path.
+ * @param[in] handle    Current recorder path
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_recorder_stop(void *handle);
 
 #undef EXTERN
