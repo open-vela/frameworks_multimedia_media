@@ -38,41 +38,22 @@ extern "C"
 #define EXTERN extern
 #endif
 
-/****************************************************************************
- * Name: media_process_command
- *
- * Description:
- *  Send command to media
- *
- * Input Parameters:
- *   target - target name
- *   cmd    - cmd
- *   arg    - arg
- *   res    - response
- *   res_len- response msg len
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Send command to media
+ * @param[in] target    target name
+ * @param[in] cmd       command
+ * @param[in] arg       argument
+ * @param[out] res      response
+ * @param[in] res_len   response msg len
+ * @return Zero on success; a negated errno value on failure
+ */
 int media_process_command(const char *target, const char *cmd,
                           const char *arg, char *res, int res_len);
 
-/****************************************************************************
- * Name: media_dump
- *
- * Description:
- *  Dump media
- *
- * Input Parameters:
- *   options - dump options
- *
- * Returned Value:
- *   None.
- *
- ****************************************************************************/
-
+/**
+ * Dump media
+ * @param[in] options dump options
+ */
 void media_dump(const char *options);
 
 #undef EXTERN

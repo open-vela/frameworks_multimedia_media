@@ -29,245 +29,126 @@ extern "C" {
  * Pre-processor Definitions
  ****************************************************************************/
 
-// audio mode
-#define MEDIA_AUDIO_MODE_NORMAL      "normal"
+#define MEDIA_AUDIO_MODE_NORMAL      "normal"   /*!< play and capture audio */
 #define MEDIA_AUDIO_MODE_PHONE       "phone"
 
-// devices
-#define MEDIA_DEVICE_A2DP            "a2dp"
+#define MEDIA_DEVICE_A2DP            "a2dp"     /*!< bt cellphone */
 
-// stream types
-#define MEDIA_STREAM_SCO             "SCO"
+#define MEDIA_STREAM_SCO             "SCO"      /*!< in call */
 #define MEDIA_STREAM_RING            "Ring"
-#define MEDIA_STREAM_NOTIFICATION    "Notify"
-#define MEDIA_STREAM_ACCESSIBILITY   "Health"
+#define MEDIA_STREAM_NOTIFICATION    "Notify"   /*!< message notification */
+#define MEDIA_STREAM_ACCESSIBILITY   "Health"   /*!< health notification */
 #define MEDIA_STREAM_MUSIC           "Music"
 #define MEDIA_STREAM_SPORT           "Sport"
-#define MEDIA_STREAM_TTS             "TTS"
+#define MEDIA_STREAM_TTS             "TTS"      /*!< text-to-speech */
 #define MEDIA_STREAM_ALARM           "Alarm"
 #define MEDIA_STREAM_SYSTEM_ENFORCED "Enforced"
-
-// stream type volume
-#define MEDIA_STREAM_TYPE_VOLUME(x)  x"Volume"
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-/****************************************************************************
- * Name: media_policy_set_audio_mode
- *
- * Description:
- *   Set audio mode, let media_policy_set_string do real work.
- *
- * Input Parameters:
- *   mode       - new audio mode.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Set audio mode.
+ * @param[in] mode  new audio mode, MEDIA_AUDIO_MODE_XXX.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_set_audio_mode(const char *mode);
 
-/****************************************************************************
- * Name: media_policy_get_audio_mode
- *
- * Description:
- *   Get audio mode, let media_policy_get_string do real work.
- *
- * Input Parameters:
- *   mode       - return current audio mode.
- *   len        - size of mode.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Get audio mode.
+ * @param[in] mode  current audio mode.
+ * @param[out] len  sizeof mode.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_get_audio_mode(char *mode, int len);
 
-/****************************************************************************
- * Name: media_policy_set_mute_mode
- *
- * Description:
- *   Set mute mode, some stream types are muted when mute mode is ON.
- *
- * Input Parameters:
- *   mute       - zero for OFF, one for ON
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Set mute mode.
+ * @param[in] mute  new mute mode.
+ *                  - 0: mute mode is off.
+ *                  - 1: mute mode is on.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_set_mute_mode(int mute);
 
-/****************************************************************************
- * Name: media_policy_get_mute_mode
- *
- * Description:
- *   Get mute mode, some stream types are muted when mute mode is ON.
- *
- * Input Parameters:
- *   mute       - currtent value, zero for OFF, one for ON.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Get mute mode.
+ * @param[out] mute current mute mode.
+ *                  - 0: mute mode is off.
+ *                  - 1: mute mode is on.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_get_mute_mode(int *mute);
 
-/****************************************************************************
- * Name: media_policy_set_no_disturb_mode
- *
- * Description:
- *   Set no-disturb mode, some stream types are muted when it's ON.
- *
- * Input Parameters:
- *   mute       - zero for OFF, one for ON
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Set no-disturb mode.
+ * @param[in] no_disturb    new no-disturb mode.
+ *                          - 0: no-disturb mode is off.
+ *                          - 1: no-disturb mode is on.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_set_no_disturb_mode(int no_disturb);
 
-/****************************************************************************
- * Name: media_policy_get_no_disturb_mode
- *
- * Description:
- *   Get no-disturb mode, some stream types are muted when it's ON.
- *
- * Input Parameters:
- *   no_disturb     - currtent value, zero for OFF, one for ON.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Get no-disturb mode.
+ * @param[in] no_disturb    current no-disturb mode.
+ *                          - 0: no-disturb mode is off.
+ *                          - 1: no-disturb mode is on.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_get_no_disturb_mode(int *no_disturb);
 
-/****************************************************************************
- * Name: media_policy_set_devices_available
- *
- * Description:
- *   Insert some devices to available devices set, let media_policy_include
- *     do real work.
- *
- * Input Parameters:
- *   devices    - available devices, separate by '|'.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Set divices available.
+ * @param[in] devices   new available devices, MEDIA_DEVICE_XXX.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_set_devices_available(const char *devices);
 
-/****************************************************************************
- * Name: media_policy_set_devices_unavailable
- *
- * Description:
- *   Remove some devices from available devices set, let media_policy_exclude
- *     do real work.
- *
- * Input Parameters:
- *   devices    - unavailable devices, separate by '|'.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Set divices unavailable.
+ * @param[in] devices   new unavailable devices, MEDIA_DEVICE_XXX.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_set_devices_unavailable(const char *devices);
 
-/****************************************************************************
- * Name: media_policy_get_devices_available
- *
- * Description:
- *   Get currenct available devices, let media_policy_get_string do real work.
- *
- * Input Parameters:
- *   devices    - available device names, separate by '|'.
- *   len        - size of devices.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Get current available devices.
+ * @param[out] devices   current available devices.
+ * @param[in] len        sizeof devices.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_get_devices_available(char *devices, int len);
 
-/****************************************************************************
- * Name: media_policy_set_stream_volume
- *
- * Description:
- *   Set stream type's volume index, let media_policy_set_int do real work.
- *
- * Input Parameters:
- *   stream     - stream type volume's criterion name.
- *   volume     - new volume index.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Set stream type volume index.
+ * @param[in] stream    stream type, MEDIA_STREAM_XXX.
+ * @param[in] volume    new volume index.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_set_stream_volume(const char *stream, int volume);
 
-/****************************************************************************
- * Name: media_policy_get_stream_volume
- *
- * Description:
- *   Set stream type's volume index, let media_policy_get_int do real work.
- *
- * Input Parameters:
- *   stream     - stream type volume's criterion name.
- *   volume     - return current volume index.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Get stream type volume index.
+ * @param[in] stream    stream type, MEDIA_STREAM_XXX.
+ * @param[out] volume   current volume index
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_get_stream_volume(const char *stream, int *volume);
 
-/****************************************************************************
- * Name: media_policy_increase_stream_volume
- *
- * Description:
- *   Increase stream type's volume index by 1, let media_policy_increase
- *     do real work.
- *
- * Input Parameters:
- *   stream     - stream type volume's criterion name.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Increase stream type volume index by 1.
+ * @param[in] stream    stream type, MEDIA_STREAM_XXX.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_increase_stream_volume(const char *stream);
 
-/****************************************************************************
- * Name: media_policy_decrease_stream_volume
- *
- * Description:
- *   Increase stream type's volume index by 1, let media_policy_decrease
- *     do real work.
- *
- * Input Parameters:
- *   stream     - stream type volume's criterion name.
- *
- * Returned Value:
- *   Zero on success; a negated errno value on failure.
- *
- ****************************************************************************/
-
+/**
+ * Decrease stream type volume index by 1.
+ * @param[in] stream    stream type, MEDIA_STREAM_XXX.
+ * @return Zero on success; a negated errno value on failure.
+ */
 int media_policy_decrease_stream_volume(const char *stream);
 
 #ifdef __cplusplus
