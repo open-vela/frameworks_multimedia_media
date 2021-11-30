@@ -216,7 +216,7 @@ int media_client_send_with_ack(void *handle, media_parcel *in, media_parcel *out
 int media_client_set_event_cb(void *handle, void *event_cb, void *cookie)
 {
     struct media_client_priv *priv = handle;
-    if (priv == NULL)
+    if (priv == NULL || event_cb == NULL)
         return -EINVAL;
 
     priv->event_cb = event_cb;
