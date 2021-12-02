@@ -145,6 +145,7 @@ void *media_client_connect(void)
 #endif
     socklen_t len;
     int family;
+    char ack;
 
     priv = zalloc(sizeof(struct media_client_priv));
     if (priv == NULL)
@@ -155,7 +156,8 @@ void *media_client_connect(void)
     if (priv->fd <= 0)
         goto socket_error;
 
-    if (connect(priv->fd, (struct sockaddr *)&addr, len) < 0)
+    if (connect(priv->fd, (struct sockaddr *)&addr, len) < 0 ||
+        recv(priv->fd, &ack, sizeof(ack), 0) <= 0 || ack < 0)
         goto connect_error;
 
     return priv;
