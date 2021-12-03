@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
 
             ret = g_media[priv->idx[i]].available(g_media[priv->idx[i]].handle,
                                                   &priv->fds[i], priv->ctx[i]);
-            if (ret < 0 && ret != -EAGAIN)
+            if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
                 syslog(LOG_ERR, "%s, %s poll_available failed %d\n",
                         __func__, g_media[priv->idx[i]].name, ret);
         }
