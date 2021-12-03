@@ -100,7 +100,7 @@ int media_graph_run_once(void *handle);
 int media_graph_process_command(void *handle, const char *target,
                                 const char *cmd, const char *arg,
                                 char *res, int res_len);
-void media_graph_dump(void *handle, const char *options);
+char *media_graph_dump(void *handle, const char *options);
 
 /****************************************************************************
  * Player Functions

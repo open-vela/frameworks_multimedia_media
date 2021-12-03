@@ -23,6 +23,7 @@
  ****************************************************************************/
 
 #include <errno.h>
+#include <stdio.h>
 #include "media_policy.h"
 #include "media_wrapper.h"
 
