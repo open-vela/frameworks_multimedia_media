@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <malloc.h>
 #include <stdio.h>
+#include <syslog.h>
 #include <sys/un.h>
 #include <netpacket/rpmsg.h>
 #include <media_api.h>
@@ -199,7 +200,8 @@ out:
 
 void media_dump(const char *options)
 {
-    media_parcel in;
+    media_parcel in, out;
+    const char *response;
     void *proxy;
     int ret;
 
@@ -208,12 +210,25 @@ void media_dump(const char *options)
         return;
 
     media_parcel_init(&in);
+    media_parcel_init(&out);
 
     ret = media_parcel_append_printf(&in, "%i%s", MEDIA_DUMP, options);
-    if (ret >= 0)
-        media_client_send(proxy, &in);
+    if (ret < 0)
+        goto out;
 
+    ret = media_client_send_with_ack(proxy, &in, &out);
+    if (ret < 0)
+        goto out;
+
+    ret = media_parcel_read_scanf(&out, "%s", &response);
+    if (ret < 0)
+        goto out;
+
+    syslog(LOG_INFO, "\n%s\n", response);
+
+out:
     media_parcel_deinit(&in);
+    media_parcel_deinit(&out);
     media_client_disconnect(proxy);
 }
 

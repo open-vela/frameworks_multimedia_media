@@ -81,7 +81,9 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
 
         case MEDIA_DUMP:
             media_parcel_read_scanf(in, "%s", &param_s1);
-            media_graph_dump(media_get_graph(), param_s1);
+            response = media_graph_dump(media_get_graph(), param_s1);
+            media_parcel_append_printf(out, "%s", response);
+            free(response);
             break;
 
         case MEDIA_PLAYER_OPEN:

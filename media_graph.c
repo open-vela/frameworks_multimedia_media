@@ -299,19 +299,14 @@ int media_graph_process_command(void *handle, const char *target,
     return 0;
 }
 
-void media_graph_dump(void *handle, const char *options)
+char *media_graph_dump(void *handle, const char *options)
 {
     MediaGraphPriv *priv = handle;
-    char *tmp;
 
     if (!priv || !priv->graph)
-        return;
+        return NULL;
 
-    tmp = avfilter_graph_dump_ext(priv->graph, options);
-    if (tmp) {
-        av_log(NULL, AV_LOG_INFO, "%s\n%s", __func__, tmp);
-        free(tmp);
-    }
+    return avfilter_graph_dump_ext(priv->graph, options);
 }
 
 /****************************************************************************
