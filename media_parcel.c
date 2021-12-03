@@ -33,7 +33,7 @@
  * Private Functions
  ****************************************************************************/
 
-static int media_parcel_grow(media_parcel *parcel, size_t newsz)
+static int media_parcel_grow(media_parcel *parcel, size_t cursz, size_t newsz)
 {
     media_parcel_chunk *newchunk;
 
@@ -48,7 +48,7 @@ static int media_parcel_grow(media_parcel *parcel, size_t newsz)
         newchunk = malloc(MEDIA_PARCEL_HEADER_LEN + newsz);
         if (newchunk) {
             memcpy(newchunk, parcel->chunk,
-                   MEDIA_PARCEL_HEADER_LEN + parcel->chunk->len);
+                   MEDIA_PARCEL_HEADER_LEN + cursz);
         }
     } else {
         newchunk = realloc(parcel->chunk, MEDIA_PARCEL_HEADER_LEN + newsz);
@@ -105,7 +105,7 @@ int media_parcel_append(media_parcel *parcel, const void *data, size_t size)
     if (size == 0)
         return 0;
 
-    if ((rv = media_parcel_grow(parcel, size)) < 0)
+    if ((rv = media_parcel_grow(parcel, parcel->chunk->len, size)) < 0)
         return rv;
 
     memcpy(&parcel->chunk->buf[parcel->chunk->len], data, size);
@@ -280,7 +280,7 @@ int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset)
 
         *offset += ret;
         if (*offset == MEDIA_PARCEL_HEADER_LEN) {
-            ret = media_parcel_grow(parcel, parcel->chunk->len);
+            ret = media_parcel_grow(parcel, 0, parcel->chunk->len);
             len = MEDIA_PARCEL_HEADER_LEN + parcel->chunk->len;
             if (ret < 0)
                 return ret;
