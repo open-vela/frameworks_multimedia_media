@@ -160,7 +160,6 @@ static int media_server_accept(void *handle, struct pollfd *fd)
     struct media_server_priv *priv = handle;
     int new_fd;
     int i;
-    char ack = 0;
 
     if (priv == NULL || fd->fd <= 0 || fd->revents == 0)
         return -EINVAL;
@@ -170,15 +169,12 @@ static int media_server_accept(void *handle, struct pollfd *fd)
         return -errno;
 
     for (i = 0; i < MEDIA_SERVER_MAXCONN; i++) {
-        if (priv->conns[i].tran_fd <= 0 && send(new_fd, &ack, sizeof(ack), 0) > 0) {
+        if (priv->conns[i].tran_fd <= 0) {
             priv->conns[i].tran_fd = new_fd;
             media_parcel_init(&priv->conns[i].parcel);
             return 0;
         }
     }
-
-    ack = -1;
-    send(new_fd, &ack, sizeof(ack), 0);
     close(new_fd);
     return -EMFILE;
 }
