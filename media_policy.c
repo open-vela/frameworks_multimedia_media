@@ -212,7 +212,7 @@ int media_policy_set_string_(const char *name, const char *value, int apply)
     if (!priv || !priv->pfw || !name)
         return -EINVAL;
 
-    if (!pfwSetStringCriterion(priv->pfw, name, value))
+    if (!pfwSetCriterionString(priv->pfw, name, value))
         return -EINVAL;
     if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
@@ -227,7 +227,7 @@ int media_policy_get_string_(const char *name, char *value, size_t len)
     if (!priv || !priv->pfw || !name || !value)
         return -EINVAL;
 
-    return pfwGetStringCriterion(priv->pfw, name, value, len) ? 0 : -EINVAL;
+    return pfwGetCriterionString(priv->pfw, name, value, len) ? 0 : -EINVAL;
 }
 
 int media_policy_include_(const char *name, const char *values, int apply)
@@ -237,7 +237,7 @@ int media_policy_include_(const char *name, const char *values, int apply)
     if (!priv || !priv->pfw || !name)
         return -EINVAL;
 
-    if (!pfwIncludeStringCriterion(priv->pfw, name, values))
+    if (!pfwIncludeCriterion(priv->pfw, name, values))
         return -EINVAL;
     if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
@@ -252,7 +252,7 @@ int media_policy_exclude_(const char *name, const char *values, int apply)
     if (!priv || !priv->pfw || !name)
         return -EINVAL;
 
-    if (!pfwExcludeStringCriterion(priv->pfw, name, values))
+    if (!pfwExcludeCriterion(priv->pfw, name, values))
         return -EINVAL;
     if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
