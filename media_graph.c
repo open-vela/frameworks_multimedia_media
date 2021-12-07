@@ -468,7 +468,7 @@ int media_player_close_(void *handle, int pending_stop)
     free(priv->name);
     free(priv);
 
-    return 0;
+    return media_policy_exclude_(priv->name, priv->filter->name, true);
 }
 
 int media_player_set_event_callback_(void *handle, void *cookie,
@@ -525,7 +525,7 @@ int media_player_start_(void *handle)
     if (ret < 0)
         return ret;
 
-    return media_policy_increase_(priv->name, true);
+    return media_policy_include_(priv->name, priv->filter->name, true);
 }
 
 int media_player_stop_(void *handle)
@@ -540,17 +540,22 @@ int media_player_stop_(void *handle)
     if (ret < 0)
         return ret;
 
-    return media_policy_decrease_(priv->name, true);
+    return media_policy_exclude_(priv->name, priv->filter->name, true);
 }
 
 int media_player_pause_(void *handle)
 {
     MediaPlayerPriv *priv = handle;
+    int ret;
 
     if (!priv)
         return -EINVAL;
 
-    return avfilter_process_command(priv->filter, "pause", NULL, NULL, 0, 0);
+    ret =  avfilter_process_command(priv->filter, "pause", NULL, NULL, 0, 0);
+    if (ret < 0)
+        return ret;
+
+    return media_policy_exclude_(priv->name, priv->filter->name, true);
 }
 
 int media_player_set_looping_(void *handle, int loop)
