@@ -61,14 +61,14 @@ static void media_policy_free_criteria(PfwCriterion *criteria, int ncriteria)
             // free criterion names
             if (criteria[i].names) {
                 for (j = 0; criteria[i].names[j]; j++)
-                    free(criteria[i].names[j]);
+                    free((void *)criteria[i].names[j]);
                 free(criteria[i].names);
             }
 
             // free criterion values
             if (criteria[i].values) {
                 for (j = 0; criteria[i].values[j]; j++)
-                    free(criteria[i].values[j]);
+                    free((void *)criteria[i].values[j]);
                 free(criteria[i].values);
             }
         }
@@ -83,7 +83,7 @@ static int media_policy_parse_criteria(PfwCriterion **pcriteria, const char *pat
     FILE *fp;
     PfwCriterion *criteria;
     int ret = -EINVAL;
-    int i, j;
+    int i = 0, j;
 
     if (!(fp = fopen(path, "r")))
         return -errno;
@@ -99,7 +99,7 @@ static int media_policy_parse_criteria(PfwCriterion **pcriteria, const char *pat
       *  ExclusiveCriterion Color Colour : Red Grean Blue
       *  InclusiveCriterion Alphabet     : A B C D E F G
       */
-    for (i = 0; !feof(fp) && i < MEDIA_CRITERIA_MAXNUM; i++) {
+    for (; !feof(fp) && i < MEDIA_CRITERIA_MAXNUM; i++) {
         char line[MEDIA_CRITERIA_LINE_MAXLENGTH];
         char *token;
 
