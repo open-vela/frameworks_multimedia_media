@@ -125,7 +125,7 @@ static int media_server_receive(void *handle, struct pollfd *fd, struct media_se
         return 0;
     }
 
-    ret = media_parcel_recv(&conn->parcel, fd->fd, &conn->offset);
+    ret = media_parcel_recv(&conn->parcel, fd->fd, &conn->offset, 0);
     if (ret < 0)
         return ret;
 
@@ -138,7 +138,7 @@ static int media_server_receive(void *handle, struct pollfd *fd, struct media_se
     case MEDIA_PARCEL_SEND_ACK:
         media_parcel_init(&ack);
         priv->onreceive(conn, &conn->parcel, &ack);
-        ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY);
+        ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
         media_parcel_deinit(&ack);
         break;
 
@@ -320,5 +320,5 @@ int media_server_notify(void *handle, void *cookie, media_parcel *parcel)
     if (priv == NULL || conn == NULL || conn->notify_fd <= 0)
         return -EINVAL;
 
-    return media_parcel_send(parcel, conn->notify_fd, MEDIA_PARCEL_NOTIFY);
+    return media_parcel_send(parcel, conn->notify_fd, MEDIA_PARCEL_NOTIFY, 0);
 }

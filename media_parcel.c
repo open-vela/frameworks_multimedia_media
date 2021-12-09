@@ -239,7 +239,7 @@ int media_parcel_append_printf(media_parcel *parcel, const char *fmt, ...)
     return ret;
 }
 
-int media_parcel_send(media_parcel *parcel, int fd, uint32_t code)
+int media_parcel_send(media_parcel *parcel, int fd, uint32_t code, int flags)
 {
     const uint8_t *buf = (const uint8_t *)parcel->chunk;
     uint32_t len = MEDIA_PARCEL_HEADER_LEN + parcel->chunk->len;
@@ -247,7 +247,7 @@ int media_parcel_send(media_parcel *parcel, int fd, uint32_t code)
     parcel->chunk->code = code;
 
     while (len) {
-        ssize_t ret = send(fd, buf, len, 0);
+        ssize_t ret = send(fd, buf, len, flags);
         if (ret < 0)
             return -errno;
         buf += ret;
@@ -257,7 +257,7 @@ int media_parcel_send(media_parcel *parcel, int fd, uint32_t code)
     return 0;
 }
 
-int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset)
+int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset, int flags)
 {
     uint32_t len = MEDIA_PARCEL_HEADER_LEN + parcel->chunk->len;
     uint32_t tmp = 0;
@@ -271,7 +271,7 @@ int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset)
                            *offset < MEDIA_PARCEL_HEADER_LEN ?
                                 MEDIA_PARCEL_HEADER_LEN - *offset :
                                 len - *offset,
-                           0);
+                           flags);
         if (ret == 0)
             return -EPIPE;
 

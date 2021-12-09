@@ -69,8 +69,8 @@ int media_parcel_append_string(media_parcel *parcel, const char *str);
 int media_parcel_append_printf(media_parcel *parcel, const char *fmt, ...);
 int media_parcel_append_vprintf(media_parcel *parcel, const char *fmt, va_list *ap);
 
-int media_parcel_send(media_parcel *parcel, int fd, uint32_t code);
-int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset);
+int media_parcel_send(media_parcel *parcel, int fd, uint32_t code, int flags);
+int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset, int flags);
 
 uint32_t media_parcel_get_code(media_parcel *parcel);
 

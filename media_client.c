@@ -101,7 +101,7 @@ static void *media_client_listen_thread(pthread_addr_t pvarg)
     getsockname(listenfd, (struct sockaddr *)&addr, &socklen);
     media_parcel_append_string(&parcel, addr.rp_cpu);
 #endif
-    ret = media_parcel_send(&parcel, priv->fd, MEDIA_PARCEL_CREATE_NOTIFY);
+    ret = media_parcel_send(&parcel, priv->fd, MEDIA_PARCEL_CREATE_NOTIFY, 0);
     media_parcel_deinit(&parcel);
     if(ret < 0)
         goto thread_error;
@@ -112,7 +112,7 @@ static void *media_client_listen_thread(pthread_addr_t pvarg)
 
     while (1) {
         media_parcel_init(&parcel);
-        ret = media_parcel_recv(&parcel, acceptfd, NULL);
+        ret = media_parcel_recv(&parcel, acceptfd, NULL, 0);
         if (ret < 0)
             break;
 
@@ -189,7 +189,7 @@ int media_client_send(void *handle, media_parcel *in)
     if (priv == NULL || in == NULL)
         return -EINVAL;
 
-    return media_parcel_send(in, priv->fd, MEDIA_PARCEL_SEND);
+    return media_parcel_send(in, priv->fd, MEDIA_PARCEL_SEND, 0);
 }
 
 int media_client_send_with_ack(void *handle, media_parcel *in, media_parcel *out)
@@ -200,11 +200,11 @@ int media_client_send_with_ack(void *handle, media_parcel *in, media_parcel *out
     if (priv == NULL || in == NULL || out == NULL)
         return -EINVAL;
 
-    ret = media_parcel_send(in, priv->fd, MEDIA_PARCEL_SEND_ACK);
+    ret = media_parcel_send(in, priv->fd, MEDIA_PARCEL_SEND_ACK, 0);
     if (ret < 0)
         return ret;
 
-    ret = media_parcel_recv(out, priv->fd, NULL);
+    ret = media_parcel_recv(out, priv->fd, NULL, 0);
     if (ret < 0)
         return ret;
 
