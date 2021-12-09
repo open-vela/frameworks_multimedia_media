@@ -125,7 +125,7 @@ static int media_server_receive(void *handle, struct pollfd *fd, struct media_se
         return 0;
     }
 
-    ret = media_parcel_recv(&conn->parcel, fd->fd, &conn->offset, 0);
+    ret = media_parcel_recv(&conn->parcel, fd->fd, &conn->offset, MSG_DONTWAIT);
     if (ret < 0)
         return ret;
 
