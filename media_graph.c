@@ -110,6 +110,11 @@ static int media_graph_loadgraph(MediaGraphPriv *priv, char *conf)
     int ret;
     int fd;
 
+    av_log_set_callback(media_graph_log_callback);
+    avdevice_register_all();
+
+    av_log(NULL, AV_LOG_INFO, "%s, loadgraph from file: %s\n", __func__, conf);
+
     fd = open(conf, O_RDONLY | O_BINARY);
     if (fd < 0) {
         av_log(NULL, AV_LOG_ERROR, "%s, can't open media graph file\n", __func__);
@@ -124,10 +129,6 @@ static int media_graph_loadgraph(MediaGraphPriv *priv, char *conf)
         return -EFBIG;
 
     graph_desc[ret] = 0;
-    av_log(NULL, AV_LOG_INFO, "%s, loadgraph:\n%s\n", __func__, graph_desc);
-
-    avdevice_register_all();
-    av_log_set_callback(media_graph_log_callback);
 
     priv->graph = avfilter_graph_alloc();
     if (!priv->graph)
@@ -151,7 +152,7 @@ static int media_graph_loadgraph(MediaGraphPriv *priv, char *conf)
     priv->graph->ready  = media_graph_filter_ready;
     priv->graph->opaque = priv;
 
-    av_log(NULL, AV_LOG_ERROR, "%s, loadgraph succeed\n", __func__);
+    av_log(NULL, AV_LOG_INFO, "%s, loadgraph succeed\n", __func__);
     return 0;
 out:
     avfilter_graph_free(&priv->graph);
