@@ -59,8 +59,6 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
 
     media_parcel_read_int32(in, &cmd);
 
-    syslog(LOG_INFO, "%s: cmd %d begin, line %d\n", __func__, cmd, __LINE__);
-
     switch (cmd) {
         case MEDIA_PROCESS_COMMAND:
             media_parcel_read_scanf(in, "%s%s%s%i", &param_s1, &param_s2,
@@ -290,6 +288,4 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
         default:
             break;
     }
-
-    syslog(LOG_INFO, "%s: cmd %d end, line %d\n", __func__, cmd, __LINE__);
 }
