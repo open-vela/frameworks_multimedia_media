@@ -465,11 +465,15 @@ int media_player_close_(void *handle, int pending_stop)
     if (ret < 0)
         return ret;
 
+    ret = media_policy_exclude_(priv->name, priv->filter->name, true);
+    if (ret < 0)
+        return ret;
+
     priv->filter->opaque = NULL;
     free(priv->name);
     free(priv);
 
-    return media_policy_exclude_(priv->name, priv->filter->name, true);
+    return 0;
 }
 
 int media_player_set_event_callback_(void *handle, void *cookie,
