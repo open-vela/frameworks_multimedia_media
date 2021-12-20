@@ -37,7 +37,6 @@
 // criterion names
 #define MEDIA_POLICY_AUDIO_MODE         "AudioMode"
 #define MEDIA_POLICY_MUTE_MODE          "MuteMode"
-#define MEDIA_POLICY_NO_DISTURB_MODE    "NoDisturbMode"
 #define MEDIA_POLICY_DEVICES            "AvailableDevices"
 #define MEDIA_POLICY_VOLUME             "Volume"
 
@@ -65,17 +64,6 @@ int media_policy_set_mute_mode(int mute)
 int media_policy_get_mute_mode(int *mute)
 {
     return media_policy_get_int(MEDIA_POLICY_AUDIO_MODE, mute);
-}
-
-int media_policy_set_no_disturb_mode(int no_disturb)
-{
-    return media_policy_set_int(MEDIA_POLICY_NO_DISTURB_MODE, no_disturb,
-                                MEDIA_POLICY_APPLY);
-}
-
-int media_policy_get_no_disturb_mode(int *no_disturb)
-{
-    return media_policy_get_int(MEDIA_POLICY_NO_DISTURB_MODE, no_disturb);
 }
 
 int media_policy_set_devices_available(const char *devices)
