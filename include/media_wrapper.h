@@ -82,24 +82,6 @@ int media_policy_set_mute_mode(int mute);
 int media_policy_get_mute_mode(int *mute);
 
 /**
- * Set no-disturb mode.
- * @param[in] no_disturb    new no-disturb mode.
- *                          - 0: no-disturb mode is off.
- *                          - 1: no-disturb mode is on.
- * @return Zero on success; a negated errno value on failure.
- */
-int media_policy_set_no_disturb_mode(int no_disturb);
-
-/**
- * Get no-disturb mode.
- * @param[in] no_disturb    current no-disturb mode.
- *                          - 0: no-disturb mode is off.
- *                          - 1: no-disturb mode is on.
- * @return Zero on success; a negated errno value on failure.
- */
-int media_policy_get_no_disturb_mode(int *no_disturb);
-
-/**
  * Set divices available.
  * @param[in] devices   new available devices, MEDIA_DEVICE_XXX.
  * @return Zero on success; a negated errno value on failure.
