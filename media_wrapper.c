@@ -63,7 +63,7 @@ int media_policy_set_mute_mode(int mute)
 
 int media_policy_get_mute_mode(int *mute)
 {
-    return media_policy_get_int(MEDIA_POLICY_AUDIO_MODE, mute);
+    return media_policy_get_int(MEDIA_POLICY_MUTE_MODE, mute);
 }
 
 int media_policy_set_devices_available(const char *devices)
