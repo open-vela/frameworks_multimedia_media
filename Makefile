@@ -34,6 +34,7 @@ ifneq ($(CONFIG_MEDIA_SERVER),)
 
   CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/ffmpeg}
   CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework}
+  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/framework/kvdb}
 endif
 
 ifneq ($(CONFIG_PFW),)

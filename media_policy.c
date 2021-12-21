@@ -23,6 +23,7 @@
  ****************************************************************************/
 
 #include <bindings/c/ParameterFramework.h>
+#include <cutils/properties.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +37,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+#define MEDIA_PERSIST                   "persist.media."
 #define MEDIA_CRITERIA_MAXNUM           64
 #define MEDIA_CRITERIA_LINE_MAXLENGTH   256
 
@@ -50,6 +52,57 @@ typedef struct MediaPolicyPriv {
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+/**
+ * Save criterion value to kvdb.
+ *
+ * Criterion has int32_t type, though users can set/get criterion with
+ * integer or string, here we just save criterion's integer value.
+ *
+ * Only for criteria whose real name start with MEDIA_PERSIST.
+ *
+ * @param pfw           parameter-framework manager instance handle.
+ * @param name          criterion name.
+ * @return Zero on success; a negated errno value on failure.
+ */
+static int media_policy_save_kvdb(PfwHandler *pfw, const char *name)
+{
+    char real_name[64];
+    int value;
+
+    if (!pfwGetCriterionRealName(pfw, name, real_name, sizeof(real_name)))
+        return -EINVAL;
+
+    if (strncmp(real_name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
+        return 0;
+
+    if (!pfwGetCriterion(pfw, real_name, &value))
+        return -EINVAL;
+
+    return property_set_int32(real_name, value);
+}
+
+/**
+ * Load criteria values from kvdb.
+ *
+ * Only for criteria whose real name start with MEDIA_PERSIST.
+ *
+ * @param criteria  criteria data structure.
+ * @param ncriteria criteria number.
+ */
+static void media_policy_load_kvdb(PfwCriterion *criteria, int ncriteria)
+{
+    int i;
+
+    for (i = 0; i < ncriteria; i++) {
+        const char *real_name = criteria[i].names[0];
+
+        if (strncmp(real_name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
+            continue;
+
+        criteria[i].initial = property_get_int32(real_name, criteria[i].initial);
+    }
+}
 
 static void media_policy_free_criteria(PfwCriterion *criteria, int ncriteria)
 {
@@ -93,11 +146,28 @@ static int media_policy_parse_criteria(PfwCriterion **pcriteria, const char *pat
     if (!criteria)
         goto err_alloc;
 
-    /** one criterion definition each line
+    /** one criterion definition each line, example:
       *
-      * example:
-      *  ExclusiveCriterion Color Colour : Red Grean Blue
+      * text to be parsed:
+      *  ExclusiveCriterion Color Colour : Red Grean Blue : 1
       *  InclusiveCriterion Alphabet     : A B C D E F G
+      *
+      * after parsing:
+      * {
+      *     {
+      *         .names     = { "Color", "Colour", NULL },
+      *         .inclusive = false,
+      *         .values    = { "Red", "Grean", "Blue", NULL },
+      *         .initial   = 1,
+      *     },
+      *     {
+      *         .names     = { "Alphabet", NULL },
+      *         .inclusive = true,
+      *         .values    = { "A", "B", "C", "D", "E", "F", "G", NULL },
+      *         .initial   = 0,
+      *     },
+      * }
+      *
       */
     for (; !feof(fp) && i < MEDIA_CRITERIA_MAXNUM; i++) {
         char line[MEDIA_CRITERIA_LINE_MAXLENGTH];
@@ -192,7 +262,7 @@ int media_policy_set_int_(const char *name, int value, int apply)
     if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
 
-    return 0;
+    return media_policy_save_kvdb(priv->pfw, name);
 }
 
 int media_policy_get_int_(const char *name, int *value)
@@ -217,7 +287,7 @@ int media_policy_set_string_(const char *name, const char *value, int apply)
     if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
 
-    return 0;
+    return media_policy_save_kvdb(priv->pfw, name);
 }
 
 int media_policy_get_string_(const char *name, char *value, size_t len)
@@ -242,7 +312,7 @@ int media_policy_include_(const char *name, const char *values, int apply)
     if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
 
-    return 0;
+    return media_policy_save_kvdb(priv->pfw, name);
 }
 
 int media_policy_exclude_(const char *name, const char *values, int apply)
@@ -257,7 +327,7 @@ int media_policy_exclude_(const char *name, const char *values, int apply)
     if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
 
-    return 0;
+    return media_policy_save_kvdb(priv->pfw, name);
 }
 
 int media_policy_increase_(const char *name, int apply)
@@ -275,7 +345,7 @@ int media_policy_increase_(const char *name, int apply)
     if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
 
-    return 0;
+    return media_policy_save_kvdb(priv->pfw, name);
 }
 
 int media_policy_decrease_(const char *name, int apply)
@@ -293,7 +363,7 @@ int media_policy_decrease_(const char *name, int apply)
     if (apply && !pfwApplyConfigurations(priv->pfw))
         return -EINVAL;
 
-    return 0;
+    return media_policy_save_kvdb(priv->pfw, name);
 }
 
 /****************************************************************************
@@ -329,9 +399,15 @@ void *media_policy_create(void *files)
     if (!priv)
         return NULL;
 
+    // parse criteria.
     ncriteria = media_policy_parse_criteria(&criteria, file_paths[1]);
     if (ncriteria <= 0)
         goto err_parse;
+
+    // load persist criteria values from kvdb.
+    media_policy_load_kvdb(criteria, ncriteria);
+
+    // create and start parameter-framework manager.
     if (!(priv->pfw = pfwCreate()))
         goto err_pfw;
     if (!pfwStart(priv->pfw, file_paths[0], criteria, ncriteria, &logger))
