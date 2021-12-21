@@ -32,7 +32,6 @@
 #define MEDIA_EVENT_STOPPED             4
 #define MEDIA_EVENT_SEEKED              5
 #define MEDIA_EVENT_COMPLETED           6
-#define MEDIA_EVENT_TIMEUPDATED         7
 
 /****************************************************************************
  * Public Types
