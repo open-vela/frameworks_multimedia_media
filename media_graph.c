@@ -228,7 +228,7 @@ int media_graph_get_pollfds(void *handle, struct pollfd *fds,
         if (ret < 0)
             continue;
 
-        while (fds[nfd].events) {
+        while (ret--) {
             cookies[nfd++] = filter;
             if (nfd > count)
                 return -EINVAL;
