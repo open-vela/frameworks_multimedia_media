@@ -36,8 +36,9 @@
 
 // criterion names
 #define MEDIA_POLICY_AUDIO_MODE         "AudioMode"
-#define MEDIA_POLICY_MUTE_MODE          "MuteMode"
 #define MEDIA_POLICY_DEVICES            "AvailableDevices"
+#define MEDIA_POLICY_HFP_SAMPLERATE     "HFPSampleRate"
+#define MEDIA_POLICY_MUTE_MODE          "MuteMode"
 #define MEDIA_POLICY_VOLUME             "Volume"
 
 /****************************************************************************
@@ -53,6 +54,12 @@ int media_policy_set_audio_mode(const char *mode)
 int media_policy_get_audio_mode(char *mode, int len)
 {
     return media_policy_get_string(MEDIA_POLICY_AUDIO_MODE, mode, len);
+}
+
+int media_policy_set_hfp_samplerate(const char *rate)
+{
+    return media_policy_set_string(MEDIA_POLICY_HFP_SAMPLERATE, rate,
+                                   MEDIA_POLICY_NOT_APPLY);
 }
 
 int media_policy_set_mute_mode(int mute)
