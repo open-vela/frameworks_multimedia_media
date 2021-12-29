@@ -34,6 +34,15 @@ extern "C" {
 
 #define MEDIA_DEVICE_A2DP            "a2dp"     /*!< bt cellphone */
 
+#define MEDIA_SAMPLERATE_8000        "8000"
+#define MEDIA_SAMPLERATE_16000       "16000"
+#define MEDIA_SAMPLERATE_22050       "22050"
+#define MEDIA_SAMPLERATE_32000       "32000"
+#define MEDIA_SAMPLERATE_44100       "44100"
+#define MEDIA_SAMPLERATE_48000       "48000"
+#define MEDIA_SAMPLERATE_96000       "96000"
+#define MEDIA_SAMPLERATE_192000      "192000"
+
 #define MEDIA_STREAM_SCO             "SCO"      /*!< in call */
 #define MEDIA_STREAM_RING            "Ring"
 #define MEDIA_STREAM_NOTIFICATION    "Notify"   /*!< message notification */
@@ -62,6 +71,13 @@ int media_policy_set_audio_mode(const char *mode);
  * @return Zero on success; a negated errno value on failure.
  */
 int media_policy_get_audio_mode(char *mode, int len);
+
+/**
+ * Set hfp(hands free protocol) sampling rate.
+ * @param[in] rate  sampling rate for SCO, MEDIA_SAMPLING_RATE_XXX.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_set_hfp_samplerate(const char *rate);
 
 /**
  * Set mute mode.
