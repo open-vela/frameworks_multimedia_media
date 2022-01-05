@@ -300,8 +300,6 @@ static void mediatool_common_stop_thread(struct mediatool_chain_s *chain)
 {
     if (chain->thread) {
 
-        chain->exit = 1;
-
         pthread_join(chain->thread, NULL);
         free(chain->buf);
         close(chain->fd);
@@ -317,7 +315,8 @@ static int mediatool_common_stop_inner(struct mediatool_chain_s *chain)
 {
     int ret = 0;
 
-    chain->exit = 1;
+    if (chain->thread)
+        chain->exit = 1;
 
     if (!chain->player)
         ret = media_recorder_stop(chain->handle);
@@ -433,7 +432,8 @@ static int mediatool_common_cmd_close(struct mediatool_s *media, char *pargs)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    media->chain[id].exit = 1;
+    if (media->chain[id].thread)
+        media->chain[id].exit = 1;
 
     if (media->chain[id].player)
         ret = media_player_close(media->chain[id].handle, pending_stop);
