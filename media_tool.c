@@ -211,47 +211,47 @@ static struct mediatool_cmd_s g_mediatool_cmds[] =
     {
         "dump",
         mediatool_server_cmd_dump,
-        "Graph dump"
+        "Dump graph and policy"
     },
     {
         "setint",
         mediatool_policy_cmd_setint,
-        "set criterion value with integer"
+        "set criterion value with integer(setint NAME VALUE APPLY)"
     },
     {
         "getint",
         mediatool_policy_cmd_getint,
-        "get criterion value in integer"
+        "get criterion value in integer(getint NAME)"
     },
     {
         "setstring",
         mediatool_policy_cmd_setstring,
-        "set criterion value with string"
+        "set criterion value with string(setstring NAME VALUE APPLY)"
     },
     {
         "getstring",
         mediatool_policy_cmd_getstring,
-        "get criterion value in string"
+        "get criterion value in string(getstring NAME)"
     },
     {
         "include",
         mediatool_policy_cmd_include,
-        "include inclusive criterion values"
+        "include inclusive criterion values(include NAME VALUE APPLY)"
     },
     {
         "exclude",
         mediatool_policy_cmd_exclude,
-        "exclude inclusive criterion values"
+        "exclude inclusive criterion values(exclude NAME VALUE APPLY)"
     },
     {
         "increase",
         mediatool_policy_cmd_increase,
-        "increase criterion value by one"
+        "increase criterion value by one(increase NAME APPLY)"
     },
     {
         "decrease",
         mediatool_policy_cmd_decrease,
-        "decrease criterion value by one"
+        "decrease criterion value by one(decrease NAME APPLY)"
     },
     {
         "q",
@@ -865,7 +865,12 @@ static int mediatool_common_cmd_send(struct mediatool_s *media, char *pargs)
 
 static int mediatool_server_cmd_dump(struct mediatool_s *media, char *pargs)
 {
-    media_dump(pargs);
+    /* pargs not used in neither graph_dump nor policy_dump,
+     * so let's make it simple, just "dump".
+     */
+    media_graph_dump(pargs);
+    media_policy_dump(pargs);
+
     return 0;
 }
 
