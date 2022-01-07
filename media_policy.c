@@ -366,6 +366,16 @@ int media_policy_decrease_(const char *name, int apply)
     return media_policy_save_kvdb(priv->pfw, name);
 }
 
+char *media_policy_dump_(const char *options)
+{
+    MediaPolicyPriv *priv = media_get_policy();
+
+    if (!priv || !priv->pfw)
+        return NULL;
+
+    return pfwDump(priv->pfw, options);
+}
+
 /****************************************************************************
  * Public Functions for daemon
  ****************************************************************************/
@@ -477,6 +487,11 @@ int media_policy_increase_(const char *name, int apply)
 int media_policy_decrease_(const char *name, int apply)
 {
     return 0;
+}
+
+char *media_policy_dump_(const char *options)
+{
+    return NULL;
 }
 
 #endif
