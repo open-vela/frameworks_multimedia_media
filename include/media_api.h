@@ -30,6 +30,7 @@
 #include <media_player.h>
 #include <media_policy.h>
 #include <media_recorder.h>
+#include <media_wrapper.h>
 
 #ifdef __cplusplus
 #define EXTERN extern "C"
@@ -52,10 +53,16 @@ int media_process_command(const char *target, const char *cmd,
                           const char *arg, char *res, int res_len);
 
 /**
- * Dump media
- * @param[in] options dump options
+ * Dump media graph
+ * @param[in] options   dump options
  */
-void media_dump(const char *options);
+void media_graph_dump(const char *options);
+
+/**
+ * Dump media policy
+ * @param[in] options   dump options
+ */
+void media_policy_dump(const char *options);
 
 #undef EXTERN
 #ifdef __cplusplus

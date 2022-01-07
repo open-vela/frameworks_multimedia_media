@@ -37,7 +37,7 @@ extern "C" {
  ****************************************************************************/
 
 #define MEDIA_PROCESS_COMMAND        1
-#define MEDIA_DUMP                   2
+#define MEDIA_GRAPH_DUMP             2
 #define MEDIA_PLAYER_OPEN            3
 #define MEDIA_PLAYER_CLOSE           4
 #define MEDIA_PLAYER_SET_CALLBACK    5
@@ -70,6 +70,7 @@ extern "C" {
 #define MEDIA_POLICY_EXCLUDE         32
 #define MEDIA_POLICY_INCREASE        33
 #define MEDIA_POLICY_DECREASE        34
+#define MEDIA_POLICY_DUMP            35
 
 /****************************************************************************
  * Media Functions
@@ -100,7 +101,7 @@ int media_graph_run_once(void *handle);
 int media_graph_process_command(void *handle, const char *target,
                                 const char *cmd, const char *arg,
                                 char *res, int res_len);
-char *media_graph_dump(void *handle, const char *options);
+char *media_graph_dump_(void *handle, const char *options);
 
 /****************************************************************************
  * Player Functions
@@ -152,6 +153,7 @@ int media_policy_include_(const char *name, const char *values, int apply);
 int media_policy_exclude_(const char *name, const char *values, int apply);
 int media_policy_increase_(const char *name, int apply);
 int media_policy_decrease_(const char *name, int apply);
+char *media_policy_dump_(const char *options);
 
 #ifdef __cplusplus
 }

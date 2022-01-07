@@ -77,9 +77,9 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
             free(response);
             break;
 
-        case MEDIA_DUMP:
+        case MEDIA_GRAPH_DUMP:
             media_parcel_read_scanf(in, "%s", &param_s1);
-            response = media_graph_dump(media_get_graph(), param_s1);
+            response = media_graph_dump_(media_get_graph(), param_s1);
             media_parcel_append_printf(out, "%s", response);
             free(response);
             break;
@@ -283,6 +283,13 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
             media_parcel_read_scanf(in, "%s%i", &param_s1, &param_i32);
             ret = media_policy_decrease_(param_s1, param_i32);
             media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_POLICY_DUMP:
+            media_parcel_read_scanf(in, "%s", &param_s1);
+            response = media_policy_dump_(param_s1);
+            media_parcel_append_printf(out, "%s", response);
+            free(response);
             break;
 
         default:

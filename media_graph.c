@@ -300,7 +300,7 @@ int media_graph_process_command(void *handle, const char *target,
     return 0;
 }
 
-char *media_graph_dump(void *handle, const char *options)
+char *media_graph_dump_(void *handle, const char *options)
 {
     MediaGraphPriv *priv = handle;
 

@@ -198,7 +198,7 @@ out:
     return ret;
 }
 
-void media_dump(const char *options)
+void media_graph_dump(const char *options)
 {
     media_parcel in, out;
     const char *response;
@@ -212,7 +212,7 @@ void media_dump(const char *options)
     media_parcel_init(&in);
     media_parcel_init(&out);
 
-    ret = media_parcel_append_printf(&in, "%i%s", MEDIA_DUMP, options);
+    ret = media_parcel_append_printf(&in, "%i%s", MEDIA_GRAPH_DUMP, options);
     if (ret < 0)
         goto out;
 
@@ -849,4 +849,38 @@ int media_policy_decrease(const char *name, int apply)
     media_client_disconnect(proxy);
 
     return ret < 0 ? ret : resp;
+}
+
+void media_policy_dump(const char *options)
+{
+    media_parcel in, out;
+    const char *response;
+    void *proxy;
+    int ret;
+
+    proxy = media_client_connect();
+    if (!proxy)
+        return;
+
+    media_parcel_init(&in);
+    media_parcel_init(&out);
+
+    ret = media_parcel_append_printf(&in, "%i%s", MEDIA_POLICY_DUMP, options);
+    if (ret < 0)
+        goto out;
+
+    ret = media_client_send_with_ack(proxy, &in, &out);
+    if (ret < 0)
+        goto out;
+
+    ret = media_parcel_read_scanf(&out, "%s", &response);
+    if (ret < 0)
+        goto out;
+
+    syslog(LOG_INFO, "\n%s\n", response);
+
+out:
+    media_parcel_deinit(&in);
+    media_parcel_deinit(&out);
+    media_client_disconnect(proxy);
 }
