@@ -124,7 +124,11 @@ static void entrypoint(CSubsystemLibrary* subsystemLibrary, core::log::Logger& l
     );
 }
 
-extern const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[] =
+/* let linker find symbol in parameter-framework lib */
+extern const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[];
+extern int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE;
+
+const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[] =
 {
     {
         QUOTE(PARAMETER_FRAMEWORK_PLUGIN_ENTRYPOINT_V1),
@@ -132,6 +136,6 @@ extern const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[] =
     },
 };
 
-extern int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE =
+int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE =
     sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB) /
     sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[0]);
