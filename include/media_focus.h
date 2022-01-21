@@ -29,6 +29,7 @@
 #define MEDIA_FOCUS_PAUSE               2   // media pause
 #define MEDIA_FOCUS_PLAY_BUT_SILENT     3   // media play but silent in background
 #define MEDIA_FOCUS_PLAY_WITH_DUCK      4   // media play in background, duck volumn down
+#define MEDIA_FOCUS_PLAY_WITH_KEEP      5   // media play keep current status in background
 
 /****************************************************************************
  * Public Types
