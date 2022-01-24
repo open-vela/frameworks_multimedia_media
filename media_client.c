@@ -39,6 +39,7 @@ struct media_client_priv {
     void                  *cookie;
     media_client_event_cb event_cb;
     pthread_t             thread;
+    pthread_mutex_t       mutex;
 };
 
 /****************************************************************************
@@ -158,6 +159,7 @@ void *media_client_connect(void)
     if (connect(priv->fd, (struct sockaddr *)&addr, len) < 0)
         goto connect_error;
 
+    pthread_mutex_init(&priv->mutex, NULL);
     return priv;
 
 connect_error:
@@ -178,6 +180,7 @@ int media_client_disconnect(void *handle)
         close(priv->fd);
     if(priv->thread > 0)
         pthread_join(priv->thread, NULL);
+    pthread_mutex_destroy(&priv->mutex);
     free(priv);
     return 0;
 }
@@ -185,11 +188,17 @@ int media_client_disconnect(void *handle)
 int media_client_send(void *handle, media_parcel *in)
 {
     struct media_client_priv *priv = handle;
+    int ret;
 
     if (priv == NULL || in == NULL)
         return -EINVAL;
 
-    return media_parcel_send(in, priv->fd, MEDIA_PARCEL_SEND, 0);
+    pthread_mutex_lock(&priv->mutex);
+
+    ret = media_parcel_send(in, priv->fd, MEDIA_PARCEL_SEND, 0);
+
+    pthread_mutex_unlock(&priv->mutex);
+    return ret;
 }
 
 int media_client_send_with_ack(void *handle, media_parcel *in, media_parcel *out)
@@ -200,30 +209,45 @@ int media_client_send_with_ack(void *handle, media_parcel *in, media_parcel *out
     if (priv == NULL || in == NULL || out == NULL)
         return -EINVAL;
 
+    pthread_mutex_lock(&priv->mutex);
+
     ret = media_parcel_send(in, priv->fd, MEDIA_PARCEL_SEND_ACK, 0);
     if (ret < 0)
-        return ret;
+        goto out;
 
     ret = media_parcel_recv(out, priv->fd, NULL, 0);
     if (ret < 0)
-        return ret;
+        goto out;
 
-    if (media_parcel_get_code(out) != MEDIA_PARCEL_REPLY)
-        return -EIO;
+    if (media_parcel_get_code(out) != MEDIA_PARCEL_REPLY) {
+        ret = -EIO;
+        goto out;
+    }
+out:
+    pthread_mutex_unlock(&priv->mutex);
     return ret;
 }
 
 int media_client_set_event_cb(void *handle, void *event_cb, void *cookie)
 {
     struct media_client_priv *priv = handle;
+    int ret;
+
     if (priv == NULL || event_cb == NULL)
         return -EINVAL;
 
+    pthread_mutex_lock(&priv->mutex);
+
     priv->event_cb = event_cb;
     priv->cookie = cookie;
-    if (priv->thread > 0)
+    if (priv->thread > 0) {
+        pthread_mutex_unlock(&priv->mutex);
         return 0;
-    return pthread_create(&priv->thread, NULL, media_client_listen_thread, (pthread_addr_t)priv);
+    }
+    ret = pthread_create(&priv->thread, NULL, media_client_listen_thread, (pthread_addr_t)priv);
+
+    pthread_mutex_unlock(&priv->mutex);
+    return ret;
 }
 
 int media_client_send_recieve(void *handle, const char *in_fmt, const char *out_fmt, ...)
