@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <malloc.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <syslog.h>
 #include <sys/un.h>
@@ -40,7 +41,7 @@
 typedef struct MediaProxyPriv {
     void                  *proxy;
     uint64_t              handle;
-    int                   refs;
+    atomic_int            refs;
     int                   socket;
     void                  *cookie;
     media_event_callback  event;
@@ -88,7 +89,7 @@ static ssize_t media_process_data(void *handle, bool player,
     if (!handle || !data || !len)
         return ret;
 
-    priv->refs++;
+    atomic_fetch_add(&priv->refs, 1);
 
     if (priv->socket <= 0) {
 #ifdef CONFIG_MEDIA_SERVER
@@ -130,7 +131,7 @@ out:
         ret = -errno;
     }
 
-    if (!--priv->refs)
+    if (atomic_fetch_sub(&priv->refs, 1) == 1)
         free(priv);
 
     return ret;
@@ -250,7 +251,7 @@ void *media_player_open(const char *params)
     if (ret < 0 || !priv->handle)
         goto disconnect;
 
-    priv->refs = 1;
+    atomic_store(&priv->refs, 1);
     return priv;
 
 disconnect:
@@ -281,7 +282,7 @@ int media_player_close(void *handle, int pending_stop)
     if (ret < 0)
         return ret;
 
-    if (!--priv->refs) {
+    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
         if (priv->socket)
             close(priv->socket);
 
@@ -369,7 +370,7 @@ int media_player_stop(void *handle)
     if (!priv)
         return -EINVAL;
 
-    if (priv->refs == 1 && priv->socket) {
+    if (atomic_load(&priv->refs) == 1 && priv->socket) {
         close(priv->socket);
         priv->socket = 0;
     }
@@ -549,7 +550,7 @@ void *media_recorder_open(const char *params)
     if (ret < 0 || !priv->handle)
         goto disconnect;
 
-    priv->refs = 1;
+    atomic_store(&priv->refs, 1);
     return priv;
 
 disconnect:
@@ -580,7 +581,7 @@ int media_recorder_close(void *handle)
     if (ret < 0)
         return ret;
 
-    if (!--priv->refs) {
+    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
         if (priv->socket)
             close(priv->socket);
 
@@ -667,7 +668,7 @@ int media_recorder_stop(void *handle)
     if (!priv)
         return -EINVAL;
 
-    if (priv->refs == 1 && priv->socket) {
+    if (atomic_load(&priv->refs) == 1 && priv->socket) {
         close(priv->socket);
         priv->socket = 0;
     }
