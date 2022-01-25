@@ -35,7 +35,7 @@
  * Public Types
  ****************************************************************************/
 
-typedef void (*media_focus_callback)(int return_type);
+typedef void (*media_focus_callback)(int return_type, void* callback_argv);
 
 /****************************************************************************
  * Public Functions
@@ -51,6 +51,7 @@ typedef void (*media_focus_callback)(int return_type);
  *   return_type            - pointer of play return suggestion for app
  *   stream_type            - one of stream types defined in media_wrapper.h
  *   callback_method        - callback method of request app
+ *   callback_argv          - argument of callback
  *
  * Returned Value:
  *   Return NULL when request failed.
@@ -67,7 +68,8 @@ typedef void (*media_focus_callback)(int return_type);
 
 void* media_focus_request(int* return_type,
     const char* stream_type,
-    media_focus_callback callback_method);
+    media_focus_callback callback_method,
+    void* callback_argv);
 
 /****************************************************************************
  * Name: media_focus_abandon
@@ -96,6 +98,7 @@ typedef struct media_focus_id {
     unsigned int thread_id;
     int focus_state;
     media_focus_callback callback_method;
+    void* callback_argv;
 } media_focus_id;
 
 /****************************************************************************
