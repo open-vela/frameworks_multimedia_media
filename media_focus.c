@@ -51,7 +51,6 @@
 #define MEDIA_FOCUS_FILE_READ_STREAM_TYPE   1
 #define MEDIA_FOCUS_FILE_READ_STREAM_NUM    2
 
-
 #define ID_TO_HANDLE(x) ((x << ID_SHIFT) | 0x0000000F)
 #define HANDLE_TO_ID(x) (x >> ID_SHIFT)
 
@@ -333,7 +332,7 @@ static void media_focus_stack_callback(
 
     // step 2: get focus return type of focus change listener
     if (cur_id != NULL && req_id != NULL) {
-        req_id->focus_callback(media_focus_play_arbitrate(cur_id, req_id));
+        req_id->focus_callback(media_focus_play_arbitrate(cur_id, req_id), req_id->callback_argv);
     }
 }
 
@@ -456,7 +455,8 @@ static int media_focus_focus_id_insert(void* x, app_focus_id* new_focus_id)
 
 void* media_focus_request(int* return_type,
     const char* stream_type,
-    media_focus_callback callback_method)
+    media_focus_callback callback_method,
+    void* callback_argv)
 {
     int i;
     int ret = -EINVAL;
@@ -508,6 +508,7 @@ void* media_focus_request(int* return_type,
     new_id.thread_id = getpid();
     new_id.focus_state = APP_FOCUS_STATE_STACK_QUIT;
     new_id.focus_callback = callback_method;
+    new_id.callback_argv = callback_argv;
 
     // step 7: get exist top focus id
     if (app_focus_stack_top(g_media_focus->stack, &tmp_id) == 0) {
