@@ -36,13 +36,16 @@
 
 // criterion names
 #define MEDIA_POLICY_AUDIO_MODE         "AudioMode"
-#define MEDIA_POLICY_DEVICES            "AvailableDevices"
+
+#define MEDIA_POLICY_DEVICE_USE         "UsingDevices"
+#define MEDIA_POLICY_DEVICE_AVAILABLE   "AvailableDevices"
 #define MEDIA_POLICY_HFP_SAMPLERATE     "HFPSampleRate"
+
 #define MEDIA_POLICY_MUTE_MODE          "MuteMode"
 #define MEDIA_POLICY_VOLUME             "Volume"
 
 /****************************************************************************
- * Public Functions
+ * Public Functions for Mode Control
  ****************************************************************************/
 
 int media_policy_set_audio_mode(const char *mode)
@@ -56,11 +59,54 @@ int media_policy_get_audio_mode(char *mode, int len)
     return media_policy_get_string(MEDIA_POLICY_AUDIO_MODE, mode, len);
 }
 
+/****************************************************************************
+ * Public Functions for Devices Control
+ ****************************************************************************/
+
+int media_policy_set_devices_use(const char *devices)
+{
+    return media_policy_include(MEDIA_POLICY_DEVICE_USE, devices,
+                                MEDIA_POLICY_APPLY);
+}
+
+int media_policy_set_devices_unuse(const char *devices)
+{
+    return media_policy_exclude(MEDIA_POLICY_DEVICE_USE, devices,
+                                MEDIA_POLICY_APPLY);
+}
+
+int media_policy_get_devices_use(char *devices, int len)
+{
+    return media_policy_get_string(MEDIA_POLICY_DEVICE_USE, devices, len);
+}
+
 int media_policy_set_hfp_samplerate(const char *rate)
 {
+    // Setting sample rate should not change graph state.
     return media_policy_set_string(MEDIA_POLICY_HFP_SAMPLERATE, rate,
                                    MEDIA_POLICY_NOT_APPLY);
 }
+
+int media_policy_set_devices_available(const char *devices)
+{
+    return media_policy_include(MEDIA_POLICY_DEVICE_AVAILABLE, devices,
+                                MEDIA_POLICY_APPLY);
+}
+
+int media_policy_set_devices_unavailable(const char *devices)
+{
+    return media_policy_exclude(MEDIA_POLICY_DEVICE_AVAILABLE, devices,
+                                MEDIA_POLICY_APPLY);
+}
+
+int media_policy_get_devices_available(char *devices, int len)
+{
+    return media_policy_get_string(MEDIA_POLICY_DEVICE_AVAILABLE, devices, len);
+}
+
+/****************************************************************************
+ * Public Functions for Volume Control
+ ****************************************************************************/
 
 int media_policy_set_mute_mode(int mute)
 {
@@ -71,23 +117,6 @@ int media_policy_set_mute_mode(int mute)
 int media_policy_get_mute_mode(int *mute)
 {
     return media_policy_get_int(MEDIA_POLICY_MUTE_MODE, mute);
-}
-
-int media_policy_set_devices_available(const char *devices)
-{
-    return media_policy_include(MEDIA_POLICY_DEVICES, devices,
-                                MEDIA_POLICY_APPLY);
-}
-
-int media_policy_set_devices_unavailable(const char *devices)
-{
-    return media_policy_exclude(MEDIA_POLICY_DEVICES, devices,
-                                MEDIA_POLICY_APPLY);
-}
-
-int media_policy_get_devices_available(char *devices, int len)
-{
-    return media_policy_get_string(MEDIA_POLICY_DEVICES, devices, len);
 }
 
 int media_policy_set_stream_volume(const char *stream, int volume)
