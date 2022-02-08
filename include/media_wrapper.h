@@ -33,6 +33,7 @@ extern "C" {
 #define MEDIA_AUDIO_MODE_PHONE       "phone"
 
 #define MEDIA_DEVICE_A2DP            "a2dp"     /*!< bt cellphone */
+#define MEDIA_DEVICE_SCO             "sco"      /*!< phone */
 
 #define MEDIA_SAMPLERATE_8000        "8000"
 #define MEDIA_SAMPLERATE_16000       "16000"
@@ -54,13 +55,15 @@ extern "C" {
 #define MEDIA_STREAM_SYSTEM_ENFORCED "Enforced"
 
 /****************************************************************************
- * Public Functions
+ * Public Functions for Mode Control
  ****************************************************************************/
 
 /**
  * Set audio mode.
  * @param[in] mode  new audio mode, MEDIA_AUDIO_MODE_XXX.
  * @return Zero on success; a negated errno value on failure.
+ * @note Before changing mode, call media_policy_set_btsco_use(0), which
+ *       can turn off SCO and avoid noise.
  */
 int media_policy_set_audio_mode(const char *mode);
 
@@ -72,30 +75,41 @@ int media_policy_set_audio_mode(const char *mode);
  */
 int media_policy_get_audio_mode(char *mode, int len);
 
+/****************************************************************************
+ * Public Functions for Devices Control
+ ****************************************************************************/
+
+/**
+ * Set divices using.
+ * @param[in] devices   new using devices, MEDIA_DEVICE_XXX.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_set_devices_use(const char *devices);
+
+/**
+ * Set divices not using.
+ * @param[in] devices   new unavailable devices, MEDIA_DEVICE_XXX.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_set_devices_unuse(const char *devices);
+
+/**
+ * Get current using devices.
+ * @param[out] devices   current using devices.
+ *                       device names are separated by "|".
+ * @param[in] len        sizeof devices.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_get_devices_use(char *devices, int len);
+
 /**
  * Set hfp(hands free protocol) sampling rate.
- * @param[in] rate  sampling rate for SCO, MEDIA_SAMPLING_RATE_XXX.
+ * @param[in] rate  sample rate for SCO, MEDIA_SAMPLING_RATE_XXX.
  * @return Zero on success; a negated errno value on failure.
+ * @note Sample rate is a negotiated result, which is sent from BT,
+ *       should be set before set sco available.
  */
 int media_policy_set_hfp_samplerate(const char *rate);
-
-/**
- * Set mute mode.
- * @param[in] mute  new mute mode.
- *                  - 0: mute mode is off.
- *                  - 1: mute mode is on.
- * @return Zero on success; a negated errno value on failure.
- */
-int media_policy_set_mute_mode(int mute);
-
-/**
- * Get mute mode.
- * @param[out] mute current mute mode.
- *                  - 0: mute mode is off.
- *                  - 1: mute mode is on.
- * @return Zero on success; a negated errno value on failure.
- */
-int media_policy_get_mute_mode(int *mute);
 
 /**
  * Set divices available.
@@ -114,10 +128,33 @@ int media_policy_set_devices_unavailable(const char *devices);
 /**
  * Get current available devices.
  * @param[out] devices   current available devices.
+ *                       device names are separated by "|".
  * @param[in] len        sizeof devices.
  * @return Zero on success; a negated errno value on failure.
  */
 int media_policy_get_devices_available(char *devices, int len);
+
+/****************************************************************************
+ * Public Functions for Volume Control
+ ****************************************************************************/
+
+/**
+ * Set mute mode.
+ * @param[in] mute  New mute mode.
+ *                  - 0: mute mode is off.
+ *                  - 1: mute mode is on.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_set_mute_mode(int mute);
+
+/**
+ * Get mute mode.
+ * @param[out] mute Current mute mode.
+ *                  - 0: mute mode is off.
+ *                  - 1: mute mode is on.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_get_mute_mode(int *mute);
 
 /**
  * Set stream type volume index.
@@ -130,7 +167,7 @@ int media_policy_set_stream_volume(const char *stream, int volume);
 /**
  * Get stream type volume index.
  * @param[in] stream    stream type, MEDIA_STREAM_XXX.
- * @param[out] volume   current volume index
+ * @param[out] volume   current volume index.
  * @return Zero on success; a negated errno value on failure.
  */
 int media_policy_get_stream_volume(const char *stream, int *volume);
