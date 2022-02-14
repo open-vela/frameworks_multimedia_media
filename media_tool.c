@@ -57,7 +57,6 @@ struct mediatool_chain_s
 
     bool      start;
     bool      loop;
-    bool      exit;
 
     char      *buf;
     int       size;
@@ -304,7 +303,6 @@ static void mediatool_common_stop_thread(struct mediatool_chain_s *chain)
         free(chain->buf);
         close(chain->fd);
 
-        chain->exit = 0;
         chain->thread = 0;
         chain->buf = NULL;
         chain->fd = -1;
@@ -314,9 +312,6 @@ static void mediatool_common_stop_thread(struct mediatool_chain_s *chain)
 static int mediatool_common_stop_inner(struct mediatool_chain_s *chain)
 {
     int ret = 0;
-
-    if (chain->thread)
-        chain->exit = 1;
 
     if (!chain->player)
         ret = media_recorder_stop(chain->handle);
@@ -432,9 +427,6 @@ static int mediatool_common_cmd_close(struct mediatool_s *media, char *pargs)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    if (media->chain[id].thread)
-        media->chain[id].exit = 1;
-
     if (media->chain[id].player)
         ret = media_player_close(media->chain[id].handle, pending_stop);
     else
@@ -480,14 +472,14 @@ static void *mediatool_common_thread(void *arg)
     printf("%s, start, line %d\n", __func__, __LINE__);
 
     if (chain->player) {
-        while (!chain->exit) {
+        while (1) {
             act = read(chain->fd, chain->buf, chain->size);
             assert(act >= 0);
             if (act == 0)
                 break;
 
             tmp = chain->buf;
-            while (!chain->exit && act > 0) {
+            while (act > 0) {
                 ret = media_player_write_data(chain->handle, tmp, act);
                 if (ret == 0) {
                     break;
@@ -504,7 +496,7 @@ static void *mediatool_common_thread(void *arg)
             }
         }
     } else {
-        while (!chain->exit) {
+        while (1) {
             ret = media_recorder_read_data(chain->handle, chain->buf, chain->size);
             if (ret == 0) {
                 break;
@@ -571,7 +563,15 @@ static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs)
     else
         ret = media_recorder_prepare(media->chain[id].handle, url_mode ? file : NULL, ptr);
 
+    if (ret < 0)
+        return ret;
+
     if (!url_mode) {
+        if (media->chain[id].thread) {
+            printf("already prepare, can't prepare twice\n");
+            return -EPERM;
+        }
+
         if (!media->chain[id].player)
             unlink(file);
 
