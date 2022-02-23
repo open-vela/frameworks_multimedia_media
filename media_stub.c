@@ -204,15 +204,21 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
             media_parcel_append_printf(out, "%i", ret);
             break;
 
+        case MEDIA_RECORDER_PREPARE:
+            media_parcel_read_scanf(in, "%l%s%s", &handle, &param_s1, &param_s2);
+            ret = media_recorder_prepare_((void *)(uintptr_t)handle, param_s1, param_s2);
+            media_parcel_append_printf(out, "%i", ret);
+            break;
+
         case MEDIA_RECORDER_START:
             media_parcel_read_scanf(in, "%l", &handle);
             ret = media_recorder_start_((void *)(uintptr_t)handle);
             media_parcel_append_printf(out, "%i", ret);
             break;
 
-        case MEDIA_RECORDER_PREPARE:
-            media_parcel_read_scanf(in, "%l%s%s", &handle, &param_s1, &param_s2);
-            ret = media_recorder_prepare_((void *)(uintptr_t)handle, param_s1, param_s2);
+        case MEDIA_RECORDER_PAUSE:
+            media_parcel_read_scanf(in, "%l", &handle);
+            ret = media_recorder_pause_((void *)(uintptr_t)handle);
             media_parcel_append_printf(out, "%i", ret);
             break;
 

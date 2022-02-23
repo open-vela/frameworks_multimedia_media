@@ -659,6 +659,21 @@ int media_recorder_start(void *handle)
     return ret < 0 ? ret : resp;
 }
 
+int media_recorder_pause(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
+                                    MEDIA_RECORDER_PAUSE, priv->handle, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
 int media_recorder_stop(void *handle)
 {
     MediaProxyPriv *priv = handle;

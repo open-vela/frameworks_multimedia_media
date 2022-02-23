@@ -792,6 +792,14 @@ int media_recorder_start_(void *handle)
     return avfilter_process_command(handle, "start", NULL, NULL, 0, 0);
 }
 
+int media_recorder_pause_(void *handle)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return avfilter_process_command(handle, "pause", NULL, NULL, 0, 0);
+}
+
 int media_recorder_stop_(void *handle)
 {
     if (!handle)
