@@ -186,6 +186,32 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
             media_parcel_append_printf(out, "%i%f", ret, param_flt);
             break;
 
+        case MEDIA_PLAYER_SET_PROPERTY:
+            media_parcel_read_scanf(in, "%l%s%s%s", &handle, &param_s1, &param_s2, &param_s3);
+            ret = media_player_process_command((void *)(uintptr_t)handle, param_s1, param_s2, param_s3, NULL, 0);
+            media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_PLAYER_GET_PROPERTY:
+            media_parcel_read_scanf(in, "%l%s%s%i", &handle, &param_s1, &param_s2, &param_i32);
+
+            if (param_i32 > 0) {
+                response = malloc(param_i32);
+                if (!response) {
+                    media_parcel_append_int32(out, -ENOMEM);
+                    break;
+                }
+            }
+
+            ret = media_player_process_command((void *)(uintptr_t)handle, param_s1, param_s2, NULL, response, param_i32);
+            if (ret < 0)
+                media_parcel_append_printf(out, "%i", ret);
+            else
+                media_parcel_append_printf(out, "%i%s", ret, response);
+
+            free(response);
+            break;
+
         case MEDIA_RECORDER_OPEN:
             media_parcel_read_scanf(in, "%s", &param_s1);
             handle = (uint64_t)(uintptr_t)media_recorder_open_(media_get_graph(), param_s1);
@@ -232,6 +258,32 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
             media_parcel_read_scanf(in, "%l", &handle);
             ret = media_recorder_reset_((void *)(uintptr_t)handle);
             media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_RECORDER_SET_PROPERTY:
+            media_parcel_read_scanf(in, "%l%s%s%s", &handle, &param_s1, &param_s2, &param_s3);
+            ret = media_recorder_process_command((void *)(uintptr_t)handle, param_s1, param_s2, param_s3, NULL, 0);
+            media_parcel_append_printf(out, "%i", ret);
+            break;
+
+        case MEDIA_RECORDER_GET_PROPERTY:
+            media_parcel_read_scanf(in, "%l%s%s%i", &handle, &param_s1, &param_s2, &param_i32);
+
+            if (param_i32 > 0) {
+                response = malloc(param_i32);
+                if (!response) {
+                    media_parcel_append_int32(out, -ENOMEM);
+                    break;
+                }
+            }
+
+            ret = media_recorder_process_command((void *)(uintptr_t)handle, param_s1, param_s2, NULL, response, param_i32);
+            if (ret < 0)
+                media_parcel_append_printf(out, "%i", ret);
+            else
+                media_parcel_append_printf(out, "%i%s", ret, response);
+
+            free(response);
             break;
 
         case MEDIA_POLICY_SET_INT:

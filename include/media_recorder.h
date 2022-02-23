@@ -114,6 +114,27 @@ int media_recorder_pause(void *handle);
  */
 int media_recorder_stop(void *handle);
 
+/**
+ * Set properties of the recorder path.
+ * @param[in] handle      Current recorder path
+ * @param[in] target      Target filter
+ * @param[in] key         Key
+ * @param[in] value       Value
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_recorder_set_property(void *handle, const char *target, const char *key, const char *value);
+
+/**
+ * Get properties of the recorder path.
+ * @param[in] handle      Current recorder path
+ * @param[in] target      Target filter
+ * @param[in] key         Key
+ * @param[in] value       Buffer of value
+ * @param[in] value_len   Buffer length of value
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_recorder_get_property(void *handle, const char *target, const char *key, char *value, int value_len);
+
 #undef EXTERN
 #ifdef __cplusplus
 }
