@@ -532,6 +532,60 @@ int media_player_get_volume(void *handle, float *volume)
     return ret < 0 ? ret : resp;
 }
 
+int media_player_set_property(void *handle, const char *target, const char *key, const char *value)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%s%s%s", "%i",
+                                    MEDIA_PLAYER_SET_PROPERTY, priv->handle, target, key, value, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_player_get_property(void *handle, const char *target, const char *key, char *value, int value_len)
+{
+    MediaProxyPriv *priv = handle;
+    media_parcel in, out;
+    const char *response;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    media_parcel_init(&in);
+    media_parcel_init(&out);
+
+    ret = media_parcel_append_printf(&in, "%i%l%s%s%i", MEDIA_PLAYER_GET_PROPERTY,
+                                     priv->handle, target, key, value_len);
+    if (ret < 0)
+        goto out;
+
+    ret = media_client_send_with_ack(priv->proxy, &in, &out);
+    if (ret < 0)
+        goto out;
+
+    ret = media_parcel_read_scanf(&out, "%i%s", &resp, &response);
+    if (ret < 0)
+        goto out;
+
+    if (resp < 0)
+        goto out;
+
+    if (value_len)
+        strcpy(value, response);
+
+out:
+    media_parcel_deinit(&in);
+    media_parcel_deinit(&out);
+    return ret;
+}
+
 void *media_recorder_open(const char *params)
 {
     MediaProxyPriv *priv;
@@ -692,6 +746,60 @@ int media_recorder_stop(void *handle)
                                     MEDIA_RECORDER_STOP, priv->handle, &resp);
 
     return ret < 0 ? ret : resp;
+}
+
+int media_recorder_set_property(void *handle, const char *target, const char *key, const char *value)
+{
+    MediaProxyPriv *priv = handle;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%s%s%s", "%i",
+                                    MEDIA_RECORDER_SET_PROPERTY, priv->handle, target, key, value, &resp);
+
+    return ret < 0 ? ret : resp;
+}
+
+int media_recorder_get_property(void *handle, const char *target, const char *key, char *value, int value_len)
+{
+    MediaProxyPriv *priv = handle;
+    media_parcel in, out;
+    const char *response;
+    int32_t resp;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    media_parcel_init(&in);
+    media_parcel_init(&out);
+
+    ret = media_parcel_append_printf(&in, "%i%l%s%s%i", MEDIA_RECORDER_GET_PROPERTY,
+                                     priv->handle, target, key, value_len);
+    if (ret < 0)
+        goto out;
+
+    ret = media_client_send_with_ack(priv->proxy, &in, &out);
+    if (ret < 0)
+        goto out;
+
+    ret = media_parcel_read_scanf(&out, "%i%s", &resp, &response);
+    if (ret < 0)
+        goto out;
+
+    if (resp < 0)
+        goto out;
+
+    if (value_len)
+        strcpy(value, response);
+
+out:
+    media_parcel_deinit(&in);
+    media_parcel_deinit(&out);
+    return ret;
 }
 
 int media_policy_set_int(const char *name, int value, int apply)
