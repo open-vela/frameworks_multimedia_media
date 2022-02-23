@@ -160,7 +160,7 @@ static struct mediatool_cmd_s g_mediatool_cmds[] =
     {
         "pause",
         mediatool_player_cmd_pause,
-        "Set player pause (pause ID)"
+        "Set player/recorder pause (pause ID)"
     },
     {
         "fadein",
@@ -646,6 +646,8 @@ static int mediatool_player_cmd_pause(struct mediatool_s *media, char *pargs)
 
     if (media->chain[id].player)
         ret = media_player_pause(media->chain[id].handle);
+    else
+        ret = media_recorder_pause(media->chain[id].handle);
 
     return ret;
 }

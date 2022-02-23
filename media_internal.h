@@ -38,39 +38,40 @@ extern "C" {
 
 #define MEDIA_PROCESS_COMMAND        1
 #define MEDIA_GRAPH_DUMP             2
-#define MEDIA_PLAYER_OPEN            3
-#define MEDIA_PLAYER_CLOSE           4
-#define MEDIA_PLAYER_SET_CALLBACK    5
-#define MEDIA_PLAYER_PREPARE         6
-#define MEDIA_PLAYER_RESET           7
-#define MEDIA_PLAYER_START           8
-#define MEDIA_PLAYER_STOP            9
-#define MEDIA_PLAYER_PAUSE           10
-#define MEDIA_PLAYER_SEEK            11
-#define MEDIA_PLAYER_LOOP            12
-#define MEDIA_PLAYER_ISPLAYING       13
-#define MEDIA_PLAYER_POSITION        14
-#define MEDIA_PLAYER_DURATION        15
-#define MEDIA_PLAYER_FADEIN          16
-#define MEDIA_PLAYER_FADEOUT         17
-#define MEDIA_PLAYER_SET_VOLUME      18
-#define MEDIA_PLAYER_GET_VOLUME      19
-#define MEDIA_RECORDER_OPEN          20
-#define MEDIA_RECORDER_CLOSE         21
-#define MEDIA_RECORDER_SET_CALLBACK  22
-#define MEDIA_RECORDER_PREPARE       23
-#define MEDIA_RECORDER_RESET         24
-#define MEDIA_RECORDER_START         25
-#define MEDIA_RECORDER_STOP          26
-#define MEDIA_POLICY_SET_INT         27
-#define MEDIA_POLICY_GET_INT         28
-#define MEDIA_POLICY_SET_STRING      29
-#define MEDIA_POLICY_GET_STRING      30
-#define MEDIA_POLICY_INCLUDE         31
-#define MEDIA_POLICY_EXCLUDE         32
-#define MEDIA_POLICY_INCREASE        33
-#define MEDIA_POLICY_DECREASE        34
-#define MEDIA_POLICY_DUMP            35
+#define MEDIA_PLAYER_OPEN            100
+#define MEDIA_PLAYER_CLOSE           101
+#define MEDIA_PLAYER_SET_CALLBACK    102
+#define MEDIA_PLAYER_PREPARE         103
+#define MEDIA_PLAYER_RESET           104
+#define MEDIA_PLAYER_START           105
+#define MEDIA_PLAYER_STOP            106
+#define MEDIA_PLAYER_PAUSE           107
+#define MEDIA_PLAYER_SEEK            108
+#define MEDIA_PLAYER_LOOP            109
+#define MEDIA_PLAYER_ISPLAYING       110
+#define MEDIA_PLAYER_POSITION        111
+#define MEDIA_PLAYER_DURATION        112
+#define MEDIA_PLAYER_FADEIN          113
+#define MEDIA_PLAYER_FADEOUT         114
+#define MEDIA_PLAYER_SET_VOLUME      115
+#define MEDIA_PLAYER_GET_VOLUME      116
+#define MEDIA_RECORDER_OPEN          200
+#define MEDIA_RECORDER_CLOSE         201
+#define MEDIA_RECORDER_SET_CALLBACK  202
+#define MEDIA_RECORDER_PREPARE       203
+#define MEDIA_RECORDER_RESET         204
+#define MEDIA_RECORDER_START         205
+#define MEDIA_RECORDER_PAUSE         206
+#define MEDIA_RECORDER_STOP          207
+#define MEDIA_POLICY_SET_INT         300
+#define MEDIA_POLICY_GET_INT         301
+#define MEDIA_POLICY_SET_STRING      302
+#define MEDIA_POLICY_GET_STRING      303
+#define MEDIA_POLICY_INCLUDE         304
+#define MEDIA_POLICY_EXCLUDE         305
+#define MEDIA_POLICY_INCREASE        306
+#define MEDIA_POLICY_DECREASE        307
+#define MEDIA_POLICY_DUMP            308
 
 /****************************************************************************
  * Media Functions
@@ -137,6 +138,7 @@ int media_recorder_set_event_callback_(void *handle, void *cookie,
 int media_recorder_prepare_(void *handle, const char *url, const char *options);
 int media_recorder_reset_(void *handle);
 int media_recorder_start_(void *handle);
+int media_recorder_pause_(void *handle);
 int media_recorder_stop_(void *handle);
 
 /****************************************************************************
