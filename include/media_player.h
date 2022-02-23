@@ -193,6 +193,27 @@ int media_player_set_volume(void *handle, float volume);
  */
 int media_player_get_volume(void *handle, float *volume);
 
+/**
+ * Set properties of the player path.
+ * @param[in] handle      Current player path
+ * @param[in] target      Target filter
+ * @param[in] key         Key
+ * @param[in] value       Value
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_player_set_property(void *handle, const char *target, const char *key, const char *value);
+
+/**
+ * Get properties of the player path.
+ * @param[in] handle      Current player path
+ * @param[in] target      Target filter
+ * @param[in] key         Key
+ * @param[in] value       Buffer of value
+ * @param[in] value_len   Buffer length of value
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_player_get_property(void *handle, const char *target, const char *key, char *value, int value_len);
+
 #undef EXTERN
 #ifdef __cplusplus
 }

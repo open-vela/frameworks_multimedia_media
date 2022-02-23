@@ -55,6 +55,8 @@ extern "C" {
 #define MEDIA_PLAYER_FADEOUT         114
 #define MEDIA_PLAYER_SET_VOLUME      115
 #define MEDIA_PLAYER_GET_VOLUME      116
+#define MEDIA_PLAYER_SET_PROPERTY    117
+#define MEDIA_PLAYER_GET_PROPERTY    118
 #define MEDIA_RECORDER_OPEN          200
 #define MEDIA_RECORDER_CLOSE         201
 #define MEDIA_RECORDER_SET_CALLBACK  202
@@ -63,6 +65,8 @@ extern "C" {
 #define MEDIA_RECORDER_START         205
 #define MEDIA_RECORDER_PAUSE         206
 #define MEDIA_RECORDER_STOP          207
+#define MEDIA_RECORDER_SET_PROPERTY  208
+#define MEDIA_RECORDER_GET_PROPERTY  209
 #define MEDIA_POLICY_SET_INT         300
 #define MEDIA_POLICY_GET_INT         301
 #define MEDIA_POLICY_SET_STRING      302
@@ -126,6 +130,9 @@ int media_player_set_fadein_(void *handle, unsigned int msec);
 int media_player_set_fadeout_(void *handle, unsigned int msec);
 int media_player_set_volume_(void *handle, float volume);
 int media_player_get_volume_(void *handle, float *volume);
+int media_player_process_command(void *handle, const char *target,
+                                 const char *cmd, const char *arg,
+                                 char *res, int res_len);
 
 /****************************************************************************
  * Recorder Functions
@@ -140,6 +147,9 @@ int media_recorder_reset_(void *handle);
 int media_recorder_start_(void *handle);
 int media_recorder_pause_(void *handle);
 int media_recorder_stop_(void *handle);
+int media_recorder_process_command(void *handle, const char *target,
+                                 const char *cmd, const char *arg,
+                                 char *res, int res_len);
 
 /****************************************************************************
  * Policy Functions

@@ -159,6 +159,33 @@ out:
     return ret;
 }
 
+static AVFilterContext *media_graph_find(AVFilterContext *filter,
+                                          const char *name,
+                                          bool (*extra)(AVFilterContext *filter),
+                                          bool is_play)
+{
+    AVFilterContext *ret;
+    int i, count;
+
+    if (!strcmp(name, filter->filter->name) ||
+        !strcmp(name, filter->name)) {
+        if (!extra || extra(filter))
+            return filter;
+    }
+
+    count = is_play ? filter->nb_outputs : filter->nb_inputs;
+    for (i = 0; i < count; i++) {
+        AVFilterContext *next = is_play ?  filter->outputs[i]->dst :
+                                filter->inputs[i]->src;
+
+        ret = media_graph_find(next, name, extra, is_play);
+        if (ret)
+            return ret;
+    }
+
+    return NULL;
+}
+
 /****************************************************************************
  * Public Graph Functions
  ****************************************************************************/
@@ -314,29 +341,6 @@ char *media_graph_dump_(void *handle, const char *options)
  * Private Player Functions
  ****************************************************************************/
 
-static AVFilterContext *media_player_find(AVFilterContext *filter,
-                                          const char *name,
-                                          bool (*extra)(AVFilterContext *filter))
-{
-    AVFilterContext *ret;
-    int i;
-
-    if (!strcmp(name, filter->filter->name)) {
-        if (!extra || extra(filter))
-            return filter;
-    }
-
-    for (i = 0; i < filter->nb_outputs; i++) {
-        AVFilterContext *next = filter->outputs[i]->dst;
-
-        ret = media_player_find(next, name, extra);
-        if (ret)
-            return ret;
-    }
-
-    return NULL;
-}
-
 static bool media_player_fadein_extra(AVFilterContext *filter)
 {
     int64_t val = 1;
@@ -363,9 +367,9 @@ static int media_player_set_fadeinout(AVFilterContext *filter,
     int ret;
 
     if (out)
-        fade = media_player_find(filter, "afade", media_player_fadeout_extra);
+        fade = media_graph_find(filter, "afade", media_player_fadeout_extra, true);
     else
-        fade = media_player_find(filter, "afade", media_player_fadein_extra);
+        fade = media_graph_find(filter, "afade", media_player_fadein_extra, true);
 
     if (!fade)
         return -EINVAL;
@@ -661,23 +665,15 @@ int media_player_set_fadeout_(void *handle, unsigned int msec)
 int media_player_set_volume_(void *handle, float volume)
 {
     MediaPlayerPriv *priv = handle;
-    AVFilterContext *filter;
     char tmp[32];
     int ret;
 
-    if (!priv)
-        return -EINVAL;
-
-    if (volume < 0.0 || volume > 1.0)
-        return -EINVAL;
-
-    filter = media_player_find(priv->filter, "volume", NULL);
-    if (!filter)
+    if (!priv || volume < 0.0 || volume > 1.0)
         return -EINVAL;
 
     snprintf(tmp, 32, "%f", volume);
 
-    ret = avfilter_process_command(filter, "volume", tmp, 0, 0, AV_OPT_SEARCH_CHILDREN);
+    ret = media_player_process_command(priv, "volume", "volume", tmp, 0, 0);
     if (ret >= 0)
         priv->volume = volume;
 
@@ -693,6 +689,20 @@ int media_player_get_volume_(void *handle, float *volume)
 
     *volume = priv->volume;
     return 0;
+}
+
+int media_player_process_command(void *handle, const char *target,
+                                 const char *cmd, const char *arg,
+                                 char *res, int res_len)
+{
+    MediaPlayerPriv *priv = handle;
+    AVFilterContext *filter;
+
+    filter = media_graph_find(priv->filter, target, NULL, true);
+    if (!filter)
+        return -EINVAL;
+
+    return avfilter_process_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
 }
 
 /****************************************************************************
@@ -806,4 +816,17 @@ int media_recorder_stop_(void *handle)
         return -EINVAL;
 
     return avfilter_process_command(handle, "stop", NULL, NULL, 0, 0);
+}
+
+int media_recorder_process_command(void *handle, const char *target,
+                                   const char *cmd, const char *arg,
+                                   char *res, int res_len)
+{
+    AVFilterContext *filter;
+
+    filter = media_graph_find(handle, target, NULL, false);
+    if (!filter)
+        return -EINVAL;
+
+    return avfilter_process_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
 }
