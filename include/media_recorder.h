@@ -101,6 +101,13 @@ ssize_t media_recorder_read_data(void *handle, void *data, size_t len);
 int media_recorder_start(void *handle);
 
 /**
+ * Pause the recorder path.
+ * @param[in] handle    Current recorder path
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_recorder_pause(void *handle);
+
+/**
  * Stop the recorder path.
  * @param[in] handle    Current recorder path
  * @return Zero on success; a negated errno value on failure.
