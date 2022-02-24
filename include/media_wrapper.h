@@ -34,6 +34,7 @@ extern "C" {
 
 #define MEDIA_DEVICE_A2DP            "a2dp"     /*!< bt cellphone */
 #define MEDIA_DEVICE_SCO             "sco"      /*!< phone */
+#define MEDIA_DEVICE_MIC             "mic"
 
 #define MEDIA_SAMPLERATE_8000        "8000"
 #define MEDIA_SAMPLERATE_16000       "16000"
