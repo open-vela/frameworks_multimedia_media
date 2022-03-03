@@ -571,7 +571,8 @@ int media_focus_abandon(void* handle)
     app_focus_stack_useless_clear(g_media_focus->stack, NONBLOCK_CALLBACK_FLAG);
 
     // step 4: get exist top focus id
-    if (app_focus_stack_top(g_media_focus->stack, &tmp_id)) {
+    if (app_focus_stack_top(g_media_focus->stack, &tmp_id) < 0) {
+        auderr("media focus stack is empty\n");
         ret = -ENOENT;
         goto err;
     }
