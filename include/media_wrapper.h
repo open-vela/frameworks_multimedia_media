@@ -47,13 +47,15 @@ extern "C" {
 
 #define MEDIA_STREAM_SCO             "SCO"      /*!< in call */
 #define MEDIA_STREAM_RING            "Ring"
-#define MEDIA_STREAM_NOTIFICATION    "Notify"   /*!< message notification */
-#define MEDIA_STREAM_ACCESSIBILITY   "Health"   /*!< health notification */
-#define MEDIA_STREAM_MUSIC           "Music"
-#define MEDIA_STREAM_SPORT           "Sport"
-#define MEDIA_STREAM_TTS             "TTS"      /*!< text-to-speech */
 #define MEDIA_STREAM_ALARM           "Alarm"
 #define MEDIA_STREAM_SYSTEM_ENFORCED "Enforced"
+#define MEDIA_STREAM_NOTIFICATION    "Notify"   /*!< message notification */
+#define MEDIA_STREAM_RECORD          "Record"
+#define MEDIA_STREAM_TTS             "TTS"      /*!< text-to-speech */
+#define MEDIA_STREAM_ACCESSIBILITY   "Health"   /*!< health notification */
+#define MEDIA_STREAM_SPORT           "Sport"
+#define MEDIA_STREAM_INFO            "Info"
+#define MEDIA_STREAM_MUSIC           "Music"
 
 /****************************************************************************
  * Public Functions for Mode Control
