@@ -550,6 +550,9 @@ err:
     if (ret < 0) {
         return NULL;
     }
+    if (*return_type == MEDIA_FOCUS_STOP) {
+        valid_id += CONFIG_MEDIA_FOCUS_STACK_DEPTH;
+    }
     return (void*)ID_TO_HANDLE(valid_id);
 }
 
