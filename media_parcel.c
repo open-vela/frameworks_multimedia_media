@@ -181,7 +181,7 @@ int media_parcel_append_vprintf(media_parcel *parcel, const char *fmt, va_list *
     int8_t val_i8, c;
     double val_dbl;
     float val_flt;
-    int ret;
+    int ret = 0;
 
     while ((c = *fmt++)) {
         if (c == '%')
