@@ -130,7 +130,7 @@ close:
 
 static int media_focus_str_to_num(char* str)
 {
-    if (strspn(str, "0123456789") == strlen(str)) {
+    if (strlen(str) > 0 && (strspn(str, "0123456789") == strlen(str))) {
         int num = atoi(str);
         return num;
     }
