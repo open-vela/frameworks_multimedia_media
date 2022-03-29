@@ -427,12 +427,12 @@ static int mediatool_common_cmd_close(struct mediatool_s *media, char *pargs)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
+    mediatool_common_stop_inner(&media->chain[id]);
+
     if (media->chain[id].player)
         ret = media_player_close(media->chain[id].handle, pending_stop);
     else
         ret = media_recorder_close(media->chain[id].handle);
-
-    mediatool_common_stop_thread(&media->chain[id]);
 
     media->chain[id].handle = NULL;
 
