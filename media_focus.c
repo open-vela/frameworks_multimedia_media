@@ -238,6 +238,7 @@ static media_focus_cell* media_focus_matrix_init(int len, char* line, int* index
         if (count >= 0) {
             int pro_num, pas_num;
             if (media_focus_divided_by_colon(ptr, &pro_num, &pas_num) < 0) {
+                free(matrix);
                 return NULL;
             }
             (matrix + *index)->pro_inter = pro_num;
