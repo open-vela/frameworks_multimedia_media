@@ -34,6 +34,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <syslog.h>
+#include <sys/types.h>
 #include <sys/eventfd.h>
 
 #include <media_api.h>
@@ -53,6 +54,7 @@ typedef struct MediaGraphPriv {
     AVFilterGraph *graph;
     struct file   *filep;
     int            fd;
+    pid_t          pid;
 } MediaGraphPriv;
 
 typedef struct MediaPlayerPriv {
@@ -70,7 +72,8 @@ static void media_graph_filter_ready(AVFilterContext *ctx)
     MediaGraphPriv *priv = ctx->graph->opaque;
     eventfd_t val = 1;
 
-    file_write(priv->filep, &val, sizeof(eventfd_t));
+    if (priv->pid != getpid())
+        file_write(priv->filep, &val, sizeof(eventfd_t));
 }
 
 static void media_graph_log_callback(void *avcl, int level,
@@ -210,6 +213,8 @@ void *media_graph_create(void *file)
     ret = media_graph_loadgraph(priv, file);
     if (ret < 0)
         goto err;
+
+    priv->pid = getpid();
 
     return priv;
 err:
