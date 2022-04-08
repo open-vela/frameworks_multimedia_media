@@ -428,22 +428,24 @@ void *media_player_open_(void *graph, const char *name)
     MediaGraphPriv *media = graph;
     AVFilterContext *filter;
     MediaPlayerPriv *priv;
+    char namebuf[64];
     int ret, i;
 
     if (!media || !media->graph)
         return NULL;
 
-    if (media_policy_get_int_(name, &ret))
-        return NULL;
+    if (name && media_policy_get_string_(name, namebuf, sizeof(namebuf)) == 0)
+        name = namebuf;
 
     for (i = 0; i < media->graph->nb_filters; i++) {
         filter = media->graph->filters[i];
 
-        if (!filter->opaque && !strcmp(filter->filter->name, "amovie_async")) {
-            if (!name || !strcmp(filter->name, name) ||
-                !strncmp(filter->name + strlen("amovie_async@"), name, strlen(name)))
-                break;
-        }
+        if (filter->opaque || strcmp(filter->filter->name, "amovie_async"))
+            continue;
+
+        if (!name || !strcmp(filter->name, name) ||
+            !strncmp(filter->name + strlen("amovie_async@"), name, strlen(name)))
+            break;
     }
 
     if (i == media->graph->nb_filters)
@@ -491,9 +493,7 @@ int media_player_close_(void *handle, int pending_stop)
     if (ret < 0)
         return ret;
 
-    ret = media_policy_exclude_(priv->name, priv->filter->name, true);
-    if (ret < 0)
-        return ret;
+    media_policy_exclude_(priv->name, priv->filter->name + strlen("amovie_async@"), true);
 
     priv->filter->opaque = NULL;
     free(priv->name);
@@ -556,7 +556,8 @@ int media_player_start_(void *handle)
     if (ret < 0)
         return ret;
 
-    return media_policy_include_(priv->name, priv->filter->name, true);
+    media_policy_include_(priv->name, priv->filter->name + strlen("amovie_async@"), true);
+    return 0;
 }
 
 int media_player_stop_(void *handle)
@@ -571,7 +572,8 @@ int media_player_stop_(void *handle)
     if (ret < 0)
         return ret;
 
-    return media_policy_exclude_(priv->name, priv->filter->name, true);
+    media_policy_exclude_(priv->name, priv->filter->name + strlen("amovie_async@"), true);
+    return 0;
 }
 
 int media_player_pause_(void *handle)
@@ -582,11 +584,12 @@ int media_player_pause_(void *handle)
     if (!priv)
         return -EINVAL;
 
-    ret =  avfilter_process_command(priv->filter, "pause", NULL, NULL, 0, 0);
+    ret = avfilter_process_command(priv->filter, "pause", NULL, NULL, 0, 0);
     if (ret < 0)
         return ret;
 
-    return media_policy_exclude_(priv->name, priv->filter->name, true);
+    media_policy_exclude_(priv->name, priv->filter->name + strlen("amovie_async@"), true);
+    return 0;
 }
 
 int media_player_set_looping_(void *handle, int loop)
