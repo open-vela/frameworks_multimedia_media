@@ -45,6 +45,7 @@
  ****************************************************************************/
 
 #define MAX_GRAPH_SIZE      4096
+#define MAX_POLL_FILTERS    8
 
 /****************************************************************************
  * Private Types
@@ -55,6 +56,8 @@ typedef struct MediaGraphPriv {
     struct file   *filep;
     int            fd;
     pid_t          pid;
+    void          *pollfts[MAX_POLL_FILTERS];
+    int            pollftn;
 } MediaGraphPriv;
 
 typedef struct MediaPlayerPriv {
@@ -155,6 +158,19 @@ static int media_graph_loadgraph(MediaGraphPriv *priv, char *conf)
     priv->graph->ready  = media_graph_filter_ready;
     priv->graph->opaque = priv;
 
+    priv->pollftn = 0;
+    for (fd = 0; fd < priv->graph->nb_filters; fd++) {
+        AVFilterContext *filter = priv->graph->filters[fd];
+
+        if ((filter->filter->flags & AVFILTER_FLAG_SUPPORT_POLL) != 0) {
+            priv->pollfts[priv->pollftn++] = filter;
+            if (priv->pollftn > MAX_POLL_FILTERS) {
+                av_log(NULL, AV_LOG_ERROR, "%s, media graph too many pollfds\n", __func__);
+                goto out;
+            }
+        }
+    }
+
     av_log(NULL, AV_LOG_INFO, "%s, loadgraph succeed\n", __func__);
     return 0;
 out:
@@ -251,8 +267,8 @@ int media_graph_get_pollfds(void *handle, struct pollfd *fds,
     cookies[0]    = NULL;
     nfd           = 1;
 
-    for (i = 0; i < priv->graph->nb_filters; i++) {
-        AVFilterContext *filter = priv->graph->filters[i];
+    for (i = 0; i < priv->pollftn; i++) {
+        AVFilterContext *filter = priv->pollfts[i];
 
         ret = avfilter_process_command(filter, "get_pollfd", NULL,
                 (char *)&fds[nfd], sizeof(struct pollfd) * (count - nfd),
