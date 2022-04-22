@@ -26,6 +26,7 @@
 
 #include <libavdevice/avdevice.h>
 #include <libavfilter/avfilter.h>
+#include <libavfilter/filters.h>
 #include <libavfilter/internal.h>
 #include <libavfilter/movie_async.h>
 #include <libavutil/opt.h>
@@ -314,9 +315,9 @@ int media_graph_run_once(void *handle)
 
     do {
         ret = ff_filter_graph_run_once(priv->graph);
-    } while (ret == 0);
+    } while (ret >= 0 || ret == AVERROR(EAGAIN) || ret == AVERROR_EOF);
 
-    return 0;
+    return ret == FFERROR_NOT_READY ? 0 : ret;
 }
 
 int media_graph_process_command(void *handle, const char *target,
