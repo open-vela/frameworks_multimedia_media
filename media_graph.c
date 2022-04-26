@@ -455,10 +455,12 @@ void *media_player_open_(void *graph, const char *name)
     if (!priv)
         return NULL;
 
-    priv->name = strdup(name);
-    if (!priv->name) {
-        free(priv);
-        return NULL;
+    if (name) {
+        priv->name = strdup(name);
+        if (!priv->name) {
+            free(priv);
+            return NULL;
+        }
     }
 
     ret = avfilter_process_command(filter, "open", NULL, NULL, 0, 0);
