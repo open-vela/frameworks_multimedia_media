@@ -870,8 +870,8 @@ static int mediatool_server_cmd_dump(struct mediatool_s *media, char *pargs)
     /* pargs not used in neither graph_dump nor policy_dump,
      * so let's make it simple, just "dump".
      */
-    media_graph_dump(pargs);
     media_policy_dump(pargs);
+    media_graph_dump(pargs);
 
     return 0;
 }
