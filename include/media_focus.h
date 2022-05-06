@@ -41,51 +41,27 @@ typedef void (*media_focus_callback)(int return_type, void* callback_argv);
  * Public Functions
  ****************************************************************************/
 
-/****************************************************************************
- * Name: media_focus_request
+/**
+ * @brief Allow application to request audio focus.
  *
- * Description:
- *   This function allow application to request audio focus.
- *
- * Input Parameters:
- *   return_type            - pointer of play return suggestion for app
- *   stream_type            - one of stream types defined in media_wrapper.h
- *   callback_method        - callback method of request app
- *   callback_argv          - argument of callback
- *
- * Returned Value:
- *   Return NULL when request failed.
- *   Return void* handle for request.
- *
- * Comments:
- *  Value of return_type are:
- *          MEDIA_FOCUS_PLAY(0)             with media play,
- *          MEDIA_FOCUS_STOP(1)             with media stop,
- *          MEDIA_FOCUS_PLAY_BUT_SILENT(3)  with play but silent in background
- *          MEDIA_FOCUS_PLAY_WITH_DUCK(4)   with play with duck volume down.
- *
- ****************************************************************************/
-
+ * @param[out] return_type      pointer of play return suggestion for app
+ * @param[in]  stream_type      one of stream types defined in media_wrapper.h
+ * @param[in]  callback_method  callback method of request app
+ * @param[in]  callback_argv    argument of callback
+ * @return     NULL when request failed, void* handle for request.
+ * @note       Value of return_type are announced above.
+ */
 void* media_focus_request(int* return_type,
     const char* stream_type,
     media_focus_callback callback_method,
     void* callback_argv);
 
-/****************************************************************************
- * Name: media_focus_abandon
+/**
+ * @brief Allow application to abandon its audio focus.
  *
- * Description:
- *   This function allow application to abandon its audio focus.
- *
- * Input Parameters:
- *   handle          - app identify id in audio focus stack
- *
- * Returned Value:
- *   Return 0 if specific abandon success.
- *   Return negative number when abandon failed.
- *
- ****************************************************************************/
-
+ * @param[in] handle    app identify id in audio focus stack
+ * @return 0 if specific abandon success, negative number when abandon failed.
+ */
 int media_focus_abandon(void* handle);
 
 /****************************************************************************
@@ -105,34 +81,19 @@ typedef struct media_focus_id {
  * Debug Functions
  ****************************************************************************/
 
-/****************************************************************************
- * Name: media_focus_debug_stack_display
- *
- * Description:
- *   This function display all focus request in audio focus stack.
- *
- * Returned Value:
- *   Void.
- *
- ****************************************************************************/
-
+/**
+ * @brief Display all focus request in audio focus stack.
+ */
 void media_focus_debug_stack_display(void);
 
-/****************************************************************************
- * Name: media_focus_debug_stack_return
+/**
+ * @brief Assign current media focus stack to focus list,
+ *        and give out unused space in num of focus_list.
  *
- * Description:
- *   This function assign current media focus stack to focus list, and give
- *   out unused space in num of focus_list.
- *
- * Input Parameters:
- *   focus_list          - pointer of media focus identity list
- *   num                 - length of the focus_id_list
- *
- * Returned Value:
- *   Return number of unused focus_id in focus_id_list.
- *
- ****************************************************************************/
+ * @param[out]  focus_list    pointer of media focus identity list
+ * @param[in]   num           length of the focus_id_list
+ * @return              number of unused focus_id in focus_id_list.
+ */
 
 int media_focus_debug_stack_return(media_focus_id* focus_list, int num);
 
