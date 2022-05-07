@@ -99,12 +99,16 @@ static void *media_client_listen_thread(pthread_addr_t pvarg)
 #ifdef CONFIG_MEDIA_SERVER
     media_parcel_append_string(&parcel, NULL);
 #else
-    getsockname(listenfd, (struct sockaddr *)&addr, &socklen);
+    ret = getsockname(listenfd, (struct sockaddr *)&addr, &socklen);
+    if (ret < 0) {
+        media_parcel_deinit(&parcel);
+        goto thread_error;
+    }
     media_parcel_append_string(&parcel, addr.rp_cpu);
 #endif
     ret = media_parcel_send(&parcel, priv->fd, MEDIA_PARCEL_CREATE_NOTIFY, 0);
     media_parcel_deinit(&parcel);
-    if(ret < 0)
+    if (ret < 0)
         goto thread_error;
 
     acceptfd = accept(listenfd, NULL, NULL);
