@@ -54,14 +54,14 @@ static void media_client_get_sockaddr(int *family, socklen_t *len, void *addr, c
     *family = PF_LOCAL;
     *len = sizeof(struct sockaddr_un);
     un_addr->sun_family = AF_LOCAL;
-    strcpy(un_addr->sun_path, key);
+    strlcpy(un_addr->sun_path, key, UNIX_PATH_MAX);
 #else
     struct sockaddr_rpmsg *rp_addr = addr;
     *family = AF_RPMSG;
     *len = sizeof(struct sockaddr_rpmsg);
     rp_addr->rp_family = AF_RPMSG;
-    strcpy(rp_addr->rp_name, key);
-    strcpy(rp_addr->rp_cpu, CONFIG_MEDIA_SERVER_CPUNAME);
+    strlcpy(rp_addr->rp_name, key, RPMSG_SOCKET_NAME_SIZE);
+    strlcpy(rp_addr->rp_cpu, CONFIG_MEDIA_SERVER_CPUNAME, RPMSG_SOCKET_CPU_SIZE);
 #endif
 }
 
