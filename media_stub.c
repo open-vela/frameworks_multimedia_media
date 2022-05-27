@@ -162,18 +162,6 @@ void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
             media_parcel_append_printf(out, "%i%i", ret, param_u32);
             break;
 
-        case MEDIA_PLAYER_FADEIN:
-            media_parcel_read_scanf(in, "%l%i", &handle, &param_u32);
-            ret = media_player_set_fadein_((void *)(uintptr_t)handle, param_u32);
-            media_parcel_append_printf(out, "%i", ret);
-            break;
-
-        case MEDIA_PLAYER_FADEOUT:
-            media_parcel_read_scanf(in, "%l%i", &handle, &param_u32);
-            ret = media_player_set_fadeout_((void *)(uintptr_t)handle, param_u32);
-            media_parcel_append_printf(out, "%i", ret);
-            break;
-
         case MEDIA_PLAYER_SET_VOLUME:
             media_parcel_read_scanf(in, "%l%f", &handle, &param_flt);
             ret = media_player_set_volume_((void *)(uintptr_t)handle, param_flt);
