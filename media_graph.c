@@ -333,51 +333,6 @@ char *media_graph_dump_(void *handle, const char *options)
 }
 
 /****************************************************************************
- * Private Player Functions
- ****************************************************************************/
-
-static bool media_player_fade_extra(AVFilterContext *filter, void *args)
-{
-    int64_t type;
-    av_opt_get_int(filter, "type", AV_OPT_SEARCH_CHILDREN, &type);
-    return type == *(bool *)args;
-}
-
-static int media_player_set_fadeinout(AVFilterContext *filter,
-                                      bool out, unsigned int duration)
-{
-    AVFilterContext *fade;
-    char tmp[32];
-    int ret;
-
-    fade = avfilter_find_on_link(filter, "afade", media_player_fade_extra, true, &out);
-    if (!fade)
-        return -EINVAL;
-
-    if (duration == 0)
-        return avfilter_process_command(fade, "enable", "0", NULL, 0, 0);
-
-    snprintf(tmp, 32, "%f", duration / 1000.0f);
-    ret = avfilter_process_command(fade, "duration", tmp, NULL, 0, AV_OPT_SEARCH_CHILDREN);
-    if (ret < 0)
-        return ret;
-
-    if (out) {
-        ret = avfilter_process_command(filter, "get_duration", NULL, tmp, sizeof(tmp), 0);
-        if (ret >= 0) {
-            int start_time = strtoul(tmp, NULL, 0) - duration;
-
-            snprintf(tmp, 32, "%f", start_time / 1000.0f);
-            ret = avfilter_process_command(fade, "start_time", tmp, NULL, 0, AV_OPT_SEARCH_CHILDREN);
-            if (ret < 0)
-                return ret;
-        }
-    }
-
-    return avfilter_process_command(fade, "enable", "1", NULL, 0, 0);
-}
-
-/****************************************************************************
  * Public Player Functions
  ****************************************************************************/
 
@@ -622,26 +577,6 @@ int media_player_get_duration_(void *handle, unsigned int *msec)
         *msec = strtoul(tmp, NULL, 0);
 
     return ret;
-}
-
-int media_player_set_fadein_(void *handle, unsigned int msec)
-{
-    MediaPlayerPriv *priv = handle;
-
-    if (!priv)
-        return -EINVAL;
-
-    return media_player_set_fadeinout(priv->filter, false, msec);
-}
-
-int media_player_set_fadeout_(void *handle, unsigned int msec)
-{
-    MediaPlayerPriv *priv = handle;
-
-    if (!priv)
-        return -EINVAL;
-
-    return media_player_set_fadeinout(priv->filter, true, msec);
 }
 
 int media_player_set_volume_(void *handle, float volume)

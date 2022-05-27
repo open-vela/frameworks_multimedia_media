@@ -86,8 +86,6 @@ static int mediatool_player_cmd_position(struct mediatool_s *media, char *pargs)
 static int mediatool_player_cmd_duration(struct mediatool_s *media, char *pargs);
 static int mediatool_player_cmd_isplaying(struct mediatool_s *media, char *pargs);
 static int mediatool_common_stop_inner(struct mediatool_chain_s *chain);
-static int mediatool_player_cmd_fadein(struct mediatool_s *media, char *pargs);
-static int mediatool_player_cmd_fadeout(struct mediatool_s *media, char *pargs);
 static int mediatool_common_cmd_send(struct mediatool_s *media, char *pargs);
 static int mediatool_server_cmd_dump(struct mediatool_s *media, char *pargs);
 static int mediatool_policy_cmd_setint(struct mediatool_s *media, char *pargs);
@@ -161,16 +159,6 @@ static struct mediatool_cmd_s g_mediatool_cmds[] =
         "pause",
         mediatool_player_cmd_pause,
         "Set player/recorder pause (pause ID)"
-    },
-    {
-        "fadein",
-        mediatool_player_cmd_fadein,
-        "Set player fadein (player ID duration(ms))"
-    },
-    {
-        "fadeout",
-        mediatool_player_cmd_fadeout,
-        "Set player fadeout (player ID duration(ms))"
     },
     {
         "volume",
@@ -648,46 +636,6 @@ static int mediatool_player_cmd_pause(struct mediatool_s *media, char *pargs)
         ret = media_player_pause(media->chain[id].handle);
     else
         ret = media_recorder_pause(media->chain[id].handle);
-
-    return ret;
-}
-
-static int mediatool_player_cmd_fadein(struct mediatool_s *media, char *pargs)
-{
-    unsigned int duration = 0;
-    int ret = 0;
-    int id;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    sscanf(pargs, "%d %d", &id, &duration);
-
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
-        return -EINVAL;
-
-    if (media->chain[id].player)
-        ret = media_player_set_fadein(media->chain[id].handle, duration);
-
-    return ret;
-}
-
-static int mediatool_player_cmd_fadeout(struct mediatool_s *media, char *pargs)
-{
-    unsigned int duration = 0;
-    int ret = 0;
-    int id;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    sscanf(pargs, "%d %d", &id, &duration);
-
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
-        return -EINVAL;
-
-    if (media->chain[id].player)
-        ret = media_player_set_fadeout(media->chain[id].handle, duration);
 
     return ret;
 }

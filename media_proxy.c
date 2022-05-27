@@ -472,36 +472,6 @@ int media_player_get_duration(void *handle, unsigned int *msec)
     return ret < 0 ? ret : resp;
 }
 
-int media_player_set_fadein(void *handle, unsigned int msec)
-{
-    MediaProxyPriv *priv = handle;
-    int32_t resp;
-    int ret;
-
-    if (!priv)
-        return -EINVAL;
-
-    ret = media_client_send_recieve(priv->proxy, "%i%l%i", "%i",
-                                    MEDIA_PLAYER_FADEIN, priv->handle, msec, &resp);
-
-    return ret < 0 ? ret : resp;
-}
-
-int media_player_set_fadeout(void *handle, unsigned int msec)
-{
-    MediaProxyPriv *priv = handle;
-    int32_t resp;
-    int ret;
-
-    if (!priv)
-        return -EINVAL;
-
-    ret = media_client_send_recieve(priv->proxy, "%i%l%i", "%i",
-                                    MEDIA_PLAYER_FADEOUT, priv->handle, msec, &resp);
-
-    return ret < 0 ? ret : resp;
-}
-
 int media_player_set_volume(void *handle, float volume)
 {
     MediaProxyPriv *priv = handle;

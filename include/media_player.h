@@ -162,22 +162,6 @@ int media_player_get_position(void *handle, unsigned int *msec);
 int media_player_get_duration(void *handle, unsigned int *msec);
 
 /**
- * Set the player path fadein
- * @param[in] handle    The player path
- * @param[in] mesc      Fadein used time in millisecond
- * @return Zero on success; a negated errno value on failure.
- */
-int media_player_set_fadein(void *handle, unsigned int msec);
-
-/**
- * Set the player path fadeout
- * @param[in] handle    The player path
- * @param[in] mesc      Fadeout used time in millisecond
- * @return Zero on success; a negated errno value on failure.
- */
-int media_player_set_fadeout(void *handle, unsigned int msec);
-
-/**
  * Set the player path volume
  * @param[in] handle    The player path
  * @param[in] mesc      Volume with range of 0.0 - 1.0
