@@ -51,12 +51,10 @@ extern "C" {
 #define MEDIA_PLAYER_ISPLAYING       110
 #define MEDIA_PLAYER_POSITION        111
 #define MEDIA_PLAYER_DURATION        112
-#define MEDIA_PLAYER_FADEIN          113
-#define MEDIA_PLAYER_FADEOUT         114
-#define MEDIA_PLAYER_SET_VOLUME      115
-#define MEDIA_PLAYER_GET_VOLUME      116
-#define MEDIA_PLAYER_SET_PROPERTY    117
-#define MEDIA_PLAYER_GET_PROPERTY    118
+#define MEDIA_PLAYER_SET_VOLUME      113
+#define MEDIA_PLAYER_GET_VOLUME      114
+#define MEDIA_PLAYER_SET_PROPERTY    115
+#define MEDIA_PLAYER_GET_PROPERTY    116
 #define MEDIA_RECORDER_OPEN          200
 #define MEDIA_RECORDER_CLOSE         201
 #define MEDIA_RECORDER_SET_CALLBACK  202
@@ -126,8 +124,6 @@ int media_player_is_playing_(void *handle);
 int media_player_seek_(void *handle, unsigned int msec);
 int media_player_get_position_(void *handle, unsigned int *msec);
 int media_player_get_duration_(void *handle, unsigned int *msec);
-int media_player_set_fadein_(void *handle, unsigned int msec);
-int media_player_set_fadeout_(void *handle, unsigned int msec);
 int media_player_set_volume_(void *handle, float volume);
 int media_player_get_volume_(void *handle, float *volume);
 int media_player_process_command(void *handle, const char *target,
