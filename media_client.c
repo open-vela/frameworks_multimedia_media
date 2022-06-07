@@ -235,6 +235,7 @@ out:
 int media_client_set_event_cb(void *handle, void *event_cb, void *cookie)
 {
     struct media_client_priv *priv = handle;
+    pthread_attr_t pattr;
     int ret;
 
     if (priv == NULL || event_cb == NULL)
@@ -248,7 +249,10 @@ int media_client_set_event_cb(void *handle, void *event_cb, void *cookie)
         pthread_mutex_unlock(&priv->mutex);
         return 0;
     }
-    ret = pthread_create(&priv->thread, NULL, media_client_listen_thread, (pthread_addr_t)priv);
+    pthread_attr_init(&pattr);
+    pthread_attr_setstacksize(&pattr, 4096);
+    ret = pthread_create(&priv->thread, &pattr, media_client_listen_thread, (pthread_addr_t)priv);
+    pthread_attr_destroy(&pattr);
 
     pthread_mutex_unlock(&priv->mutex);
     return ret;
