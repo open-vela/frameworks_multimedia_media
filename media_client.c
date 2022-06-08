@@ -250,7 +250,7 @@ int media_client_set_event_cb(void *handle, void *event_cb, void *cookie)
         return 0;
     }
     pthread_attr_init(&pattr);
-    pthread_attr_setstacksize(&pattr, 4096);
+    pthread_attr_setstacksize(&pattr, CONFIG_MEDIA_CLIENT_LISTEN_STACKSIZE);
     ret = pthread_create(&priv->thread, &pattr, media_client_listen_thread, (pthread_addr_t)priv);
     pthread_attr_destroy(&pattr);
 
