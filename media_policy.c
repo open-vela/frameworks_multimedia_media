@@ -451,42 +451,42 @@ int media_policy_destroy(void *handle)
 
 int media_policy_set_int_(const char *name, int value, int apply)
 {
-    return 0;
+    return -ENOSYS;
 }
 
 int media_policy_get_int_(const char *name, int *value)
 {
-    return 0;
+    return -ENOSYS;
 }
 
 int media_policy_set_string_(const char *name, const char *value, int apply)
 {
-    return 0;
+    return -ENOSYS;
 }
 
 int media_policy_get_string_(const char *name, char *value, size_t len)
 {
-    return 0;
+    return -ENOSYS;
 }
 
 int media_policy_include_(const char *name, const char *values, int apply)
 {
-    return 0;
+    return -ENOSYS;
 }
 
 int media_policy_exclude_(const char *name, const char *values, int apply)
 {
-    return 0;
+    return -ENOSYS;
 }
 
 int media_policy_increase_(const char *name, int apply)
 {
-    return 0;
+    return -ENOSYS;
 }
 
 int media_policy_decrease_(const char *name, int apply)
 {
-    return 0;
+    return -ENOSYS;
 }
 
 char *media_policy_dump_(const char *options)
