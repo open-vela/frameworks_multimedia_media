@@ -459,17 +459,12 @@ int media_player_reset_(void *handle)
 int media_player_start_(void *handle)
 {
     MediaPlayerPriv *priv = handle;
-    int ret;
 
     if (!priv)
         return -EINVAL;
 
-    ret = avfilter_process_command(priv->filter, "start", NULL, NULL, 0, 0);
-    if (ret < 0)
-        return ret;
-
     media_policy_include_(priv->name, priv->filter->name + strlen("amovie_async@"), true);
-    return 0;
+    return avfilter_process_command(priv->filter, "start", NULL, NULL, 0, 0);
 }
 
 int media_player_stop_(void *handle)
