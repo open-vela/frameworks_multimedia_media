@@ -72,6 +72,7 @@ static int media_prepare(void *handle, int32_t cmd,
     ret = media_client_send_recieve(priv->proxy, "%i%l%s%s", "%i",
                                     cmd, priv->handle, url, options, &resp);
 
+    syslog(LOG_INFO, "%s %p url %s. ret %d\n", __func__, handle, url, ret);
     return ret < 0 ? ret : resp;
 }
 
@@ -211,6 +212,7 @@ out:
     media_parcel_deinit(&in);
     media_parcel_deinit(&out);
     media_client_disconnect(proxy);
+    syslog(LOG_INFO, "%s target %s cmd %s args %s ret %d\n", __func__, target, cmd, arg, ret);
     return ret;
 }
 
@@ -267,6 +269,7 @@ void *media_player_open(const char *params)
         goto disconnect;
 
     atomic_store(&priv->refs, 1);
+    syslog(LOG_INFO, "%s %s return %p. \n", __func__, params, priv);
     return priv;
 
 disconnect:
@@ -285,6 +288,7 @@ int media_player_close(void *handle, int pending_stop)
     if (!priv)
         return -EINVAL;
 
+    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     ret = media_client_send_recieve(priv->proxy, "%i%l%i", "%i",
                                     MEDIA_PLAYER_CLOSE, priv->handle, pending_stop, &resp);
     if (ret < 0)
@@ -375,6 +379,7 @@ int media_player_start(void *handle)
     if (!priv)
         return -EINVAL;
 
+    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
                                     MEDIA_PLAYER_START, priv->handle, &resp);
 
@@ -398,6 +403,7 @@ int media_player_stop(void *handle)
     ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
                                     MEDIA_PLAYER_STOP, priv->handle, &resp);
 
+    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     return ret < 0 ? ret : resp;
 }
 
@@ -595,6 +601,8 @@ void *media_recorder_open(const char *params)
         goto disconnect;
 
     atomic_store(&priv->refs, 1);
+
+    syslog(LOG_INFO, "%s %s return %p. \n", __func__, params, priv);
     return priv;
 
 disconnect:
@@ -613,6 +621,7 @@ int media_recorder_close(void *handle)
     if (!priv)
         return -EINVAL;
 
+    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
                                     MEDIA_RECORDER_CLOSE, priv->handle, &resp);
     if (ret < 0)
@@ -705,6 +714,7 @@ int media_recorder_start(void *handle)
     ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
                                     MEDIA_RECORDER_START, priv->handle, &resp);
 
+    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     return ret < 0 ? ret : resp;
 }
 
@@ -740,6 +750,7 @@ int media_recorder_stop(void *handle)
     ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
                                     MEDIA_RECORDER_STOP, priv->handle, &resp);
 
+    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     return ret < 0 ? ret : resp;
 }
 
