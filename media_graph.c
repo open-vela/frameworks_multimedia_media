@@ -306,13 +306,16 @@ int media_graph_process_command(void *handle, const char *target,
     for (i = 0; i < priv->graph->nb_filters; i++) {
         AVFilterContext *filter = priv->graph->filters[i];
 
-        if (!strcmp(target, filter->name))
+        if (!strcmp(target, filter->name)) {
+            av_log(NULL, AV_LOG_INFO, "%s name %s cmd %s arg %s\n", __func__, filter->name, cmd, arg);
             ret = avfilter_process_command(filter, cmd, arg, res, res_len, 0);
-        else {
+        } else {
             const char *tmp = strchr(filter->name, '@');
 
-            if (tmp && !strncmp(tmp + 1, target, strlen(target)))
+            if (tmp && !strncmp(tmp + 1, target, strlen(target))) {
+                av_log(NULL, AV_LOG_INFO,"%s name %s cmd %s arg %s\n", __func__, filter->name, cmd, arg);
                 ret = avfilter_process_command(filter, cmd, arg, res, res_len, 0);
+            }
         }
 
         if (ret < 0)
