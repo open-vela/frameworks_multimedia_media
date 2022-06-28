@@ -75,15 +75,35 @@ static int media_prepare(void *handle, int32_t cmd,
     return ret < 0 ? ret : resp;
 }
 
+static int media_get_sockaddr(void *handle, struct sockaddr_storage *addr_)
+{
+    MediaProxyPriv *priv = handle;
+#ifdef CONFIG_MEDIA_SERVER
+    struct sockaddr_un *addr = (struct sockaddr_un *)addr_;
+#else
+    struct sockaddr_rpmsg *addr = (struct sockaddr_rpmsg *)addr_;
+#endif
+
+    if (!handle || !addr)
+        return -EINVAL;
+
+#ifdef CONFIG_MEDIA_SERVER
+    addr->sun_family = AF_UNIX;
+    snprintf(addr->sun_path, UNIX_PATH_MAX, "med%llx", priv->handle);
+#else
+    addr->rp_family = AF_RPMSG;
+    snprintf(addr->rp_name, RPMSG_SOCKET_NAME_SIZE, "med%llx", priv->handle);
+    snprintf(addr->rp_cpu, RPMSG_SOCKET_CPU_SIZE, CONFIG_MEDIA_SERVER_CPUNAME);
+#endif
+
+    return 0;
+}
+
 static ssize_t media_process_data(void *handle, bool player,
                                   void *data, size_t len)
 {
     MediaProxyPriv *priv = handle;
-#ifdef CONFIG_MEDIA_SERVER
-    struct sockaddr_un addr;
-#else
-    struct sockaddr_rpmsg addr;
-#endif
+    struct sockaddr_storage addr;
     int ret = -EINVAL;
 
     if (!handle || !data || !len)
@@ -92,16 +112,11 @@ static ssize_t media_process_data(void *handle, bool player,
     atomic_fetch_add(&priv->refs, 1);
 
     if (priv->socket <= 0) {
-#ifdef CONFIG_MEDIA_SERVER
-        addr.sun_family = AF_UNIX;
-        snprintf(addr.sun_path, UNIX_PATH_MAX, "med%llx", priv->handle);
-        priv->socket = socket(addr.sun_family, SOCK_STREAM, 0);
-#else
-        addr.rp_family = AF_RPMSG;
-        snprintf(addr.rp_name, RPMSG_SOCKET_NAME_SIZE, "med%llx", priv->handle);
-        snprintf(addr.rp_cpu, RPMSG_SOCKET_CPU_SIZE, CONFIG_MEDIA_SERVER_CPUNAME);
-        priv->socket = socket(addr.rp_family, SOCK_STREAM, 0);
-#endif
+        ret = media_get_sockaddr(handle, &addr);
+        if (ret < 0)
+            goto out;
+
+        priv->socket = socket(addr.ss_family, SOCK_STREAM, 0);
         if (priv->socket <= 0)
             goto out;
 
@@ -344,6 +359,11 @@ int media_player_reset(void *handle)
 ssize_t media_player_write_data(void *handle, const void *data, size_t len)
 {
     return media_process_data(handle, true, (void *)data, len);
+}
+
+int media_player_get_sockaddr(void *handle, struct sockaddr_storage *addr)
+{
+    return media_get_sockaddr(handle, addr);
 }
 
 int media_player_start(void *handle)
@@ -666,6 +686,11 @@ int media_recorder_reset(void *handle)
 ssize_t media_recorder_read_data(void *handle, void *data, size_t len)
 {
     return media_process_data(handle, false, data, len);
+}
+
+int media_recorder_get_sockaddr(void *handle, struct sockaddr_storage *addr)
+{
+    return media_get_sockaddr(handle, addr);
 }
 
 int media_recorder_start(void *handle)
