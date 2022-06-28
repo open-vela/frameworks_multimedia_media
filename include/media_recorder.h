@@ -26,6 +26,7 @@
  ****************************************************************************/
 
 #include <stddef.h>
+#include <sys/socket.h>
 #include <media_event.h>
 
 #ifdef __cplusplus
@@ -86,12 +87,21 @@ int media_recorder_reset(void *handle);
 /**
  * Read recorderd data from the recorder path.
  * This need media_recorder_prepare() url set to NULL.
+ * Note: this function is blocked
  * @param[in] handle    Current recorder path
  * @param[in] data      Buffer will be recorderd to
  * @param[in] len       Buffer len
  * @return returned >= 0, Actly got len; a negated errno value on failure.
  */
 ssize_t media_recorder_read_data(void *handle, void *data, size_t len);
+
+/**
+ * Get sockaddr for unblock mode read data
+ * @param[in] handle    The player path
+ * @param[in] addr      The sockaddr pointer
+ * @return returned >= 0, Actly sent len; a negated errno value on failure.
+ */
+int media_recorder_get_sockaddr(void *handle, struct sockaddr_storage *addr);
 
 /**
  * Start the recorder path.

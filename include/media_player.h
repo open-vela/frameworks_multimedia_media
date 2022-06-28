@@ -26,6 +26,7 @@
  ****************************************************************************/
 
 #include <stddef.h>
+#include <sys/socket.h>
 #include <media_event.h>
 
 #ifdef __cplusplus
@@ -94,12 +95,21 @@ int media_player_reset(void *handle);
 /**
  * Write data to player path.
  * This need media_player_prepare() url set to NULL.
+ * Note: this function is blocked
  * @param[in] handle    The player path
  * @param[in] data      Buffer will be played
  * @param[in] len       Buffer len
  * @return returned >= 0, Actly sent len; a negated errno value on failure.
  */
 ssize_t media_player_write_data(void *handle, const void *data, size_t len);
+
+/**
+ * Get sockaddr for unblock mode write data
+ * @param[in] handle    The player path
+ * @param[in] addr      The sockaddr pointer
+ * @return returned >= 0, Actly sent len; a negated errno value on failure.
+ */
+int media_player_get_sockaddr(void *handle, struct sockaddr_storage *addr);
 
 /**
  * Start the player path to play
