@@ -93,12 +93,12 @@ static int media_server_create_notify(struct media_server_priv *priv, media_parc
         len = sizeof(struct sockaddr_un);
     }
 
-    fd = socket(family, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    fd = socket(family, SOCK_STREAM, 0);
     if (fd <= 0)
         return -errno;
 
     ret = connect(fd, addr, len);
-    if (ret < 0 && errno != EINPROGRESS) {
+    if (ret < 0) {
         close(fd);
         return -errno;
     }
@@ -320,5 +320,6 @@ int media_server_notify(void *handle, void *cookie, media_parcel *parcel)
     if (priv == NULL || conn == NULL || conn->notify_fd <= 0)
         return -EINVAL;
 
-    return media_parcel_send(parcel, conn->notify_fd, MEDIA_PARCEL_NOTIFY, 0);
+    return media_parcel_send(parcel, conn->notify_fd,
+                             MEDIA_PARCEL_NOTIFY, MSG_DONTWAIT);
 }

@@ -36,6 +36,7 @@
 
 struct media_client_priv {
     int                   fd;
+    int                   listenfd;
     void                  *cookie;
     media_client_event_cb event_cb;
     pthread_t             thread;
@@ -45,7 +46,6 @@ struct media_client_priv {
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
 
 static void media_client_get_sockaddr(int *family, socklen_t *len, void *addr, char *key)
 {
@@ -65,53 +65,64 @@ static void media_client_get_sockaddr(int *family, socklen_t *len, void *addr, c
 #endif
 }
 
-static void *media_client_listen_thread(pthread_addr_t pvarg)
+static int media_client_create_listenfd(struct media_client_priv *priv)
 {
-    struct media_client_priv *priv = pvarg;
-    media_parcel parcel;
 #ifdef CONFIG_MEDIA_SERVER
     struct sockaddr_un addr;
 #else
     struct sockaddr_rpmsg addr;
 #endif
     socklen_t socklen;
+    media_parcel parcel;
     char key[16];
-    uint32_t code;
-    int acceptfd;
-    int listenfd;
     int family;
     int ret;
 
     sprintf(key, "md_%p", priv);
     media_client_get_sockaddr(&family, &socklen, &addr, key);
-    listenfd = socket(family, SOCK_STREAM, 0);
-    if (listenfd <= 0)
-        return NULL;
 
-    if (bind(listenfd, (struct sockaddr *)&addr, socklen) < 0)
-        goto thread_error;
+    priv->listenfd = socket(family, SOCK_STREAM, 0);
+    if (priv->listenfd < 0)
+        return priv->listenfd;
 
-    if (listen(listenfd, 2) < 0)
-        goto thread_error;
+    ret = bind(priv->listenfd, (struct sockaddr *)&addr, socklen);
+    if (ret < 0)
+        goto err;
+
+    ret = listen(priv->listenfd, 2);
+    if (ret < 0)
+        goto err;
 
     media_parcel_init(&parcel);
     media_parcel_append_string(&parcel, key);
 #ifdef CONFIG_MEDIA_SERVER
     media_parcel_append_string(&parcel, NULL);
 #else
-    ret = getsockname(listenfd, (struct sockaddr *)&addr, &socklen);
-    if (ret < 0) {
-        media_parcel_deinit(&parcel);
-        goto thread_error;
-    }
+    ret = getsockname(priv->fd, (struct sockaddr *)&addr, &socklen);
+    if (ret < 0)
+        goto err;
+
     media_parcel_append_string(&parcel, addr.rp_cpu);
 #endif
+
     ret = media_parcel_send(&parcel, priv->fd, MEDIA_PARCEL_CREATE_NOTIFY, 0);
+
+err:
     media_parcel_deinit(&parcel);
     if (ret < 0)
-        goto thread_error;
+        close(priv->listenfd);
+    return ret;
+}
 
-    acceptfd = accept(listenfd, NULL, NULL);
+static void *media_client_listen_thread(pthread_addr_t pvarg)
+{
+    struct media_client_priv *priv = pvarg;
+    media_parcel parcel;
+    uint32_t code;
+    int acceptfd;
+    int ret;
+
+    acceptfd = accept(priv->listenfd, NULL, NULL);
     if (acceptfd <= 0)
         goto thread_error;
 
@@ -132,7 +143,7 @@ static void *media_client_listen_thread(pthread_addr_t pvarg)
     media_parcel_deinit(&parcel);
     close(acceptfd);
 thread_error:
-    close(listenfd);
+    close(priv->listenfd);
     return NULL;
 }
 
@@ -143,11 +154,7 @@ thread_error:
 void *media_client_connect(void)
 {
     struct media_client_priv *priv;
-#ifdef CONFIG_MEDIA_SERVER
-    struct sockaddr_un addr;
-#else
-    struct sockaddr_rpmsg addr;
-#endif
+    struct sockaddr_storage addr;
     socklen_t len;
     int family;
 
@@ -249,12 +256,24 @@ int media_client_set_event_cb(void *handle, void *event_cb, void *cookie)
         pthread_mutex_unlock(&priv->mutex);
         return 0;
     }
+
+    ret = media_client_create_listenfd(priv);
+    if (ret < 0) {
+        pthread_mutex_unlock(&priv->mutex);
+        return ret;
+    }
+
     pthread_attr_init(&pattr);
     pthread_attr_setstacksize(&pattr, CONFIG_MEDIA_CLIENT_LISTEN_STACKSIZE);
     ret = pthread_create(&priv->thread, &pattr, media_client_listen_thread, (pthread_addr_t)priv);
-    pthread_attr_destroy(&pattr);
+    if (ret < 0)
+      {
+        close(priv->listenfd);
+      }
 
+    pthread_attr_destroy(&pattr);
     pthread_mutex_unlock(&priv->mutex);
+
     return ret;
 }
 
