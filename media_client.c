@@ -98,7 +98,7 @@ static int media_client_create_listenfd(struct media_client_priv *priv)
 #ifdef CONFIG_MEDIA_SERVER
     media_parcel_append_string(&parcel, NULL);
 #else
-    ret = getsockname(priv->fd, (struct sockaddr *)&addr, &socklen);
+    ret = getsockname(priv->listenfd, (struct sockaddr *)&addr, &socklen);
     if (ret < 0)
         goto err;
 
