@@ -51,8 +51,9 @@ static void media_stub_event_cb(void *cookie, int event,
 void media_stub_onreceive(void *cookie, media_parcel *in, media_parcel *out)
 {
     const char *param_s1 = NULL, *param_s2 = NULL, *param_s3 = NULL;
-    int32_t cmd = 0, param_i32 = 0, param_i32_1 = 0, ret;
-    uint32_t param_u32 = 0;
+    int32_t cmd = 0, ret;
+    int param_i32 = 0, param_i32_1 = 0;
+    unsigned int param_u32 = 0;
     char *response = NULL;
     float param_flt = 0.0;
     uint64_t handle = 0;
