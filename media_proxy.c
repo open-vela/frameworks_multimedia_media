@@ -51,31 +51,6 @@ typedef struct MediaProxyPriv {
  * Private Functions
  ****************************************************************************/
 
-static int media_prepare(void *handle, int32_t cmd,
-                         const char *url, const char *options)
-{
-    MediaProxyPriv *priv = handle;
-    const char *opts = "listen=1";
-    char tmp[64];
-    int32_t resp;
-    int ret;
-
-    if (!url) {
-#ifdef CONFIG_MEDIA_SERVER
-        snprintf(tmp, sizeof(tmp), "unix:med%llx?%s", priv->handle, opts);
-#else
-        snprintf(tmp, sizeof(tmp), "rpmsg:med%llx?%s", priv->handle, opts);
-#endif
-        url = tmp;
-    }
-
-    ret = media_client_send_recieve(priv->proxy, "%i%l%s%s", "%i",
-                                    cmd, priv->handle, url, options, &resp);
-
-    syslog(LOG_INFO, "%s %p url %s. ret %d\n", __func__, handle, url, ret);
-    return ret < 0 ? ret : resp;
-}
-
 static int media_get_sockaddr(void *handle, struct sockaddr_storage *addr_)
 {
     MediaProxyPriv *priv = handle;
@@ -100,11 +75,86 @@ static int media_get_sockaddr(void *handle, struct sockaddr_storage *addr_)
     return 0;
 }
 
+static int media_bind_socket(void *handle, char *url, size_t len)
+{
+    MediaProxyPriv *priv = handle;
+    struct sockaddr_storage addr;
+    int fd, ret;
+
+    ret = media_get_sockaddr(handle, &addr);
+    if (ret < 0)
+        return ret;
+
+    fd = socket(addr.ss_family, SOCK_STREAM, 0);
+    if (fd < 0)
+        return -errno;
+
+    ret = bind(fd, (const struct sockaddr *)&addr, sizeof(addr));
+    if (ret < 0)
+        goto out;
+
+    ret = listen(fd, 1);
+    if (ret < 0)
+        goto out;
+
+    if (addr.ss_family == AF_UNIX)
+        snprintf(url, len, "unix:med%llx?listen=0", priv->handle);
+    else
+        snprintf(url, len, "rpmsg:med%llx:%s?listen=0", priv->handle,
+                 CONFIG_RPTUN_LOCAL_CPUNAME);
+
+    return fd;
+
+out:
+    close(fd);
+    return -errno;
+}
+
+static int media_prepare(void *handle, int32_t cmd,
+                         const char *url, const char *options)
+{
+    MediaProxyPriv *priv = handle;
+    int ret = -EINVAL;
+    char tmp[64];
+    int32_t resp;
+    int fd = 0;
+
+    if (priv->socket > 0)
+        return ret;
+
+    if (!url) {
+        fd = media_bind_socket(handle, tmp, sizeof(tmp));
+        if (fd < 0)
+            return fd;
+
+        url = tmp;
+    }
+
+    ret = media_client_send_recieve(priv->proxy, "%i%l%s%s", "%i",
+                                    cmd, priv->handle, url, options, &resp);
+    if (ret < 0)
+        goto out;
+
+    if (fd > 0) {
+        priv->socket = accept(fd, NULL, NULL);
+        if (priv->socket < 0) {
+            priv->socket = 0;
+            ret = -errno;
+        }
+    }
+
+out:
+    if (fd > 0)
+        close(fd);
+
+    syslog(LOG_INFO, "%s %p url %s. ret %d\n", __func__, handle, url, ret);
+    return ret < 0 ? ret : resp;
+}
+
 static ssize_t media_process_data(void *handle, bool player,
                                   void *data, size_t len)
 {
     MediaProxyPriv *priv = handle;
-    struct sockaddr_storage addr;
     int ret = -EINVAL;
 
     if (!handle || !data || !len)
@@ -112,20 +162,8 @@ static ssize_t media_process_data(void *handle, bool player,
 
     atomic_fetch_add(&priv->refs, 1);
 
-    if (priv->socket <= 0) {
-        ret = media_get_sockaddr(handle, &addr);
-        if (ret < 0)
-            goto out;
-
-        priv->socket = socket(addr.ss_family, SOCK_STREAM, 0);
-        if (priv->socket <= 0)
-            goto out;
-
-        ret = connect(priv->socket, (const struct sockaddr *)&addr,
-                      sizeof(addr));
-        if (ret < 0)
-            goto out;
-    }
+    if (priv->socket <= 0)
+        goto out;
 
     if (player) {
         ret = send(priv->socket, data, len, 0);
@@ -140,13 +178,6 @@ static ssize_t media_process_data(void *handle, bool player,
     }
 
 out:
-    if (ret <= 0 && priv->socket > 0) {
-        close(priv->socket);
-        priv->socket = 0;
-
-        ret = -errno;
-    }
-
     if (atomic_fetch_sub(&priv->refs, 1) == 1)
         free(priv);
 
