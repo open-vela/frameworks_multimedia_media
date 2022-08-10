@@ -33,6 +33,7 @@ extern "C" {
 #define MEDIA_AUDIO_MODE_PHONE       "phone"
 
 #define MEDIA_DEVICE_A2DP            "a2dp"     /*!< bt cellphone */
+#define MEDIA_DEVICE_A2DP_SNK        "a2dpsnk"
 #define MEDIA_DEVICE_SCO             "sco"      /*!< phone */
 #define MEDIA_DEVICE_MIC             "mic"
 
