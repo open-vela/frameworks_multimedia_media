@@ -81,7 +81,7 @@ protected:
 
             arg = strtok_r(NULL, ",", &inptr);
 
-            media_graph_process_command(media_get_graph(), target, cmd, arg, 0, 0);
+            media_graph_control(media_get_graph(), target, cmd, arg, NULL, 0);
 
             target = strtok_r(NULL, ";", &outptr);
         }
