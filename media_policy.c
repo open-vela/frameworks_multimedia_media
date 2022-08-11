@@ -24,6 +24,7 @@
 
 #include <bindings/c/ParameterFramework.h>
 #include <cutils/properties.h>
+#include <libavutil/log.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -247,138 +248,71 @@ err_parse:
 }
 
 /****************************************************************************
- * Public Functions for RPC
+ * Public Functions
  ****************************************************************************/
 
-int media_policy_set_int_(const char *name, int value, int apply)
+int media_policy_control(void *handle, const char *name, const char *cmd,
+                         const char *value, int apply, char **res, int res_len)
 {
-    MediaPolicyPriv *priv = media_get_policy();
-
-    if (!priv || !priv->pfw || !name)
-        return -EINVAL;
-
-    if (!pfwSetCriterion(priv->pfw, name, value))
-        return -EINVAL;
-    if (apply && !pfwApplyConfigurations(priv->pfw))
-        return -EINVAL;
-
-    return media_policy_save_kvdb(priv->pfw, name);
-}
-
-int media_policy_get_int_(const char *name, int *value)
-{
-    MediaPolicyPriv *priv = media_get_policy();
-
-    if (!priv || !priv->pfw || !name || !value)
-        return -EINVAL;
-
-    return pfwGetCriterion(priv->pfw, name, value) ? 0 : -EINVAL;
-}
-
-int media_policy_set_string_(const char *name, const char *value, int apply)
-{
-    MediaPolicyPriv *priv = media_get_policy();
-
-    if (!priv || !priv->pfw || !name)
-        return -EINVAL;
-
-    if (!pfwSetCriterionString(priv->pfw, name, value))
-        return -EINVAL;
-    if (apply && !pfwApplyConfigurations(priv->pfw))
-        return -EINVAL;
-
-    return media_policy_save_kvdb(priv->pfw, name);
-}
-
-int media_policy_get_string_(const char *name, char *value, size_t len)
-{
-    MediaPolicyPriv *priv = media_get_policy();
-
-    if (!priv || !priv->pfw || !name || !value)
-        return -EINVAL;
-
-    return pfwGetCriterionString(priv->pfw, name, value, len) ? 0 : -EINVAL;
-}
-
-int media_policy_include_(const char *name, const char *values, int apply)
-{
-    MediaPolicyPriv *priv = media_get_policy();
-
-    if (!priv || !priv->pfw || !name)
-        return -EINVAL;
-
-    if (!pfwIncludeCriterion(priv->pfw, name, values))
-        return -EINVAL;
-    if (apply && !pfwApplyConfigurations(priv->pfw))
-        return -EINVAL;
-
-    return media_policy_save_kvdb(priv->pfw, name);
-}
-
-int media_policy_exclude_(const char *name, const char *values, int apply)
-{
-    MediaPolicyPriv *priv = media_get_policy();
-
-    if (!priv || !priv->pfw || !name)
-        return -EINVAL;
-
-    if (!pfwExcludeCriterion(priv->pfw, name, values))
-        return -EINVAL;
-    if (apply && !pfwApplyConfigurations(priv->pfw))
-        return -EINVAL;
-
-    return media_policy_save_kvdb(priv->pfw, name);
-}
-
-int media_policy_increase_(const char *name, int apply)
-{
-    MediaPolicyPriv *priv = media_get_policy();
-    int value;
-
-    if (!priv || !priv->pfw || !name)
-        return -EINVAL;
-
-    if (!pfwGetCriterion(priv->pfw, name, &value))
-        return -EINVAL;
-    if (!pfwSetCriterion(priv->pfw, name, value + 1))
-        return -EINVAL;
-    if (apply && !pfwApplyConfigurations(priv->pfw))
-        return -EINVAL;
-
-    return media_policy_save_kvdb(priv->pfw, name);
-}
-
-int media_policy_decrease_(const char *name, int apply)
-{
-    MediaPolicyPriv *priv = media_get_policy();
-    int value;
-
-    if (!priv || !priv->pfw || !name)
-        return -EINVAL;
-
-    if (!pfwGetCriterion(priv->pfw, name, &value))
-        return -EINVAL;
-    if (!pfwSetCriterion(priv->pfw, name, value - 1))
-        return -EINVAL;
-    if (apply && !pfwApplyConfigurations(priv->pfw))
-        return -EINVAL;
-
-    return media_policy_save_kvdb(priv->pfw, name);
-}
-
-char *media_policy_dump_(const char *options)
-{
-    MediaPolicyPriv *priv = media_get_policy();
+    MediaPolicyPriv *priv = handle;
+    int ret = -EINVAL, tmp;
 
     if (!priv || !priv->pfw)
-        return NULL;
+        return -EINVAL;
 
-    return pfwDump(priv->pfw, options);
+    if (res_len && res && !*res) {
+        *res = malloc(res_len);
+        if (!*res)
+            return -ENOMEM;
+    }
+
+    if (!strcmp(cmd, "set_int")) {
+        ret = pfwSetCriterion(priv->pfw, name, atoi(value));
+    } else if (!strcmp(cmd, "set_string")) {
+        ret = pfwSetCriterionString(priv->pfw, name, value);
+    } else if (!strcmp(cmd, "include")) {
+        ret = pfwIncludeCriterion(priv->pfw, name, value);
+    } else if (!strcmp(cmd, "exclude")) {
+        ret = pfwExcludeCriterion(priv->pfw, name, value);
+    } else if (!strcmp(cmd, "increase")) {
+        if (!pfwGetCriterion(priv->pfw, name, &tmp))
+            return -EINVAL;
+
+        ret = pfwSetCriterion(priv->pfw, name, tmp + 1);
+    } else if (!strcmp(cmd, "decrease")) {
+        if (!pfwGetCriterion(priv->pfw, name, &tmp))
+            return -EINVAL;
+
+        ret = pfwSetCriterion(priv->pfw, name, tmp - 1);
+    } else if (!strcmp(cmd, "get_int")) {
+        if (!res || !*res || !pfwGetCriterion(priv->pfw, name, &tmp))
+            return -EINVAL;
+
+        return snprintf(*res, res_len, "%d", tmp);
+    } else if (!strcmp(cmd, "get_string")) {
+        if (!res || !*res)
+            return -EINVAL;
+
+        return pfwGetCriterionString(priv->pfw, name, *res, res_len) ? 0 : -EINVAL;
+    } else if (!strcmp(cmd, "dump")) {
+        if (!res)
+            return -EINVAL;
+
+        *res = pfwDump(priv->pfw, value);
+        return 0;
+    }
+
+    if (!ret) {
+        av_log(NULL, AV_LOG_ERROR, "%s, unkown name:%s cmd:%s value:%s\n",
+               __func__, name, cmd, value);
+        return -EINVAL;
+    }
+
+    if (apply && !pfwApplyConfigurations(priv->pfw))
+        return -EINVAL;
+
+    return media_policy_save_kvdb(priv->pfw, name);
 }
-
-/****************************************************************************
- * Public Functions for daemon
- ****************************************************************************/
 
 int media_policy_destroy(void *handle)
 {
@@ -433,6 +367,20 @@ err_parse:
     return NULL;
 }
 
+int media_policy_get_stream_name(void *handle, const char *stream,
+                                 char *name, int len)
+{
+    return media_policy_control(handle, stream, "get_string", NULL, 0,
+                                &name, len);
+}
+
+int media_policy_set_stream_status(void *handle, const char *name,
+                                   const char *stream, bool active)
+{
+    return media_policy_control(handle, name, active ? "include" : "exclude",
+                                stream, 0, NULL, 0);
+}
+
 #else // CONFIG_PFW
 
 /****************************************************************************
@@ -449,49 +397,22 @@ int media_policy_destroy(void *handle)
     return 0;
 }
 
-int media_policy_set_int_(const char *name, int value, int apply)
+int media_policy_control(void *handle, const char *name, const char *cmd,
+                         const char *value, int apply, char **res, int res_len)
 {
     return -ENOSYS;
 }
 
-int media_policy_get_int_(const char *name, int *value)
+int media_policy_get_stream_name(void *handle, const char *stream,
+                                 char *name, int len)
 {
     return -ENOSYS;
 }
 
-int media_policy_set_string_(const char *name, const char *value, int apply)
+int media_policy_set_stream_status(void *handle, const char *name,
+                                   const char *input, bool active)
 {
     return -ENOSYS;
-}
-
-int media_policy_get_string_(const char *name, char *value, size_t len)
-{
-    return -ENOSYS;
-}
-
-int media_policy_include_(const char *name, const char *values, int apply)
-{
-    return -ENOSYS;
-}
-
-int media_policy_exclude_(const char *name, const char *values, int apply)
-{
-    return -ENOSYS;
-}
-
-int media_policy_increase_(const char *name, int apply)
-{
-    return -ENOSYS;
-}
-
-int media_policy_decrease_(const char *name, int apply)
-{
-    return -ENOSYS;
-}
-
-char *media_policy_dump_(const char *options)
-{
-    return NULL;
 }
 
 #endif
