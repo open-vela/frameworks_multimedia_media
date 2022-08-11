@@ -66,7 +66,6 @@ typedef struct MediaGraphPriv {
 typedef struct MediaPlayerPriv {
     AVFilterContext *filter;
     char            *name;
-    float            volume;
 } MediaPlayerPriv;
 
 typedef struct MediaCommand {
@@ -78,7 +77,7 @@ typedef struct MediaCommand {
 } MediaCommand;
 
 /****************************************************************************
- * Private Graph Functions
+ * Private Functions
  ****************************************************************************/
 
 static void media_graph_filter_ready(AVFilterContext *ctx)
@@ -119,7 +118,7 @@ static void media_graph_log_callback(void *avcl, int level,
     vsyslog(level, fmt, vl);
 }
 
-static int media_graph_loadgraph(MediaGraphPriv *priv, char *conf)
+static int media_graph_load(MediaGraphPriv *priv, char *conf)
 {
     char graph_desc[MAX_GRAPH_SIZE];
     AVFilterInOut *input = NULL;
@@ -191,7 +190,7 @@ out:
 
 static int media_graph_queue_command(AVFilterContext *filter,
                                      const char *cmd, const char *arg,
-                                     char *res, int res_len, int flags)
+                                     char **res, int res_len, int flags)
 {
     MediaGraphPriv *priv;
     MediaCommand *tmp;
@@ -200,14 +199,14 @@ static int media_graph_queue_command(AVFilterContext *filter,
     if (!priv)
         return -EINVAL;
 
-    if (res_len)
-        return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
+    if (res && *res)
+        return avfilter_process_command(filter, cmd, arg, *res, res_len, flags);
 
     if (!priv->cmdhead &&
         !ff_filter_graph_has_pending_status(filter->graph)) {
         av_log(NULL, AV_LOG_INFO, "%s:do name:%s cmd:%s arg:%s\n", __func__,
                filter->name, cmd, arg);
-        return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
+        return avfilter_process_command(filter, cmd, arg, NULL, 0, flags);
     }
 
     tmp = malloc(sizeof(MediaCommand));
@@ -281,8 +280,41 @@ static int media_graph_dequeue_command(bool process)
     return ret;
 }
 
+static void *media_find_filter(void *graph, const char *prefix, const char *name)
+{
+    MediaGraphPriv *media = graph;
+    AVFilterContext *filter = NULL;
+    int i;
+
+    if (!media || !media->graph)
+        return NULL;
+
+    for (i = 0; i < media->graph->nb_filters; i++) {
+        filter = media->graph->filters[i];
+
+        if (!filter->opaque && !strcmp(filter->filter->name, prefix)) {
+            if (!name || !strcmp(filter->name, name) ||
+                !strncmp(filter->name + strlen(prefix) + 1, name, strlen(name)))
+                return filter;
+        }
+    }
+
+    return NULL;
+}
+
+static inline int media_alloc_response(int len, char **res)
+{
+    if (len && res && !*res) {
+        *res = malloc(len);
+        if (!*res)
+            return -ENOMEM;
+    }
+
+    return 0;
+}
+
 /****************************************************************************
- * Public Graph Functions
+ * Public Functions
  ****************************************************************************/
 
 void *media_graph_create(void *file)
@@ -302,7 +334,7 @@ void *media_graph_create(void *file)
     if (ret < 0)
         goto err;
 
-    ret = media_graph_loadgraph(priv, file);
+    ret = media_graph_load(priv, file);
     if (ret < 0)
         goto err;
 
@@ -353,7 +385,7 @@ int media_graph_get_pollfds(void *handle, struct pollfd *fds,
     for (i = 0; i < priv->pollftn; i++) {
         AVFilterContext *filter = priv->pollfts[i];
 
-        ret = media_graph_queue_command(filter, "get_pollfd", NULL,
+        ret = avfilter_process_command(filter, "get_pollfd", NULL,
                 (char *)&fds[nfd], sizeof(struct pollfd) * (count - nfd),
                 AV_OPT_SEARCH_CHILDREN);
         if (ret < 0)
@@ -378,7 +410,7 @@ int media_graph_poll_available(void *handle, struct pollfd *fd, void *cookie)
         return -EINVAL;
 
     if (cookie)
-        media_graph_queue_command(cookie, "poll_available", NULL,
+        avfilter_process_command(cookie, "poll_available", NULL,
                                  (char *)fd, sizeof(struct pollfd),
                                  AV_OPT_SEARCH_CHILDREN);
     else
@@ -406,15 +438,26 @@ int media_graph_run_once(void *handle)
     return ret == -EAGAIN ? 0 : ret;
 }
 
-int media_graph_process_command(void *handle, const char *target,
-                                const char *cmd, const char *arg,
-                                char *res, int res_len)
+int media_graph_control(void *handle, const char *target, const char *cmd,
+                        const char *arg, char **res, int res_len)
 {
     MediaGraphPriv *priv = handle;
     int i, ret = 0;
 
     if (!priv || !priv->graph)
         return -EINVAL;
+
+    if (!strcmp(cmd, "dump")) {
+        if (!res)
+            return -EINVAL;
+
+        *res = avfilter_graph_dump_ext(priv->graph, arg);
+        return 0;
+    }
+
+    ret = media_alloc_response(res_len, res);
+    if (ret < 0)
+        return ret;
 
     for (i = 0; i < priv->graph->nb_filters; i++) {
         AVFilterContext *filter = priv->graph->filters[i];
@@ -435,100 +478,88 @@ int media_graph_process_command(void *handle, const char *target,
     return 0;
 }
 
-char *media_graph_dump_(void *handle, const char *options)
-{
-    MediaGraphPriv *priv = handle;
-
-    if (!priv || !priv->graph)
-        return NULL;
-
-    return avfilter_graph_dump_ext(priv->graph, options);
-}
-
-/****************************************************************************
- * Public Player Functions
- ****************************************************************************/
-
-void *media_player_open_(void *graph, const char *name)
-{
-    MediaGraphPriv *media = graph;
-    AVFilterContext *filter = NULL;
-    MediaPlayerPriv *priv;
-    char namebuf[64];
-    int ret, i;
-
-    if (!media || !media->graph)
-        return NULL;
-
-    if (name && media_policy_get_string_(name, namebuf, sizeof(namebuf)) == 0)
-        name = namebuf;
-
-    for (i = 0; i < media->graph->nb_filters; i++) {
-        filter = media->graph->filters[i];
-
-        if (filter->opaque || strcmp(filter->filter->name, "amovie_async"))
-            continue;
-
-        if (!name || !strcmp(filter->name, name) ||
-            !strncmp(filter->name + strlen("amovie_async@"), name, strlen(name)))
-            break;
-    }
-
-    if (i == media->graph->nb_filters || !filter)
-        return NULL;
-
-    priv = zalloc(sizeof(MediaPlayerPriv));
-    if (!priv)
-        return NULL;
-
-    if (name) {
-        priv->name = strdup(name);
-        if (!priv->name) {
-            free(priv);
-            return NULL;
-        }
-    }
-
-    ret = media_graph_queue_command(filter, "open", NULL, NULL, 0, 0);
-    if (ret < 0) {
-        free(priv->name);
-        free(priv);
-        return NULL;
-    }
-
-    priv->filter   = filter;
-    priv->volume   = 1.0f;
-    filter->opaque = priv;
-
-    return priv;
-}
-
-int media_player_close_(void *handle, int pending_stop)
+int media_player_control(void *handle, const char *target, const char *cmd,
+                         const char *arg, char **res, int res_len)
 {
     MediaPlayerPriv *priv = handle;
-    char tmp[16];
+    AVFilterContext *filter;
+    char name[64];
     int ret;
 
-    if (!priv)
-        return -EINVAL;
-
-    snprintf(tmp, sizeof(tmp), "%d", pending_stop);
-
-    ret = media_graph_queue_command(priv->filter, "close", tmp, NULL, 0, 0);
+    ret = media_alloc_response(res_len, res);
     if (ret < 0)
         return ret;
 
-    media_policy_exclude_(priv->name, priv->filter->name + strlen("amovie_async@"), true);
+    if (!strcmp(cmd, "open")) {
+        if (!res)
+            return -EINVAL;
 
-    priv->filter->opaque = NULL;
-    free(priv->name);
-    free(priv);
+        if (arg && media_policy_get_stream_name(media_get_policy(), arg, name, sizeof(name)) == 0)
+            arg = name;
 
-    return 0;
+        filter = media_find_filter(media_get_graph(), MEDIA_PLAYER_NAME, arg);
+        if (!filter)
+            goto out;
+
+        priv = malloc(sizeof(MediaPlayerPriv));
+        if (!priv)
+            goto out;
+
+        if (arg) {
+            priv->name = strdup(arg);
+            if (!priv->name)
+                goto err1;
+        } else
+            priv->name = NULL;
+
+        ret = media_graph_queue_command(filter, "open", NULL, NULL, 0, 0);
+        if (ret < 0)
+            goto err2;
+
+        priv->filter   = filter;
+        filter->opaque = priv;
+        goto out;
+
+err2:
+        free(priv->name);
+err1:
+        free(priv);
+        priv = NULL;
+out:
+        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+    } else if (!strcmp(cmd, "close")) {
+        ret = media_graph_queue_command(priv->filter, "close", arg, NULL, 0, 0);
+        if (ret >= 0) {
+            media_policy_set_stream_status(media_get_policy(), priv->name,
+                                           priv->filter->name + sizeof(MEDIA_PLAYER_NAME), false);
+            priv->filter->opaque = NULL;
+            free(priv->name);
+            free(priv);
+        }
+
+        return ret;
+    } else if (!strcmp(cmd, "start")) {
+        media_policy_set_stream_status(media_get_policy(), priv->name,
+                                       priv->filter->name + sizeof(MEDIA_PLAYER_NAME), true);
+        return media_graph_queue_command(priv->filter, "start", NULL, NULL, 0, 0);
+    } else if (!strcmp(cmd, "pause") || !strcmp(cmd, "stop")) {
+        ret = media_graph_queue_command(priv->filter, cmd, NULL, NULL, 0, 0);
+        media_policy_set_stream_status(media_get_policy(), priv->name,
+                                       priv->filter->name + sizeof(MEDIA_PLAYER_NAME), false);
+        return ret;
+    }
+
+    if (target) {
+        filter = avfilter_find_on_link(priv->filter, target, NULL, true, NULL);
+        if (!filter)
+            return -EINVAL;
+    } else
+        filter = priv->filter;
+
+    return media_graph_queue_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
 }
 
-int media_player_set_event_callback_(void *handle, void *cookie,
-                                     media_event_callback event_cb)
+int media_player_set_event_callback_(void *handle, void *cookie, media_event_callback event_cb)
 {
     MediaPlayerPriv *priv = handle;
     AVMovieAsyncEventCookie event;
@@ -542,247 +573,49 @@ int media_player_set_event_callback_(void *handle, void *cookie,
     return avfilter_process_command(priv->filter, "set_event", (const char *)&event, NULL, 0, 0);
 }
 
-int media_player_prepare_(void *handle, const char *url, const char *options)
-{
-    MediaPlayerPriv *priv = handle;
-    int ret;
-
-    if (!priv || !url)
-        return -EINVAL;
-
-    if (options) {
-        ret = media_graph_queue_command(priv->filter, "set_options", options, NULL, 0, 0);
-        if (ret < 0)
-            return ret;
-    }
-
-    return media_graph_queue_command(priv->filter, "prepare", url, NULL, 0, 0);
-}
-
-int media_player_reset_(void *handle)
-{
-    MediaPlayerPriv *priv = handle;
-
-    if (!priv)
-        return -EINVAL;
-
-    return media_graph_queue_command(priv->filter, "reset", NULL, NULL, 0, 0);
-}
-
-int media_player_start_(void *handle)
-{
-    MediaPlayerPriv *priv = handle;
-
-    if (!priv)
-        return -EINVAL;
-
-    media_policy_include_(priv->name, priv->filter->name + strlen("amovie_async@"), true);
-    return media_graph_queue_command(priv->filter, "start", NULL, NULL, 0, 0);
-}
-
-int media_player_stop_(void *handle)
-{
-    MediaPlayerPriv *priv = handle;
-    int ret;
-
-    if (!priv)
-        return -EINVAL;
-
-    ret = media_graph_queue_command(priv->filter, "stop", NULL, NULL, 0, 0);
-    if (ret < 0)
-        return ret;
-
-    media_policy_exclude_(priv->name, priv->filter->name + strlen("amovie_async@"), true);
-    return 0;
-}
-
-int media_player_pause_(void *handle)
-{
-    MediaPlayerPriv *priv = handle;
-    int ret;
-
-    if (!priv)
-        return -EINVAL;
-
-    ret = media_graph_queue_command(priv->filter, "pause", NULL, NULL, 0, 0);
-    if (ret < 0)
-        return ret;
-
-    media_policy_exclude_(priv->name, priv->filter->name + strlen("amovie_async@"), true);
-    return 0;
-}
-
-int media_player_set_looping_(void *handle, int loop)
-{
-    MediaPlayerPriv *priv = handle;
-    char tmp[16];
-
-    if (!priv)
-        return -EINVAL;
-
-    snprintf(tmp, sizeof(tmp), "%d", loop);
-
-    return media_graph_queue_command(priv->filter, "set_loop", tmp, NULL, 0, 0);
-}
-
-int media_player_is_playing_(void *handle)
-{
-    MediaPlayerPriv *priv = handle;
-    char tmp[16];
-    int ret;
-
-    if (!priv)
-        return -EINVAL;
-
-    ret = media_graph_queue_command(priv->filter, "get_playing",
-                                    NULL, tmp, sizeof(tmp), 0);
-
-    return ret < 0 ? ret : !!atoi(tmp);
-}
-
-int media_player_seek_(void *handle, unsigned int msec)
-{
-    MediaPlayerPriv *priv = handle;
-    char tmp[32];
-
-    if (!priv)
-        return -EINVAL;
-
-    snprintf(tmp, sizeof(tmp), "%u", msec);
-
-    return media_graph_queue_command(priv->filter, "seek", tmp, NULL, 0, 0);
-}
-
-int media_player_get_position_(void *handle, unsigned int *msec)
-{
-    MediaPlayerPriv *priv = handle;
-    char tmp[16];
-    int ret;
-
-    if (!priv)
-        return -EINVAL;
-
-    ret = media_graph_queue_command(priv->filter, "get_position",
-                                   NULL, tmp, sizeof(tmp), 0);
-    if (ret >= 0)
-        *msec = strtoul(tmp, NULL, 0);
-
-    return ret;
-}
-
-int media_player_get_duration_(void *handle, unsigned int *msec)
-{
-    MediaPlayerPriv *priv = handle;
-    char tmp[16];
-    int ret;
-
-    if (!priv)
-        return -EINVAL;
-
-    ret = media_graph_queue_command(priv->filter, "get_duration",
-                                   NULL, tmp, sizeof(tmp), 0);
-    if (ret >= 0)
-        *msec = strtoul(tmp, NULL, 0);
-
-    return ret;
-}
-
-int media_player_set_volume_(void *handle, float volume)
-{
-    MediaPlayerPriv *priv = handle;
-    char tmp[32];
-    int ret;
-
-    if (!priv || volume < 0.0 || volume > 1.0)
-        return -EINVAL;
-
-    snprintf(tmp, 32, "%f", volume);
-
-    ret = media_player_process_command(priv, "volume", "volume", tmp, 0, 0);
-    if (ret >= 0)
-        priv->volume = volume;
-
-    return ret;
-}
-
-int media_player_get_volume_(void *handle, float *volume)
-{
-    MediaPlayerPriv *priv = handle;
-
-    if (!priv)
-        return -EINVAL;
-
-    *volume = priv->volume;
-    return 0;
-}
-
-int media_player_process_command(void *handle, const char *target,
-                                 const char *cmd, const char *arg,
-                                 char *res, int res_len)
-{
-    MediaPlayerPriv *priv = handle;
-    AVFilterContext *filter;
-
-    filter = avfilter_find_on_link(priv->filter, target, NULL, true, NULL);
-    if (!filter)
-        return -EINVAL;
-
-    return media_graph_queue_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
-}
-
-/****************************************************************************
- * Public Recorder Functions
- ****************************************************************************/
-
-void *media_recorder_open_(void *graph, const char *name)
-{
-    MediaGraphPriv *media = graph;
-    AVFilterContext *filter = NULL;
-    int ret, i;
-
-    if (!media || !media->graph)
-        return NULL;
-
-    for (i = 0; i < media->graph->nb_filters; i++) {
-        filter = media->graph->filters[i];
-
-        if (!filter->opaque && !strcmp(filter->filter->name, "amoviesink_async")) {
-            if (!name || !strcmp(filter->name, name) ||
-                !strncmp(filter->name + strlen("amoviesink_async@"), name, strlen(name)))
-                break;
-        }
-    }
-
-    if (i == media->graph->nb_filters || !filter)
-        return NULL;
-
-    ret = media_graph_queue_command(filter, "open", NULL, NULL, 0, 0);
-    if (ret < 0)
-        return NULL;
-
-    filter->opaque = filter;
-
-    return filter;
-}
-
-int media_recorder_close_(void *handle)
+int media_recorder_control(void *handle, const char *target, const char *cmd,
+                           const char *arg, char **res, int res_len)
 {
     AVFilterContext *filter = handle;
     int ret;
 
-    if (!filter)
-        return -EINVAL;
-
-    ret = media_graph_queue_command(filter, "close", NULL, NULL, 0, 0);
+   ret = media_alloc_response(res_len, res);
     if (ret < 0)
         return ret;
 
-    filter->opaque = NULL;
-    return 0;
+    if (!strcmp(cmd, "open")) {
+        if (!res)
+            return -EINVAL;
+
+        filter = media_find_filter(media_get_graph(), MEDIA_RECORDER_NAME, arg);
+        if (!filter)
+            goto out;
+
+        ret = media_graph_queue_command(filter, "open", NULL, NULL, 0, 0);
+        if (ret < 0)
+            goto out;
+
+        filter->opaque = filter;
+out:
+        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)filter);
+    } else if (!strcmp(cmd, "close")) {
+        ret = media_graph_queue_command(filter, "close", NULL, NULL, 0, 0);
+        if (ret >= 0)
+            filter->opaque = NULL;
+
+        return ret;
+    }
+
+    if (target) {
+        filter = avfilter_find_on_link(filter, target, NULL, false, NULL);
+        if (!filter)
+            return -EINVAL;
+    }
+
+    return media_graph_queue_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
 }
 
-int media_recorder_set_event_callback_(void *handle, void *cookie,
-                                       media_event_callback event_cb)
+int media_recorder_set_event_callback_(void *handle, void *cookie, media_event_callback event_cb)
 {
     AVMovieAsyncEventCookie event;
 
@@ -795,63 +628,3 @@ int media_recorder_set_event_callback_(void *handle, void *cookie,
     return avfilter_process_command(handle, "set_event", (const char *)&event, NULL, 0, 0);
 }
 
-int media_recorder_prepare_(void *handle, const char *url, const char *options)
-{
-    int ret;
-
-    if (!handle || !url)
-        return -EINVAL;
-
-    if (options) {
-        ret = media_graph_queue_command(handle, "set_options", options, NULL, 0, 0);
-        if (ret < 0)
-            return ret;
-    }
-
-    return media_graph_queue_command(handle, "prepare", url, NULL, 0, 0);
-}
-
-int media_recorder_reset_(void *handle)
-{
-    if (!handle)
-        return -EINVAL;
-
-    return media_graph_queue_command(handle, "reset", NULL, NULL, 0, 0);
-}
-
-int media_recorder_start_(void *handle)
-{
-    if (!handle)
-        return -EINVAL;
-
-    return media_graph_queue_command(handle, "start", NULL, NULL, 0, 0);
-}
-
-int media_recorder_pause_(void *handle)
-{
-    if (!handle)
-        return -EINVAL;
-
-    return media_graph_queue_command(handle, "pause", NULL, NULL, 0, 0);
-}
-
-int media_recorder_stop_(void *handle)
-{
-    if (!handle)
-        return -EINVAL;
-
-    return media_graph_queue_command(handle, "stop", NULL, NULL, 0, 0);
-}
-
-int media_recorder_process_command(void *handle, const char *target,
-                                   const char *cmd, const char *arg,
-                                   char *res, int res_len)
-{
-    AVFilterContext *filter;
-
-    filter = avfilter_find_on_link(handle, target, NULL, false, NULL);
-    if (!filter)
-        return -EINVAL;
-
-    return media_graph_queue_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
-}

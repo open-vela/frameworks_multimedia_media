@@ -22,11 +22,12 @@
  * Included Files
  ****************************************************************************/
 
+#include <libavutil/log.h>
+
 #include <assert.h>
 #include <errno.h>
 #include <poll.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -159,7 +160,7 @@ int main(int argc, char *argv[])
         g_media[i].handle = g_media[i].create(g_media[i].param);
         if (!g_media[i].handle) {
             free(priv);
-            syslog(LOG_ERR, "%s, %s create failed\n",
+            av_log(NULL, AV_LOG_ERROR, "%s, %s create failed\n",
                     __func__, g_media[i].name);
             return -EINVAL;
         }
@@ -173,7 +174,7 @@ int main(int argc, char *argv[])
             ret = g_media[i].get(g_media[i].handle, &priv->fds[n],
                                       &priv->ctx[n], MAX_POLLFDS - n);
             if (ret < 0) {
-                syslog(LOG_ERR, "%s, %s get_pollfds failed\n",
+                av_log(NULL, AV_LOG_ERROR, "%s, %s get_pollfds failed\n",
                         __func__, g_media[i].name);
                 continue;
             }
@@ -193,7 +194,7 @@ int main(int argc, char *argv[])
             ret = g_media[priv->idx[i]].available(g_media[priv->idx[i]].handle,
                                                   &priv->fds[i], priv->ctx[i]);
             if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
-                syslog(LOG_ERR, "%s, %s poll_available failed %d\n",
+                av_log(NULL, AV_LOG_ERROR, "%s, %s poll_available failed %d\n",
                         __func__, g_media[priv->idx[i]].name, ret);
         }
 
@@ -203,7 +204,7 @@ int main(int argc, char *argv[])
 
             ret = g_media[i].run_once(g_media[i].handle);
             if (ret < 0)
-                syslog(LOG_ERR, "%s, %s run_once failed\n", __func__, g_media[i].name);
+                av_log(NULL, AV_LOG_ERROR, "%s, %s run_once failed\n", __func__, g_media[i].name);
         }
     }
 
