@@ -36,44 +36,15 @@ extern "C" {
  * Media Definations
  ****************************************************************************/
 
-#define MEDIA_PROCESS_COMMAND        1
-#define MEDIA_GRAPH_DUMP             2
-#define MEDIA_PLAYER_OPEN            100
-#define MEDIA_PLAYER_CLOSE           101
-#define MEDIA_PLAYER_SET_CALLBACK    102
-#define MEDIA_PLAYER_PREPARE         103
-#define MEDIA_PLAYER_RESET           104
-#define MEDIA_PLAYER_START           105
-#define MEDIA_PLAYER_STOP            106
-#define MEDIA_PLAYER_PAUSE           107
-#define MEDIA_PLAYER_SEEK            108
-#define MEDIA_PLAYER_LOOP            109
-#define MEDIA_PLAYER_ISPLAYING       110
-#define MEDIA_PLAYER_POSITION        111
-#define MEDIA_PLAYER_DURATION        112
-#define MEDIA_PLAYER_SET_VOLUME      113
-#define MEDIA_PLAYER_GET_VOLUME      114
-#define MEDIA_PLAYER_SET_PROPERTY    115
-#define MEDIA_PLAYER_GET_PROPERTY    116
-#define MEDIA_RECORDER_OPEN          200
-#define MEDIA_RECORDER_CLOSE         201
-#define MEDIA_RECORDER_SET_CALLBACK  202
-#define MEDIA_RECORDER_PREPARE       203
-#define MEDIA_RECORDER_RESET         204
-#define MEDIA_RECORDER_START         205
-#define MEDIA_RECORDER_PAUSE         206
-#define MEDIA_RECORDER_STOP          207
-#define MEDIA_RECORDER_SET_PROPERTY  208
-#define MEDIA_RECORDER_GET_PROPERTY  209
-#define MEDIA_POLICY_SET_INT         300
-#define MEDIA_POLICY_GET_INT         301
-#define MEDIA_POLICY_SET_STRING      302
-#define MEDIA_POLICY_GET_STRING      303
-#define MEDIA_POLICY_INCLUDE         304
-#define MEDIA_POLICY_EXCLUDE         305
-#define MEDIA_POLICY_INCREASE        306
-#define MEDIA_POLICY_DECREASE        307
-#define MEDIA_POLICY_DUMP            308
+#define MEDIA_GRAPH_CONTROL         1
+#define MEDIA_POLICY_CONTROL        2
+#define MEDIA_PLAYER_CONTROL        3
+#define MEDIA_PLAYER_SET_CALLBACK   4
+#define MEDIA_RECORDER_CONTROL      5
+#define MEDIA_RECORDER_SET_CALLBACK 6
+
+#define MEDIA_PLAYER_NAME           "amovie_async"
+#define MEDIA_RECORDER_NAME         "amoviesink_async"
 
 /****************************************************************************
  * Media Functions
@@ -101,51 +72,26 @@ int media_graph_get_pollfds(void *handle, struct pollfd *fds,
                             void **cookies, int count);
 int media_graph_poll_available(void *handle, struct pollfd *fd, void *cookie);
 int media_graph_run_once(void *handle);
-int media_graph_process_command(void *handle, const char *target,
-                                const char *cmd, const char *arg,
-                                char *res, int res_len);
-char *media_graph_dump_(void *handle, const char *options);
+int media_graph_control(void *handle, const char *target, const char *cmd,
+                        const char *arg, char **res, int res_len);
 
 /****************************************************************************
  * Player Functions
  ****************************************************************************/
 
-void *media_player_open_(void *graph, const char *name);
-int media_player_close_(void *handle, int pending_stop);
+int media_player_control(void *handle, const char *target, const char *cmd,
+                         const char *arg, char **res, int res_len);
 int media_player_set_event_callback_(void *handle, void *cookie,
-                                    media_event_callback event_cb);
-int media_player_prepare_(void *handle, const char *url, const char *options);
-int media_player_reset_(void *handle);
-int media_player_start_(void *handle);
-int media_player_stop_(void *handle);
-int media_player_pause_(void *handle);
-int media_player_set_looping_(void *handle, int loop);
-int media_player_is_playing_(void *handle);
-int media_player_seek_(void *handle, unsigned int msec);
-int media_player_get_position_(void *handle, unsigned int *msec);
-int media_player_get_duration_(void *handle, unsigned int *msec);
-int media_player_set_volume_(void *handle, float volume);
-int media_player_get_volume_(void *handle, float *volume);
-int media_player_process_command(void *handle, const char *target,
-                                 const char *cmd, const char *arg,
-                                 char *res, int res_len);
+                                     media_event_callback event_cb);
 
 /****************************************************************************
  * Recorder Functions
  ****************************************************************************/
 
-void *media_recorder_open_(void *graph, const char *name);
-int media_recorder_close_(void *handle);
+int media_recorder_control(void *handle, const char *target, const char *cmd,
+                           const char *arg, char **res, int res_len);
 int media_recorder_set_event_callback_(void *handle, void *cookie,
-                                      media_event_callback event_cb);
-int media_recorder_prepare_(void *handle, const char *url, const char *options);
-int media_recorder_reset_(void *handle);
-int media_recorder_start_(void *handle);
-int media_recorder_pause_(void *handle);
-int media_recorder_stop_(void *handle);
-int media_recorder_process_command(void *handle, const char *target,
-                                 const char *cmd, const char *arg,
-                                 char *res, int res_len);
+                                       media_event_callback event_cb);
 
 /****************************************************************************
  * Policy Functions
@@ -153,15 +99,12 @@ int media_recorder_process_command(void *handle, const char *target,
 
 void *media_policy_create(void *file);
 int media_policy_destroy(void *handle);
-int media_policy_set_int_(const char *name, int value, int apply);
-int media_policy_get_int_(const char *name, int *value);
-int media_policy_set_string_(const char *name, const char *value, int apply);
-int media_policy_get_string_(const char *name, char *value, size_t len);
-int media_policy_include_(const char *name, const char *values, int apply);
-int media_policy_exclude_(const char *name, const char *values, int apply);
-int media_policy_increase_(const char *name, int apply);
-int media_policy_decrease_(const char *name, int apply);
-char *media_policy_dump_(const char *options);
+int media_policy_control(void *handle, const char *name, const char *cmd,
+                         const char *value, int apply, char **res, int res_len);
+int media_policy_get_stream_name(void *handle, const char *stream,
+                                 char *name, int len);
+int media_policy_set_stream_status(void *handle, const char *name,
+                                   const char *input, bool active);
 
 #ifdef __cplusplus
 }

@@ -20,8 +20,6 @@
 
 include $(APPDIR)/Make.defs
 
-ifneq ($(CONFIG_MEDIA),)
-
 MODULE = $(CONFIG_MEDIA_SERVER)
 CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c
 
@@ -60,7 +58,5 @@ ifneq ($(CONFIG_MEDIA_TOOL),)
   PRIORITY  += $(CONFIG_MEDIA_TOOL_PRIORITY)
   STACKSIZE += $(CONFIG_MEDIA_TOOL_STACKSIZE)
 endif
-
-endif # CONFIG_MEDIA
 
 include $(APPDIR)/Application.mk
