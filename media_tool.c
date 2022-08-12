@@ -1066,9 +1066,9 @@ static int mediatool_execute(struct mediatool_s *media, char *cmd, char *arg)
 
 int main(int argc, char *argv[])
 {
+    int ret, len, arg_len;
     char *cmd, *arg;
     char *buffer;
-    int ret, len;
 
     buffer = malloc(CONFIG_NSH_LINELEN);
     if (!buffer)
@@ -1099,6 +1099,13 @@ int main(int argc, char *argv[])
 
         while (*arg == ' ')
             arg++;
+
+        arg_len = strlen(arg);
+
+        while (isspace(arg[arg_len - 1]))
+            arg_len--;
+
+        arg[arg_len] = '\0';
 
         ret = mediatool_execute(&g_mediatool, cmd, arg);
         if (ret > 0)
