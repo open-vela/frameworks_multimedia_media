@@ -342,7 +342,7 @@ char *media_graph_dump_(void *handle, const char *options)
 void *media_player_open_(void *graph, const char *name)
 {
     MediaGraphPriv *media = graph;
-    AVFilterContext *filter;
+    AVFilterContext *filter = NULL;
     MediaPlayerPriv *priv;
     char namebuf[64];
     int ret, i;
@@ -364,7 +364,7 @@ void *media_player_open_(void *graph, const char *name)
             break;
     }
 
-    if (i == media->graph->nb_filters)
+    if (i == media->graph->nb_filters || !filter)
         return NULL;
 
     priv = zalloc(sizeof(MediaPlayerPriv));
@@ -627,7 +627,7 @@ int media_player_process_command(void *handle, const char *target,
 void *media_recorder_open_(void *graph, const char *name)
 {
     MediaGraphPriv *media = graph;
-    AVFilterContext *filter;
+    AVFilterContext *filter = NULL;
     int ret, i;
 
     if (!media || !media->graph)
@@ -643,7 +643,7 @@ void *media_recorder_open_(void *graph, const char *name)
         }
     }
 
-    if (i == media->graph->nb_filters)
+    if (i == media->graph->nb_filters || !filter)
         return NULL;
 
     ret = avfilter_process_command(filter, "open", NULL, NULL, 0, 0);
