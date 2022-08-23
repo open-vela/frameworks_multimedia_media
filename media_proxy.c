@@ -167,15 +167,21 @@ static ssize_t media_process_data(void *handle, bool player,
 
     if (player) {
         ret = send(priv->socket, data, len, 0);
-        if (ret >= 0 && ret < len) {
+        if (ret == len)
+            goto out;
+        else if (ret >= 0)
             errno = ECONNRESET;
-            ret = 0;
-        }
     } else {
         ret = recv(priv->socket, data, len, 0);
-        if (ret == 0)
+        if (ret > 0)
+            goto out;
+        else if (ret == 0)
             errno = ECONNRESET;
     }
+
+    close(priv->socket);
+    priv->socket = 0;
+    ret = -errno;
 
 out:
     if (atomic_fetch_sub(&priv->refs, 1) == 1)
