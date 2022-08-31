@@ -42,7 +42,7 @@
 #endif
 
 #define BLOCK_CALLBACK_FLAG     0
-#define NONBLOCK_CALLBACK_FLAG -1
+#define NONBLOCK_CALLBACK_FLAG (-1)
 #define MAX_LEN                 512
 #define STREAM_TYPE_LEN         32
 #define ID_SHIFT                16
@@ -51,8 +51,8 @@
 #define MEDIA_FOCUS_FILE_READ_STREAM_TYPE   1
 #define MEDIA_FOCUS_FILE_READ_STREAM_NUM    2
 
-#define ID_TO_HANDLE(x) ((x << ID_SHIFT) | 0x0000000F)
-#define HANDLE_TO_ID(x) (x >> ID_SHIFT)
+#define ID_TO_HANDLE(x) (((x) << ID_SHIFT) | 0x0000000F)
+#define HANDLE_TO_ID(x) ((x) >> ID_SHIFT)
 
 /****************************************************************************
  * Private Data
@@ -131,7 +131,7 @@ close:
 static int media_focus_str_to_num(char* str)
 {
     if (strlen(str) > 0 && (strspn(str, "0123456789") == strlen(str))) {
-        int num = atoi(str);
+        long int num = strtol(str, NULL, 10);
         return num;
     }
     return -EINVAL;
