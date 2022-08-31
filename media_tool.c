@@ -315,14 +315,14 @@ static int mediatool_common_stop_inner(struct mediatool_chain_s *chain)
 
 static int mediatool_player_cmd_open(struct mediatool_s *media, char *pargs)
 {
+    long int i;
     int ret;
-    int i;
 
     if (pargs && !strlen(pargs))
         pargs = NULL;
 
     if (pargs && isdigit(pargs[0])) {
-        i = atoi(pargs);
+        i = strtol(pargs, NULL, 10);
 
         if (media->chain[i].handle)
             return -EBUSY;
@@ -352,21 +352,21 @@ static int mediatool_player_cmd_open(struct mediatool_s *media, char *pargs)
 
     media->chain[i].player = true;
 
-    printf("player ID %d\n", i);
+    printf("player ID %ld\n", i);
 
     return 0;
 }
 
 static int mediatool_recorder_cmd_open(struct mediatool_s *media, char *pargs)
 {
+    long int i;
     int ret;
-    int i;
 
     if (pargs && !strlen(pargs))
         pargs = NULL;
 
     if (pargs && isdigit(pargs[0])) {
-        i = atoi(pargs);
+        i = strtol(pargs, NULL, 10);
 
         if (media->chain[i].handle)
             return -EBUSY;
@@ -396,7 +396,7 @@ static int mediatool_recorder_cmd_open(struct mediatool_s *media, char *pargs)
 
     media->chain[i].player = false;
 
-    printf("recorder ID %d\n", i);
+    printf("recorder ID %ld\n", i);
 
     return 0;
 }
@@ -429,13 +429,13 @@ static int mediatool_common_cmd_close(struct mediatool_s *media, char *pargs)
 
 static int mediatool_common_cmd_reset(struct mediatool_s *media, char *pargs)
 {
+    long int id;
     int ret;
-    int id;
 
     if (!strlen(pargs))
         return -EINVAL;
 
-    id = atoi(pargs);
+    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -510,10 +510,10 @@ static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs)
 {
     pthread_t thread;
     bool url_mode;
+    long int id;
     char *file;
     char *ptr;
     int ret = 0;
-    int id;
 
     if (!strlen(pargs))
         return -EINVAL;
@@ -524,7 +524,7 @@ static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs)
 
     *ptr++ = 0;
 
-    id = atoi(pargs);
+    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -585,13 +585,13 @@ static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs)
 
 static int mediatool_common_cmd_start(struct mediatool_s *media, char *pargs)
 {
+    long int id;
     int ret;
-    int id;
 
     if (!strlen(pargs))
         return -EINVAL;
 
-    id = atoi(pargs);
+    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -606,12 +606,12 @@ static int mediatool_common_cmd_start(struct mediatool_s *media, char *pargs)
 
 static int mediatool_common_cmd_stop(struct mediatool_s *media, char *pargs)
 {
-    int id;
+    long int id;
 
     if (!strlen(pargs))
         return -EINVAL;
 
-    id = atoi(pargs);
+    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -621,13 +621,13 @@ static int mediatool_common_cmd_stop(struct mediatool_s *media, char *pargs)
 
 static int mediatool_player_cmd_pause(struct mediatool_s *media, char *pargs)
 {
+    long int id;
     int ret = 0;
-    int id;
 
     if (!strlen(pargs))
         return -EINVAL;
 
-    id = atoi(pargs);
+    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -713,13 +713,13 @@ static int mediatool_player_cmd_seek(struct mediatool_s *media, char *pargs)
 static int mediatool_player_cmd_position(struct mediatool_s *media, char *pargs)
 {
     unsigned int position;
+    long int id;
     int ret;
-    int id;
 
     if (!strlen(pargs))
         return -EINVAL;
 
-    id = atoi(pargs);
+    id = strtol(pargs, NULL, 0);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -739,13 +739,13 @@ static int mediatool_player_cmd_position(struct mediatool_s *media, char *pargs)
 static int mediatool_player_cmd_duration(struct mediatool_s *media, char *pargs)
 {
     unsigned int duration;
+    long int id;
     int ret;
-    int id;
 
     if (!strlen(pargs))
         return -EINVAL;
 
-    id = atoi(pargs);
+    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -766,13 +766,13 @@ static int mediatool_player_cmd_duration(struct mediatool_s *media, char *pargs)
 
 static int mediatool_player_cmd_isplaying(struct mediatool_s *media, char *pargs)
 {
+    long int id;
     int ret;
-    int id;
 
     if (!strlen(pargs))
         return -EINVAL;
 
-    id = atoi(pargs);
+    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
