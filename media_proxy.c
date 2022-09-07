@@ -119,6 +119,9 @@ static int media_prepare(void *handle, int32_t cmd,
     int32_t resp;
     int fd = 0;
 
+    if (!priv)
+        return -EINVAL;
+
     if (priv->socket > 0)
         return ret;
 
