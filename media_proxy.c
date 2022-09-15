@@ -306,6 +306,16 @@ static int media_set_event_cb(int control, void *handle, void *cookie,
     return ret;
 }
 
+static int media_get_socket(void *handle)
+{
+    MediaProxyPriv *priv = handle;
+
+    if (!priv || priv->socket <= 0)
+        return -EINVAL;
+
+    return priv->socket;
+}
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -418,6 +428,11 @@ ssize_t media_player_write_data(void *handle, const void *data, size_t len)
 int media_player_get_sockaddr(void *handle, struct sockaddr_storage *addr)
 {
     return media_get_sockaddr(handle, addr);
+}
+
+int media_player_get_socket(void *handle)
+{
+    return media_get_socket(handle);
 }
 
 int media_player_start(void *handle)
@@ -646,6 +661,11 @@ ssize_t media_recorder_read_data(void *handle, void *data, size_t len)
 int media_recorder_get_sockaddr(void *handle, struct sockaddr_storage *addr)
 {
     return media_get_sockaddr(handle, addr);
+}
+
+int media_recorder_get_socket(void *handle)
+{
+    return media_get_socket(handle);
 }
 
 int media_recorder_start(void *handle)
