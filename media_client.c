@@ -85,6 +85,8 @@ static int media_client_create_listenfd(struct media_client_priv *priv)
     if (priv->listenfd < 0)
         return priv->listenfd;
 
+    media_parcel_init(&parcel);
+
     ret = bind(priv->listenfd, (struct sockaddr *)&addr, socklen);
     if (ret < 0)
         goto err;
@@ -93,7 +95,6 @@ static int media_client_create_listenfd(struct media_client_priv *priv)
     if (ret < 0)
         goto err;
 
-    media_parcel_init(&parcel);
     media_parcel_append_string(&parcel, key);
 #ifdef CONFIG_MEDIA_SERVER
     media_parcel_append_string(&parcel, NULL);
