@@ -112,6 +112,13 @@ ssize_t media_player_write_data(void *handle, const void *data, size_t len);
 int media_player_get_sockaddr(void *handle, struct sockaddr_storage *addr);
 
 /**
+ * Get socket fd for unblock mode write data
+ * @param[in] handle    The player path
+ * @return fd; a negated errno value on failure.
+ */
+int media_player_get_socket(void *handle);
+
+/**
  * Start the player path to play
  * @param[in] handle    The player path
  * @return Zero on success; a negated errno value on failure.

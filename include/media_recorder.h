@@ -104,6 +104,13 @@ ssize_t media_recorder_read_data(void *handle, void *data, size_t len);
 int media_recorder_get_sockaddr(void *handle, struct sockaddr_storage *addr);
 
 /**
+ * Get socket fd for unblock mode read data
+ * @param[in] handle    The player path
+ * @return fd; a negated errno value on failure.
+ */
+int media_recorder_get_socket(void *handle);
+
+/**
  * Start the recorder path.
  * @param[in] handle    Current recorder path
  * @return Zero on success; a negated errno value on failure.
