@@ -255,7 +255,7 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
                          const char *value, int apply, char **res, int res_len)
 {
     MediaPolicyPriv *priv = handle;
-    int ret = -EINVAL, tmp;
+    int ret = 0, tmp;
 
     if (!priv || !priv->pfw)
         return -EINVAL;
