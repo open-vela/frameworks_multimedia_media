@@ -22,14 +22,11 @@
  * Included Files
  ****************************************************************************/
 
-#include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <malloc.h>
+#include <poll.h>
 #include <pthread.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <system/readline.h>
 
@@ -58,6 +55,7 @@ struct mediatool_chain_s
     bool      start;
     bool      loop;
 
+    bool      direct;
     char      *buf;
     int       size;
 };
@@ -456,14 +454,46 @@ static int mediatool_common_cmd_reset(struct mediatool_s *media, char *pargs)
     return ret;
 }
 
-static void *mediatool_common_thread(void *arg)
+static ssize_t mediatool_process_data(int fd, bool player,
+                                             void *data, size_t len)
 {
-    struct mediatool_chain_s *chain = arg;
-    char *tmp;
-    int act;
+    int event = player ? POLLOUT : POLLIN;
+    struct pollfd fds[1];
     int ret;
 
+    fds[0].fd = fd;
+    fds[0].events = event;
+    ret = poll(fds, 1, -1);
+
+    if (ret < 0)
+        return -errno;
+
+    if (player)
+        return send(fd, data, len, 0);
+    else
+        return recv(fd, data, len, 0);
+}
+
+static void *mediatool_buffer_thread(void *arg)
+{
+    struct mediatool_chain_s *chain = arg;
+    int act, ret, fd = 0;
+    char *tmp;
+
     printf("%s, start, line %d\n", __func__, __LINE__);
+
+    if (chain->direct) {
+        if (chain->player)
+            fd = media_player_get_socket(chain->handle);
+        else
+            fd = media_recorder_get_socket(chain->handle);
+
+        if (fd < 0)
+            return NULL;
+
+        if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK) < 0)
+            return NULL;
+    }
 
     if (chain->player) {
         while (1) {
@@ -474,11 +504,14 @@ static void *mediatool_common_thread(void *arg)
 
             tmp = chain->buf;
             while (act > 0) {
-                ret = media_player_write_data(chain->handle, tmp, act);
+                if (chain->direct)
+                    ret = mediatool_process_data(fd, true, tmp, act);
+                else
+                    ret = media_player_write_data(chain->handle, tmp, act);
+
                 if (ret == 0) {
                     break;
                 } else if (ret < 0 && errno == EAGAIN) {
-                    usleep(1000);
                     continue;
                 } else if (ret < 0){
                     printf("%s, error ret %d errno %d, line %d\n", __func__, ret, errno, __LINE__);
@@ -491,11 +524,14 @@ static void *mediatool_common_thread(void *arg)
         }
     } else {
         while (1) {
-            ret = media_recorder_read_data(chain->handle, chain->buf, chain->size);
+            if (chain->direct)
+                ret = mediatool_process_data(fd, false, chain->buf, chain->size);
+            else
+                ret = media_recorder_read_data(chain->handle, chain->buf, chain->size);
+
             if (ret == 0) {
                 break;
             } else if (ret < 0 && errno == EAGAIN){
-                usleep(1000);
                 continue;
             }
 
@@ -514,11 +550,11 @@ out:
 
 static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs)
 {
+    bool url_mode = false;
+    bool direct = false;
+    char *ptr, *file;
     pthread_t thread;
-    bool url_mode;
     long int id;
-    char *file;
-    char *ptr;
     int ret = 0;
 
     if (!strlen(pargs))
@@ -544,8 +580,8 @@ static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs)
 
     if (!strcmp(file, "url"))
         url_mode = true;
-    else
-        url_mode = false;
+    else if (!strcmp(file, "direct"))
+        direct = true;
 
     file = ptr;
     ptr = strchr(ptr, ' ');
@@ -575,11 +611,12 @@ static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs)
             return -EINVAL;
         }
 
+        media->chain[id].direct = direct;
         media->chain[id].size = 512;
         media->chain[id].buf = malloc(media->chain[id].size);
         assert(media->chain[id].buf);
 
-        ret = pthread_create(&thread, NULL, mediatool_common_thread, &media->chain[id]);
+        ret = pthread_create(&thread, NULL, mediatool_buffer_thread, &media->chain[id]);
         assert(!ret);
 
         pthread_setname_np(thread, "mediatool_file");
