@@ -551,10 +551,12 @@ int media_player_get_volume(void *handle, float *volume)
         return -EINVAL;
 
     ret = media_control(MEDIA_PLAYER_CONTROL, handle, "volume", "dump", NULL, 0, tmp, sizeof(tmp));
-    if (ret >= 0)
+    if (ret >= 0) {
         sscanf(tmp, "vol:%f", volume);
+        ret = 0;
+    }
 
-    return ret >= 0 ? 0 : ret;
+    return ret;
 }
 
 int media_player_set_property(void *handle, const char *target, const char *key, const char *value)
