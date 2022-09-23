@@ -200,7 +200,7 @@ static int media_prepare(int control, void *handle,
         url = tmp;
     }
 
-    if (options) {
+    if (options && options[0] != '\0') {
         ret = media_control(control, priv, NULL, "set_options", options, 0, NULL, 0);
         if (ret < 0)
             goto out;
