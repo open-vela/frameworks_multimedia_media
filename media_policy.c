@@ -275,15 +275,14 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
     } else if (!strcmp(cmd, "exclude")) {
         ret = pfwExcludeCriterion(priv->pfw, name, value);
     } else if (!strcmp(cmd, "increase")) {
-        if (!pfwGetCriterion(priv->pfw, name, &tmp))
-            return -EINVAL;
-
-        ret = pfwSetCriterion(priv->pfw, name, tmp + 1);
+        ret = pfwIncreaseCriterion(priv->pfw, name);
     } else if (!strcmp(cmd, "decrease")) {
-        if (!pfwGetCriterion(priv->pfw, name, &tmp))
+        ret = pfwDecreaseCriterion(priv->pfw, name);
+    } else if (!strcmp(cmd, "contain")) {
+        if (!res || !*res || !pfwContainCriterion(priv->pfw, name, value, &tmp))
             return -EINVAL;
 
-        ret = pfwSetCriterion(priv->pfw, name, tmp - 1);
+        return snprintf(*res, res_len, "%d", tmp);
     } else if (!strcmp(cmd, "get_int")) {
         if (!res || !*res || !pfwGetCriterion(priv->pfw, name, &tmp))
             return -EINVAL;

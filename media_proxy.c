@@ -727,8 +727,27 @@ int media_policy_get_int(const char *name, int *value)
         return -EINVAL;
 
     ret = media_control(MEDIA_POLICY_CONTROL, NULL, name, "get_int", NULL, 0, tmp, sizeof(tmp));
-    if (ret >= 0)
+    if (ret >= 0) {
         *value = atoi(tmp);
+        ret = 0;
+    }
+
+    return ret;
+}
+
+int media_policy_contain(const char *name, const char *values, int *result)
+{
+    char tmp[32];
+    int ret;
+
+    if (!result)
+        return -EINVAL;
+
+    ret = media_control(MEDIA_POLICY_CONTROL, NULL, name, "contain", values, 0, tmp, sizeof(tmp));
+    if (ret >= 0) {
+        *result = atoi(tmp);
+        ret = 0;
+    }
 
     return ret;
 }

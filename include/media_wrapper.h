@@ -84,14 +84,16 @@ int media_policy_get_audio_mode(char *mode, int len);
  ****************************************************************************/
 
 /**
- * Set divices using.
+ * Set devices using.
  * @param[in] devices   new using devices, MEDIA_DEVICE_XXX.
  * @return Zero on success; a negated errno value on failure.
+ * @note This api is for applications to declare
+ *       whether it needs to use the device.
  */
 int media_policy_set_devices_use(const char *devices);
 
 /**
- * Set divices not using.
+ * Set devices not using.
  * @param[in] devices   new unavailable devices, MEDIA_DEVICE_XXX.
  * @return Zero on success; a negated errno value on failure.
  */
@@ -107,6 +109,17 @@ int media_policy_set_devices_unuse(const char *devices);
 int media_policy_get_devices_use(char *devices, int len);
 
 /**
+ * Check whether devices are being used.
+ * @param[in] devices   devices to check, use MEDIA_DEVICE_XXX.
+                        device names are separated by "|".
+ * @param[out] use  status of devices.
+ *                  - 0: all given devices not used.
+ *                  - 1: at least one of devices is being used.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_is_devices_use(const char *devices, int *use);
+
+/**
  * Set hfp(hands free protocol) sampling rate.
  * @param[in] rate  sample rate for SCO, MEDIA_SAMPLING_RATE_XXX.
  * @return Zero on success; a negated errno value on failure.
@@ -116,14 +129,16 @@ int media_policy_get_devices_use(char *devices, int len);
 int media_policy_set_hfp_samplerate(const char *rate);
 
 /**
- * Set divices available.
+ * Set devices available.
  * @param[in] devices   new available devices, MEDIA_DEVICE_XXX.
  * @return Zero on success; a negated errno value on failure.
+ * @note This api is for device monitors to declare
+ *       whether the device is available or not.
  */
 int media_policy_set_devices_available(const char *devices);
 
 /**
- * Set divices unavailable.
+ * Set devices unavailable.
  * @param[in] devices   new unavailable devices, MEDIA_DEVICE_XXX.
  * @return Zero on success; a negated errno value on failure.
  */
@@ -137,6 +152,17 @@ int media_policy_set_devices_unavailable(const char *devices);
  * @return Zero on success; a negated errno value on failure.
  */
 int media_policy_get_devices_available(char *devices, int len);
+
+/**
+ * Check whether devices are available.
+ * @param[in] devices   devices to check, use MEDIA_DEVICE_XXX.
+                        device names are separated by "|".
+ * @param[out] available  status of devices.
+ *                        - 0: all given devices are unavailable.
+ *                        - 1: at least one of devices is available.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_is_devices_available(const char *devices, int *available);
 
 /****************************************************************************
  * Public Functions for Volume Control

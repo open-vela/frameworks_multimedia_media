@@ -91,11 +91,23 @@ int media_policy_include(const char *name, const char *values, int apply);
 int media_policy_exclude(const char *name, const char *values, int apply);
 
 /**
+ * Check whether string values included in InclusiveCriterion.
+ * @param[in] name      criterion name
+ * @param[in] values    string values
+ * @param[out] result   whether included or not
+ * @return Zero on success; a negated errno value on failure.
+ * @note Should use wrapper functions rather than using this directly.
+ * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
+ */
+int media_policy_contain(const char *name, const char *values, int *result);
+
+/**
  * Increase criterion interger value by 1.
  * @param[in] name      criterion name
  * @param[in] apply     whether apply configurations
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
+ * @warning only for ExclusiveCriterion, never call on InclusiveCriterion.
  */
 int media_policy_increase(const char *name, int apply);
 
@@ -105,6 +117,7 @@ int media_policy_increase(const char *name, int apply);
  * @param[in] apply     whether apply configurations
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
+ * @warning only for ExclusiveCriterion, never call on InclusiveCriterion.
  */
 int media_policy_decrease(const char *name, int apply);
 
