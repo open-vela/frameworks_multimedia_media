@@ -94,6 +94,7 @@ static int mediatool_policy_cmd_setstring(struct mediatool_s *media, char *pargs
 static int mediatool_policy_cmd_getstring(struct mediatool_s *media, char *pargs);
 static int mediatool_policy_cmd_include(struct mediatool_s *media, char *pargs);
 static int mediatool_policy_cmd_exclude(struct mediatool_s *media, char *pargs);
+static int mediatool_policy_cmd_contain(struct mediatool_s *media, char *pargs);
 static int mediatool_policy_cmd_increase(struct mediatool_s *media, char *pargs);
 static int mediatool_policy_cmd_decrease(struct mediatool_s *media, char *pargs);
 static int mediatool_common_cmd_quit(struct mediatool_s *media, char *pargs);
@@ -229,6 +230,11 @@ static struct mediatool_cmd_s g_mediatool_cmds[] =
         "exclude",
         mediatool_policy_cmd_exclude,
         "exclude inclusive criterion values(exclude NAME VALUE APPLY)"
+    },
+    {
+        "contain",
+        mediatool_policy_cmd_contain,
+        "check wether contain criterion values(contain NAME VALUE)"
     },
     {
         "increase",
@@ -968,6 +974,32 @@ static int mediatool_policy_cmd_exclude(struct mediatool_s *media, char *pargs)
     apply = pargs;
 
     return media_policy_exclude(name, values, atoi(apply));
+}
+
+static int mediatool_policy_cmd_contain(struct mediatool_s *media, char *pargs)
+{
+    char *name;
+    char *values;
+    int result, ret;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+    name = pargs;
+
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+    *pargs = 0;
+    pargs++;
+    values = pargs;
+
+    ret = media_policy_contain(name, values, &result);
+    if (ret < 0)
+        return -EINVAL;
+
+    printf("criterion %s %s value %s\n", name, result ? "contains" : "doesn't contain", values);
+
+    return 0;
 }
 
 static int mediatool_policy_cmd_increase(struct mediatool_s *media, char *pargs)

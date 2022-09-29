@@ -75,6 +75,11 @@ int media_policy_set_devices_unuse(const char *devices)
                                 MEDIA_POLICY_APPLY);
 }
 
+int media_policy_is_devices_use(const char *devices, int *use)
+{
+    return media_policy_contain(MEDIA_POLICY_DEVICE_USE, devices, use);
+}
+
 int media_policy_get_devices_use(char *devices, int len)
 {
     return media_policy_get_string(MEDIA_POLICY_DEVICE_USE, devices, len);
@@ -97,6 +102,11 @@ int media_policy_set_devices_unavailable(const char *devices)
 {
     return media_policy_exclude(MEDIA_POLICY_DEVICE_AVAILABLE, devices,
                                 MEDIA_POLICY_APPLY);
+}
+
+int media_policy_is_devices_available(const char *devices, int *available)
+{
+    return media_policy_contain(MEDIA_POLICY_DEVICE_AVAILABLE, devices, available);
 }
 
 int media_policy_get_devices_available(char *devices, int len)
