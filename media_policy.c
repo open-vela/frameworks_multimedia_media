@@ -22,7 +22,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <bindings/c/ParameterFramework.h>
+#include <ParameterFramework.h>
 #include <cutils/properties.h>
 #include <libavutil/log.h>
 
