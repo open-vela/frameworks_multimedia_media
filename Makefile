@@ -36,16 +36,14 @@ ifneq ($(CONFIG_MEDIA_SERVER),)
   STACKSIZE = $(CONFIG_MEDIA_SERVER_STACKSIZE)
 
   CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/ffmpeg/ffmpeg}
-  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework}
-  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/framework/kvdb}
+  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/bindings/c}
 endif
 
 ifneq ($(CONFIG_PFW),)
   CXXEXT   := .cpp
   CXXSRCS  += media_policy_plugin.cpp
-  CXXFLAGS += -fpermissive
-  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework}
   CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter}
+  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter/include}
   CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter/log/include}
   CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/xmlserializer}
   CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/utility}
