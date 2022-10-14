@@ -20,6 +20,10 @@
 
 include $(APPDIR)/Make.defs
 
+ifneq ($(CONFIG_ARCH_BOARD_CUSTOM_NAME),)
+  BIN := $(TOPDIR)/$(CONFIG_ARCH_BOARD_CUSTOM_DIR)/libs/$(CONFIG_ARCH_BOARD_CUSTOM_NAME)/libframework.a
+endif
+
 MODULE = $(CONFIG_MEDIA_SERVER)
 CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c
 
@@ -56,5 +60,8 @@ ifneq ($(CONFIG_MEDIA_TOOL),)
   PRIORITY  += $(CONFIG_MEDIA_TOOL_PRIORITY)
   STACKSIZE += $(CONFIG_MEDIA_TOOL_STACKSIZE)
 endif
+
+distclean::
+	rm -rf $(TOPDIR)/$(CONFIG_ARCH_BOARD_CUSTOM_DIR)/libs/$(CONFIG_ARCH_BOARD_CUSTOM_NAME)
 
 include $(APPDIR)/Application.mk
