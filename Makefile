@@ -20,7 +20,7 @@
 
 include $(APPDIR)/Make.defs
 
-BIN := libframework.a
+BIN := $(APPDIR)/staging/libframework.a
 
 MODULE = $(CONFIG_MEDIA_SERVER)
 CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c
