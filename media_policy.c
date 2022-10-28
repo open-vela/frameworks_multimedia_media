@@ -257,7 +257,7 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
     MediaPolicyPriv *priv = handle;
     int ret = 0, tmp;
 
-    if (!priv || !priv->pfw)
+    if (!priv || !priv->pfw || !name)
         return -EINVAL;
 
     if (res_len && res && !*res) {
@@ -268,16 +268,25 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
 
     if (!strcmp(cmd, "set_int")) {
         ret = pfwSetCriterion(priv->pfw, name, atoi(value));
-    } else if (!strcmp(cmd, "set_string")) {
-        ret = pfwSetCriterionString(priv->pfw, name, value);
-    } else if (!strcmp(cmd, "include")) {
-        ret = pfwIncludeCriterion(priv->pfw, name, value);
-    } else if (!strcmp(cmd, "exclude")) {
-        ret = pfwExcludeCriterion(priv->pfw, name, value);
     } else if (!strcmp(cmd, "increase")) {
         ret = pfwIncreaseCriterion(priv->pfw, name);
     } else if (!strcmp(cmd, "decrease")) {
         ret = pfwDecreaseCriterion(priv->pfw, name);
+    } else if (!strcmp(cmd, "set_string")) {
+        if (!value)
+            return -EINVAL;
+
+        ret = pfwSetCriterionString(priv->pfw, name, value);
+    } else if (!strcmp(cmd, "include")) {
+        if (!value)
+            return -EINVAL;
+
+        ret = pfwIncludeCriterion(priv->pfw, name, value);
+    } else if (!strcmp(cmd, "exclude")) {
+        if (!value)
+            return -EINVAL;
+
+        ret = pfwExcludeCriterion(priv->pfw, name, value);
     } else if (!strcmp(cmd, "contain")) {
         if (!res || !*res || !pfwContainCriterion(priv->pfw, name, value, &tmp))
             return -EINVAL;
