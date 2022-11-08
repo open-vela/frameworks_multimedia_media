@@ -257,7 +257,7 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
     MediaPolicyPriv *priv = handle;
     int ret = 0, tmp;
 
-    if (!priv || !priv->pfw || !name)
+    if (!priv || !priv->pfw)
         return -EINVAL;
 
     if (res_len && res && !*res) {
@@ -266,7 +266,15 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
             return -ENOMEM;
     }
 
-    if (!strcmp(cmd, "set_int")) {
+    if (!strcmp(cmd, "dump")) {
+        if (!res)
+            return -EINVAL;
+
+        *res = pfwDump(priv->pfw, value);
+        return 0;
+    } else if (!name) {
+        return -EINVAL;
+    } else if (!strcmp(cmd, "set_int")) {
         ret = pfwSetCriterion(priv->pfw, name, atoi(value));
     } else if (!strcmp(cmd, "increase")) {
         ret = pfwIncreaseCriterion(priv->pfw, name);
@@ -302,12 +310,6 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
             return -EINVAL;
 
         return pfwGetCriterionString(priv->pfw, name, *res, res_len) ? 0 : -EINVAL;
-    } else if (!strcmp(cmd, "dump")) {
-        if (!res)
-            return -EINVAL;
-
-        *res = pfwDump(priv->pfw, value);
-        return 0;
     }
 
     if (!ret) {
