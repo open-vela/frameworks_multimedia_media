@@ -35,14 +35,6 @@
 #include "media_client.h"
 
 /****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-#ifndef CONFIG_RPTUN_LOCAL_CPUNAME
-#  define CONFIG_RPTUN_LOCAL_CPUNAME "local"
-#endif
-
-/****************************************************************************
  * Private Types
  ****************************************************************************/
 
@@ -70,7 +62,7 @@ static int media_control(int control, void *handle, const char *target,
     int32_t resp;
     void *proxy;
 
-    proxy = priv ? priv->proxy : media_client_connect();
+    proxy = priv ? priv->proxy : media_client_connect(CONFIG_MEDIA_SERVER_CPUNAME);
     if (!proxy)
         return ret;
 
@@ -348,7 +340,7 @@ void *media_player_open(const char *params)
     if (!priv)
         return NULL;
 
-    priv->proxy = media_client_connect();
+    priv->proxy = media_client_connect(CONFIG_MEDIA_SERVER_CPUNAME);
     if (!priv->proxy)
         goto error;
 
@@ -585,7 +577,7 @@ void *media_recorder_open(const char *params)
     if (!priv)
         return NULL;
 
-    priv->proxy = media_client_connect();
+    priv->proxy = media_client_connect(CONFIG_MEDIA_SERVER_CPUNAME);
     if (!priv->proxy)
         goto error;
 
