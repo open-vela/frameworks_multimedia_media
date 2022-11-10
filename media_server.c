@@ -22,6 +22,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <poll.h>
 #include <errno.h>
@@ -30,6 +31,7 @@
 #include <netpacket/rpmsg.h>
 #include <sys/un.h>
 
+#include "media_internal.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -66,23 +68,23 @@ static int media_server_create_notify(struct media_server_priv *priv, media_parc
     struct sockaddr_rpmsg rpmsg_addr;
     struct sockaddr *addr;
     const char *key;
-    const char *rp_cpu;
+    const char *cpu;
     int fd;
     int family;
     int len;
     int ret;
 
     key = media_parcel_read_string(parcel);
-    rp_cpu = media_parcel_read_string(parcel);
+    cpu = media_parcel_read_string(parcel);
 
     if (key == NULL)
         return -EINVAL;
 
-    if (rp_cpu) {
+    if (strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME)) {
         family = AF_RPMSG;
         rpmsg_addr.rp_family = AF_RPMSG;
         strcpy(rpmsg_addr.rp_name, key);
-        strcpy(rpmsg_addr.rp_cpu, rp_cpu);
+        strcpy(rpmsg_addr.rp_cpu, cpu);
         addr = (struct sockaddr *)&rpmsg_addr;
         len = sizeof(struct sockaddr_rpmsg);
     } else {
@@ -194,13 +196,15 @@ static int media_server_listen(struct media_server_priv *priv, int family)
     if (family == PF_LOCAL) {
         priv->local_fd = fd;
         local_addr.sun_family = AF_LOCAL;
-        strcpy(local_addr.sun_path, "mediad");
+        snprintf(local_addr.sun_path, UNIX_PATH_MAX,
+                 MEDIA_SOCKADDR_NAME, CONFIG_RPTUN_LOCAL_CPUNAME);
         addr = (struct sockaddr *)&local_addr;
         len = sizeof(struct sockaddr_un);
     } else {
         priv->rpmsg_fd = fd;
         rpmsg_addr.rp_family = AF_RPMSG;
-        strcpy(rpmsg_addr.rp_name, "mediad");
+        snprintf(rpmsg_addr.rp_name, RPMSG_SOCKET_NAME_SIZE,
+                 MEDIA_SOCKADDR_NAME, CONFIG_RPTUN_LOCAL_CPUNAME);
         strcpy(rpmsg_addr.rp_cpu, "");
         addr = (struct sockaddr *)&rpmsg_addr;
         len = sizeof(struct sockaddr_rpmsg);
