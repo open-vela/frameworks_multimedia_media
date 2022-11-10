@@ -526,7 +526,8 @@ err1:
         free(priv);
         priv = NULL;
 out:
-        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+        snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+        return priv ? 0 : -EINVAL;
     } else if (!strcmp(cmd, "close")) {
         ret = media_graph_queue_command(priv->filter, "close", arg, NULL, 0, 0);
         if (ret >= 0) {
