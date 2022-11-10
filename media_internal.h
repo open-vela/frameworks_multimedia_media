@@ -111,6 +111,8 @@ int media_policy_get_stream_name(void *handle, const char *stream,
                                  char *name, int len);
 int media_policy_set_stream_status(void *handle, const char *name,
                                    const char *input, bool active);
+void media_policy_process_command(const char *target, const char *cmd,
+                                  const char *arg);
 
 #ifdef __cplusplus
 }
