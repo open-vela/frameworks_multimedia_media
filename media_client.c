@@ -29,6 +29,7 @@
 #include <sys/un.h>
 
 #include "media_client.h"
+#include "media_internal.h"
 
 /****************************************************************************
  * Private Types
@@ -47,31 +48,30 @@ struct media_client_priv {
  * Private Functions
  ****************************************************************************/
 
-static void media_client_get_sockaddr(int *family, socklen_t *len, void *addr, char *key)
+static void media_client_get_sockaddr(int *family, socklen_t *len, void *addr,
+                                      const char *cpu, const char *key)
 {
-#ifdef CONFIG_MEDIA_SERVER
-    struct sockaddr_un *un_addr = addr;
-    *family = PF_LOCAL;
-    *len = sizeof(struct sockaddr_un);
-    un_addr->sun_family = AF_LOCAL;
-    strlcpy(un_addr->sun_path, key, UNIX_PATH_MAX);
-#else
-    struct sockaddr_rpmsg *rp_addr = addr;
-    *family = AF_RPMSG;
-    *len = sizeof(struct sockaddr_rpmsg);
-    rp_addr->rp_family = AF_RPMSG;
-    strlcpy(rp_addr->rp_name, key, RPMSG_SOCKET_NAME_SIZE);
-    strlcpy(rp_addr->rp_cpu, CONFIG_MEDIA_SERVER_CPUNAME, RPMSG_SOCKET_CPU_SIZE);
-#endif
+    if (!strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME)) {
+        struct sockaddr_un *un_addr = addr;
+
+        *family = PF_LOCAL;
+        *len = sizeof(struct sockaddr_un);
+        un_addr->sun_family = AF_LOCAL;
+        strlcpy(un_addr->sun_path, key, UNIX_PATH_MAX);
+    } else {
+        struct sockaddr_rpmsg *rp_addr = addr;
+
+        *family = AF_RPMSG;
+        *len = sizeof(struct sockaddr_rpmsg);
+        rp_addr->rp_family = AF_RPMSG;
+        strlcpy(rp_addr->rp_name, key, RPMSG_SOCKET_NAME_SIZE);
+        strlcpy(rp_addr->rp_cpu, cpu, RPMSG_SOCKET_CPU_SIZE);
+    }
 }
 
-static int media_client_create_listenfd(struct media_client_priv *priv)
+static int media_client_create_listenfd(struct media_client_priv *priv, const char *cpu)
 {
-#ifdef CONFIG_MEDIA_SERVER
-    struct sockaddr_un addr;
-#else
-    struct sockaddr_rpmsg addr;
-#endif
+    struct sockaddr_storage addr;
     socklen_t socklen;
     media_parcel parcel;
     char key[16];
@@ -79,7 +79,7 @@ static int media_client_create_listenfd(struct media_client_priv *priv)
     int ret;
 
     sprintf(key, "md_%p", priv);
-    media_client_get_sockaddr(&family, &socklen, &addr, key);
+    media_client_get_sockaddr(&family, &socklen, &addr, cpu, key);
 
     priv->listenfd = socket(family, SOCK_STREAM, 0);
     if (priv->listenfd < 0)
@@ -96,16 +96,7 @@ static int media_client_create_listenfd(struct media_client_priv *priv)
         goto err;
 
     media_parcel_append_string(&parcel, key);
-#ifdef CONFIG_MEDIA_SERVER
-    media_parcel_append_string(&parcel, NULL);
-#else
-    ret = getsockname(priv->listenfd, (struct sockaddr *)&addr, &socklen);
-    if (ret < 0)
-        goto err;
-
-    media_parcel_append_string(&parcel, addr.rp_cpu);
-#endif
-
+    media_parcel_append_string(&parcel, CONFIG_RPTUN_LOCAL_CPUNAME);
     ret = media_parcel_send(&parcel, priv->fd, MEDIA_PARCEL_CREATE_NOTIFY, 0);
 
 err:
@@ -152,18 +143,20 @@ thread_error:
  * Public Functions
  ****************************************************************************/
 
-void *media_client_connect(void)
+void *media_client_connect(const char *cpu)
 {
     struct media_client_priv *priv;
     struct sockaddr_storage addr;
     socklen_t len;
+    char key[32];
     int family;
 
     priv = zalloc(sizeof(struct media_client_priv));
     if (priv == NULL)
         return NULL;
 
-    media_client_get_sockaddr(&family, &len, &addr, "mediad");
+    snprintf(key, sizeof(key), MEDIA_SOCKADDR_NAME, cpu);
+    media_client_get_sockaddr(&family, &len, &addr, cpu, key);
     priv->fd = socket(family, SOCK_STREAM, 0);
     if (priv->fd <= 0)
         goto socket_error;
@@ -240,7 +233,7 @@ out:
     return ret;
 }
 
-int media_client_set_event_cb(void *handle, void *event_cb, void *cookie)
+int media_client_set_event_cb(void *handle, const char *cpu, void *event_cb, void *cookie)
 {
     struct media_client_priv *priv = handle;
     pthread_attr_t pattr;
@@ -258,7 +251,7 @@ int media_client_set_event_cb(void *handle, void *event_cb, void *cookie)
         return 0;
     }
 
-    ret = media_client_create_listenfd(priv);
+    ret = media_client_create_listenfd(priv, cpu);
     if (ret < 0) {
         pthread_mutex_unlock(&priv->mutex);
         return ret;

@@ -36,15 +36,21 @@ extern "C" {
  * Media Definations
  ****************************************************************************/
 
-#define MEDIA_GRAPH_CONTROL         1
-#define MEDIA_POLICY_CONTROL        2
-#define MEDIA_PLAYER_CONTROL        3
-#define MEDIA_PLAYER_SET_CALLBACK   4
-#define MEDIA_RECORDER_CONTROL      5
-#define MEDIA_RECORDER_SET_CALLBACK 6
+#define MEDIA_GRAPH_CONTROL          1
+#define MEDIA_POLICY_CONTROL         2
+#define MEDIA_PLAYER_CONTROL         3
+#define MEDIA_PLAYER_SET_CALLBACK    4
+#define MEDIA_RECORDER_CONTROL       5
+#define MEDIA_RECORDER_SET_CALLBACK  6
 
-#define MEDIA_PLAYER_NAME           "amovie_async"
-#define MEDIA_RECORDER_NAME         "amoviesink_async"
+#define MEDIA_PLAYER_NAME            "amovie_async"
+#define MEDIA_RECORDER_NAME          "amoviesink_async"
+
+#ifndef CONFIG_RPTUN_LOCAL_CPUNAME
+#  define CONFIG_RPTUN_LOCAL_CPUNAME "local"
+#endif
+
+#define MEDIA_SOCKADDR_NAME          "mediad:%s"
 
 /****************************************************************************
  * Media Functions
