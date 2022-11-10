@@ -52,9 +52,8 @@ config MEDIA_SERVER_PRIORITY
 endif # MEDIA_SERVER
 
 config MEDIA_SERVER_CPUNAME
-	string "Media server CPU name"
-	depends on !MEDIA_SERVER
-	default "audio"
+	string "Media server CPU name, for distributed server, use list like 'ap,audio'"
+	default "local"
 
 config MEDIA_TOOL
 	bool "Media tool"
