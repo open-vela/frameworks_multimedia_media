@@ -204,8 +204,8 @@ static int media_graph_queue_command(AVFilterContext *filter,
 
     if (!priv->cmdhead &&
         !ff_filter_graph_has_pending_status(filter->graph)) {
-        av_log(NULL, AV_LOG_INFO, "%s:do name:%s cmd:%s arg:%s\n", __func__,
-               filter->name, cmd, arg);
+        av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
+               filter->name, cmd, arg ? arg : "_");
         return avfilter_process_command(filter, cmd, arg, NULL, 0, flags);
     }
 
@@ -234,8 +234,8 @@ static int media_graph_queue_command(AVFilterContext *filter,
         priv->cmdtail->next = tmp;
 
     priv->cmdtail = tmp;
-    av_log(NULL, AV_LOG_INFO, "%s:pend name:%s cmd:%s arg:%s\n", __func__,
-           filter->name, cmd, arg);
+    av_log(NULL, AV_LOG_INFO, "pending %s %s %s\n",
+           filter->name, cmd, arg ? arg : "_");
     return 0;
 
 err2:
@@ -263,8 +263,8 @@ static int media_graph_dequeue_command(bool process)
         if (ff_filter_graph_has_pending_status(priv->graph))
             return -EAGAIN;
 
-        av_log(NULL, AV_LOG_INFO, "%s:do name:%s cmd:%s arg:%s\n", __func__,
-               tmp->filter->name, tmp->cmd, tmp->arg);
+        av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
+               tmp->filter->name, tmp->cmd, tmp->arg ? tmp->arg : "_");
         ret = avfilter_process_command(tmp->filter, tmp->cmd, tmp->arg,
                                        NULL, 0, tmp->flags);
     }
