@@ -113,6 +113,9 @@ out:
     media_parcel_deinit(&in);
     media_parcel_deinit(&out);
 
+    syslog(LOG_INFO, "send:%s:%p %s %s %s %s ret:%d resp:%d\n",
+           priv->cpu, (void *)(uintptr_t)priv->handle, target ? target : "_",
+           cmd, arg ? arg : "_", apply ? "apply" : "_", ret, (int)resp);
     return ret < 0 ? ret : resp;
 }
 
@@ -139,6 +142,7 @@ static int media_transact(int control, void *handle, const char *target, const c
         if (!priv->proxy)
             continue;
 
+        priv->cpu = cpu;
         ret = media_transact_once(control, priv, target, cmd, arg, apply, res, res_len);
         switch (control) {
             case MEDIA_GRAPH_CONTROL:
@@ -178,18 +182,19 @@ static void *media_open(int control, const char *params)
         return NULL;
 
     if (media_transact(control, priv, NULL, "open", params, 0, tmp, sizeof(tmp), 0) < 0)
-        goto error;
+        goto error1;
 
     sscanf(tmp, "%llu", &priv->handle);
     if (!priv->handle)
-        goto error;
+        goto error2;
 
     atomic_store(&priv->refs, 1);
-    syslog(LOG_INFO, "%s %s return %p. \n", __func__, params, priv);
+    syslog(LOG_INFO, "%s:%s handle:%p\n", __func__, params, priv);
     return priv;
 
-error:
+error2:
     free(priv->cpu);
+error1:
     free(priv);
     return NULL;
 }
