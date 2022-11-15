@@ -427,9 +427,9 @@ int media_graph_run_once(void *handle)
     if (!priv || !priv->graph)
         return -EINVAL;
 
-    do {
-        ret = ff_filter_graph_run_once(priv->graph);
-    } while (ret >= 0 || ret == AVERROR(EAGAIN) || ret == AVERROR_EOF);
+    ret = ff_filter_graph_run_all(priv->graph);
+    if (ret < 0)
+        return ret;
 
     do {
         ret = media_graph_dequeue_command(true);
