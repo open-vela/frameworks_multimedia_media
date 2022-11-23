@@ -56,7 +56,7 @@ typedef struct MediaGraphPriv {
     AVFilterGraph       *graph;
     struct file         *filep;
     int                  fd;
-    pid_t                pid;
+    pid_t                tid;
     void                *pollfts[MAX_POLL_FILTERS];
     int                  pollftn;
     struct MediaCommand *cmdhead;
@@ -85,7 +85,7 @@ static void media_graph_filter_ready(AVFilterContext *ctx)
     MediaGraphPriv *priv = ctx->graph->opaque;
     eventfd_t val = 1;
 
-    if (priv->pid != getpid())
+    if (priv->tid != gettid())
         file_write(priv->filep, &val, sizeof(eventfd_t));
 }
 
@@ -338,7 +338,7 @@ void *media_graph_create(void *file)
     if (ret < 0)
         goto err;
 
-    priv->pid = getpid();
+    priv->tid = gettid();
     priv->cmdhead = NULL;
     priv->cmdtail = NULL;
 
