@@ -506,7 +506,7 @@ void* media_focus_request(int* return_type,
     // step 6: specific app_focus_request assemable
     new_id.client_id = valid_id;
     new_id.focus_level = new_stream_type;
-    new_id.thread_id = getpid();
+    new_id.thread_id = gettid();
     new_id.focus_state = APP_FOCUS_STATE_STACK_QUIT;
     new_id.focus_callback = callback_method;
     new_id.callback_argv = callback_argv;
