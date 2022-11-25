@@ -24,8 +24,8 @@
 
 #include <ParameterFramework.h>
 #include <cutils/properties.h>
-#include <libavutil/log.h>
 
+#include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -313,7 +313,7 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
     }
 
     if (!ret) {
-        av_log(NULL, AV_LOG_ERROR, "%s, unkown name:%s cmd:%s value:%s\n",
+        syslog(LOG_ERR, "%s, unkown name:%s cmd:%s value:%s\n",
                __func__, name, cmd, value);
         return -EINVAL;
     }
