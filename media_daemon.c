@@ -75,6 +75,7 @@ typedef struct MediaPoll {
 
 static MediaPoll g_media[] =
 {
+#ifdef CONFIG_LIB_FFMPEG
     {
         "media_graph",
         NULL,
@@ -85,6 +86,8 @@ static MediaPoll g_media[] =
         media_graph_run_once,
         media_graph_destroy,
     },
+#endif
+#ifdef CONFIG_PFW
     {
         "media_policy",
         NULL,
@@ -99,6 +102,7 @@ static MediaPoll g_media[] =
         NULL,
         media_policy_destroy,
     },
+#endif
     {
         "media_server",
         NULL,
