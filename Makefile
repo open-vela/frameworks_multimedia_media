@@ -31,17 +31,22 @@ ifneq ($(CONFIG_MEDIA_FOCUS),)
 endif
 
 ifneq ($(CONFIG_MEDIA_SERVER),)
-  CSRCS    += media_graph.c media_stub.c media_server.c media_policy.c
+  CSRCS    += media_stub.c media_server.c
   MAINSRC   = media_daemon.c
   PROGNAME  = $(CONFIG_MEDIA_SERVER_PROGNAME)
   PRIORITY  = $(CONFIG_MEDIA_SERVER_PRIORITY)
   STACKSIZE = $(CONFIG_MEDIA_SERVER_STACKSIZE)
+endif
 
+ifneq ($(CONFIG_LIB_FFMPEG),)
+  CSRCS  += media_graph.c
   CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/ffmpeg/ffmpeg}
-  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/bindings/c}
 endif
 
 ifneq ($(CONFIG_PFW),)
+  CSRCS  += media_policy.c
+  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/bindings/c}
+
   CXXEXT   := .cpp
   CXXSRCS  += media_policy_plugin.cpp
   CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter}

@@ -32,8 +32,6 @@
 
 #include "media_internal.h"
 
-#ifdef CONFIG_PFW
-
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
@@ -377,52 +375,3 @@ err_parse:
     return NULL;
 }
 
-int media_policy_get_stream_name(void *handle, const char *stream,
-                                 char *name, int len)
-{
-    return media_policy_control(handle, stream, "get_string", NULL, 0,
-                                &name, len);
-}
-
-int media_policy_set_stream_status(void *handle, const char *name,
-                                   const char *stream, bool active)
-{
-    return media_policy_control(handle, name, active ? "include" : "exclude",
-                                stream, 0, NULL, 0);
-}
-
-#else // CONFIG_PFW
-
-/****************************************************************************
- * Dummy Public Functions
- ****************************************************************************/
-
-void *media_policy_create(void *file)
-{
-    return (void *)1;
-}
-
-int media_policy_destroy(void *handle)
-{
-    return 0;
-}
-
-int media_policy_control(void *handle, const char *name, const char *cmd,
-                         const char *value, int apply, char **res, int res_len)
-{
-    return -ENOSYS;
-}
-
-int media_policy_get_stream_name(void *handle, const char *stream,
-                                 char *name, int len)
-{
-    return -ENOSYS;
-}
-
-int media_policy_set_stream_status(void *handle, const char *name,
-                                   const char *input, bool active)
-{
-    return -ENOSYS;
-}
-
-#endif

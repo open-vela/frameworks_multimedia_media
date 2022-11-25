@@ -731,8 +731,34 @@ void media_policy_dump(const char *options)
     media_transact(MEDIA_POLICY_CONTROL, NULL, NULL, "dump", options, 0, NULL, 0, false);
 }
 
+int media_policy_get_stream_name(void *handle, const char *stream,
+                                 char *name, int len)
+{
+#ifdef CONFIG_PFW
+    return media_policy_control(handle, stream, "get_string", NULL, 0, &name, len);
+#else
+    (void)handle;
+    return media_transact(MEDIA_POLICY_CONTROL, NULL, stream, "get_string", NULL, 0, name, len, true);
+#endif
+}
+
+int media_policy_set_stream_status(void *handle, const char *name,
+                                   const char *input, bool active)
+{
+    const char *cmd = active ? "include" : "exclude";
+
+#ifdef CONFIG_PFW
+    return media_policy_control(handle, name, cmd, input, 0, NULL, 0);
+#else
+    (void)handle;
+    return media_transact(MEDIA_POLICY_CONTROL, NULL, name, cmd, input, 0, NULL, 0, true);
+#endif
+}
+
 void media_policy_process_command(const char *target, const char *cmd, const char *arg)
 {
+#ifdef CONFIG_LIB_FFMPEG
     media_graph_control(media_get_graph(), target, cmd, arg, NULL, 0);
+#endif
     media_transact(MEDIA_GRAPH_CONTROL, NULL, target, cmd, arg, 0, NULL, 0, true);
 }
