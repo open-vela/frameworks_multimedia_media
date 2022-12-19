@@ -20,8 +20,6 @@
 
 include $(APPDIR)/Make.defs
 
-BIN := $(APPDIR)/staging/libframework.a
-
 MODULE = $(CONFIG_MEDIA_SERVER)
 CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c
 
@@ -64,5 +62,17 @@ ifneq ($(CONFIG_MEDIA_TOOL),)
   PRIORITY  += $(CONFIG_MEDIA_TOOL_PRIORITY)
   STACKSIZE += $(CONFIG_MEDIA_TOOL_STACKSIZE)
 endif
+
+ASRCS := $(wildcard $(ASRCS))
+CSRCS := $(wildcard $(CSRCS))
+CXXSRCS := $(wildcard $(CXXSRCS))
+MAINSRC := $(wildcard $(MAINSRC))
+NOEXPORTSRCS = $(ASRCS)$(CSRCS)$(CXXSRCS)$(MAINSRC)
+
+ifneq ($(NOEXPORTSRCS),)
+BIN := $(APPDIR)/staging/libframework.a
+endif
+
+EXPORT_FILES := include
 
 include $(APPDIR)/Application.mk
