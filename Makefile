@@ -49,6 +49,7 @@ ifneq ($(CONFIG_PFW),)
 
   CXXEXT   := .cpp
   CXXSRCS  += media_policy_plugin.cpp
+  CXXFLAGS += --std=c++11
   CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter}
   CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter/include}
   CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter/log/include}
