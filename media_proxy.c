@@ -66,7 +66,7 @@ static int media_transact_once(int control, void *handle, const char *target,
     media_parcel in, out;
     const char *response;
     int ret = -EINVAL;
-    int32_t resp;
+    int32_t resp = 0;
 
     if (!priv || !priv->proxy)
         return ret;
