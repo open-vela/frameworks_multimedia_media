@@ -1113,11 +1113,13 @@ static int mediatool_execute(struct mediatool_s *media, char *cmd, char *arg)
         if (strcmp(cmd, g_mediatool_cmds[x].cmd) == 0) {
 
             ret = g_mediatool_cmds[x].pfunc(media, arg);
-            if (ret < 0)
+            if (ret < 0) {
                 printf("cmd %s error %d\n", cmd, ret);
+                ret = 0;
+            }
 
             if (g_mediatool_cmds[x].pfunc == mediatool_common_cmd_quit)
-                ret = 1;
+                ret = -1;
 
             break;
         }
@@ -1177,7 +1179,7 @@ int main(int argc, char *argv[])
         arg[arg_len] = '\0';
 
         ret = mediatool_execute(&g_mediatool, cmd, arg);
-        if (ret > 0)
+        if (ret < 0)
             break;
     }
 
