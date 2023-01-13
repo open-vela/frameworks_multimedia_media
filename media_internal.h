@@ -50,7 +50,7 @@ extern "C" {
 #  define CONFIG_RPTUN_LOCAL_CPUNAME "local"
 #endif
 
-#define MEDIA_SOCKADDR_NAME          "mediad:%s"
+#define MEDIA_SOCKADDR_NAME          "md:%s"
 
 /****************************************************************************
  * Media Functions

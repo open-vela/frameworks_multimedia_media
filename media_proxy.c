@@ -22,6 +22,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <assert.h>
 #include <errno.h>
 #include <malloc.h>
 #include <stdatomic.h>
@@ -147,11 +148,13 @@ static int media_transact(int control, void *handle, const char *target, const c
         switch (control) {
             case MEDIA_GRAPH_CONTROL:
                 media_client_disconnect(priv->proxy);
+                priv->proxy = NULL;
                 ret = 0;
                 break;
 
             case MEDIA_POLICY_CONTROL:
                 media_client_disconnect(priv->proxy);
+                priv->proxy = NULL;
                 if (ret != -ENOSYS) // return once found policy
                     return ret;
 
@@ -159,13 +162,17 @@ static int media_transact(int control, void *handle, const char *target, const c
 
             case MEDIA_PLAYER_CONTROL:
             case MEDIA_RECORDER_CONTROL:
-                if (ret >= 0) {
-                    priv->cpu = strdup(cpu);
-                    return priv->cpu ? ret : -ENOMEM;
+                if (ret < 0) {
+                    media_client_disconnect(priv->proxy);
+                    priv->proxy = NULL;
+                    break;
                 }
 
-                media_client_disconnect(priv->proxy);
-                break;
+                /* keep the connection */
+
+                priv->cpu = strdup(cpu);
+                DEBUGASSERT(priv->cpu);
+                return 0;
         }
     }
 
