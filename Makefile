@@ -25,7 +25,10 @@ CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
   CSRCS  += media_focus.c
-  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/frameworks/utils/include}
+endif
+
+ifneq ($(CONFIG_APP_FOCUS),)
+  CSRCS  += app_focus.c
 endif
 
 ifneq ($(CONFIG_MEDIA_SERVER),)
