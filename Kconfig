@@ -7,6 +7,10 @@ config MEDIA
 	tristate "Enable media"
 	default n
 
+config APP_FOCUS
+	bool "Enable app focus"
+	default n
+
 if MEDIA
 
 config MEDIA_SERVER

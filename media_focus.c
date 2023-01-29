@@ -28,7 +28,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "app_focus.h"
 #include "media_focus.h"
 #include "media_internal.h"
 #include "media_wrapper.h"
