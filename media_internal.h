@@ -43,9 +43,6 @@ extern "C" {
 #define MEDIA_RECORDER_CONTROL 5
 #define MEDIA_RECORDER_SET_CALLBACK 6
 
-#define MEDIA_PLAYER_NAME "amovie_async"
-#define MEDIA_RECORDER_NAME "amoviesink_async"
-
 #ifndef CONFIG_RPTUN_LOCAL_CPUNAME
 #define CONFIG_RPTUN_LOCAL_CPUNAME "local"
 #endif
@@ -107,10 +104,8 @@ void* media_policy_create(void* file);
 int media_policy_destroy(void* handle);
 int media_policy_control(void* handle, const char* name, const char* cmd,
     const char* value, int apply, char** res, int res_len);
-int media_policy_get_stream_name(void* handle, const char* stream,
-    char* name, int len);
-int media_policy_set_stream_status(void* handle, const char* name,
-    const char* input, bool active);
+int media_policy_get_stream_name(const char* stream, char* name, int len);
+int media_policy_set_stream_status(const char* name, bool active);
 void media_policy_process_command(const char* target, const char* cmd,
     const char* arg);
 
