@@ -65,7 +65,6 @@ typedef struct MediaGraphPriv {
 
 typedef struct MediaPlayerPriv {
     AVFilterContext* filter;
-    char* name;
 } MediaPlayerPriv;
 
 typedef struct MediaCommand {
@@ -75,6 +74,22 @@ typedef struct MediaCommand {
     int flags;
     struct MediaCommand* next;
 } MediaCommand;
+
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+static const char* g_media_inputs[] = {
+    "amovie_async",
+    "movie_async",
+    NULL,
+};
+
+static const char* g_media_outputs[] = {
+    "amoviesink_async",
+    "moviesink_async",
+    NULL,
+};
 
 /****************************************************************************
  * Private Functions
@@ -279,21 +294,40 @@ static int media_graph_dequeue_command(bool process)
     return ret;
 }
 
-static void* media_find_filter(void* graph, const char* prefix, const char* name)
+static void* media_find_filter(const char* prefix, bool input)
 {
-    MediaGraphPriv* media = graph;
     AVFilterContext* filter = NULL;
-    int i;
+    MediaGraphPriv* media;
+    char name[64];
+    int i, j;
 
+    media = media_get_graph();
     if (!media || !media->graph)
         return NULL;
 
     for (i = 0; i < media->graph->nb_filters; i++) {
         filter = media->graph->filters[i];
 
-        if (!filter->opaque && !strcmp(filter->filter->name, prefix)) {
-            if (!name || !strcmp(filter->name, name) || !strncmp(filter->name + strlen(prefix) + 1, name, strlen(name)))
-                return filter;
+        if (!filter->opaque) {
+            if (!prefix) {
+                // find an available input/output as prefix is not specified.
+                if (input) {
+                    for (j = 0; g_media_inputs[j]; j++)
+                        if (!strcmp(filter->filter->name, g_media_inputs[j]))
+                            return filter;
+                } else {
+                    for (j = 0; g_media_outputs[j]; j++)
+                        if (!strcmp(filter->filter->name, g_media_outputs[j]))
+                            return filter;
+                }
+            } else {
+                // policy might do mapping (e.g. "Music" => "amovie_async@Music")
+                if (0 == media_policy_get_stream_name(prefix, name, sizeof(name)))
+                    prefix = name;
+
+                if (!strncmp(filter->name, prefix, strlen(prefix)))
+                    return filter;
+            }
         }
     }
 
@@ -481,7 +515,6 @@ int media_player_control(void* handle, const char* target, const char* cmd,
 {
     MediaPlayerPriv* priv = handle;
     AVFilterContext* filter;
-    char name[64];
     int ret;
 
     ret = media_alloc_response(res_len, res);
@@ -492,10 +525,7 @@ int media_player_control(void* handle, const char* target, const char* cmd,
         if (!res)
             return -EINVAL;
 
-        if (arg && media_policy_get_stream_name(media_get_policy(), arg, name, sizeof(name)) == 0)
-            arg = name;
-
-        filter = media_find_filter(media_get_graph(), MEDIA_PLAYER_NAME, arg);
+        filter = media_find_filter(arg, true);
         if (!filter)
             goto out;
 
@@ -503,48 +533,34 @@ int media_player_control(void* handle, const char* target, const char* cmd,
         if (!priv)
             goto out;
 
-        if (arg) {
-            priv->name = strdup(arg);
-            if (!priv->name)
-                goto err1;
-        } else
-            priv->name = NULL;
-
         ret = media_graph_queue_command(filter, "open", NULL, NULL, 0, 0);
-        if (ret < 0)
-            goto err2;
+        if (ret < 0) {
+            free(priv);
+            priv = NULL;
+            goto out;
+        }
 
         priv->filter = filter;
         filter->opaque = priv;
-        goto out;
 
-    err2:
-        free(priv->name);
-    err1:
-        free(priv);
-        priv = NULL;
     out:
         snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
         return priv ? 0 : -EINVAL;
     } else if (!strcmp(cmd, "close")) {
         ret = media_graph_queue_command(priv->filter, "close", arg, NULL, 0, 0);
         if (ret >= 0) {
-            media_policy_set_stream_status(media_get_policy(), priv->name,
-                priv->filter->name + sizeof(MEDIA_PLAYER_NAME), false);
+            media_policy_set_stream_status(priv->filter->name, false);
             priv->filter->opaque = NULL;
-            free(priv->name);
             free(priv);
         }
 
         return ret;
     } else if (!strcmp(cmd, "start")) {
-        media_policy_set_stream_status(media_get_policy(), priv->name,
-            priv->filter->name + sizeof(MEDIA_PLAYER_NAME), true);
+        media_policy_set_stream_status(priv->filter->name, true);
         return media_graph_queue_command(priv->filter, "start", NULL, NULL, 0, 0);
     } else if (!strcmp(cmd, "pause") || !strcmp(cmd, "stop")) {
         ret = media_graph_queue_command(priv->filter, cmd, NULL, NULL, 0, 0);
-        media_policy_set_stream_status(media_get_policy(), priv->name,
-            priv->filter->name + sizeof(MEDIA_PLAYER_NAME), false);
+        media_policy_set_stream_status(priv->filter->name, false);
         return ret;
     }
 
@@ -586,7 +602,7 @@ int media_recorder_control(void* handle, const char* target, const char* cmd,
         if (!res)
             return -EINVAL;
 
-        filter = media_find_filter(media_get_graph(), MEDIA_RECORDER_NAME, arg);
+        filter = media_find_filter(arg, false);
         if (!filter)
             goto out;
 
