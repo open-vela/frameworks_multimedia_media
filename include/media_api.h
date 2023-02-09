@@ -30,6 +30,7 @@
 #include <media_player.h>
 #include <media_policy.h>
 #include <media_recorder.h>
+#include <media_session.h>
 #include <media_wrapper.h>
 
 #ifdef __cplusplus
