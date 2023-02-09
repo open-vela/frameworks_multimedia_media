@@ -39,9 +39,7 @@ extern "C" {
 #define MEDIA_GRAPH_CONTROL 1
 #define MEDIA_POLICY_CONTROL 2
 #define MEDIA_PLAYER_CONTROL 3
-#define MEDIA_PLAYER_SET_CALLBACK 4
-#define MEDIA_RECORDER_CONTROL 5
-#define MEDIA_RECORDER_SET_CALLBACK 6
+#define MEDIA_RECORDER_CONTROL 4
 
 #ifndef CONFIG_RPTUN_LOCAL_CPUNAME
 #define CONFIG_RPTUN_LOCAL_CPUNAME "local"
@@ -62,6 +60,8 @@ void* media_get_server(void);
  ****************************************************************************/
 
 struct media_parcel;
+void media_stub_notify_event(void* cookie, int event,
+    int result, const char* extra);
 void media_stub_onreceive(void* cookie,
     struct media_parcel* in, struct media_parcel* out);
 
@@ -78,23 +78,10 @@ int media_graph_run_once(void* handle);
 int media_graph_control(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len);
 
-/****************************************************************************
- * Player Functions
- ****************************************************************************/
-
 int media_player_control(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len);
-int media_player_set_event_callback_(void* handle, void* cookie,
-    media_event_callback event_cb);
-
-/****************************************************************************
- * Recorder Functions
- ****************************************************************************/
-
 int media_recorder_control(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len);
-int media_recorder_set_event_callback_(void* handle, void* cookie,
-    media_event_callback event_cb);
 
 /****************************************************************************
  * Policy Functions

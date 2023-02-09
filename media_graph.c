@@ -65,7 +65,15 @@ typedef struct MediaGraphPriv {
 
 typedef struct MediaPlayerPriv {
     AVFilterContext* filter;
+    void* cookie;
+    bool event;
 } MediaPlayerPriv;
+
+typedef struct MediaRecorderPriv {
+    AVFilterContext* filter;
+    void* cookie;
+    bool event;
+} MediaRecorderPriv;
 
 typedef struct MediaCommand {
     AVFilterContext* filter;
@@ -214,6 +222,12 @@ static int media_graph_queue_command(AVFilterContext* filter,
     if (!priv)
         return -EINVAL;
 
+    if (res_len && res && !*res) {
+        *res = malloc(res_len);
+        if (!*res)
+            return -ENOMEM;
+    }
+
     if (res && *res)
         return avfilter_process_command(filter, cmd, arg, *res, res_len, flags);
 
@@ -334,15 +348,57 @@ static void* media_find_filter(const char* prefix, bool input)
     return NULL;
 }
 
-static inline int media_alloc_response(int len, char** res)
+static void media_player_event_cb(void* cookie, int event,
+    int result, const char* extra)
 {
-    if (len && res && !*res) {
-        *res = malloc(len);
-        if (!*res)
-            return -ENOMEM;
+    MediaPlayerPriv* priv = cookie;
+
+    if (event == MEDIA_EVENT_NOP) {
+        priv->filter->opaque = NULL;
+        free(priv);
+        return;
     }
 
-    return 0;
+    if (priv->event)
+        media_stub_notify_event(priv->cookie, event, result, extra);
+}
+
+static void media_recorder_event_cb(void* cookie, int event,
+    int result, const char* extra)
+{
+    MediaRecorderPriv* priv = cookie;
+
+    if (event == MEDIA_EVENT_NOP) {
+        priv->filter->opaque = NULL;
+        free(priv);
+        return;
+    }
+
+    if (priv->event)
+        media_stub_notify_event(priv->cookie, event, result, extra);
+}
+
+static void* media_pick_filter(void* handle, const char* arg, bool input)
+{
+    AVMovieAsyncEventCookie event;
+    AVFilterContext* filter;
+
+    filter = media_find_filter(arg, input);
+    if (!filter)
+        return NULL;
+
+    if (avfilter_process_command(filter, "open", NULL, NULL, 0, 0) < 0)
+        return NULL;
+
+    event.cookie = handle;
+    event.event = input ? media_player_event_cb : media_recorder_event_cb;
+
+    if (avfilter_process_command(filter, "set_event", (const char*)&event, NULL, 0, 0) < 0) {
+        avfilter_process_command(filter, "close", NULL, NULL, 0, 0);
+        return NULL;
+    }
+
+    return filter;
 }
 
 /****************************************************************************
@@ -487,10 +543,6 @@ int media_graph_control(void* handle, const char* target, const char* cmd,
         return 0;
     }
 
-    ret = media_alloc_response(res_len, res);
-    if (ret < 0)
-        return ret;
-
     for (i = 0; i < priv->graph->nb_filters; i++) {
         AVFilterContext* filter = priv->graph->filters[i];
 
@@ -513,54 +565,59 @@ int media_graph_control(void* handle, const char* target, const char* cmd,
 int media_player_control(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len)
 {
-    MediaPlayerPriv* priv = handle;
     AVFilterContext* filter;
+    MediaPlayerPriv* priv;
     int ret;
-
-    ret = media_alloc_response(res_len, res);
-    if (ret < 0)
-        return ret;
 
     if (!strcmp(cmd, "open")) {
         if (!res)
             return -EINVAL;
 
-        filter = media_find_filter(arg, true);
-        if (!filter)
-            goto out;
+        *res = zalloc(res_len);
+        if (!*res)
+            return -ENOMEM;
 
         priv = malloc(sizeof(MediaPlayerPriv));
-        if (!priv)
-            goto out;
-
-        ret = media_graph_queue_command(filter, "open", NULL, NULL, 0, 0);
-        if (ret < 0) {
-            free(priv);
-            priv = NULL;
-            goto out;
+        if (!priv) {
+            free(*res);
+            return -ENOMEM;
         }
 
+        filter = media_pick_filter(priv, arg, true);
+        if (!filter) {
+            free(priv);
+            free(*res);
+            return -EINVAL;
+        }
+
+        priv->cookie = handle;
         priv->filter = filter;
         filter->opaque = priv;
 
-    out:
-        snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
-        return priv ? 0 : -EINVAL;
-    } else if (!strcmp(cmd, "close")) {
-        ret = media_graph_queue_command(priv->filter, "close", arg, NULL, 0, 0);
-        if (ret >= 0) {
-            media_policy_set_stream_status(priv->filter->name, false);
-            priv->filter->opaque = NULL;
-            free(priv);
-        }
+        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+    }
+
+    priv = handle;
+
+    if (!strcmp(cmd, "set_event")) {
+        priv->event = true;
+
+        return 0;
+    }
+
+    if (!strcmp(cmd, "start")) {
+        ret = media_graph_queue_command(priv->filter, cmd, arg, NULL, 0, 0);
+        if (ret >= 0)
+            media_policy_set_stream_status(priv->filter->name, true);
 
         return ret;
-    } else if (!strcmp(cmd, "start")) {
-        media_policy_set_stream_status(priv->filter->name, true);
-        return media_graph_queue_command(priv->filter, "start", NULL, NULL, 0, 0);
-    } else if (!strcmp(cmd, "pause") || !strcmp(cmd, "stop")) {
-        ret = media_graph_queue_command(priv->filter, cmd, NULL, NULL, 0, 0);
-        media_policy_set_stream_status(priv->filter->name, false);
+    }
+
+    if (!strcmp(cmd, "close") || !strcmp(cmd, "pause") || !strcmp(cmd, "stop")) {
+        ret = media_graph_queue_command(priv->filter, cmd, arg, NULL, 0, 0);
+        if (ret >= 0)
+            media_policy_set_stream_status(priv->filter->name, false);
+
         return ret;
     }
 
@@ -574,80 +631,71 @@ int media_player_control(void* handle, const char* target, const char* cmd,
     return media_graph_queue_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
 }
 
-int media_player_set_event_callback_(void* handle, void* cookie, media_event_callback event_cb)
-{
-    MediaPlayerPriv* priv = handle;
-    AVMovieAsyncEventCookie event;
-
-    if (!priv)
-        return -EINVAL;
-
-    event.event = event_cb;
-    event.cookie = cookie;
-
-    return avfilter_process_command(priv->filter, "set_event", (const char*)&event, NULL, 0, 0);
-}
-
 int media_recorder_control(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len)
 {
-    AVFilterContext* filter = handle;
+    AVFilterContext* filter;
+    MediaRecorderPriv* priv;
     int ret;
-
-    ret = media_alloc_response(res_len, res);
-    if (ret < 0)
-        return ret;
 
     if (!strcmp(cmd, "open")) {
         if (!res)
             return -EINVAL;
 
-        filter = media_find_filter(arg, false);
-        if (!filter)
-            goto out;
+        *res = zalloc(res_len);
+        if (!*res)
+            return -ENOMEM;
 
-        ret = media_graph_queue_command(filter, "open", NULL, NULL, 0, 0);
-        if (ret < 0)
-            goto out;
-
-        filter->opaque = filter;
-    out:
-        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)filter);
-    } else if (!strcmp(cmd, "close")) {
-        ret = media_graph_queue_command(filter, "close", arg, NULL, 0, 0);
-        if (ret >= 0) {
-            media_policy_set_stream_status(filter->name, false);
-            filter->opaque = NULL;
+        priv = malloc(sizeof(MediaRecorderPriv));
+        if (!priv) {
+            free(*res);
+            return -ENOMEM;
         }
 
+        filter = media_pick_filter(priv, arg, false);
+        if (!filter) {
+            free(priv);
+            free(*res);
+            return -EINVAL;
+        }
+
+        priv->cookie = handle;
+        priv->filter = filter;
+        filter->opaque = priv;
+
+        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+    }
+
+    priv = handle;
+
+    if (!strcmp(cmd, "set_event")) {
+        priv->event = true;
+
+        return 0;
+    }
+
+    if (!strcmp(cmd, "start")) {
+        ret = media_graph_queue_command(priv->filter, cmd, arg, NULL, 0, 0);
+        if (ret >= 0)
+            media_policy_set_stream_status(priv->filter->name, true);
+
         return ret;
-    } else if (!strcmp(cmd, "start")) {
-        media_policy_set_stream_status(filter->name, true);
-        return media_graph_queue_command(filter, "start", NULL, NULL, 0, 0);
-    } else if (!strcmp(cmd, "pause") || !strcmp(cmd, "stop")) {
-        ret = media_graph_queue_command(filter, cmd, NULL, NULL, 0, 0);
-        media_policy_set_stream_status(filter->name, false);
+    }
+
+    if (!strcmp(cmd, "close") || !strcmp(cmd, "pause") || !strcmp(cmd, "stop")) {
+        ret = media_graph_queue_command(priv->filter, cmd, arg, NULL, 0, 0);
+        if (ret >= 0)
+            media_policy_set_stream_status(priv->filter->name, false);
+
         return ret;
     }
 
     if (target) {
-        filter = avfilter_find_on_link(filter, target, NULL, false, NULL);
+        filter = avfilter_find_on_link(priv->filter, target, NULL, true, NULL);
         if (!filter)
             return -EINVAL;
-    }
+    } else
+        filter = priv->filter;
 
     return media_graph_queue_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
-}
-
-int media_recorder_set_event_callback_(void* handle, void* cookie, media_event_callback event_cb)
-{
-    AVMovieAsyncEventCookie event;
-
-    if (!handle)
-        return -EINVAL;
-
-    event.event = event_cb;
-    event.cookie = cookie;
-
-    return avfilter_process_command(handle, "set_event", (const char*)&event, NULL, 0, 0);
 }
