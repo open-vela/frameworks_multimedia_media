@@ -398,7 +398,6 @@ static int media_set_event_cb(int control, void* handle, void* cookie,
     media_event_callback event_cb)
 {
     MediaProxyPriv* priv = handle;
-    int32_t resp;
     int ret;
 
     if (!priv)
@@ -408,13 +407,9 @@ static int media_set_event_cb(int control, void* handle, void* cookie,
     if (ret < 0)
         return ret;
 
-    ret = media_client_send_recieve(priv->proxy, "%i%l", "%i",
-        control, priv->handle, &resp);
+    ret = media_transact(control, handle, NULL, "set_event", NULL, 0, NULL, 0, false);
     if (ret < 0)
         return ret;
-
-    if (resp < 0)
-        return resp;
 
     priv->event = event_cb;
     priv->cookie = cookie;
@@ -460,7 +455,7 @@ int media_player_close(void* handle, int pending_stop)
 int media_player_set_event_callback(void* handle, void* cookie,
     media_event_callback event_cb)
 {
-    return media_set_event_cb(MEDIA_PLAYER_SET_CALLBACK, handle, cookie, event_cb);
+    return media_set_event_cb(MEDIA_PLAYER_CONTROL, handle, cookie, event_cb);
 }
 
 int media_player_prepare(void* handle, const char* url, const char* options)
@@ -623,7 +618,7 @@ int media_recorder_close(void* handle)
 int media_recorder_set_event_callback(void* handle, void* cookie,
     media_event_callback event_cb)
 {
-    return media_set_event_cb(MEDIA_RECORDER_SET_CALLBACK, handle, cookie, event_cb);
+    return media_set_event_cb(MEDIA_RECORDER_CONTROL, handle, cookie, event_cb);
 }
 
 int media_recorder_prepare(void* handle, const char* url, const char* options)

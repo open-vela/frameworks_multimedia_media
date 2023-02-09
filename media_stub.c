@@ -29,10 +29,10 @@
 #include "media_server.h"
 
 /****************************************************************************
- * Private Functions
+ * Public Functions
  ****************************************************************************/
 
-static void media_stub_event_cb(void* cookie, int event,
+void media_stub_notify_event(void* cookie, int event,
     int result, const char* extra)
 {
     media_parcel notify;
@@ -43,16 +43,13 @@ static void media_stub_event_cb(void* cookie, int event,
     media_parcel_deinit(&notify);
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-
 void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
 {
     const char *param_s1 = NULL, *param_s2 = NULL, *param_s3 = NULL;
     int32_t param_i1 = 0, param_i2 = 0, cmd = 0, ret;
     char* response = NULL;
-    uint64_t handle = 0;
+    uint64_t param_u = 0;
+    void* handle;
 
     media_parcel_read_int32(in, &cmd);
 
@@ -77,42 +74,29 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         break;
 
     case MEDIA_PLAYER_CONTROL:
-        media_parcel_read_scanf(in, "%l%s%s%s%i", &handle, &param_s1,
+        media_parcel_read_scanf(in, "%l%s%s%s%i", &param_u, &param_s1,
             &param_s2, &param_s3, &param_i1);
-        ret = media_player_control((void*)(uintptr_t)handle, param_s1,
-            param_s2, param_s3, &response,
-            param_i1);
+        handle = param_u ? (void*)(uintptr_t)param_u : cookie;
+        ret = media_player_control(handle, param_s1, param_s2, param_s3,
+            &response, param_i1);
         media_parcel_append_printf(out, "%i%s", ret, response);
-        break;
-
-    case MEDIA_PLAYER_SET_CALLBACK:
-        media_parcel_read_scanf(in, "%l", &handle);
-        ret = media_player_set_event_callback_((void*)(uintptr_t)handle,
-            cookie, media_stub_event_cb);
-        media_parcel_append_printf(out, "%i", ret);
         break;
 
     case MEDIA_RECORDER_CONTROL:
-        media_parcel_read_scanf(in, "%l%s%s%s%i", &handle, &param_s1,
+        media_parcel_read_scanf(in, "%l%s%s%s%i", &param_u, &param_s1,
             &param_s2, &param_s3, &param_i1);
-        ret = media_recorder_control((void*)(uintptr_t)handle, param_s1,
-            param_s2, param_s3, &response,
-            param_i1);
+        handle = param_u ? (void*)(uintptr_t)param_u : cookie;
+        ret = media_recorder_control(handle, param_s1, param_s2, param_s3,
+            &response, param_i1);
         media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 
-    case MEDIA_RECORDER_SET_CALLBACK:
-        media_parcel_read_scanf(in, "%l", &handle);
-        ret = media_recorder_set_event_callback_((void*)(uintptr_t)handle,
-            cookie, media_stub_event_cb);
-        media_parcel_append_printf(out, "%i", ret);
-        break;
 #endif // CONFIG_LIB_FFMPEG
 
     default:
         (void)handle;
+        (void)param_u;
         (void)param_i2;
-        (void)media_stub_event_cb;
         media_parcel_append_printf(out, "%i", -ENOSYS);
         break;
     }
