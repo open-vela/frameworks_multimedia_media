@@ -40,6 +40,7 @@ extern "C" {
 #define MEDIA_POLICY_CONTROL 2
 #define MEDIA_PLAYER_CONTROL 3
 #define MEDIA_RECORDER_CONTROL 4
+#define MEDIA_SESSION_CONTROL 5
 
 #ifndef CONFIG_RPTUN_LOCAL_CPUNAME
 #define CONFIG_RPTUN_LOCAL_CPUNAME "local"
@@ -81,6 +82,8 @@ int media_graph_handler(void* handle, const char* target, const char* cmd,
 int media_player_handler(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len);
 int media_recorder_handler(void* handle, const char* target, const char* cmd,
+    const char* arg, char** res, int res_len);
+int media_session_handler(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len);
 
 /****************************************************************************

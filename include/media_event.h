@@ -25,6 +25,8 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* Status change */
+
 #define MEDIA_EVENT_NOP 0
 #define MEDIA_EVENT_PREPARED 1
 #define MEDIA_EVENT_STARTED 2
@@ -32,6 +34,14 @@
 #define MEDIA_EVENT_STOPPED 4
 #define MEDIA_EVENT_SEEKED 5
 #define MEDIA_EVENT_COMPLETED 6
+
+/* Control Message */
+
+#define MEDIA_EVENT_START 100
+#define MEDIA_EVENT_PAUSE 101
+#define MEDIA_EVENT_STOP 102
+#define MEDIA_EVENT_PREV 103
+#define MEDIA_EVENT_NEXT 104
 
 /****************************************************************************
  * Public Types
