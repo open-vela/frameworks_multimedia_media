@@ -53,14 +53,14 @@ void* media_player_open(const char* params);
  * @param[in] pending_stop whether pending command.
  *                         - 0: close immediately
  *                         - 1: pending command,
- *                              close automatically after playbacek complete
+ *                              close automatically after playback complete
  * @return Zero on success; a negated errno value on failure.
  */
 int media_player_close(void* handle, int pending_stop);
 
 /**
  * Set event callback to the player path, the callback will be called
- * when state changed or something user cares.
+ * when state changed.
  * @param[in] handle    The player path
  * @param[in] cookie    User cookie, will bring back to user when do event_cb
  * @param[in] event_cb  Event callback
@@ -170,7 +170,7 @@ int media_player_is_playing(void* handle);
 int media_player_get_position(void* handle, unsigned int* msec);
 
 /**
- * Get plyabck file duration (Total play time)
+ * Get playback file duration (Total play time)
  * @param[in] handle    The player path
  * @param[in] mesc      File duration
  * @return Zero on success; a negated errno value on failure.

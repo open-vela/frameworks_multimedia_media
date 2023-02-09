@@ -34,6 +34,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <sys/eventfd.h>
+#include <sys/queue.h>
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -64,9 +65,12 @@ typedef struct MediaGraphPriv {
 } MediaGraphPriv;
 
 typedef struct MediaPlayerPriv {
+    LIST_ENTRY(MediaPlayerPriv)
+    entry;
     AVFilterContext* filter;
     void* cookie;
     bool event;
+    char* name;
 } MediaPlayerPriv;
 
 typedef struct MediaRecorderPriv {
@@ -75,6 +79,14 @@ typedef struct MediaRecorderPriv {
     bool event;
 } MediaRecorderPriv;
 
+typedef struct MediaSessionPriv {
+    LIST_ENTRY(MediaSessionPriv)
+    entry;
+    void* cookie;
+    bool event;
+    char* name;
+} MediaSessionPriv;
+
 typedef struct MediaCommand {
     AVFilterContext* filter;
     char* cmd;
@@ -82,6 +94,9 @@ typedef struct MediaCommand {
     int flags;
     struct MediaCommand* next;
 } MediaCommand;
+
+LIST_HEAD(MediaPlayerPrivHead, MediaPlayerPriv);
+LIST_HEAD(MediaSessionPrivHead, MediaSessionPriv);
 
 /****************************************************************************
  * Private Data
@@ -98,6 +113,10 @@ static const char* g_media_outputs[] = {
     "moviesink_async",
     NULL,
 };
+
+static struct MediaPlayerPrivHead g_players;
+static struct MediaSessionPrivHead g_sessions;
+static pthread_mutex_t g_media_mutex;
 
 /****************************************************************************
  * Private Functions
@@ -308,7 +327,7 @@ static int media_graph_dequeue_command(bool process)
     return ret;
 }
 
-static void* media_find_filter(const char* prefix, bool input)
+static void* media_find_filter(const char* prefix, bool input, bool available)
 {
     AVFilterContext* filter = NULL;
     MediaGraphPriv* media;
@@ -322,7 +341,7 @@ static void* media_find_filter(const char* prefix, bool input)
     for (i = 0; i < media->graph->nb_filters; i++) {
         filter = media->graph->filters[i];
 
-        if (!filter->opaque) {
+        if (!available || !filter->opaque) {
             if (!prefix) {
                 // find an available input/output as prefix is not specified.
                 if (input) {
@@ -348,13 +367,61 @@ static void* media_find_filter(const char* prefix, bool input)
     return NULL;
 }
 
+static bool media_player_is_most_active(void* handle)
+{
+    MediaPlayerPriv* priv = handle;
+    MediaPlayerPriv* tmp;
+
+    LIST_FOREACH(tmp, &g_players, entry)
+    {
+        if (!strcmp(tmp->name, priv->name))
+            return tmp == priv;
+    }
+
+    return false;
+}
+
+static void media_session_notify_event(const char* name, int event,
+    int result, const char* extra)
+{
+    MediaSessionPriv* tmp;
+
+    LIST_FOREACH(tmp, &g_sessions, entry)
+    {
+        if (!strcmp(tmp->name, name) && tmp->event)
+            media_stub_notify_event(tmp->cookie, event, result, extra);
+    }
+}
+
 static void media_player_event_cb(void* cookie, int event,
     int result, const char* extra)
 {
     MediaPlayerPriv* priv = cookie;
 
-    if (event == MEDIA_EVENT_NOP) {
+    switch (event) {
+    case MEDIA_EVENT_STARTED:
+        pthread_mutex_lock(&g_media_mutex);
+        LIST_REMOVE(priv, entry);
+        LIST_INSERT_HEAD(&g_players, priv, entry);
+        media_session_notify_event(priv->name, event, result, extra);
+        pthread_mutex_unlock(&g_media_mutex);
+        break;
+
+    case MEDIA_EVENT_PAUSED:
+    case MEDIA_EVENT_STOPPED:
+    case MEDIA_EVENT_COMPLETED:
+        pthread_mutex_lock(&g_media_mutex);
+        if (media_player_is_most_active(priv))
+            media_session_notify_event(priv->name, event, result, extra);
+        pthread_mutex_unlock(&g_media_mutex);
+        break;
+
+    case MEDIA_EVENT_NOP:
+        pthread_mutex_lock(&g_media_mutex);
+        LIST_REMOVE(priv, entry);
+        pthread_mutex_unlock(&g_media_mutex);
         priv->filter->opaque = NULL;
+        free(priv->name);
         free(priv);
         return;
     }
@@ -383,7 +450,7 @@ static void* media_pick_filter(void* handle, const char* arg, bool input)
     AVMovieAsyncEventCookie event;
     AVFilterContext* filter;
 
-    filter = media_find_filter(arg, input);
+    filter = media_find_filter(arg, input, true);
     if (!filter)
         return NULL;
 
@@ -426,6 +493,10 @@ void* media_graph_create(void* file)
     if (ret < 0)
         goto err;
 
+    LIST_INIT(&g_players);
+    LIST_INIT(&g_sessions);
+    pthread_mutex_init(&g_media_mutex, NULL);
+
     priv->tid = gettid();
     priv->cmdhead = NULL;
     priv->cmdtail = NULL;
@@ -449,6 +520,8 @@ int media_graph_destroy(void* handle)
     do {
         ret = media_graph_dequeue_command(false);
     } while (ret >= 0);
+
+    pthread_mutex_destroy(&g_media_mutex);
 
     avfilter_graph_free(&priv->graph);
     free(priv);
@@ -577,14 +650,24 @@ int media_player_handler(void* handle, const char* target, const char* cmd,
         if (!*res)
             return -ENOMEM;
 
-        priv = malloc(sizeof(MediaPlayerPriv));
+        priv = zalloc(sizeof(MediaPlayerPriv));
         if (!priv) {
             free(*res);
             return -ENOMEM;
         }
 
+        if (arg) {
+            priv->name = strdup(arg);
+            if (!priv->name) {
+                free(priv);
+                free(*res);
+                return -ENOMEM;
+            }
+        }
+
         filter = media_pick_filter(priv, arg, true);
         if (!filter) {
+            free(priv->name);
             free(priv);
             free(*res);
             return -EINVAL;
@@ -593,6 +676,10 @@ int media_player_handler(void* handle, const char* target, const char* cmd,
         priv->cookie = handle;
         priv->filter = filter;
         filter->opaque = priv;
+
+        pthread_mutex_lock(&g_media_mutex);
+        LIST_INSERT_HEAD(&g_players, priv, entry);
+        pthread_mutex_unlock(&g_media_mutex);
 
         return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
     }
@@ -698,4 +785,101 @@ int media_recorder_handler(void* handle, const char* target, const char* cmd,
         filter = priv->filter;
 
     return media_graph_queue_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
+}
+
+int media_session_handler(void* handle, const char* target, const char* cmd,
+    const char* arg, char** res, int res_len)
+{
+    AVFilterContext* filter;
+    MediaSessionPriv* priv;
+    MediaPlayerPriv* tmp;
+    int ret;
+
+    if (!strcmp(cmd, "open")) {
+        if (!res || !arg)
+            return -EINVAL;
+
+        filter = media_find_filter(arg, true, false);
+        if (!filter)
+            return -EINVAL;
+
+        priv = zalloc(sizeof(MediaSessionPriv));
+        if (!priv)
+            return -ENOMEM;
+
+        priv->cookie = handle;
+        priv->event = false;
+
+        priv->name = strdup(arg);
+        if (!priv->name) {
+            free(priv);
+            return -ENOMEM;
+        }
+
+        *res = malloc(res_len);
+        if (!*res) {
+            free(priv->name);
+            free(priv);
+            return -ENOMEM;
+        }
+
+        pthread_mutex_lock(&g_media_mutex);
+        LIST_INSERT_HEAD(&g_sessions, priv, entry);
+        pthread_mutex_unlock(&g_media_mutex);
+
+        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+    }
+
+    priv = handle;
+
+    if (!strcmp(cmd, "close")) {
+        pthread_mutex_lock(&g_media_mutex);
+        LIST_REMOVE(priv, entry);
+        pthread_mutex_unlock(&g_media_mutex);
+
+        free(priv->name);
+        free(priv);
+
+        return 0;
+    }
+
+    if (!strcmp(cmd, "set_event")) {
+        priv->event = true;
+
+        return 0;
+    }
+
+    /* find the most active player and send control message */
+
+    pthread_mutex_lock(&g_media_mutex);
+    LIST_FOREACH(tmp, &g_players, entry)
+    {
+        if (!strcmp(tmp->name, priv->name))
+            break;
+
+        tmp = NULL;
+    }
+    pthread_mutex_unlock(&g_media_mutex);
+
+    if (!tmp)
+        return -ENOENT;
+
+    ret = media_player_handler(tmp, target, cmd, arg, res, res_len);
+    if (tmp->event) {
+        if (!strcmp(cmd, "start"))
+            ret = MEDIA_EVENT_START;
+        else if (!strcmp(cmd, "pause"))
+            ret = MEDIA_EVENT_PAUSE;
+        else if (!strcmp(cmd, "stop"))
+            ret = MEDIA_EVENT_STOP;
+        else if (!strcmp(cmd, "prev"))
+            ret = MEDIA_EVENT_PREV;
+        else if (!strcmp(cmd, "next"))
+            ret = MEDIA_EVENT_NEXT;
+        else
+            return -ENOSYS;
+        media_stub_notify_event(tmp->cookie, ret, 0, arg);
+    }
+
+    return ret;
 }

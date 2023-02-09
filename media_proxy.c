@@ -59,9 +59,22 @@ typedef struct MediaProxyPriv {
  * Private Functions
  ****************************************************************************/
 
+/**
+ * @brief Transact a command to server through existed long connection.
+ *
+ * @param control   Type ID.
+ * @param handle    Instance handle.
+ * @param target
+ * @param cmd
+ * @param arg
+ * @param apply     For Policy: wether apply to hw,
+ *                  For Session: event sent to player client.
+ * @param res       Response address.
+ * @param res_len   Response max lenghth.
+ * @return int      Zero on success; a negated errno value on failure.
+ */
 static int media_transact_once(int control, void* handle, const char* target,
-    const char* cmd, const char* arg, int apply,
-    char* res, int res_len)
+    const char* cmd, const char* arg, int apply, char* res, int res_len)
 {
     MediaProxyPriv* priv = handle;
     media_parcel in, out;
@@ -88,9 +101,9 @@ static int media_transact_once(int control, void* handle, const char* target,
 
     case MEDIA_PLAYER_CONTROL:
     case MEDIA_RECORDER_CONTROL:
+    case MEDIA_SESSION_CONTROL:
         ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", control,
-            priv->handle, target, cmd,
-            arg, res_len);
+            priv->handle, target, cmd, arg, res_len);
         break;
     }
 
@@ -120,6 +133,22 @@ out:
     return ret < 0 ? ret : resp;
 }
 
+/**
+ * @brief Transact a command to server.
+ *
+ * @param control   Type ID.
+ * @param handle    Instance handle.
+ * @param target
+ * @param cmd
+ * @param arg
+ * @param apply     For Policy: wether apply to hw,
+ *                  For Session: event sent to player client.
+ * @param res       Response address.
+ * @param res_len   Response max lenghth.
+ * @param remote    Only transact to remote servers if true
+ *                  (for server transacts to other servers)
+ * @return int      Zero on success; a negated errno value on failure.
+ */
 static int media_transact(int control, void* handle, const char* target, const char* cmd,
     const char* arg, int apply, char* res, int res_len, bool remote)
 {
@@ -162,6 +191,7 @@ static int media_transact(int control, void* handle, const char* target, const c
 
         case MEDIA_PLAYER_CONTROL:
         case MEDIA_RECORDER_CONTROL:
+        case MEDIA_SESSION_CONTROL:
             if (ret < 0) {
                 media_client_disconnect(priv->proxy);
                 priv->proxy = NULL;
@@ -385,7 +415,7 @@ static void media_proxy_event_cb(void* cookie, media_parcel* msg)
 {
     MediaProxyPriv* priv = cookie;
     const char* extra;
-    uint32_t event;
+    int32_t event;
     int32_t ret;
 
     if (priv->event) {
@@ -783,4 +813,65 @@ void media_policy_process_command(const char* target, const char* cmd, const cha
     media_graph_handler(media_get_graph(), target, cmd, arg, NULL, 0);
 #endif
     media_transact(MEDIA_GRAPH_CONTROL, NULL, target, cmd, arg, 0, NULL, 0, true);
+}
+
+void* media_session_open(const char* params)
+{
+    return media_open(MEDIA_SESSION_CONTROL, params);
+}
+
+int media_session_set_event_callback(void* handle, void* cookie,
+    media_event_callback event_cb)
+{
+    return media_set_event_cb(MEDIA_SESSION_CONTROL, handle, cookie, event_cb);
+}
+
+int media_session_close(void* handle)
+{
+    return media_close(MEDIA_SESSION_CONTROL, handle, 0);
+}
+
+int media_session_start(void* handle)
+{
+    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "start", NULL, 0, NULL, 0);
+}
+
+int media_session_pause(void* handle)
+{
+    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "pause", NULL, 0, NULL, 0);
+}
+
+int media_session_stop(void* handle)
+{
+    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "stop", NULL, 0, NULL, 0);
+}
+
+int media_session_get_position(void* handle, unsigned int* msec)
+{
+    char tmp[32];
+    int ret;
+
+    if (!msec)
+        return -EINVAL;
+
+    ret = media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "get_position", NULL, 0, tmp, sizeof(tmp));
+    if (ret >= 0)
+        *msec = strtoul(tmp, NULL, 0);
+
+    return ret;
+}
+
+int media_session_get_duration(void* handle, unsigned int* msec)
+{
+    char tmp[32];
+    int ret;
+
+    if (!msec)
+        return -EINVAL;
+
+    ret = media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "get_duration", NULL, 0, tmp, sizeof(tmp));
+    if (ret >= 0)
+        *msec = strtoul(tmp, NULL, 0);
+
+    return ret;
 }
