@@ -25,14 +25,13 @@
  * Included Files
  ****************************************************************************/
 
+#include <media_event.h>
 #include <stddef.h>
 #include <sys/socket.h>
-#include <media_event.h>
 
 #ifdef __cplusplus
 #define EXTERN extern "C"
-extern "C"
-{
+extern "C" {
 #else
 #define EXTERN extern
 #endif
@@ -46,7 +45,7 @@ extern "C"
  * @param[in] params    open params
  * @return Pointer to created handle or NULL on failure.
  */
-void *media_player_open(const char *params);
+void* media_player_open(const char* params);
 
 /**
  * Close the player path
@@ -57,7 +56,7 @@ void *media_player_open(const char *params);
  *                              close automatically after playbacek complete
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_close(void *handle, int pending_stop);
+int media_player_close(void* handle, int pending_stop);
 
 /**
  * Set event callback to the player path, the callback will be called
@@ -67,8 +66,8 @@ int media_player_close(void *handle, int pending_stop);
  * @param[in] event_cb  Event callback
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_set_event_callback(void *handle, void *cookie,
-                                    media_event_callback event_cb);
+int media_player_set_event_callback(void* handle, void* cookie,
+    media_event_callback event_cb);
 
 /**
  * Prepare the player path.
@@ -83,14 +82,14 @@ int media_player_set_event_callback(void *handle, void *cookie,
  *                        then use media_player_write_data() write data
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_prepare(void *handle, const char *url, const char *options);
+int media_player_prepare(void* handle, const char* url, const char* options);
 
 /**
  * Reset the player path.
  * @param[in] handle The player path
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_reset(void *handle);
+int media_player_reset(void* handle);
 
 /**
  * Write data to player path.
@@ -101,7 +100,7 @@ int media_player_reset(void *handle);
  * @param[in] len       Buffer len
  * @return returned >= 0, Actly sent len; a negated errno value on failure.
  */
-ssize_t media_player_write_data(void *handle, const void *data, size_t len);
+ssize_t media_player_write_data(void* handle, const void* data, size_t len);
 
 /**
  * Get sockaddr for unblock mode write data
@@ -109,35 +108,35 @@ ssize_t media_player_write_data(void *handle, const void *data, size_t len);
  * @param[in] addr      The sockaddr pointer
  * @return returned >= 0, Actly sent len; a negated errno value on failure.
  */
-int media_player_get_sockaddr(void *handle, struct sockaddr_storage *addr);
+int media_player_get_sockaddr(void* handle, struct sockaddr_storage* addr);
 
 /**
  * Get socket fd for unblock mode write data
  * @param[in] handle    The player path
  * @return fd; a negated errno value on failure.
  */
-int media_player_get_socket(void *handle);
+int media_player_get_socket(void* handle);
 
 /**
  * Start the player path to play
  * @param[in] handle    The player path
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_start(void *handle);
+int media_player_start(void* handle);
 
 /**
  * Stop the player path
  * @param[in] handle    The player path
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_stop(void *handle);
+int media_player_stop(void* handle);
 
 /**
  * Pause the player path
  * @param[in] handle    The player path
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_pause(void *handle);
+int media_player_pause(void* handle);
 
 /**
  * Seek to msec position from begining
@@ -145,7 +144,7 @@ int media_player_pause(void *handle);
  * @param[in] mesc      Which postion should seek from begining
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_seek(void *handle, unsigned int msec);
+int media_player_seek(void* handle, unsigned int msec);
 
 /**
  * Set the player path looping play, defult is not looping
@@ -153,14 +152,14 @@ int media_player_seek(void *handle, unsigned int msec);
  * @param[in] loop      Loop count (-1: forever, 0: not loop)
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_set_looping(void *handle, int loop);
+int media_player_set_looping(void* handle, int loop);
 
 /**
  * Get play path is playing or not
  * @param[in] handle    The player path
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_is_playing(void *handle);
+int media_player_is_playing(void* handle);
 
 /**
  * Get player playback position
@@ -168,7 +167,7 @@ int media_player_is_playing(void *handle);
  * @param[in] mesc      Playback postion (from begining)
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_get_position(void *handle, unsigned int *msec);
+int media_player_get_position(void* handle, unsigned int* msec);
 
 /**
  * Get plyabck file duration (Total play time)
@@ -176,7 +175,7 @@ int media_player_get_position(void *handle, unsigned int *msec);
  * @param[in] mesc      File duration
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_get_duration(void *handle, unsigned int *msec);
+int media_player_get_duration(void* handle, unsigned int* msec);
 
 /**
  * Set the player path volume
@@ -184,7 +183,7 @@ int media_player_get_duration(void *handle, unsigned int *msec);
  * @param[in] mesc      Volume with range of 0.0 - 1.0
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_set_volume(void *handle, float volume);
+int media_player_set_volume(void* handle, float volume);
 
 /**
  * Get the player path volume
@@ -192,7 +191,7 @@ int media_player_set_volume(void *handle, float volume);
  * @param[in] mesc      Volume with range of 0.0 - 1.0
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_get_volume(void *handle, float *volume);
+int media_player_get_volume(void* handle, float* volume);
 
 /**
  * Set properties of the player path.
@@ -202,7 +201,7 @@ int media_player_get_volume(void *handle, float *volume);
  * @param[in] value       Value
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_set_property(void *handle, const char *target, const char *key, const char *value);
+int media_player_set_property(void* handle, const char* target, const char* key, const char* value);
 
 /**
  * Get properties of the player path.
@@ -213,7 +212,7 @@ int media_player_set_property(void *handle, const char *target, const char *key,
  * @param[in] value_len   Buffer length of value
  * @return Zero on success; a negated errno value on failure.
  */
-int media_player_get_property(void *handle, const char *target, const char *key, char *value, int value_len);
+int media_player_get_property(void* handle, const char* target, const char* key, char* value, int value_len);
 
 #undef EXTERN
 #ifdef __cplusplus

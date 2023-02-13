@@ -27,8 +27,8 @@
 #include <poll.h>
 #include <pthread.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <system/readline.h>
+#include <unistd.h>
 
 #include <media_api.h>
 
@@ -36,32 +36,30 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIATOOL_MAX_CHAIN     16
-#define MEDIATOOL_FILE_MAX      64
+#define MEDIATOOL_MAX_CHAIN 16
+#define MEDIATOOL_FILE_MAX 64
 
 /****************************************************************************
  * Public Type Declarations
  ****************************************************************************/
 
-struct mediatool_chain_s
-{
-    int       id;
-    bool      player;
-    void      *handle;
+struct mediatool_chain_s {
+    int id;
+    bool player;
+    void* handle;
 
     pthread_t thread;
-    int       fd;
+    int fd;
 
-    bool      start;
-    bool      loop;
+    bool start;
+    bool loop;
 
-    bool      direct;
-    char      *buf;
-    int       size;
+    bool direct;
+    char* buf;
+    int size;
 };
 
-struct mediatool_s
-{
+struct mediatool_s {
     struct mediatool_chain_s chain[MEDIATOOL_MAX_CHAIN];
 };
 
@@ -69,46 +67,45 @@ struct mediatool_s
  * Private Function Prototypes
  ****************************************************************************/
 
-static int mediatool_player_cmd_open(struct mediatool_s *media, char *pargs);
-static int mediatool_recorder_cmd_open(struct mediatool_s *media, char *pargs);
-static int mediatool_common_cmd_close(struct mediatool_s *media, char *pargs);
-static int mediatool_common_cmd_reset(struct mediatool_s *media, char *pargs);
-static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs);
-static int mediatool_common_cmd_start(struct mediatool_s *media, char *pargs);
-static int mediatool_common_cmd_stop(struct mediatool_s *media, char *pargs);
-static int mediatool_player_cmd_pause(struct mediatool_s *media, char *pargs);
-static int mediatool_player_cmd_volume(struct mediatool_s *media, char *pargs);
-static int mediatool_player_cmd_loop(struct mediatool_s *media, char *pargs);
-static int mediatool_player_cmd_seek(struct mediatool_s *media, char *pargs);
-static int mediatool_player_cmd_position(struct mediatool_s *media, char *pargs);
-static int mediatool_player_cmd_duration(struct mediatool_s *media, char *pargs);
-static int mediatool_player_cmd_isplaying(struct mediatool_s *media, char *pargs);
-static int mediatool_common_stop_inner(struct mediatool_chain_s *chain);
-static int mediatool_common_cmd_send(struct mediatool_s *media, char *pargs);
-static int mediatool_server_cmd_dump(struct mediatool_s *media, char *pargs);
-static int mediatool_policy_cmd_setint(struct mediatool_s *media, char *pargs);
-static int mediatool_policy_cmd_getint(struct mediatool_s *media, char *pargs);
-static int mediatool_policy_cmd_setstring(struct mediatool_s *media, char *pargs);
-static int mediatool_policy_cmd_getstring(struct mediatool_s *media, char *pargs);
-static int mediatool_policy_cmd_include(struct mediatool_s *media, char *pargs);
-static int mediatool_policy_cmd_exclude(struct mediatool_s *media, char *pargs);
-static int mediatool_policy_cmd_contain(struct mediatool_s *media, char *pargs);
-static int mediatool_policy_cmd_increase(struct mediatool_s *media, char *pargs);
-static int mediatool_policy_cmd_decrease(struct mediatool_s *media, char *pargs);
-static int mediatool_common_cmd_quit(struct mediatool_s *media, char *pargs);
-static int mediatool_common_cmd_help(struct mediatool_s *media, char *pargs);
+static int mediatool_player_cmd_open(struct mediatool_s* media, char* pargs);
+static int mediatool_recorder_cmd_open(struct mediatool_s* media, char* pargs);
+static int mediatool_common_cmd_close(struct mediatool_s* media, char* pargs);
+static int mediatool_common_cmd_reset(struct mediatool_s* media, char* pargs);
+static int mediatool_common_cmd_prepare(struct mediatool_s* media, char* pargs);
+static int mediatool_common_cmd_start(struct mediatool_s* media, char* pargs);
+static int mediatool_common_cmd_stop(struct mediatool_s* media, char* pargs);
+static int mediatool_player_cmd_pause(struct mediatool_s* media, char* pargs);
+static int mediatool_player_cmd_volume(struct mediatool_s* media, char* pargs);
+static int mediatool_player_cmd_loop(struct mediatool_s* media, char* pargs);
+static int mediatool_player_cmd_seek(struct mediatool_s* media, char* pargs);
+static int mediatool_player_cmd_position(struct mediatool_s* media, char* pargs);
+static int mediatool_player_cmd_duration(struct mediatool_s* media, char* pargs);
+static int mediatool_player_cmd_isplaying(struct mediatool_s* media, char* pargs);
+static int mediatool_common_stop_inner(struct mediatool_chain_s* chain);
+static int mediatool_common_cmd_send(struct mediatool_s* media, char* pargs);
+static int mediatool_server_cmd_dump(struct mediatool_s* media, char* pargs);
+static int mediatool_policy_cmd_setint(struct mediatool_s* media, char* pargs);
+static int mediatool_policy_cmd_getint(struct mediatool_s* media, char* pargs);
+static int mediatool_policy_cmd_setstring(struct mediatool_s* media, char* pargs);
+static int mediatool_policy_cmd_getstring(struct mediatool_s* media, char* pargs);
+static int mediatool_policy_cmd_include(struct mediatool_s* media, char* pargs);
+static int mediatool_policy_cmd_exclude(struct mediatool_s* media, char* pargs);
+static int mediatool_policy_cmd_contain(struct mediatool_s* media, char* pargs);
+static int mediatool_policy_cmd_increase(struct mediatool_s* media, char* pargs);
+static int mediatool_policy_cmd_decrease(struct mediatool_s* media, char* pargs);
+static int mediatool_common_cmd_quit(struct mediatool_s* media, char* pargs);
+static int mediatool_common_cmd_help(struct mediatool_s* media, char* pargs);
 
 /****************************************************************************
  * Private Type Declarations
  ****************************************************************************/
 
-typedef int (*mediatool_func)(struct mediatool_s *media, char *pargs);
+typedef int (*mediatool_func)(struct mediatool_s* media, char* pargs);
 
-struct mediatool_cmd_s
-{
-    const char     *cmd;      /* The command text */
-    mediatool_func pfunc;     /* Pointer to command handler */
-    const char     *help;     /* The help text */
+struct mediatool_cmd_s {
+    const char* cmd; /* The command text */
+    mediatool_func pfunc; /* Pointer to command handler */
+    const char* help; /* The help text */
 };
 
 /****************************************************************************
@@ -117,146 +114,89 @@ struct mediatool_cmd_s
 
 static struct mediatool_s g_mediatool;
 
-static struct mediatool_cmd_s g_mediatool_cmds[] =
-{
-    {
-        "open",
+static struct mediatool_cmd_s g_mediatool_cmds[] = {
+    { "open",
         mediatool_player_cmd_open,
-        "Create player channel return ID (open [specific filter])"
-    },
-    {
-        "copen",
+        "Create player channel return ID (open [specific filter])" },
+    { "copen",
         mediatool_recorder_cmd_open,
-        "Create recorder channel return ID (copen)"
-    },
-    {
-        "close",
+        "Create recorder channel return ID (copen)" },
+    { "close",
         mediatool_common_cmd_close,
-        "Destroy player/recorder channel (close ID)"
-    },
-    {
-        "reset",
+        "Destroy player/recorder channel (close ID)" },
+    { "reset",
         mediatool_common_cmd_reset,
-        "Reset player/recorder channel (reset ID)"
-    },
-    {
-        "prepare",
+        "Reset player/recorder channel (reset ID)" },
+    { "prepare",
         mediatool_common_cmd_prepare,
-        "Set player/recorder prepare (start ID url/buffer options)"
-    },
-    {
-        "start",
+        "Set player/recorder prepare (start ID url/buffer options)" },
+    { "start",
         mediatool_common_cmd_start,
-        "Set player/recorder start (start ID)"
-    },
-    {
-        "stop",
+        "Set player/recorder start (start ID)" },
+    { "stop",
         mediatool_common_cmd_stop,
-        "Set player/recorder stop (stop ID)"
-    },
-    {
-        "pause",
+        "Set player/recorder stop (stop ID)" },
+    { "pause",
         mediatool_player_cmd_pause,
-        "Set player/recorder pause (pause ID)"
-    },
-    {
-        "volume",
+        "Set player/recorder pause (pause ID)" },
+    { "volume",
         mediatool_player_cmd_volume,
-        "Set/Get player volume (volume ID ?/volume)"
-    },
-    {
-        "loop",
+        "Set/Get player volume (volume ID ?/volume)" },
+    { "loop",
         mediatool_player_cmd_loop,
-        "Set/Get player loop (loop ID 1/0)"
-    },
-    {
-        "seek",
+        "Set/Get player loop (loop ID 1/0)" },
+    { "seek",
         mediatool_player_cmd_seek,
-        "Set player seek (seek ID time)"
-    },
-    {
-        "position",
+        "Set player seek (seek ID time)" },
+    { "position",
         mediatool_player_cmd_position,
-        "Get player position time ms(position ID)"
-    },
-    {
-        "duration",
+        "Get player position time ms(position ID)" },
+    { "duration",
         mediatool_player_cmd_duration,
-        "Get player duration time ms(duration ID)"
-    },
-    {
-        "isplay",
+        "Get player duration time ms(duration ID)" },
+    { "isplay",
         mediatool_player_cmd_isplaying,
-        "Get position is playing or not(isplay ID)"
-    },
-    {
-        "send",
+        "Get position is playing or not(isplay ID)" },
+    { "send",
         mediatool_common_cmd_send,
-        "Send cmd to graph"
-    },
-    {
-        "dump",
+        "Send cmd to graph" },
+    { "dump",
         mediatool_server_cmd_dump,
-        "Dump graph and policy"
-    },
-    {
-        "setint",
+        "Dump graph and policy" },
+    { "setint",
         mediatool_policy_cmd_setint,
-        "set criterion value with integer(setint NAME VALUE APPLY)"
-    },
-    {
-        "getint",
+        "set criterion value with integer(setint NAME VALUE APPLY)" },
+    { "getint",
         mediatool_policy_cmd_getint,
-        "get criterion value in integer(getint NAME)"
-    },
-    {
-        "setstring",
+        "get criterion value in integer(getint NAME)" },
+    { "setstring",
         mediatool_policy_cmd_setstring,
-        "set criterion value with string(setstring NAME VALUE APPLY)"
-    },
-    {
-        "getstring",
+        "set criterion value with string(setstring NAME VALUE APPLY)" },
+    { "getstring",
         mediatool_policy_cmd_getstring,
-        "get criterion value in string(getstring NAME)"
-    },
-    {
-        "include",
+        "get criterion value in string(getstring NAME)" },
+    { "include",
         mediatool_policy_cmd_include,
-        "include inclusive criterion values(include NAME VALUE APPLY)"
-    },
-    {
-        "exclude",
+        "include inclusive criterion values(include NAME VALUE APPLY)" },
+    { "exclude",
         mediatool_policy_cmd_exclude,
-        "exclude inclusive criterion values(exclude NAME VALUE APPLY)"
-    },
-    {
-        "contain",
+        "exclude inclusive criterion values(exclude NAME VALUE APPLY)" },
+    { "contain",
         mediatool_policy_cmd_contain,
-        "check wether contain criterion values(contain NAME VALUE)"
-    },
-    {
-        "increase",
+        "check wether contain criterion values(contain NAME VALUE)" },
+    { "increase",
         mediatool_policy_cmd_increase,
-        "increase criterion value by one(increase NAME APPLY)"
-    },
-    {
-        "decrease",
+        "increase criterion value by one(increase NAME APPLY)" },
+    { "decrease",
         mediatool_policy_cmd_decrease,
-        "decrease criterion value by one(decrease NAME APPLY)"
-    },
-    {
-        "q",
+        "decrease criterion value by one(decrease NAME APPLY)" },
+    { "q",
         mediatool_common_cmd_quit,
-        "Quit (q)"
-    },
-    {
-        "help",
+        "Quit (q)" },
+    { "help",
         mediatool_common_cmd_help,
-        "Show this message (help)"
-    },
-    {
-        0
-    },
+        "Show this message (help)" },
+    { 0 },
 };
 
 /****************************************************************************
@@ -264,10 +204,10 @@ static struct mediatool_cmd_s g_mediatool_cmds[] =
  ****************************************************************************/
 
 static void mediatool_event_callback(void* cookie, int event,
-                                     int ret, const char *data)
+    int ret, const char* data)
 {
-    struct mediatool_chain_s *chain = cookie;
-    char *str;
+    struct mediatool_chain_s* chain = cookie;
+    char* str;
 
     if (event == MEDIA_EVENT_STARTED) {
         str = "MEDIA_EVENT_STARTED";
@@ -284,10 +224,10 @@ static void mediatool_event_callback(void* cookie, int event,
     }
 
     printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
-            __func__, chain->id, str, event, ret, __LINE__);
+        __func__, chain->id, str, event, ret, __LINE__);
 }
 
-static void mediatool_common_stop_thread(struct mediatool_chain_s *chain)
+static void mediatool_common_stop_thread(struct mediatool_chain_s* chain)
 {
     if (chain->thread) {
 
@@ -301,7 +241,7 @@ static void mediatool_common_stop_thread(struct mediatool_chain_s *chain)
     }
 }
 
-static int mediatool_common_stop_inner(struct mediatool_chain_s *chain)
+static int mediatool_common_stop_inner(struct mediatool_chain_s* chain)
 {
     int ret = 0;
 
@@ -317,7 +257,7 @@ static int mediatool_common_stop_inner(struct mediatool_chain_s *chain)
     return ret;
 }
 
-static int mediatool_player_cmd_open(struct mediatool_s *media, char *pargs)
+static int mediatool_player_cmd_open(struct mediatool_s* media, char* pargs)
 {
     long int i;
     int ret;
@@ -350,8 +290,8 @@ static int mediatool_player_cmd_open(struct mediatool_s *media, char *pargs)
     }
 
     ret = media_player_set_event_callback(media->chain[i].handle,
-                                             &media->chain[i],
-                                             mediatool_event_callback);
+        &media->chain[i],
+        mediatool_event_callback);
     assert(!ret);
 
     media->chain[i].player = true;
@@ -361,7 +301,7 @@ static int mediatool_player_cmd_open(struct mediatool_s *media, char *pargs)
     return 0;
 }
 
-static int mediatool_recorder_cmd_open(struct mediatool_s *media, char *pargs)
+static int mediatool_recorder_cmd_open(struct mediatool_s* media, char* pargs)
 {
     long int i;
     int ret;
@@ -394,8 +334,8 @@ static int mediatool_recorder_cmd_open(struct mediatool_s *media, char *pargs)
     }
 
     ret = media_recorder_set_event_callback(media->chain[i].handle,
-                                             &media->chain[i],
-                                             mediatool_event_callback);
+        &media->chain[i],
+        mediatool_event_callback);
     assert(!ret);
 
     media->chain[i].player = false;
@@ -405,7 +345,7 @@ static int mediatool_recorder_cmd_open(struct mediatool_s *media, char *pargs)
     return 0;
 }
 
-static int mediatool_common_cmd_close(struct mediatool_s *media, char *pargs)
+static int mediatool_common_cmd_close(struct mediatool_s* media, char* pargs)
 {
     int ret;
     int id;
@@ -431,7 +371,7 @@ static int mediatool_common_cmd_close(struct mediatool_s *media, char *pargs)
     return ret;
 }
 
-static int mediatool_common_cmd_reset(struct mediatool_s *media, char *pargs)
+static int mediatool_common_cmd_reset(struct mediatool_s* media, char* pargs)
 {
     long int id;
     int ret;
@@ -455,7 +395,7 @@ static int mediatool_common_cmd_reset(struct mediatool_s *media, char *pargs)
 }
 
 static ssize_t mediatool_process_data(int fd, bool player,
-                                             void *data, size_t len)
+    void* data, size_t len)
 {
     int event = player ? POLLOUT : POLLIN;
     struct pollfd fds[1];
@@ -474,11 +414,11 @@ static ssize_t mediatool_process_data(int fd, bool player,
         return recv(fd, data, len, 0);
 }
 
-static void *mediatool_buffer_thread(void *arg)
+static void* mediatool_buffer_thread(void* arg)
 {
-    struct mediatool_chain_s *chain = arg;
+    struct mediatool_chain_s* chain = arg;
     int act, ret, fd = 0;
-    char *tmp;
+    char* tmp;
 
     printf("%s, start, line %d\n", __func__, __LINE__);
 
@@ -513,7 +453,7 @@ static void *mediatool_buffer_thread(void *arg)
                     break;
                 } else if (ret < 0 && errno == EAGAIN) {
                     continue;
-                } else if (ret < 0){
+                } else if (ret < 0) {
                     printf("%s, error ret %d errno %d, line %d\n", __func__, ret, errno, __LINE__);
                     goto out;
                 }
@@ -531,7 +471,7 @@ static void *mediatool_buffer_thread(void *arg)
 
             if (ret == 0) {
                 break;
-            } else if (ret < 0 && errno == EAGAIN){
+            } else if (ret < 0 && errno == EAGAIN) {
                 continue;
             }
 
@@ -548,7 +488,7 @@ out:
     return NULL;
 }
 
-static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs)
+static int mediatool_common_cmd_prepare(struct mediatool_s* media, char* pargs)
 {
     bool url_mode = false;
     bool direct = false;
@@ -626,7 +566,7 @@ static int mediatool_common_cmd_prepare(struct mediatool_s *media, char *pargs)
     return ret;
 }
 
-static int mediatool_common_cmd_start(struct mediatool_s *media, char *pargs)
+static int mediatool_common_cmd_start(struct mediatool_s* media, char* pargs)
 {
     long int id;
     int ret;
@@ -647,7 +587,7 @@ static int mediatool_common_cmd_start(struct mediatool_s *media, char *pargs)
     return ret;
 }
 
-static int mediatool_common_cmd_stop(struct mediatool_s *media, char *pargs)
+static int mediatool_common_cmd_stop(struct mediatool_s* media, char* pargs)
 {
     long int id;
 
@@ -662,7 +602,7 @@ static int mediatool_common_cmd_stop(struct mediatool_s *media, char *pargs)
     return mediatool_common_stop_inner(&media->chain[id]);
 }
 
-static int mediatool_player_cmd_pause(struct mediatool_s *media, char *pargs)
+static int mediatool_player_cmd_pause(struct mediatool_s* media, char* pargs)
 {
     long int id;
     int ret = 0;
@@ -683,11 +623,11 @@ static int mediatool_player_cmd_pause(struct mediatool_s *media, char *pargs)
     return ret;
 }
 
-static int mediatool_player_cmd_volume(struct mediatool_s *media, char *pargs)
+static int mediatool_player_cmd_volume(struct mediatool_s* media, char* pargs)
 {
     float volume;
     int ret = 0;
-    char *ptr;
+    char* ptr;
     int id;
 
     if (!strlen(pargs))
@@ -715,7 +655,7 @@ static int mediatool_player_cmd_volume(struct mediatool_s *media, char *pargs)
     return ret;
 }
 
-static int mediatool_player_cmd_loop(struct mediatool_s *media, char *pargs)
+static int mediatool_player_cmd_loop(struct mediatool_s* media, char* pargs)
 {
     int loop;
     int id;
@@ -734,7 +674,7 @@ static int mediatool_player_cmd_loop(struct mediatool_s *media, char *pargs)
     return media_player_set_looping(media->chain[id].handle, loop);
 }
 
-static int mediatool_player_cmd_seek(struct mediatool_s *media, char *pargs)
+static int mediatool_player_cmd_seek(struct mediatool_s* media, char* pargs)
 {
     unsigned int seek;
     int id;
@@ -753,7 +693,7 @@ static int mediatool_player_cmd_seek(struct mediatool_s *media, char *pargs)
     return media_player_seek(media->chain[id].handle, seek);
 }
 
-static int mediatool_player_cmd_position(struct mediatool_s *media, char *pargs)
+static int mediatool_player_cmd_position(struct mediatool_s* media, char* pargs)
 {
     unsigned int position;
     long int id;
@@ -779,7 +719,7 @@ static int mediatool_player_cmd_position(struct mediatool_s *media, char *pargs)
     return 0;
 }
 
-static int mediatool_player_cmd_duration(struct mediatool_s *media, char *pargs)
+static int mediatool_player_cmd_duration(struct mediatool_s* media, char* pargs)
 {
     unsigned int duration;
     long int id;
@@ -807,7 +747,7 @@ static int mediatool_player_cmd_duration(struct mediatool_s *media, char *pargs)
     return 0;
 }
 
-static int mediatool_player_cmd_isplaying(struct mediatool_s *media, char *pargs)
+static int mediatool_player_cmd_isplaying(struct mediatool_s* media, char* pargs)
 {
     long int id;
     int ret;
@@ -834,10 +774,10 @@ static int mediatool_player_cmd_isplaying(struct mediatool_s *media, char *pargs
     return 0;
 }
 
-static int mediatool_common_cmd_send(struct mediatool_s *media, char *pargs)
+static int mediatool_common_cmd_send(struct mediatool_s* media, char* pargs)
 {
-    char *target;
-    char *cmd;
+    char* target;
+    char* cmd;
     if (!strlen(pargs))
         return -EINVAL;
     target = pargs;
@@ -856,7 +796,7 @@ static int mediatool_common_cmd_send(struct mediatool_s *media, char *pargs)
     return media_process_command(target, cmd, pargs, NULL, 0);
 }
 
-static int mediatool_server_cmd_dump(struct mediatool_s *media, char *pargs)
+static int mediatool_server_cmd_dump(struct mediatool_s* media, char* pargs)
 {
     /* pargs not used in neither graph_dump nor policy_dump,
      * so let's make it simple, just "dump".
@@ -867,11 +807,11 @@ static int mediatool_server_cmd_dump(struct mediatool_s *media, char *pargs)
     return 0;
 }
 
-static int mediatool_policy_cmd_setint(struct mediatool_s *media, char *pargs)
+static int mediatool_policy_cmd_setint(struct mediatool_s* media, char* pargs)
 {
-    char *name;
-    char *value;
-    char *apply;
+    char* name;
+    char* value;
+    char* apply;
 
     if (!strlen(pargs))
         return -EINVAL;
@@ -894,9 +834,9 @@ static int mediatool_policy_cmd_setint(struct mediatool_s *media, char *pargs)
     return media_policy_set_int(name, atoi(value), atoi(apply));
 }
 
-static int mediatool_policy_cmd_getint(struct mediatool_s *media, char *pargs)
+static int mediatool_policy_cmd_getint(struct mediatool_s* media, char* pargs)
 {
-    char *name;
+    char* name;
     int value;
     int ret;
 
@@ -913,11 +853,11 @@ static int mediatool_policy_cmd_getint(struct mediatool_s *media, char *pargs)
     return 0;
 }
 
-static int mediatool_policy_cmd_setstring(struct mediatool_s *media, char *pargs)
+static int mediatool_policy_cmd_setstring(struct mediatool_s* media, char* pargs)
 {
-    char *name;
-    char *value;
-    char *apply;
+    char* name;
+    char* value;
+    char* apply;
 
     if (!strlen(pargs))
         return -EINVAL;
@@ -940,9 +880,9 @@ static int mediatool_policy_cmd_setstring(struct mediatool_s *media, char *pargs
     return media_policy_set_string(name, value, atoi(apply));
 }
 
-static int mediatool_policy_cmd_getstring(struct mediatool_s *media, char *pargs)
+static int mediatool_policy_cmd_getstring(struct mediatool_s* media, char* pargs)
 {
-    char *name;
+    char* name;
     char value[64];
     int ret;
 
@@ -959,11 +899,11 @@ static int mediatool_policy_cmd_getstring(struct mediatool_s *media, char *pargs
     return 0;
 }
 
-static int mediatool_policy_cmd_include(struct mediatool_s *media, char *pargs)
+static int mediatool_policy_cmd_include(struct mediatool_s* media, char* pargs)
 {
-    char *name;
-    char *values;
-    char *apply;
+    char* name;
+    char* values;
+    char* apply;
 
     if (!strlen(pargs))
         return -EINVAL;
@@ -986,11 +926,11 @@ static int mediatool_policy_cmd_include(struct mediatool_s *media, char *pargs)
     return media_policy_include(name, values, atoi(apply));
 }
 
-static int mediatool_policy_cmd_exclude(struct mediatool_s *media, char *pargs)
+static int mediatool_policy_cmd_exclude(struct mediatool_s* media, char* pargs)
 {
-    char *name;
-    char *values;
-    char *apply;
+    char* name;
+    char* values;
+    char* apply;
 
     if (!strlen(pargs))
         return -EINVAL;
@@ -1013,10 +953,10 @@ static int mediatool_policy_cmd_exclude(struct mediatool_s *media, char *pargs)
     return media_policy_exclude(name, values, atoi(apply));
 }
 
-static int mediatool_policy_cmd_contain(struct mediatool_s *media, char *pargs)
+static int mediatool_policy_cmd_contain(struct mediatool_s* media, char* pargs)
 {
-    char *name;
-    char *values;
+    char* name;
+    char* values;
     int result, ret;
 
     if (!strlen(pargs))
@@ -1039,10 +979,10 @@ static int mediatool_policy_cmd_contain(struct mediatool_s *media, char *pargs)
     return 0;
 }
 
-static int mediatool_policy_cmd_increase(struct mediatool_s *media, char *pargs)
+static int mediatool_policy_cmd_increase(struct mediatool_s* media, char* pargs)
 {
-    char *name;
-    char *apply;
+    char* name;
+    char* apply;
 
     if (!strlen(pargs))
         return -EINVAL;
@@ -1058,10 +998,10 @@ static int mediatool_policy_cmd_increase(struct mediatool_s *media, char *pargs)
     return media_policy_increase(name, atoi(apply));
 }
 
-static int mediatool_policy_cmd_decrease(struct mediatool_s *media, char *pargs)
+static int mediatool_policy_cmd_decrease(struct mediatool_s* media, char* pargs)
 {
-    char *name;
-    char *apply;
+    char* name;
+    char* apply;
 
     if (!strlen(pargs))
         return -EINVAL;
@@ -1077,7 +1017,7 @@ static int mediatool_policy_cmd_decrease(struct mediatool_s *media, char *pargs)
     return media_policy_decrease(name, atoi(apply));
 }
 
-static int mediatool_common_cmd_quit(struct mediatool_s *media, char *pargs)
+static int mediatool_common_cmd_quit(struct mediatool_s* media, char* pargs)
 {
     char tmp[8];
     int i;
@@ -1092,7 +1032,7 @@ static int mediatool_common_cmd_quit(struct mediatool_s *media, char *pargs)
     return 0;
 }
 
-static int mediatool_common_cmd_help(struct mediatool_s *media, char *pargs)
+static int mediatool_common_cmd_help(struct mediatool_s* media, char* pargs)
 {
     int i;
 
@@ -1102,7 +1042,7 @@ static int mediatool_common_cmd_help(struct mediatool_s *media, char *pargs)
     return 0;
 }
 
-static int mediatool_execute(struct mediatool_s *media, char *cmd, char *arg)
+static int mediatool_execute(struct mediatool_s* media, char* cmd, char* arg)
 {
     int ret = 0;
     int x;
@@ -1125,7 +1065,7 @@ static int mediatool_execute(struct mediatool_s *media, char *cmd, char *arg)
         }
     }
 
-    if (x == sizeof(g_mediatool_cmds)/sizeof(g_mediatool_cmds[0]))
+    if (x == sizeof(g_mediatool_cmds) / sizeof(g_mediatool_cmds[0]))
         printf("Unknown cmd: %s\n", cmd);
 
     return ret;
@@ -1135,11 +1075,11 @@ static int mediatool_execute(struct mediatool_s *media, char *cmd, char *arg)
  * Public Functions
  ****************************************************************************/
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int ret, len, arg_len;
     char *cmd, *arg;
-    char *buffer;
+    char* buffer;
 
     buffer = malloc(CONFIG_NSH_LINELEN);
     if (!buffer)

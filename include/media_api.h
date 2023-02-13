@@ -34,8 +34,7 @@
 
 #ifdef __cplusplus
 #define EXTERN extern "C"
-extern "C"
-{
+extern "C" {
 #else
 #define EXTERN extern
 #endif
@@ -49,20 +48,20 @@ extern "C"
  * @param[in] res_len   response msg len
  * @return Zero on success; a negated errno value on failure
  */
-int media_process_command(const char *target, const char *cmd,
-                          const char *arg, char *res, int res_len);
+int media_process_command(const char* target, const char* cmd,
+    const char* arg, char* res, int res_len);
 
 /**
  * Dump media graph
  * @param[in] options   dump options
  */
-void media_graph_dump(const char *options);
+void media_graph_dump(const char* options);
 
 /**
  * Dump media policy
  * @param[in] options   dump options
  */
-void media_policy_dump(const char *options);
+void media_policy_dump(const char* options);
 
 #undef EXTERN
 #ifdef __cplusplus

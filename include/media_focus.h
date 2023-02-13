@@ -29,16 +29,16 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-//media focus request play result suggestion,
-#define MEDIA_FOCUS_PLAY                0   // media play
-#define MEDIA_FOCUS_STOP                1   // media stop
-#define MEDIA_FOCUS_PAUSE               2   // media pause
-#define MEDIA_FOCUS_PLAY_BUT_SILENT     3   // media play but silent in background
-#define MEDIA_FOCUS_PLAY_WITH_DUCK      4   // media play in background, duck volumn down
-#define MEDIA_FOCUS_PLAY_WITH_KEEP      5   // media play keep current status in background
+// media focus request play result suggestion,
+#define MEDIA_FOCUS_PLAY 0 // media play
+#define MEDIA_FOCUS_STOP 1 // media stop
+#define MEDIA_FOCUS_PAUSE 2 // media pause
+#define MEDIA_FOCUS_PLAY_BUT_SILENT 3 // media play but silent in background
+#define MEDIA_FOCUS_PLAY_WITH_DUCK 4 // media play in background, duck volumn down
+#define MEDIA_FOCUS_PLAY_WITH_KEEP 5 // media play keep current status in background
 
-#define APP_FOCUS_STATE_STACK_TOP    1 /* app focus id at stack top */
-#define APP_FOCUS_STATE_STACK_QUIT  -1 /* app focus id out of stack */
+#define APP_FOCUS_STATE_STACK_TOP 1 /* app focus id at stack top */
+#define APP_FOCUS_STATE_STACK_QUIT -1 /* app focus id out of stack */
 #define APP_FOCUS_STATE_STACK_UNDER -2 /* app focus id under stack */
 
 /****************************************************************************

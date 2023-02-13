@@ -22,13 +22,13 @@
  * Included Files
  ****************************************************************************/
 
+#include <errno.h>
+#include <netpacket/rpmsg.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <poll.h>
-#include <errno.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <netpacket/rpmsg.h>
 #include <sys/un.h>
 
 #include "media_internal.h"
@@ -38,37 +38,37 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_SERVER_MAXCONN      10
+#define MEDIA_SERVER_MAXCONN 10
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
 
 struct media_server_conn {
-    int              tran_fd;
-    int              notify_fd;
-    media_parcel     parcel;
-    uint32_t         offset;
+    int tran_fd;
+    int notify_fd;
+    media_parcel parcel;
+    uint32_t offset;
 };
 
 struct media_server_priv {
-    int                        local_fd;
-    int                        rpmsg_fd;
-    media_server_onreceive     onreceive;
-    struct media_server_conn   conns[MEDIA_SERVER_MAXCONN];
+    int local_fd;
+    int rpmsg_fd;
+    media_server_onreceive onreceive;
+    struct media_server_conn conns[MEDIA_SERVER_MAXCONN];
 };
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-static int media_server_create_notify(struct media_server_priv *priv, media_parcel *parcel)
+static int media_server_create_notify(struct media_server_priv* priv, media_parcel* parcel)
 {
     struct sockaddr_un local_addr;
     struct sockaddr_rpmsg rpmsg_addr;
-    struct sockaddr *addr;
-    const char *key;
-    const char *cpu;
+    struct sockaddr* addr;
+    const char* key;
+    const char* cpu;
     int fd;
     int family;
     int len;
@@ -85,13 +85,13 @@ static int media_server_create_notify(struct media_server_priv *priv, media_parc
         rpmsg_addr.rp_family = AF_RPMSG;
         strcpy(rpmsg_addr.rp_name, key);
         strcpy(rpmsg_addr.rp_cpu, cpu);
-        addr = (struct sockaddr *)&rpmsg_addr;
+        addr = (struct sockaddr*)&rpmsg_addr;
         len = sizeof(struct sockaddr_rpmsg);
     } else {
         family = PF_LOCAL;
         local_addr.sun_family = AF_LOCAL;
         strcpy(local_addr.sun_path, key);
-        addr = (struct sockaddr *)&local_addr;
+        addr = (struct sockaddr*)&local_addr;
         len = sizeof(struct sockaddr_un);
     }
 
@@ -108,9 +108,9 @@ static int media_server_create_notify(struct media_server_priv *priv, media_parc
     return fd;
 }
 
-static int media_server_receive(void *handle, struct pollfd *fd, struct media_server_conn *conn)
+static int media_server_receive(void* handle, struct pollfd* fd, struct media_server_conn* conn)
 {
-    struct media_server_priv *priv = handle;
+    struct media_server_priv* priv = handle;
     media_parcel ack;
     uint32_t code;
     int ret;
@@ -157,9 +157,9 @@ static int media_server_receive(void *handle, struct pollfd *fd, struct media_se
     return ret;
 }
 
-static int media_server_accept(void *handle, struct pollfd *fd)
+static int media_server_accept(void* handle, struct pollfd* fd)
 {
-    struct media_server_priv *priv = handle;
+    struct media_server_priv* priv = handle;
     int new_fd;
     int i;
 
@@ -181,9 +181,9 @@ static int media_server_accept(void *handle, struct pollfd *fd)
     return -EMFILE;
 }
 
-static int media_server_listen(struct media_server_priv *priv, int family)
+static int media_server_listen(struct media_server_priv* priv, int family)
 {
-    struct sockaddr *addr;
+    struct sockaddr* addr;
     struct sockaddr_un local_addr;
     struct sockaddr_rpmsg rpmsg_addr;
     int fd;
@@ -197,16 +197,16 @@ static int media_server_listen(struct media_server_priv *priv, int family)
         priv->local_fd = fd;
         local_addr.sun_family = AF_LOCAL;
         snprintf(local_addr.sun_path, UNIX_PATH_MAX,
-                 MEDIA_SOCKADDR_NAME, CONFIG_RPTUN_LOCAL_CPUNAME);
-        addr = (struct sockaddr *)&local_addr;
+            MEDIA_SOCKADDR_NAME, CONFIG_RPTUN_LOCAL_CPUNAME);
+        addr = (struct sockaddr*)&local_addr;
         len = sizeof(struct sockaddr_un);
     } else {
         priv->rpmsg_fd = fd;
         rpmsg_addr.rp_family = AF_RPMSG;
         snprintf(rpmsg_addr.rp_name, RPMSG_SOCKET_NAME_SIZE,
-                 MEDIA_SOCKADDR_NAME, CONFIG_RPTUN_LOCAL_CPUNAME);
+            MEDIA_SOCKADDR_NAME, CONFIG_RPTUN_LOCAL_CPUNAME);
         strcpy(rpmsg_addr.rp_cpu, "");
-        addr = (struct sockaddr *)&rpmsg_addr;
+        addr = (struct sockaddr*)&rpmsg_addr;
         len = sizeof(struct sockaddr_rpmsg);
     }
 
@@ -223,9 +223,9 @@ static int media_server_listen(struct media_server_priv *priv, int family)
  * Public Functions
  ****************************************************************************/
 
-void *media_server_create(void *cb)
+void* media_server_create(void* cb)
 {
-    struct media_server_priv *priv;
+    struct media_server_priv* priv;
     int ret1, ret2;
 
     if (cb == NULL)
@@ -245,9 +245,9 @@ void *media_server_create(void *cb)
     return priv;
 }
 
-int media_server_destroy(void *handle)
+int media_server_destroy(void* handle)
 {
-    struct media_server_priv *priv = handle;
+    struct media_server_priv* priv = handle;
     int i;
 
     if (priv == NULL)
@@ -255,7 +255,7 @@ int media_server_destroy(void *handle)
 
     if (priv->local_fd > 0)
         close(priv->local_fd);
-    if(priv->rpmsg_fd > 0)
+    if (priv->rpmsg_fd > 0)
         close(priv->rpmsg_fd);
 
     for (i = 0; i < MEDIA_SERVER_MAXCONN; i++) {
@@ -271,9 +271,9 @@ int media_server_destroy(void *handle)
     return 0;
 }
 
-int media_server_get_pollfds(void *handle, struct pollfd *fds, void **conns, int count)
+int media_server_get_pollfds(void* handle, struct pollfd* fds, void** conns, int count)
 {
-    struct media_server_priv *priv = handle;
+    struct media_server_priv* priv = handle;
     int i = 0;
     int j;
 
@@ -305,7 +305,7 @@ int media_server_get_pollfds(void *handle, struct pollfd *fds, void **conns, int
     return i;
 }
 
-int media_server_poll_available(void *handle, struct pollfd *fd, void *conn)
+int media_server_poll_available(void* handle, struct pollfd* fd, void* conn)
 {
     if (fd == NULL)
         return -EINVAL;
@@ -316,14 +316,14 @@ int media_server_poll_available(void *handle, struct pollfd *fd, void *conn)
         return media_server_accept(handle, fd);
 }
 
-int media_server_notify(void *handle, void *cookie, media_parcel *parcel)
+int media_server_notify(void* handle, void* cookie, media_parcel* parcel)
 {
-    struct media_server_priv *priv = handle;
-    struct media_server_conn *conn = cookie;
+    struct media_server_priv* priv = handle;
+    struct media_server_conn* conn = cookie;
 
     if (priv == NULL || conn == NULL || conn->notify_fd <= 0)
         return -EINVAL;
 
     return media_parcel_send(parcel, conn->notify_fd,
-                             MEDIA_PARCEL_NOTIFY, MSG_DONTWAIT);
+        MEDIA_PARCEL_NOTIFY, MSG_DONTWAIT);
 }
