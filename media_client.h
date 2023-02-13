@@ -27,16 +27,16 @@
 extern "C" {
 #endif
 
-void *media_client_connect(const char *cpu);
-int media_client_disconnect(void *handle);
+void* media_client_connect(const char* cpu);
+int media_client_disconnect(void* handle);
 
-int media_client_send(void *handle, media_parcel *in);
-int media_client_send_with_ack(void *handle, media_parcel *in, media_parcel *out);
-int media_client_send_recieve(void *handle, const char *in_fmt, const char *out_fmt, ...);
+int media_client_send(void* handle, media_parcel* in);
+int media_client_send_with_ack(void* handle, media_parcel* in, media_parcel* out);
+int media_client_send_recieve(void* handle, const char* in_fmt, const char* out_fmt, ...);
 
-typedef void (*media_client_event_cb)(void *cookie, media_parcel *parcel);
-int media_client_set_event_cb(void *handle, const char *cpu,
-                              void *event_cb, void *cookie);
+typedef void (*media_client_event_cb)(void* cookie, media_parcel* parcel);
+int media_client_set_event_cb(void* handle, const char* cpu,
+    void* event_cb, void* cookie);
 
 #ifdef __cplusplus
 }

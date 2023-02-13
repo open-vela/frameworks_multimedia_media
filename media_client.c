@@ -22,10 +22,10 @@
  * Included Files
  ****************************************************************************/
 
+#include <netpacket/rpmsg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
-#include <netpacket/rpmsg.h>
 #include <sys/un.h>
 
 #include "media_client.h"
@@ -36,30 +36,30 @@
  ****************************************************************************/
 
 struct media_client_priv {
-    int                   fd;
-    int                   listenfd;
-    void                  *cookie;
+    int fd;
+    int listenfd;
+    void* cookie;
     media_client_event_cb event_cb;
-    pthread_t             thread;
-    pthread_mutex_t       mutex;
+    pthread_t thread;
+    pthread_mutex_t mutex;
 };
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-static void media_client_get_sockaddr(int *family, socklen_t *len, void *addr,
-                                      const char *cpu, const char *key)
+static void media_client_get_sockaddr(int* family, socklen_t* len, void* addr,
+    const char* cpu, const char* key)
 {
     if (!strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME)) {
-        struct sockaddr_un *un_addr = addr;
+        struct sockaddr_un* un_addr = addr;
 
         *family = PF_LOCAL;
         *len = sizeof(struct sockaddr_un);
         un_addr->sun_family = AF_LOCAL;
         strlcpy(un_addr->sun_path, key, UNIX_PATH_MAX);
     } else {
-        struct sockaddr_rpmsg *rp_addr = addr;
+        struct sockaddr_rpmsg* rp_addr = addr;
 
         *family = AF_RPMSG;
         *len = sizeof(struct sockaddr_rpmsg);
@@ -69,7 +69,7 @@ static void media_client_get_sockaddr(int *family, socklen_t *len, void *addr,
     }
 }
 
-static int media_client_create_listenfd(struct media_client_priv *priv, const char *cpu)
+static int media_client_create_listenfd(struct media_client_priv* priv, const char* cpu)
 {
     struct sockaddr_storage addr;
     socklen_t socklen;
@@ -87,7 +87,7 @@ static int media_client_create_listenfd(struct media_client_priv *priv, const ch
 
     media_parcel_init(&parcel);
 
-    ret = bind(priv->listenfd, (struct sockaddr *)&addr, socklen);
+    ret = bind(priv->listenfd, (struct sockaddr*)&addr, socklen);
     if (ret < 0)
         goto err;
 
@@ -106,9 +106,9 @@ err:
     return ret;
 }
 
-static void *media_client_listen_thread(pthread_addr_t pvarg)
+static void* media_client_listen_thread(pthread_addr_t pvarg)
 {
-    struct media_client_priv *priv = pvarg;
+    struct media_client_priv* priv = pvarg;
     media_parcel parcel;
     uint32_t code;
     int acceptfd;
@@ -143,9 +143,9 @@ thread_error:
  * Public Functions
  ****************************************************************************/
 
-void *media_client_connect(const char *cpu)
+void* media_client_connect(const char* cpu)
 {
-    struct media_client_priv *priv;
+    struct media_client_priv* priv;
     struct sockaddr_storage addr;
     socklen_t len;
     char key[32];
@@ -161,7 +161,7 @@ void *media_client_connect(const char *cpu)
     if (priv->fd <= 0)
         goto socket_error;
 
-    if (connect(priv->fd, (struct sockaddr *)&addr, len) < 0)
+    if (connect(priv->fd, (struct sockaddr*)&addr, len) < 0)
         goto connect_error;
 
     pthread_mutex_init(&priv->mutex, NULL);
@@ -174,25 +174,25 @@ socket_error:
     return NULL;
 }
 
-int media_client_disconnect(void *handle)
+int media_client_disconnect(void* handle)
 {
-    struct media_client_priv *priv = handle;
+    struct media_client_priv* priv = handle;
 
     if (priv == NULL)
         return -EINVAL;
 
     if (priv->fd > 0)
         close(priv->fd);
-    if(priv->thread > 0)
+    if (priv->thread > 0)
         pthread_join(priv->thread, NULL);
     pthread_mutex_destroy(&priv->mutex);
     free(priv);
     return 0;
 }
 
-int media_client_send(void *handle, media_parcel *in)
+int media_client_send(void* handle, media_parcel* in)
 {
-    struct media_client_priv *priv = handle;
+    struct media_client_priv* priv = handle;
     int ret;
 
     if (priv == NULL || in == NULL)
@@ -206,9 +206,9 @@ int media_client_send(void *handle, media_parcel *in)
     return ret;
 }
 
-int media_client_send_with_ack(void *handle, media_parcel *in, media_parcel *out)
+int media_client_send_with_ack(void* handle, media_parcel* in, media_parcel* out)
 {
-    struct media_client_priv *priv = handle;
+    struct media_client_priv* priv = handle;
     int ret;
 
     if (priv == NULL || in == NULL || out == NULL)
@@ -233,9 +233,9 @@ out:
     return ret;
 }
 
-int media_client_set_event_cb(void *handle, const char *cpu, void *event_cb, void *cookie)
+int media_client_set_event_cb(void* handle, const char* cpu, void* event_cb, void* cookie)
 {
-    struct media_client_priv *priv = handle;
+    struct media_client_priv* priv = handle;
     pthread_attr_t pattr;
     int ret;
 
@@ -260,10 +260,9 @@ int media_client_set_event_cb(void *handle, const char *cpu, void *event_cb, voi
     pthread_attr_init(&pattr);
     pthread_attr_setstacksize(&pattr, CONFIG_MEDIA_CLIENT_LISTEN_STACKSIZE);
     ret = pthread_create(&priv->thread, &pattr, media_client_listen_thread, (pthread_addr_t)priv);
-    if (ret < 0)
-      {
+    if (ret < 0) {
         close(priv->listenfd);
-      }
+    }
 
     pthread_attr_destroy(&pattr);
     pthread_mutex_unlock(&priv->mutex);
@@ -271,7 +270,7 @@ int media_client_set_event_cb(void *handle, const char *cpu, void *event_cb, voi
     return ret;
 }
 
-int media_client_send_recieve(void *handle, const char *in_fmt, const char *out_fmt, ...)
+int media_client_send_recieve(void* handle, const char* in_fmt, const char* out_fmt, ...)
 {
     media_parcel in, out;
     va_list ap;
@@ -297,5 +296,4 @@ out:
 
     va_end(ap);
     return ret;
-
 }

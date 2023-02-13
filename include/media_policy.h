@@ -37,7 +37,7 @@ extern "C" {
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  */
-int media_policy_set_int(const char *name, int value, int apply);
+int media_policy_set_int(const char* name, int value, int apply);
 
 /**
  * Get criterion in interger value.
@@ -46,7 +46,7 @@ int media_policy_set_int(const char *name, int value, int apply);
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  */
-int media_policy_get_int(const char *name, int *value);
+int media_policy_get_int(const char* name, int* value);
 
 /**
  * Set criterion with string value.
@@ -56,7 +56,7 @@ int media_policy_get_int(const char *name, int *value);
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  */
-int media_policy_set_string(const char *name, const char *value, int apply);
+int media_policy_set_string(const char* name, const char* value, int apply);
 
 /**
  * Get criterion in string value.
@@ -66,7 +66,7 @@ int media_policy_set_string(const char *name, const char *value, int apply);
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  */
-int media_policy_get_string(const char *name, char *value, int len);
+int media_policy_get_string(const char* name, char* value, int len);
 
 /**
  * Include(insert) string values to InclusiveCriterion.
@@ -77,7 +77,7 @@ int media_policy_get_string(const char *name, char *value, int len);
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
  */
-int media_policy_include(const char *name, const char *values, int apply);
+int media_policy_include(const char* name, const char* values, int apply);
 
 /**
  * Exclude(remove) string values from InclusiveCriterion.
@@ -88,7 +88,7 @@ int media_policy_include(const char *name, const char *values, int apply);
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
  */
-int media_policy_exclude(const char *name, const char *values, int apply);
+int media_policy_exclude(const char* name, const char* values, int apply);
 
 /**
  * Check whether string values included in InclusiveCriterion.
@@ -99,7 +99,7 @@ int media_policy_exclude(const char *name, const char *values, int apply);
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
  */
-int media_policy_contain(const char *name, const char *values, int *result);
+int media_policy_contain(const char* name, const char* values, int* result);
 
 /**
  * Increase criterion interger value by 1.
@@ -109,7 +109,7 @@ int media_policy_contain(const char *name, const char *values, int *result);
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for ExclusiveCriterion, never call on InclusiveCriterion.
  */
-int media_policy_increase(const char *name, int apply);
+int media_policy_increase(const char* name, int apply);
 
 /**
  * Decrease criterion interger value by 1.
@@ -119,7 +119,7 @@ int media_policy_increase(const char *name, int apply);
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for ExclusiveCriterion, never call on InclusiveCriterion.
  */
-int media_policy_decrease(const char *name, int apply);
+int media_policy_decrease(const char* name, int apply);
 
 #ifdef __cplusplus
 }

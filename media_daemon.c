@@ -25,10 +25,10 @@
 #include <assert.h>
 #include <errno.h>
 #include <poll.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "media_internal.h"
 #include "media_server.h"
@@ -37,49 +37,48 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MAX_POLLFDS         64
-#define ARRAY_SIZE(x)       (sizeof(x)/sizeof((x)[0]))
+#define MAX_POLLFDS 64
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
 
 typedef struct MediaPriv {
-    int           idx[MAX_POLLFDS];
+    int idx[MAX_POLLFDS];
     struct pollfd fds[MAX_POLLFDS];
-    void         *ctx[MAX_POLLFDS];
+    void* ctx[MAX_POLLFDS];
 } MediaPriv;
 
-typedef void *(*media_create)(void *param);
-typedef int (*media_get_pollfds)(void *handle, struct pollfd *fds,
-                                 void **cookies, int count);
-typedef int (*media_poll_available)(void *handle, struct pollfd *fds,
-                                    void *cookies);
-typedef int (*media_run_once)(void *handle);
-typedef int (*media_destroy)(void *handle);
+typedef void* (*media_create)(void* param);
+typedef int (*media_get_pollfds)(void* handle, struct pollfd* fds,
+    void** cookies, int count);
+typedef int (*media_poll_available)(void* handle, struct pollfd* fds,
+    void* cookies);
+typedef int (*media_run_once)(void* handle);
+typedef int (*media_destroy)(void* handle);
 
 typedef struct MediaPoll {
-    const char          *name;
-    void                *handle;
-    void                *param;
-    media_create         create;
-    media_get_pollfds    get;
+    const char* name;
+    void* handle;
+    void* param;
+    media_create create;
+    media_get_pollfds get;
     media_poll_available available;
-    media_run_once       run_once;
-    media_destroy        destroy;
+    media_run_once run_once;
+    media_destroy destroy;
 } MediaPoll;
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
 
-static MediaPoll g_media[] =
-{
+static MediaPoll g_media[] = {
 #ifdef CONFIG_LIB_FFMPEG
     {
         "media_graph",
         NULL,
-        CONFIG_MEDIA_SERVER_CONFIG_PATH"graph.conf",
+        CONFIG_MEDIA_SERVER_CONFIG_PATH "graph.conf",
         media_graph_create,
         media_graph_get_pollfds,
         media_graph_poll_available,
@@ -91,11 +90,9 @@ static MediaPoll g_media[] =
     {
         "media_policy",
         NULL,
-        (const char* [])
-        {
-            CONFIG_MEDIA_SERVER_CONFIG_PATH"configurations.xml",
-            CONFIG_MEDIA_SERVER_CONFIG_PATH"criteria.txt"
-        },
+        (const char*[]) {
+            CONFIG_MEDIA_SERVER_CONFIG_PATH "configurations.xml",
+            CONFIG_MEDIA_SERVER_CONFIG_PATH "criteria.txt" },
         media_policy_create,
         NULL,
         NULL,
@@ -119,7 +116,7 @@ static MediaPoll g_media[] =
  * Private Functions
  ****************************************************************************/
 
-static void *media_get_handle(const char *name)
+static void* media_get_handle(const char* name)
 {
     int i;
 
@@ -135,24 +132,24 @@ static void *media_get_handle(const char *name)
  * Public Functions
  ****************************************************************************/
 
-void *media_get_graph(void)
+void* media_get_graph(void)
 {
     return media_get_handle("media_graph");
 }
 
-void *media_get_policy(void)
+void* media_get_policy(void)
 {
     return media_get_handle("media_policy");
 }
 
-void *media_get_server(void)
+void* media_get_server(void)
 {
     return media_get_handle("media_server");
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    MediaPriv *priv;
+    MediaPriv* priv;
     int ret, n, i;
 
     priv = malloc(sizeof(MediaPriv));
@@ -164,7 +161,7 @@ int main(int argc, char *argv[])
         if (!g_media[i].handle) {
             free(priv);
             syslog(LOG_ERR, "%s, %s create failed\n",
-                    __func__, g_media[i].name);
+                __func__, g_media[i].name);
             return -EINVAL;
         }
     }
@@ -175,10 +172,10 @@ int main(int argc, char *argv[])
                 continue;
 
             ret = g_media[i].get(g_media[i].handle, &priv->fds[n],
-                                      &priv->ctx[n], MAX_POLLFDS - n);
+                &priv->ctx[n], MAX_POLLFDS - n);
             if (ret < 0) {
                 syslog(LOG_ERR, "%s, %s get_pollfds failed\n",
-                        __func__, g_media[i].name);
+                    __func__, g_media[i].name);
                 continue;
             }
 
@@ -195,10 +192,10 @@ int main(int argc, char *argv[])
                 continue;
 
             ret = g_media[priv->idx[i]].available(g_media[priv->idx[i]].handle,
-                                                  &priv->fds[i], priv->ctx[i]);
+                &priv->fds[i], priv->ctx[i]);
             if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
                 syslog(LOG_ERR, "%s, %s poll_available failed %d\n",
-                        __func__, g_media[priv->idx[i]].name, ret);
+                    __func__, g_media[priv->idx[i]].name, ret);
         }
 
         for (i = 0; i < ARRAY_SIZE(g_media); i++) {
