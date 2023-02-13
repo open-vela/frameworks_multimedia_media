@@ -25,19 +25,19 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_EVENT_NOP                 0
-#define MEDIA_EVENT_PREPARED            1
-#define MEDIA_EVENT_STARTED             2
-#define MEDIA_EVENT_PAUSED              3
-#define MEDIA_EVENT_STOPPED             4
-#define MEDIA_EVENT_SEEKED              5
-#define MEDIA_EVENT_COMPLETED           6
+#define MEDIA_EVENT_NOP 0
+#define MEDIA_EVENT_PREPARED 1
+#define MEDIA_EVENT_STARTED 2
+#define MEDIA_EVENT_PAUSED 3
+#define MEDIA_EVENT_STOPPED 4
+#define MEDIA_EVENT_SEEKED 5
+#define MEDIA_EVENT_COMPLETED 6
 
 /****************************************************************************
  * Public Types
  ****************************************************************************/
 
-typedef void (*media_event_callback)(void *cookie, int event, int ret,
-                                     const char *extra);
+typedef void (*media_event_callback)(void* cookie, int event, int ret,
+    const char* extra);
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H */

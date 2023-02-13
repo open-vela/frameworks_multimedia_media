@@ -33,9 +33,9 @@
  * Private Functions
  ****************************************************************************/
 
-static int media_parcel_grow(media_parcel *parcel, size_t cursz, size_t newsz)
+static int media_parcel_grow(media_parcel* parcel, size_t cursz, size_t newsz)
 {
-    media_parcel_chunk *newchunk;
+    media_parcel_chunk* newchunk;
 
     newsz += parcel->chunk->len;
     if (newsz <= parcel->cap)
@@ -48,7 +48,7 @@ static int media_parcel_grow(media_parcel *parcel, size_t cursz, size_t newsz)
         newchunk = malloc(MEDIA_PARCEL_HEADER_LEN + newsz);
         if (newchunk) {
             memcpy(newchunk, parcel->chunk,
-                   MEDIA_PARCEL_HEADER_LEN + cursz);
+                MEDIA_PARCEL_HEADER_LEN + cursz);
         }
     } else {
         newchunk = realloc(parcel->chunk, MEDIA_PARCEL_HEADER_LEN + newsz);
@@ -62,7 +62,7 @@ static int media_parcel_grow(media_parcel *parcel, size_t cursz, size_t newsz)
     return 0;
 }
 
-static int media_parcel_copy(media_parcel *parcel, void *val, size_t size)
+static int media_parcel_copy(media_parcel* parcel, void* val, size_t size)
 {
     if (parcel->next + size > parcel->chunk->len)
         return -ENOSPC;
@@ -77,7 +77,7 @@ static int media_parcel_copy(media_parcel *parcel, void *val, size_t size)
  * Public Functions
  ****************************************************************************/
 
-void media_parcel_init(media_parcel *parcel)
+void media_parcel_init(media_parcel* parcel)
 {
     parcel->chunk = &parcel->prealloc;
     parcel->next = 0;
@@ -86,19 +86,19 @@ void media_parcel_init(media_parcel *parcel)
     parcel->chunk->len = 0;
 }
 
-void media_parcel_deinit(media_parcel *parcel)
+void media_parcel_deinit(media_parcel* parcel)
 {
     if (parcel->chunk != &parcel->prealloc)
         free(parcel->chunk);
 }
 
-void media_parcel_reinit(media_parcel *parcel)
+void media_parcel_reinit(media_parcel* parcel)
 {
     media_parcel_deinit(parcel);
     media_parcel_init(parcel);
 }
 
-int media_parcel_append(media_parcel *parcel, const void *data, size_t size)
+int media_parcel_append(media_parcel* parcel, const void* data, size_t size)
 {
     int rv;
 
@@ -114,57 +114,57 @@ int media_parcel_append(media_parcel *parcel, const void *data, size_t size)
     return 0;
 }
 
-int media_parcel_append_uint8(media_parcel *parcel, uint8_t val)
+int media_parcel_append_uint8(media_parcel* parcel, uint8_t val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_uint16(media_parcel *parcel, uint16_t val)
+int media_parcel_append_uint16(media_parcel* parcel, uint16_t val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_uint32(media_parcel *parcel, uint32_t val)
+int media_parcel_append_uint32(media_parcel* parcel, uint32_t val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_uint64(media_parcel *parcel, uint64_t val)
+int media_parcel_append_uint64(media_parcel* parcel, uint64_t val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_int8(media_parcel *parcel, int8_t val)
+int media_parcel_append_int8(media_parcel* parcel, int8_t val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_int16(media_parcel *parcel, int16_t val)
+int media_parcel_append_int16(media_parcel* parcel, int16_t val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_int32(media_parcel *parcel, int32_t val)
+int media_parcel_append_int32(media_parcel* parcel, int32_t val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_int64(media_parcel *parcel, int64_t val)
+int media_parcel_append_int64(media_parcel* parcel, int64_t val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_float(media_parcel *parcel, float val)
+int media_parcel_append_float(media_parcel* parcel, float val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_double(media_parcel *parcel, double val)
+int media_parcel_append_double(media_parcel* parcel, double val)
 {
     return media_parcel_append(parcel, &val, sizeof(val));
 }
 
-int media_parcel_append_string(media_parcel *parcel, const char *str)
+int media_parcel_append_string(media_parcel* parcel, const char* str)
 {
     if (!str)
         str = "";
@@ -172,9 +172,9 @@ int media_parcel_append_string(media_parcel *parcel, const char *str)
     return media_parcel_append(parcel, str, strlen(str) + 1);
 }
 
-int media_parcel_append_vprintf(media_parcel *parcel, const char *fmt, va_list *ap)
+int media_parcel_append_vprintf(media_parcel* parcel, const char* fmt, va_list* ap)
 {
-    const char *val_s;
+    const char* val_s;
     int64_t val_i64;
     int32_t val_i32;
     int16_t val_i16;
@@ -188,36 +188,36 @@ int media_parcel_append_vprintf(media_parcel *parcel, const char *fmt, va_list *
             continue;
 
         switch (c) {
-            case 'l':
-                val_i64 = va_arg(*ap, int64_t);
-                ret = media_parcel_append_int64(parcel, val_i64);
-                break;
-            case 'i':
-                val_i32 = va_arg(*ap, int32_t);
-                ret = media_parcel_append_int32(parcel, val_i32);
-                break;
-            case 'h':
-                val_i16 = va_arg(*ap, int32_t);
-                ret = media_parcel_append_int16(parcel, val_i16);
-                break;
-            case 'c':
-                val_i8 = va_arg(*ap, int32_t);
-                ret = media_parcel_append_int8(parcel, val_i8);
-                break;
-            case 'd':
-                val_dbl = va_arg(*ap, double);
-                ret = media_parcel_append_double(parcel, val_dbl);
-                break;
-            case 'f':
-                val_flt = va_arg(*ap, double);
-                ret = media_parcel_append_float(parcel, val_flt);
-                break;
-            case 's':
-                val_s = va_arg(*ap, const char *);
-                ret = media_parcel_append_string(parcel, val_s);
-                break;
-            default:
-                break;
+        case 'l':
+            val_i64 = va_arg(*ap, int64_t);
+            ret = media_parcel_append_int64(parcel, val_i64);
+            break;
+        case 'i':
+            val_i32 = va_arg(*ap, int32_t);
+            ret = media_parcel_append_int32(parcel, val_i32);
+            break;
+        case 'h':
+            val_i16 = va_arg(*ap, int32_t);
+            ret = media_parcel_append_int16(parcel, val_i16);
+            break;
+        case 'c':
+            val_i8 = va_arg(*ap, int32_t);
+            ret = media_parcel_append_int8(parcel, val_i8);
+            break;
+        case 'd':
+            val_dbl = va_arg(*ap, double);
+            ret = media_parcel_append_double(parcel, val_dbl);
+            break;
+        case 'f':
+            val_flt = va_arg(*ap, double);
+            ret = media_parcel_append_float(parcel, val_flt);
+            break;
+        case 's':
+            val_s = va_arg(*ap, const char*);
+            ret = media_parcel_append_string(parcel, val_s);
+            break;
+        default:
+            break;
         }
 
         if (ret < 0)
@@ -227,7 +227,7 @@ int media_parcel_append_vprintf(media_parcel *parcel, const char *fmt, va_list *
     return ret;
 }
 
-int media_parcel_append_printf(media_parcel *parcel, const char *fmt, ...)
+int media_parcel_append_printf(media_parcel* parcel, const char* fmt, ...)
 {
     va_list ap;
     int ret;
@@ -239,9 +239,9 @@ int media_parcel_append_printf(media_parcel *parcel, const char *fmt, ...)
     return ret;
 }
 
-int media_parcel_send(media_parcel *parcel, int fd, uint32_t code, int flags)
+int media_parcel_send(media_parcel* parcel, int fd, uint32_t code, int flags)
 {
-    const uint8_t *buf = (const uint8_t *)parcel->chunk;
+    const uint8_t* buf = (const uint8_t*)parcel->chunk;
     uint32_t len = MEDIA_PARCEL_HEADER_LEN + parcel->chunk->len;
 
     parcel->chunk->code = code;
@@ -257,7 +257,7 @@ int media_parcel_send(media_parcel *parcel, int fd, uint32_t code, int flags)
     return 0;
 }
 
-int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset, int flags)
+int media_parcel_recv(media_parcel* parcel, int fd, uint32_t* offset, int flags)
 {
     uint32_t len = MEDIA_PARCEL_HEADER_LEN + parcel->chunk->len;
     uint32_t tmp = 0;
@@ -267,11 +267,9 @@ int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset, int flags)
 
     while (*offset != len) {
         ssize_t ret = recv(fd,
-                           (char *)parcel->chunk + *offset,
-                           *offset < MEDIA_PARCEL_HEADER_LEN ?
-                                MEDIA_PARCEL_HEADER_LEN - *offset :
-                                len - *offset,
-                           flags);
+            (char*)parcel->chunk + *offset,
+            *offset < MEDIA_PARCEL_HEADER_LEN ? MEDIA_PARCEL_HEADER_LEN - *offset : len - *offset,
+            flags);
         if (ret == 0)
             return -EPIPE;
 
@@ -290,14 +288,14 @@ int media_parcel_recv(media_parcel *parcel, int fd, uint32_t *offset, int flags)
     return 0;
 }
 
-uint32_t media_parcel_get_code(media_parcel *parcel)
+uint32_t media_parcel_get_code(media_parcel* parcel)
 {
     return parcel->chunk->code;
 }
 
-const void *media_parcel_read(media_parcel *parcel, size_t size)
+const void* media_parcel_read(media_parcel* parcel, size_t size)
 {
-    const void *rv = NULL;
+    const void* rv = NULL;
 
     if (parcel->next + size <= parcel->chunk->len) {
         rv = &parcel->chunk->buf[parcel->next];
@@ -307,61 +305,61 @@ const void *media_parcel_read(media_parcel *parcel, size_t size)
     return rv;
 }
 
-int media_parcel_read_uint8(media_parcel *parcel, uint8_t *val)
+int media_parcel_read_uint8(media_parcel* parcel, uint8_t* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-int media_parcel_read_uint16(media_parcel *parcel, uint16_t *val)
+int media_parcel_read_uint16(media_parcel* parcel, uint16_t* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-int media_parcel_read_uint32(media_parcel *parcel, uint32_t *val)
+int media_parcel_read_uint32(media_parcel* parcel, uint32_t* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-int media_parcel_read_uint64(media_parcel *parcel, uint64_t *val)
+int media_parcel_read_uint64(media_parcel* parcel, uint64_t* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-int media_parcel_read_int8(media_parcel *parcel, int8_t *val)
+int media_parcel_read_int8(media_parcel* parcel, int8_t* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-int media_parcel_read_int16(media_parcel *parcel, int16_t *val)
+int media_parcel_read_int16(media_parcel* parcel, int16_t* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-int media_parcel_read_int32(media_parcel *parcel, int32_t *val)
+int media_parcel_read_int32(media_parcel* parcel, int32_t* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-int media_parcel_read_int64(media_parcel *parcel, int64_t *val)
+int media_parcel_read_int64(media_parcel* parcel, int64_t* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-int media_parcel_read_float(media_parcel *parcel, float *val)
+int media_parcel_read_float(media_parcel* parcel, float* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-int media_parcel_read_double(media_parcel *parcel, double *val)
+int media_parcel_read_double(media_parcel* parcel, double* val)
 {
     return media_parcel_copy(parcel, val, sizeof(*val));
 }
 
-const char *media_parcel_read_string(media_parcel *parcel)
+const char* media_parcel_read_string(media_parcel* parcel)
 {
-    const void *beg;
-    const void *end;
-    const char *ret;
+    const void* beg;
+    const void* end;
+    const char* ret;
 
     beg = &parcel->chunk->buf[parcel->next];
     end = memchr(beg, 0, parcel->chunk->len - parcel->next);
@@ -375,15 +373,15 @@ const char *media_parcel_read_string(media_parcel *parcel)
     return ret;
 }
 
-int media_parcel_read_vscanf(media_parcel *parcel, const char *fmt, va_list *ap)
+int media_parcel_read_vscanf(media_parcel* parcel, const char* fmt, va_list* ap)
 {
-    const char **p_s;
-    int64_t *p_i64;
-    int32_t *p_i32;
-    int16_t *p_i16;
-    int8_t *p_i8;
-    double *p_dbl;
-    float *p_flt;
+    const char** p_s;
+    int64_t* p_i64;
+    int32_t* p_i32;
+    int16_t* p_i16;
+    int8_t* p_i8;
+    double* p_dbl;
+    float* p_flt;
     int ret = 0;
     char c;
 
@@ -392,36 +390,36 @@ int media_parcel_read_vscanf(media_parcel *parcel, const char *fmt, va_list *ap)
             continue;
 
         switch (c) {
-            case 'l':
-                p_i64 = va_arg(*ap, int64_t *);
-                ret = media_parcel_read_int64(parcel, p_i64);
-                break;
-            case 'i':
-                p_i32 = va_arg(*ap, int32_t *);
-                ret = media_parcel_read_int32(parcel, p_i32);
-                break;
-            case 'h':
-                p_i16 = va_arg(*ap, int16_t *);
-                ret = media_parcel_read_int16(parcel, p_i16);
-                break;
-            case 'c':
-                p_i8 = va_arg(*ap, int8_t *);
-                ret = media_parcel_read_int8(parcel, p_i8);
-                break;
-            case 'd':
-                p_dbl = va_arg(*ap, double *);
-                ret = media_parcel_read_double(parcel, p_dbl);
-                break;
-            case 'f':
-                p_flt = va_arg(*ap, float *);
-                ret = media_parcel_read_float(parcel, p_flt);
-                break;
-            case 's':
-                p_s = va_arg(*ap, const char **);
-                *p_s = media_parcel_read_string(parcel);
-                break;
-            default:
-                break;
+        case 'l':
+            p_i64 = va_arg(*ap, int64_t*);
+            ret = media_parcel_read_int64(parcel, p_i64);
+            break;
+        case 'i':
+            p_i32 = va_arg(*ap, int32_t*);
+            ret = media_parcel_read_int32(parcel, p_i32);
+            break;
+        case 'h':
+            p_i16 = va_arg(*ap, int16_t*);
+            ret = media_parcel_read_int16(parcel, p_i16);
+            break;
+        case 'c':
+            p_i8 = va_arg(*ap, int8_t*);
+            ret = media_parcel_read_int8(parcel, p_i8);
+            break;
+        case 'd':
+            p_dbl = va_arg(*ap, double*);
+            ret = media_parcel_read_double(parcel, p_dbl);
+            break;
+        case 'f':
+            p_flt = va_arg(*ap, float*);
+            ret = media_parcel_read_float(parcel, p_flt);
+            break;
+        case 's':
+            p_s = va_arg(*ap, const char**);
+            *p_s = media_parcel_read_string(parcel);
+            break;
+        default:
+            break;
         }
 
         if (ret < 0)
@@ -431,7 +429,7 @@ int media_parcel_read_vscanf(media_parcel *parcel, const char *fmt, va_list *ap)
     return ret;
 }
 
-int media_parcel_read_scanf(media_parcel *parcel, const char *fmt, ...)
+int media_parcel_read_scanf(media_parcel* parcel, const char* fmt, ...)
 {
     va_list ap;
     int ret;
@@ -442,4 +440,3 @@ int media_parcel_read_scanf(media_parcel *parcel, const char *fmt, ...)
 
     return ret;
 }
-

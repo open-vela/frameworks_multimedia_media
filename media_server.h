@@ -26,18 +26,17 @@
 #include "media_parcel.h"
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
-typedef void (*media_server_onreceive)(void *cookie, media_parcel *in, media_parcel *out);
-void *media_server_create(void *cb);
-int media_server_destroy(void *handle);
+typedef void (*media_server_onreceive)(void* cookie, media_parcel* in, media_parcel* out);
+void* media_server_create(void* cb);
+int media_server_destroy(void* handle);
 
-int media_server_get_pollfds(void *handle, struct pollfd *fds, void **conns, int count);
-int media_server_poll_available(void *handle, struct pollfd *fd, void *conn);
+int media_server_get_pollfds(void* handle, struct pollfd* fds, void** conns, int count);
+int media_server_poll_available(void* handle, struct pollfd* fd, void* conn);
 
-int media_server_notify(void *handle, void *cookie, media_parcel *parcel);
+int media_server_notify(void* handle, void* cookie, media_parcel* parcel);
 
 #ifdef __cplusplus
 }

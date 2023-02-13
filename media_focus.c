@@ -20,6 +20,9 @@
  * Included Files
  ****************************************************************************/
 
+#include "media_focus.h"
+#include "media_internal.h"
+#include "media_wrapper.h"
 #include <ctype.h>
 #include <debug.h>
 #include <errno.h>
@@ -28,9 +31,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "media_focus.h"
-#include "media_internal.h"
-#include "media_wrapper.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -40,15 +40,15 @@
 #define CONFIG_MEDIA_FOCUS_STACK_DEPTH 8
 #endif
 
-#define BLOCK_CALLBACK_FLAG     0
+#define BLOCK_CALLBACK_FLAG 0
 #define NONBLOCK_CALLBACK_FLAG (-1)
-#define MAX_LEN                 512
-#define STREAM_TYPE_LEN         32
-#define ID_SHIFT                16
+#define MAX_LEN 512
+#define STREAM_TYPE_LEN 32
+#define ID_SHIFT 16
 
-#define MEDIA_FOCUS_FILE_READ_JUMP          0
-#define MEDIA_FOCUS_FILE_READ_STREAM_TYPE   1
-#define MEDIA_FOCUS_FILE_READ_STREAM_NUM    2
+#define MEDIA_FOCUS_FILE_READ_JUMP 0
+#define MEDIA_FOCUS_FILE_READ_STREAM_TYPE 1
+#define MEDIA_FOCUS_FILE_READ_STREAM_NUM 2
 
 #define ID_TO_HANDLE(x) (((x) << ID_SHIFT) | 0x0000000F)
 #define HANDLE_TO_ID(x) ((x) >> ID_SHIFT)
@@ -275,7 +275,7 @@ static int media_focus_line_identity(char* line, int* shift_index)
             return -EINVAL;
         }
 
-        //shift index position is position after first comma
+        // shift index position is position after first comma
         *shift_index = comma_index - line + 1;
         if (strncmp(line, "Stream", (*shift_index - 1)) == 0) {
             return MEDIA_FOCUS_FILE_READ_STREAM_TYPE;
@@ -355,7 +355,7 @@ static int media_focus_init(void)
     int index = 0;
     int shift_index = 0;
 
-    fp = fopen(CONFIG_MEDIA_FOCUS_CONFIG_PATH"/media_focus.conf", "r");
+    fp = fopen(CONFIG_MEDIA_FOCUS_CONFIG_PATH "/media_focus.conf", "r");
     if (fp == NULL) {
         auderr("no such interaction matrix file\n");
         return -ENOENT;

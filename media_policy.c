@@ -24,11 +24,11 @@
 
 #include <ParameterFramework.h>
 
+#include <errno.h>
 #include <kvdb.h>
-#include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
+#include <syslog.h>
 
 #include "media_internal.h"
 
@@ -36,16 +36,16 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_PERSIST                   "persist.media."
-#define MEDIA_CRITERIA_MAXNUM           64
-#define MEDIA_CRITERIA_LINE_MAXLENGTH   256
+#define MEDIA_PERSIST "persist.media."
+#define MEDIA_CRITERIA_MAXNUM 64
+#define MEDIA_CRITERIA_LINE_MAXLENGTH 256
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
 
 typedef struct MediaPolicyPriv {
-    PfwHandler *pfw;
+    PfwHandler* pfw;
 } MediaPolicyPriv;
 
 /****************************************************************************
@@ -64,7 +64,7 @@ typedef struct MediaPolicyPriv {
  * @param name          criterion name.
  * @return Zero on success; a negated errno value on failure.
  */
-static int media_policy_save_kvdb(PfwHandler *pfw, const char *name)
+static int media_policy_save_kvdb(PfwHandler* pfw, const char* name)
 {
     char real_name[64];
     int value;
@@ -89,12 +89,12 @@ static int media_policy_save_kvdb(PfwHandler *pfw, const char *name)
  * @param criteria  criteria data structure.
  * @param ncriteria criteria number.
  */
-static void media_policy_load_kvdb(PfwCriterion *criteria, int ncriteria)
+static void media_policy_load_kvdb(PfwCriterion* criteria, int ncriteria)
 {
     int i;
 
     for (i = 0; i < ncriteria; i++) {
-        const char *real_name = criteria[i].names[0];
+        const char* real_name = criteria[i].names[0];
 
         if (strncmp(real_name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
             continue;
@@ -103,7 +103,7 @@ static void media_policy_load_kvdb(PfwCriterion *criteria, int ncriteria)
     }
 }
 
-static void media_policy_free_criteria(PfwCriterion *criteria, int ncriteria)
+static void media_policy_free_criteria(PfwCriterion* criteria, int ncriteria)
 {
     int i, j;
 
@@ -113,14 +113,14 @@ static void media_policy_free_criteria(PfwCriterion *criteria, int ncriteria)
             // free criterion names
             if (criteria[i].names) {
                 for (j = 0; criteria[i].names[j]; j++)
-                    free((void *)criteria[i].names[j]);
+                    free((void*)criteria[i].names[j]);
                 free(criteria[i].names);
             }
 
             // free criterion values
             if (criteria[i].values) {
                 for (j = 0; criteria[i].values[j]; j++)
-                    free((void *)criteria[i].values[j]);
+                    free((void*)criteria[i].values[j]);
                 free(criteria[i].values);
             }
         }
@@ -128,12 +128,12 @@ static void media_policy_free_criteria(PfwCriterion *criteria, int ncriteria)
     }
 }
 
-static int media_policy_parse_criteria(PfwCriterion **pcriteria, const char *path)
+static int media_policy_parse_criteria(PfwCriterion** pcriteria, const char* path)
 {
-    const char *delim = " \t\r\n";
-    char *saveptr;
-    FILE *fp;
-    PfwCriterion *criteria;
+    const char* delim = " \t\r\n";
+    char* saveptr;
+    FILE* fp;
+    PfwCriterion* criteria;
     int ret = -EINVAL;
     int i = 0, j;
 
@@ -146,31 +146,31 @@ static int media_policy_parse_criteria(PfwCriterion **pcriteria, const char *pat
         goto err_alloc;
 
     /** one criterion definition each line, example:
-      *
-      * text to be parsed:
-      *  ExclusiveCriterion Color Colour : Red Grean Blue : 1
-      *  InclusiveCriterion Alphabet     : A B C D E F G
-      *
-      * after parsing:
-      * {
-      *     {
-      *         .names     = { "Color", "Colour", NULL },
-      *         .inclusive = false,
-      *         .values    = { "Red", "Grean", "Blue", NULL },
-      *         .initial   = 1,
-      *     },
-      *     {
-      *         .names     = { "Alphabet", NULL },
-      *         .inclusive = true,
-      *         .values    = { "A", "B", "C", "D", "E", "F", "G", NULL },
-      *         .initial   = 0,
-      *     },
-      * }
-      *
-      */
+     *
+     * text to be parsed:
+     *  ExclusiveCriterion Color Colour : Red Grean Blue : 1
+     *  InclusiveCriterion Alphabet     : A B C D E F G
+     *
+     * after parsing:
+     * {
+     *     {
+     *         .names     = { "Color", "Colour", NULL },
+     *         .inclusive = false,
+     *         .values    = { "Red", "Grean", "Blue", NULL },
+     *         .initial   = 1,
+     *     },
+     *     {
+     *         .names     = { "Alphabet", NULL },
+     *         .inclusive = true,
+     *         .values    = { "A", "B", "C", "D", "E", "F", "G", NULL },
+     *         .initial   = 0,
+     *     },
+     * }
+     *
+     */
     for (; !feof(fp) && i < MEDIA_CRITERIA_MAXNUM; i++) {
         char line[MEDIA_CRITERIA_LINE_MAXLENGTH];
-        char *token;
+        char* token;
 
         if (!fgets(line, sizeof(line), fp)) {
             i--; // ignore empty line
@@ -189,7 +189,7 @@ static int media_policy_parse_criteria(PfwCriterion **pcriteria, const char *pat
             goto err_parse;
 
         // parse criterion names : calloc + parse
-        criteria[i].names = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char *));
+        criteria[i].names = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char*));
         if (!criteria[i].names)
             goto err_alloc;
 
@@ -207,7 +207,7 @@ static int media_policy_parse_criteria(PfwCriterion **pcriteria, const char *pat
         }
 
         // parse criterion values : calloc + parse
-        criteria[i].values = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char *));
+        criteria[i].values = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char*));
         if (!criteria[i].values)
             goto err_alloc;
 
@@ -249,10 +249,10 @@ err_parse:
  * Public Functions
  ****************************************************************************/
 
-int media_policy_control(void *handle, const char *name, const char *cmd,
-                         const char *value, int apply, char **res, int res_len)
+int media_policy_control(void* handle, const char* name, const char* cmd,
+    const char* value, int apply, char** res, int res_len)
 {
-    MediaPolicyPriv *priv = handle;
+    MediaPolicyPriv* priv = handle;
     int ret = 0, tmp;
 
     if (!priv || !priv->pfw)
@@ -312,7 +312,7 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
 
     if (!ret) {
         syslog(LOG_ERR, "%s, unkown name:%s cmd:%s value:%s\n",
-               __func__, name, cmd, value);
+            __func__, name, cmd, value);
         return -EINVAL;
     }
 
@@ -322,9 +322,9 @@ int media_policy_control(void *handle, const char *name, const char *cmd,
     return media_policy_save_kvdb(priv->pfw, name);
 }
 
-int media_policy_destroy(void *handle)
+int media_policy_destroy(void* handle)
 {
-    MediaPolicyPriv *priv = handle;
+    MediaPolicyPriv* priv = handle;
 
     if (!priv)
         return -EINVAL;
@@ -336,11 +336,11 @@ int media_policy_destroy(void *handle)
     return 0;
 }
 
-void *media_policy_create(void *files)
+void* media_policy_create(void* files)
 {
-    const char **file_paths = files;
-    MediaPolicyPriv *priv;
-    PfwCriterion *criteria;
+    const char** file_paths = files;
+    MediaPolicyPriv* priv;
+    PfwCriterion* criteria;
     PfwLogger logger = {};
     int ncriteria;
 
@@ -374,4 +374,3 @@ err_parse:
     media_policy_destroy(priv);
     return NULL;
 }
-
