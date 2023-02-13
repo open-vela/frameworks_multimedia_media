@@ -29,34 +29,34 @@ extern "C" {
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_AUDIO_MODE_NORMAL      "normal"   /*!< play and capture audio */
-#define MEDIA_AUDIO_MODE_PHONE       "phone"
+#define MEDIA_AUDIO_MODE_NORMAL "normal" /*!< play and capture audio */
+#define MEDIA_AUDIO_MODE_PHONE "phone"
 
-#define MEDIA_DEVICE_A2DP            "a2dp"     /*!< bt cellphone */
-#define MEDIA_DEVICE_A2DP_SNK        "a2dpsnk"
-#define MEDIA_DEVICE_SCO             "sco"      /*!< phone */
-#define MEDIA_DEVICE_MIC             "mic"
+#define MEDIA_DEVICE_A2DP "a2dp" /*!< bt cellphone */
+#define MEDIA_DEVICE_A2DP_SNK "a2dpsnk"
+#define MEDIA_DEVICE_SCO "sco" /*!< phone */
+#define MEDIA_DEVICE_MIC "mic"
 
-#define MEDIA_SAMPLERATE_8000        "8000"
-#define MEDIA_SAMPLERATE_16000       "16000"
-#define MEDIA_SAMPLERATE_22050       "22050"
-#define MEDIA_SAMPLERATE_32000       "32000"
-#define MEDIA_SAMPLERATE_44100       "44100"
-#define MEDIA_SAMPLERATE_48000       "48000"
-#define MEDIA_SAMPLERATE_96000       "96000"
-#define MEDIA_SAMPLERATE_192000      "192000"
+#define MEDIA_SAMPLERATE_8000 "8000"
+#define MEDIA_SAMPLERATE_16000 "16000"
+#define MEDIA_SAMPLERATE_22050 "22050"
+#define MEDIA_SAMPLERATE_32000 "32000"
+#define MEDIA_SAMPLERATE_44100 "44100"
+#define MEDIA_SAMPLERATE_48000 "48000"
+#define MEDIA_SAMPLERATE_96000 "96000"
+#define MEDIA_SAMPLERATE_192000 "192000"
 
-#define MEDIA_STREAM_SCO             "SCO"      /*!< in call */
-#define MEDIA_STREAM_RING            "Ring"
-#define MEDIA_STREAM_ALARM           "Alarm"
+#define MEDIA_STREAM_SCO "SCO" /*!< in call */
+#define MEDIA_STREAM_RING "Ring"
+#define MEDIA_STREAM_ALARM "Alarm"
 #define MEDIA_STREAM_SYSTEM_ENFORCED "Enforced"
-#define MEDIA_STREAM_NOTIFICATION    "Notify"   /*!< message notification */
-#define MEDIA_STREAM_RECORD          "Record"
-#define MEDIA_STREAM_TTS             "TTS"      /*!< text-to-speech */
-#define MEDIA_STREAM_ACCESSIBILITY   "Health"   /*!< health notification */
-#define MEDIA_STREAM_SPORT           "Sport"
-#define MEDIA_STREAM_INFO            "Info"
-#define MEDIA_STREAM_MUSIC           "Music"
+#define MEDIA_STREAM_NOTIFICATION "Notify" /*!< message notification */
+#define MEDIA_STREAM_RECORD "Record"
+#define MEDIA_STREAM_TTS "TTS" /*!< text-to-speech */
+#define MEDIA_STREAM_ACCESSIBILITY "Health" /*!< health notification */
+#define MEDIA_STREAM_SPORT "Sport"
+#define MEDIA_STREAM_INFO "Info"
+#define MEDIA_STREAM_MUSIC "Music"
 
 /****************************************************************************
  * Public Functions for Mode Control
@@ -69,7 +69,7 @@ extern "C" {
  * @note Before changing mode, call media_policy_set_btsco_use(0), which
  *       can turn off SCO and avoid noise.
  */
-int media_policy_set_audio_mode(const char *mode);
+int media_policy_set_audio_mode(const char* mode);
 
 /**
  * Get audio mode.
@@ -77,7 +77,7 @@ int media_policy_set_audio_mode(const char *mode);
  * @param[out] len  sizeof mode.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_get_audio_mode(char *mode, int len);
+int media_policy_get_audio_mode(char* mode, int len);
 
 /****************************************************************************
  * Public Functions for Devices Control
@@ -90,14 +90,14 @@ int media_policy_get_audio_mode(char *mode, int len);
  * @note This api is for applications to declare
  *       whether it needs to use the device.
  */
-int media_policy_set_devices_use(const char *devices);
+int media_policy_set_devices_use(const char* devices);
 
 /**
  * Set devices not using.
  * @param[in] devices   new unavailable devices, MEDIA_DEVICE_XXX.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_set_devices_unuse(const char *devices);
+int media_policy_set_devices_unuse(const char* devices);
 
 /**
  * Get current using devices.
@@ -106,7 +106,7 @@ int media_policy_set_devices_unuse(const char *devices);
  * @param[in] len        sizeof devices.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_get_devices_use(char *devices, int len);
+int media_policy_get_devices_use(char* devices, int len);
 
 /**
  * Check whether devices are being used.
@@ -117,7 +117,7 @@ int media_policy_get_devices_use(char *devices, int len);
  *                  - 1: at least one of devices is being used.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_is_devices_use(const char *devices, int *use);
+int media_policy_is_devices_use(const char* devices, int* use);
 
 /**
  * Set hfp(hands free protocol) sampling rate.
@@ -126,7 +126,7 @@ int media_policy_is_devices_use(const char *devices, int *use);
  * @note Sample rate is a negotiated result, which is sent from BT,
  *       should be set before set sco available.
  */
-int media_policy_set_hfp_samplerate(const char *rate);
+int media_policy_set_hfp_samplerate(const char* rate);
 
 /**
  * Set devices available.
@@ -135,14 +135,14 @@ int media_policy_set_hfp_samplerate(const char *rate);
  * @note This api is for device monitors to declare
  *       whether the device is available or not.
  */
-int media_policy_set_devices_available(const char *devices);
+int media_policy_set_devices_available(const char* devices);
 
 /**
  * Set devices unavailable.
  * @param[in] devices   new unavailable devices, MEDIA_DEVICE_XXX.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_set_devices_unavailable(const char *devices);
+int media_policy_set_devices_unavailable(const char* devices);
 
 /**
  * Get current available devices.
@@ -151,7 +151,7 @@ int media_policy_set_devices_unavailable(const char *devices);
  * @param[in] len        sizeof devices.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_get_devices_available(char *devices, int len);
+int media_policy_get_devices_available(char* devices, int len);
 
 /**
  * Check whether devices are available.
@@ -162,7 +162,7 @@ int media_policy_get_devices_available(char *devices, int len);
  *                        - 1: at least one of devices is available.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_is_devices_available(const char *devices, int *available);
+int media_policy_is_devices_available(const char* devices, int* available);
 
 /****************************************************************************
  * Public Functions for Volume Control
@@ -184,7 +184,7 @@ int media_policy_set_mute_mode(int mute);
  *                  - 1: mute mode is on.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_get_mute_mode(int *mute);
+int media_policy_get_mute_mode(int* mute);
 
 /**
  * Set stream type volume index.
@@ -192,7 +192,7 @@ int media_policy_get_mute_mode(int *mute);
  * @param[in] volume    new volume index.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_set_stream_volume(const char *stream, int volume);
+int media_policy_set_stream_volume(const char* stream, int volume);
 
 /**
  * Get stream type volume index.
@@ -200,21 +200,21 @@ int media_policy_set_stream_volume(const char *stream, int volume);
  * @param[out] volume   current volume index.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_get_stream_volume(const char *stream, int *volume);
+int media_policy_get_stream_volume(const char* stream, int* volume);
 
 /**
  * Increase stream type volume index by 1.
  * @param[in] stream    stream type, MEDIA_STREAM_XXX.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_increase_stream_volume(const char *stream);
+int media_policy_increase_stream_volume(const char* stream);
 
 /**
  * Decrease stream type volume index by 1.
  * @param[in] stream    stream type, MEDIA_STREAM_XXX.
  * @return Zero on success; a negated errno value on failure.
  */
-int media_policy_decrease_stream_volume(const char *stream);
+int media_policy_decrease_stream_volume(const char* stream);
 
 #ifdef __cplusplus
 }

@@ -40,17 +40,16 @@
  * FFmpegCommander : send commands to media graph
  ****************************************************************************/
 
-class FFmpegCommander : public CSubsystemObject
-{
+class FFmpegCommander : public CSubsystemObject {
 private:
     const size_t paramSize;
 
 public:
     FFmpegCommander(const std::string& mappingValue,
-                 CInstanceConfigurableElement *instanceConfigurableElement,
-                 const CMappingContext& context, core::log::Logger& logger)
-        : CSubsystemObject(instanceConfigurableElement, logger),
-          paramSize(getSize())
+        CInstanceConfigurableElement* instanceConfigurableElement,
+        const CMappingContext& context, core::log::Logger& logger)
+        : CSubsystemObject(instanceConfigurableElement, logger)
+        , paramSize(getSize())
     {
     }
 
@@ -69,13 +68,13 @@ protected:
         while (target) {
             target = strtok_r(target, ",", &inptr);
             if (!target) {
-                delete [] params;
+                delete[] params;
                 return false;
             }
 
             cmd = strtok_r(NULL, ",", &inptr);
             if (!cmd) {
-                delete [] params;
+                delete[] params;
                 return false;
             }
 
@@ -86,7 +85,7 @@ protected:
             target = strtok_r(NULL, ";", &outptr);
         }
 
-        delete [] params;
+        delete[] params;
         return true;
     }
 };
@@ -95,21 +94,19 @@ protected:
  * FFmpegSubsystem : define mapping keys and syner creators
  ****************************************************************************/
 
-class FFmpegSubsystem : public CSubsystem
-{
+class FFmpegSubsystem : public CSubsystem {
 public:
     FFmpegSubsystem(const std::string& name, core::log::Logger& logger)
         : CSubsystem(name, logger)
     {
         addSubsystemObjectFactory(
-            new TSubsystemObjectFactory<FFmpegCommander>("Commander", 0)
-        );
+            new TSubsystemObjectFactory<FFmpegCommander>("Commander", 0));
     }
 
 private:
     /* Copy facilities are put private to disable copy. */
     FFmpegSubsystem(const FFmpegSubsystem& object);
-    FFmpegSubsystem &operator=(const FFmpegSubsystem& object);
+    FFmpegSubsystem& operator=(const FFmpegSubsystem& object);
 };
 
 /****************************************************************************
@@ -120,22 +117,16 @@ static void entrypoint(CSubsystemLibrary* subsystemLibrary, core::log::Logger& l
 {
     subsystemLibrary->addElementBuilder(
         "FFmpeg",
-        new TLoggingElementBuilderTemplate<FFmpegSubsystem>(logger)
-    );
+        new TLoggingElementBuilderTemplate<FFmpegSubsystem>(logger));
 }
 
 /* let linker find symbol in parameter-framework lib */
 extern const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[];
 extern int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE;
 
-const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[] =
-{
-    {
-        QUOTE(PARAMETER_FRAMEWORK_PLUGIN_ENTRYPOINT_V1),
-        (const void*)entrypoint
-    },
+const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[] = {
+    { QUOTE(PARAMETER_FRAMEWORK_PLUGIN_ENTRYPOINT_V1),
+        (const void*)entrypoint },
 };
 
-int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE =
-    sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB) /
-    sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[0]);
+int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE = sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB) / sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[0]);

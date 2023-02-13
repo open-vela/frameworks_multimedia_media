@@ -22,39 +22,39 @@
  * Included Files
  ****************************************************************************/
 
+#include "media_wrapper.h"
+#include "media_policy.h"
 #include <errno.h>
 #include <stdio.h>
-#include "media_policy.h"
-#include "media_wrapper.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_POLICY_APPLY              1
-#define MEDIA_POLICY_NOT_APPLY          0
+#define MEDIA_POLICY_APPLY 1
+#define MEDIA_POLICY_NOT_APPLY 0
 
 // criterion names
-#define MEDIA_POLICY_AUDIO_MODE         "AudioMode"
+#define MEDIA_POLICY_AUDIO_MODE "AudioMode"
 
-#define MEDIA_POLICY_DEVICE_USE         "UsingDevices"
-#define MEDIA_POLICY_DEVICE_AVAILABLE   "AvailableDevices"
-#define MEDIA_POLICY_HFP_SAMPLERATE     "HFPSampleRate"
+#define MEDIA_POLICY_DEVICE_USE "UsingDevices"
+#define MEDIA_POLICY_DEVICE_AVAILABLE "AvailableDevices"
+#define MEDIA_POLICY_HFP_SAMPLERATE "HFPSampleRate"
 
-#define MEDIA_POLICY_MUTE_MODE          "MuteMode"
-#define MEDIA_POLICY_VOLUME             "Volume"
+#define MEDIA_POLICY_MUTE_MODE "MuteMode"
+#define MEDIA_POLICY_VOLUME "Volume"
 
 /****************************************************************************
  * Public Functions for Mode Control
  ****************************************************************************/
 
-int media_policy_set_audio_mode(const char *mode)
+int media_policy_set_audio_mode(const char* mode)
 {
     return media_policy_set_string(MEDIA_POLICY_AUDIO_MODE, mode,
-                                   MEDIA_POLICY_APPLY);
+        MEDIA_POLICY_APPLY);
 }
 
-int media_policy_get_audio_mode(char *mode, int len)
+int media_policy_get_audio_mode(char* mode, int len)
 {
     return media_policy_get_string(MEDIA_POLICY_AUDIO_MODE, mode, len);
 }
@@ -63,53 +63,53 @@ int media_policy_get_audio_mode(char *mode, int len)
  * Public Functions for Devices Control
  ****************************************************************************/
 
-int media_policy_set_devices_use(const char *devices)
+int media_policy_set_devices_use(const char* devices)
 {
     return media_policy_include(MEDIA_POLICY_DEVICE_USE, devices,
-                                MEDIA_POLICY_APPLY);
+        MEDIA_POLICY_APPLY);
 }
 
-int media_policy_set_devices_unuse(const char *devices)
+int media_policy_set_devices_unuse(const char* devices)
 {
     return media_policy_exclude(MEDIA_POLICY_DEVICE_USE, devices,
-                                MEDIA_POLICY_APPLY);
+        MEDIA_POLICY_APPLY);
 }
 
-int media_policy_is_devices_use(const char *devices, int *use)
+int media_policy_is_devices_use(const char* devices, int* use)
 {
     return media_policy_contain(MEDIA_POLICY_DEVICE_USE, devices, use);
 }
 
-int media_policy_get_devices_use(char *devices, int len)
+int media_policy_get_devices_use(char* devices, int len)
 {
     return media_policy_get_string(MEDIA_POLICY_DEVICE_USE, devices, len);
 }
 
-int media_policy_set_hfp_samplerate(const char *rate)
+int media_policy_set_hfp_samplerate(const char* rate)
 {
     // Setting sample rate should not change graph state.
     return media_policy_set_string(MEDIA_POLICY_HFP_SAMPLERATE, rate,
-                                   MEDIA_POLICY_NOT_APPLY);
+        MEDIA_POLICY_NOT_APPLY);
 }
 
-int media_policy_set_devices_available(const char *devices)
+int media_policy_set_devices_available(const char* devices)
 {
     return media_policy_include(MEDIA_POLICY_DEVICE_AVAILABLE, devices,
-                                MEDIA_POLICY_APPLY);
+        MEDIA_POLICY_APPLY);
 }
 
-int media_policy_set_devices_unavailable(const char *devices)
+int media_policy_set_devices_unavailable(const char* devices)
 {
     return media_policy_exclude(MEDIA_POLICY_DEVICE_AVAILABLE, devices,
-                                MEDIA_POLICY_APPLY);
+        MEDIA_POLICY_APPLY);
 }
 
-int media_policy_is_devices_available(const char *devices, int *available)
+int media_policy_is_devices_available(const char* devices, int* available)
 {
     return media_policy_contain(MEDIA_POLICY_DEVICE_AVAILABLE, devices, available);
 }
 
-int media_policy_get_devices_available(char *devices, int len)
+int media_policy_get_devices_available(char* devices, int len)
 {
     return media_policy_get_string(MEDIA_POLICY_DEVICE_AVAILABLE, devices, len);
 }
@@ -121,58 +121,58 @@ int media_policy_get_devices_available(char *devices, int len)
 int media_policy_set_mute_mode(int mute)
 {
     return media_policy_set_int(MEDIA_POLICY_MUTE_MODE, mute,
-                                MEDIA_POLICY_APPLY);
+        MEDIA_POLICY_APPLY);
 }
 
-int media_policy_get_mute_mode(int *mute)
+int media_policy_get_mute_mode(int* mute)
 {
     return media_policy_get_int(MEDIA_POLICY_MUTE_MODE, mute);
 }
 
-int media_policy_set_stream_volume(const char *stream, int volume)
+int media_policy_set_stream_volume(const char* stream, int volume)
 {
     char name[64];
     int len;
 
     len = snprintf(name, sizeof(name), "%s%s", stream, MEDIA_POLICY_VOLUME);
     if (len >= sizeof(name))
-        return  -ENAMETOOLONG;
+        return -ENAMETOOLONG;
 
     return media_policy_set_int(name, volume, MEDIA_POLICY_APPLY);
 }
 
-int media_policy_get_stream_volume(const char *stream, int *volume)
+int media_policy_get_stream_volume(const char* stream, int* volume)
 {
     char name[64];
     int len;
 
     len = snprintf(name, sizeof(name), "%s%s", stream, MEDIA_POLICY_VOLUME);
     if (len >= sizeof(name))
-        return  -ENAMETOOLONG;
+        return -ENAMETOOLONG;
 
     return media_policy_get_int(name, volume);
 }
 
-int media_policy_increase_stream_volume(const char *stream)
+int media_policy_increase_stream_volume(const char* stream)
 {
     char name[64];
     int len;
 
     len = snprintf(name, sizeof(name), "%s%s", stream, MEDIA_POLICY_VOLUME);
     if (len >= sizeof(name))
-        return  -ENAMETOOLONG;
+        return -ENAMETOOLONG;
 
     return media_policy_increase(name, MEDIA_POLICY_APPLY);
 }
 
-int media_policy_decrease_stream_volume(const char *stream)
+int media_policy_decrease_stream_volume(const char* stream)
 {
     char name[64];
     int len;
 
     len = snprintf(name, sizeof(name), "%s%s", stream, MEDIA_POLICY_VOLUME);
     if (len >= sizeof(name))
-        return  -ENAMETOOLONG;
+        return -ENAMETOOLONG;
 
     return media_policy_decrease(name, MEDIA_POLICY_APPLY);
 }
