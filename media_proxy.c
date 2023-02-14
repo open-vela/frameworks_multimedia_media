@@ -81,6 +81,7 @@ static int media_transact_once(int control, void* handle, const char* target,
     const char* response;
     int ret = -EINVAL;
     int32_t resp = 0;
+    const char* name;
 
     if (!priv || !priv->proxy)
         return ret;
@@ -90,18 +91,31 @@ static int media_transact_once(int control, void* handle, const char* target,
 
     switch (control) {
     case MEDIA_GRAPH_CONTROL:
+        name = "graph";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i", control,
             target, cmd, arg, res_len);
         break;
 
     case MEDIA_POLICY_CONTROL:
+        name = "policy";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i%i", control,
             target, cmd, arg, apply, res_len);
         break;
 
     case MEDIA_PLAYER_CONTROL:
+        name = "player";
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", control,
+            priv->handle, target, cmd, arg, res_len);
+        break;
+
     case MEDIA_RECORDER_CONTROL:
+        name = "recorder";
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", control,
+            priv->handle, target, cmd, arg, res_len);
+        break;
+
     case MEDIA_SESSION_CONTROL:
+        name = "session";
         ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", control,
             priv->handle, target, cmd, arg, res_len);
         break;
@@ -127,8 +141,8 @@ out:
     media_parcel_deinit(&in);
     media_parcel_deinit(&out);
 
-    syslog(LOG_INFO, "send:%s:%p %s %s %s %s ret:%d resp:%d\n",
-        priv->cpu, (void*)(uintptr_t)priv->handle, target ? target : "_",
+    syslog(LOG_INFO, "%s:%s:%p %s %s %s %s ret:%d resp:%d\n",
+        name, priv->cpu, (void*)(uintptr_t)priv->handle, target ? target : "_",
         cmd, arg ? arg : "_", apply ? "apply" : "_", ret, (int)resp);
     return ret < 0 ? ret : resp;
 }
@@ -226,7 +240,7 @@ static void* media_open(int control, const char* params)
         goto error2;
 
     atomic_store(&priv->refs, 1);
-    syslog(LOG_INFO, "%s:%s handle:%p\n", __func__, params, priv);
+    syslog(LOG_INFO, "%s:%s handle:%p\n", __func__, params, (void*)(uintptr_t)priv->handle);
     return priv;
 
 error2:
@@ -520,7 +534,6 @@ int media_player_start(void* handle)
 {
     if (!handle)
         return -EINVAL;
-    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "start", NULL, 0, NULL, 0);
 }
 
@@ -536,7 +549,6 @@ int media_player_stop(void* handle)
         priv->socket = 0;
     }
 
-    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "stop", NULL, 0, NULL, 0);
 }
 
