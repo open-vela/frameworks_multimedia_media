@@ -33,6 +33,7 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#include <media_api.h>
 #include <sys/eventfd.h>
 #include <sys/queue.h>
 #include <sys/types.h>
@@ -40,7 +41,6 @@
 #include <unistd.h>
 
 #include "media_internal.h"
-#include <media_api.h>
 
 /****************************************************************************
  * Pre-processor Definitions
