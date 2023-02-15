@@ -22,10 +22,11 @@
  * Included Files
  ****************************************************************************/
 
-#include "media_wrapper.h"
-#include "media_policy.h"
 #include <errno.h>
 #include <stdio.h>
+
+#include "media_wrapper.h"
+#include "media_policy.h"
 
 /****************************************************************************
  * Pre-processor Definitions

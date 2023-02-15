@@ -20,9 +20,6 @@
  * Included Files
  ****************************************************************************/
 
-#include "media_focus.h"
-#include "media_internal.h"
-#include "media_wrapper.h"
 #include <ctype.h>
 #include <debug.h>
 #include <errno.h>
@@ -31,6 +28,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "media_focus.h"
+#include "media_internal.h"
+#include "media_wrapper.h"
 
 /****************************************************************************
  * Pre-processor Definitions
