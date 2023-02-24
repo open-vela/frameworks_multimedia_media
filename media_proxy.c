@@ -206,6 +206,16 @@ error1:
     return NULL;
 }
 
+static void media_close_socket(void* handle)
+{
+    MediaProxyPriv* priv = handle;
+
+    if (atomic_load(&priv->refs) == 1 && priv->socket) {
+        close(priv->socket);
+        priv->socket = 0;
+    }
+}
+
 static int media_close(int control, void* handle, int pending_stop)
 {
     MediaProxyPriv* priv = handle;
@@ -221,10 +231,8 @@ static int media_close(int control, void* handle, int pending_stop)
     if (ret < 0)
         return ret;
 
+    media_close_socket(priv);
     if (atomic_fetch_sub(&priv->refs, 1) == 1) {
-        if (priv->socket)
-            close(priv->socket);
-
         free(priv->cpu);
         free(priv);
     }
@@ -462,6 +470,8 @@ int media_player_prepare(void* handle, const char* url, const char* options)
 
 int media_player_reset(void* handle)
 {
+    media_close_socket(handle);
+
     return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "reset", NULL, 0, NULL, 0);
 }
 
@@ -622,6 +632,8 @@ int media_recorder_prepare(void* handle, const char* url, const char* options)
 
 int media_recorder_reset(void* handle)
 {
+    media_close_socket(handle);
+
     return media_transact_once(MEDIA_RECORDER_CONTROL, handle, NULL, "reset", NULL, 0, NULL, 0);
 }
 
@@ -652,6 +664,8 @@ int media_recorder_pause(void* handle)
 
 int media_recorder_stop(void* handle)
 {
+    media_close_socket(handle);
+
     return media_transact_once(MEDIA_RECORDER_CONTROL, handle, NULL, "stop", NULL, 0, NULL, 0);
 }
 
