@@ -614,10 +614,19 @@ int media_recorder_control(void* handle, const char* target, const char* cmd,
     out:
         return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)filter);
     } else if (!strcmp(cmd, "close")) {
-        ret = media_graph_queue_command(filter, "close", NULL, NULL, 0, 0);
-        if (ret >= 0)
+        ret = media_graph_queue_command(filter, "close", arg, NULL, 0, 0);
+        if (ret >= 0) {
+            media_policy_set_stream_status(filter->name, false);
             filter->opaque = NULL;
+        }
 
+        return ret;
+    } else if (!strcmp(cmd, "start")) {
+        media_policy_set_stream_status(filter->name, true);
+        return media_graph_queue_command(filter, "start", NULL, NULL, 0, 0);
+    } else if (!strcmp(cmd, "pause") || !strcmp(cmd, "stop")) {
+        ret = media_graph_queue_command(filter, cmd, NULL, NULL, 0, 0);
+        media_policy_set_stream_status(filter->name, false);
         return ret;
     }
 
