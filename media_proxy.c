@@ -465,6 +465,7 @@ int media_player_set_event_callback(void* handle, void* cookie,
 
 int media_player_prepare(void* handle, const char* url, const char* options)
 {
+    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     return media_prepare(MEDIA_PLAYER_CONTROL, handle, url, options);
 }
 
