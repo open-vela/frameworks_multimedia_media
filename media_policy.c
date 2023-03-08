@@ -249,7 +249,7 @@ err_parse:
  * Public Functions
  ****************************************************************************/
 
-int media_policy_control(void* handle, const char* name, const char* cmd,
+int media_policy_handler(void* handle, const char* name, const char* cmd,
     const char* value, int apply, char** res, int res_len)
 {
     MediaPolicyPriv* priv = handle;

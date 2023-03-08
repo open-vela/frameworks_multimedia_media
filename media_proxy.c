@@ -758,7 +758,7 @@ int media_policy_get_stream_name(const char* stream, char* name, int len)
 
     handle = media_get_policy();
     if (handle)
-        return media_policy_control(handle, stream, "get_string", NULL, 0, &name, len);
+        return media_policy_handler(handle, stream, "get_string", NULL, 0, &name, len);
     else
         return media_transact(MEDIA_POLICY_CONTROL, NULL, stream, "get_string", NULL, 0, name, len, true);
 }
@@ -772,7 +772,7 @@ int media_policy_set_stream_status(const char* name, bool active)
 
     handle = media_get_policy();
     if (handle)
-        return media_policy_control(handle, "ActiveStreams", cmd, name, 0, NULL, 0);
+        return media_policy_handler(handle, "ActiveStreams", cmd, name, 0, NULL, 0);
     else
         return media_transact(MEDIA_POLICY_CONTROL, NULL, "ActiveStreams", cmd, name, 0, NULL, 0, true);
 }
@@ -780,7 +780,7 @@ int media_policy_set_stream_status(const char* name, bool active)
 void media_policy_process_command(const char* target, const char* cmd, const char* arg)
 {
 #ifdef CONFIG_LIB_FFMPEG
-    media_graph_control(media_get_graph(), target, cmd, arg, NULL, 0);
+    media_graph_handler(media_get_graph(), target, cmd, arg, NULL, 0);
 #endif
     media_transact(MEDIA_GRAPH_CONTROL, NULL, target, cmd, arg, 0, NULL, 0, true);
 }
