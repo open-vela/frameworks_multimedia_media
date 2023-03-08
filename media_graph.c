@@ -526,7 +526,7 @@ int media_graph_run_once(void* handle)
     return ret == -EAGAIN ? 0 : ret;
 }
 
-int media_graph_control(void* handle, const char* target, const char* cmd,
+int media_graph_handler(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len)
 {
     MediaGraphPriv* priv = handle;
@@ -562,7 +562,7 @@ int media_graph_control(void* handle, const char* target, const char* cmd,
     return 0;
 }
 
-int media_player_control(void* handle, const char* target, const char* cmd,
+int media_player_handler(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len)
 {
     AVFilterContext* filter;
@@ -631,7 +631,7 @@ int media_player_control(void* handle, const char* target, const char* cmd,
     return media_graph_queue_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
 }
 
-int media_recorder_control(void* handle, const char* target, const char* cmd,
+int media_recorder_handler(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len)
 {
     AVFilterContext* filter;
