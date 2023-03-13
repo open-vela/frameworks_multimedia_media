@@ -887,3 +887,38 @@ int media_session_get_duration(void* handle, unsigned int* msec)
 
     return ret;
 }
+
+int media_session_set_volume(void* handle, float volume)
+{
+    char tmp[32];
+
+    snprintf(tmp, sizeof(tmp), "%f", volume);
+    return media_transact_once(MEDIA_SESSION_CONTROL, handle, "volume", "volume", tmp, 0, NULL, 0);
+}
+
+int media_session_get_volume(void* handle, float* volume)
+{
+    char tmp[32];
+    int ret;
+
+    if (!volume)
+        return -EINVAL;
+
+    ret = media_transact_once(MEDIA_SESSION_CONTROL, handle, "volume", "dump", NULL, 0, tmp, sizeof(tmp));
+    if (ret >= 0) {
+        sscanf(tmp, "vol:%f", volume);
+        ret = 0;
+    }
+
+    return ret;
+}
+
+int media_session_next_song(void* handle)
+{
+    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "next", NULL, 0, NULL, 0);
+}
+
+int media_session_prev_song(void* handle)
+{
+    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "prev", NULL, 0, NULL, 0);
+}
