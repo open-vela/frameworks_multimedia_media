@@ -86,6 +86,8 @@ static int mediatool_player_cmd_seek(struct mediatool_s* media, char* pargs);
 static int mediatool_player_cmd_position(struct mediatool_s* media, char* pargs);
 static int mediatool_player_cmd_duration(struct mediatool_s* media, char* pargs);
 static int mediatool_player_cmd_isplaying(struct mediatool_s* media, char* pargs);
+static int mediatool_session_cmd_prevsong(struct mediatool_s* media, char* pargs);
+static int mediatool_session_cmd_nextsong(struct mediatool_s* media, char* pargs);
 static int mediatool_common_stop_inner(struct mediatool_chain_s* chain);
 static int mediatool_common_cmd_send(struct mediatool_s* media, char* pargs);
 static int mediatool_server_cmd_dump(struct mediatool_s* media, char* pargs);
@@ -165,6 +167,12 @@ static struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "isplay",
         mediatool_player_cmd_isplaying,
         "Get position is playing or not(isplay ID)" },
+    { "prev",
+        mediatool_session_cmd_prevsong,
+        "To play previous song in player list(prev ID)" },
+    { "next",
+        mediatool_session_cmd_nextsong,
+        "To play next song in player list(next ID)" },
     { "send",
         mediatool_common_cmd_send,
         "Send cmd to graph" },
@@ -756,13 +764,24 @@ static int mediatool_player_cmd_volume(struct mediatool_s* media, char* pargs)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    if (media->chain[id].type != MEDIATOOL_PLAYER)
-        return 0;
+    switch (media->chain[id].type) {
+    case MEDIATOOL_PLAYER:
+        if (ptr)
+            ret = media_player_get_volume(media->chain[id].handle, &volume);
+        else
+            ret = media_player_set_volume(media->chain[id].handle, volume);
+        break;
 
-    if (ptr)
-        ret = media_player_get_volume(media->chain[id].handle, &volume);
-    else
-        ret = media_player_set_volume(media->chain[id].handle, volume);
+    case MEDIATOOL_SESSION:
+        if (ptr)
+            ret = media_session_get_volume(media->chain[id].handle, &volume);
+        else
+            ret = media_session_set_volume(media->chain[id].handle, volume);
+        break;
+
+    case MEDIATOOL_RECORDER:
+        return 0;
+    }
 
     printf("ID %d, %s volume %f\n", id, ptr ? "get" : "set", volume);
 
@@ -906,6 +925,44 @@ static int mediatool_player_cmd_isplaying(struct mediatool_s* media, char* pargs
     printf("Is_playing %d\n", ret);
 
     return 0;
+}
+
+static int mediatool_session_cmd_prevsong(struct mediatool_s* media, char* pargs)
+{
+    int ret = -EINVAL;
+    long int id;
+
+    if (!strlen(pargs))
+        return ret;
+
+    id = strtol(pargs, NULL, 10);
+
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+        return ret;
+
+    if (media->chain[id].type != MEDIATOOL_SESSION)
+        return 0;
+
+    return media_session_prev_song(media->chain[id].handle);
+}
+
+static int mediatool_session_cmd_nextsong(struct mediatool_s* media, char* pargs)
+{
+    int ret = -EINVAL;
+    long int id;
+
+    if (!strlen(pargs))
+        return ret;
+
+    id = strtol(pargs, NULL, 10);
+
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+        return ret;
+
+    if (media->chain[id].type != MEDIATOOL_SESSION)
+        return 0;
+
+    return media_session_next_song(media->chain[id].handle);
 }
 
 static int mediatool_common_cmd_send(struct mediatool_s* media, char* pargs)

@@ -101,6 +101,40 @@ int media_session_get_position(void* handle, unsigned int* msec);
  */
 int media_session_get_duration(void* handle, unsigned int* msec);
 
+/**
+ * Set the most active player path volume through sessoin path.
+ * @param[in] handle    The session path
+ * @param[in] mesc      Volume with range of 0.0 - 1.0
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_session_set_volume(void* handle, float volume);
+
+/**
+ * Get the most active player path volume through sessoin path.
+ * @param[in] handle    The session path
+ * @param[in] mesc      Volume with range of 0.0 - 1.0
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_session_get_volume(void* handle, float* volume);
+
+/**
+ * Play previous song in player list through sessoin path.
+ * @param[in] handle    The session path.
+ * @return Zero on success; a negated errno value on failure.
+ * @note media framework has no player list, such function shall be
+ * implemented by player.
+ */
+int media_session_prev_song(void* handle);
+
+/**
+ * Play next song in player list through sessoin path.
+ * @param[in] handle    The session path.
+ * @return Zero on success; a negated errno value on failure.
+ * @note media framework has no player list, such function shall be
+ * implemented by player.
+ */
+int media_session_next_song(void* handle);
+
 #undef EXTERN
 #ifdef __cplusplus
 }
