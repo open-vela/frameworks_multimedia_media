@@ -876,7 +876,7 @@ int media_session_handler(void* handle, const char* target, const char* cmd,
         else if (!strcmp(cmd, "next"))
             ret = MEDIA_EVENT_NEXT;
         else
-            return -ENOSYS;
+            return ret;
         media_stub_notify_event(player->cookie, ret, 0, arg);
     }
 
