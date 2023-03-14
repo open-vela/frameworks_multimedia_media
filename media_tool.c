@@ -22,6 +22,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <poll.h>
