@@ -372,9 +372,12 @@ static bool media_player_is_most_active(void* handle)
     MediaPlayerPriv* priv = handle;
     MediaPlayerPriv* tmp;
 
+    if (!priv->name)
+        return false;
+
     LIST_FOREACH(tmp, &g_players, entry)
     {
-        if (!strcmp(tmp->name, priv->name))
+        if (tmp->name && !strcmp(tmp->name, priv->name))
             return tmp == priv;
     }
 
@@ -385,6 +388,9 @@ static void media_session_notify_event(const char* name, int event,
     int result, const char* extra)
 {
     MediaSessionPriv* tmp;
+
+    if (!name)
+        return;
 
     LIST_FOREACH(tmp, &g_sessions, entry)
     {
@@ -645,16 +651,13 @@ int media_player_handler(void* handle, const char* target, const char* cmd,
             return -ENOMEM;
 
         priv = zalloc(sizeof(MediaPlayerPriv));
-        if (!priv) {
-            free(*res);
+        if (!priv)
             return -ENOMEM;
-        }
 
         if (arg) {
             priv->name = strdup(arg);
             if (!priv->name) {
                 free(priv);
-                free(*res);
                 return -ENOMEM;
             }
         }
@@ -663,7 +666,6 @@ int media_player_handler(void* handle, const char* target, const char* cmd,
         if (!filter) {
             free(priv->name);
             free(priv);
-            free(*res);
             return -EINVAL;
         }
 
@@ -728,15 +730,12 @@ int media_recorder_handler(void* handle, const char* target, const char* cmd,
             return -ENOMEM;
 
         priv = malloc(sizeof(MediaRecorderPriv));
-        if (!priv) {
-            free(*res);
+        if (!priv)
             return -ENOMEM;
-        }
 
         filter = media_pick_filter(priv, arg, false);
         if (!filter) {
             free(priv);
-            free(*res);
             return -EINVAL;
         }
 
@@ -795,9 +794,9 @@ int media_recorder_handler(void* handle, const char* target, const char* cmd,
 int media_session_handler(void* handle, const char* target, const char* cmd,
     const char* arg, char** res, int res_len)
 {
+    MediaPlayerPriv *tmp, *player = NULL;
     AVFilterContext* filter;
     MediaSessionPriv* priv;
-    MediaPlayerPriv* tmp;
     int ret;
 
     if (!strcmp(cmd, "open")) {
@@ -859,18 +858,18 @@ int media_session_handler(void* handle, const char* target, const char* cmd,
     pthread_mutex_lock(&g_media_mutex);
     LIST_FOREACH(tmp, &g_players, entry)
     {
-        if (!strcmp(tmp->name, priv->name))
+        if (tmp->name && !strcmp(tmp->name, priv->name)) {
+            player = tmp;
             break;
-
-        tmp = NULL;
+        }
     }
     pthread_mutex_unlock(&g_media_mutex);
 
-    if (!tmp)
+    if (!player)
         return -ENOENT;
 
-    ret = media_player_handler(tmp, target, cmd, arg, res, res_len);
-    if (tmp->event) {
+    ret = media_player_handler(player, target, cmd, arg, res, res_len);
+    if (player->event) {
         if (!strcmp(cmd, "start"))
             ret = MEDIA_EVENT_START;
         else if (!strcmp(cmd, "pause"))
@@ -883,7 +882,7 @@ int media_session_handler(void* handle, const char* target, const char* cmd,
             ret = MEDIA_EVENT_NEXT;
         else
             return -ENOSYS;
-        media_stub_notify_event(tmp->cookie, ret, 0, arg);
+        media_stub_notify_event(player->cookie, ret, 0, arg);
     }
 
     return ret;
