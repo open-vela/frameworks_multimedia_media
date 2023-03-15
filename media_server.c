@@ -49,6 +49,7 @@ struct media_server_conn {
     int notify_fd;
     media_parcel parcel;
     uint32_t offset;
+    pthread_mutex_t mutex;
 };
 
 struct media_server_priv {
@@ -120,10 +121,14 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
 
     if (fd->revents == POLLERR || fd->revents == POLLHUP) {
         close(fd->fd);
-        if (conn->notify_fd > 0)
+        pthread_mutex_lock(&conn->mutex);
+        if (conn->notify_fd > 0) {
             close(conn->notify_fd);
+            conn->notify_fd = 0;
+        }
+        pthread_mutex_unlock(&conn->mutex);
         media_parcel_deinit(&conn->parcel);
-        memset(conn, 0, sizeof(*conn));
+        conn->tran_fd = 0;
         return 0;
     }
 
@@ -174,6 +179,7 @@ static int media_server_accept(void* handle, struct pollfd* fd)
         if (priv->conns[i].tran_fd <= 0) {
             priv->conns[i].tran_fd = new_fd;
             media_parcel_init(&priv->conns[i].parcel);
+            pthread_mutex_init(&priv->conns[i].mutex, NULL);
             return 0;
         }
     }
@@ -265,6 +271,7 @@ int media_server_destroy(void* handle)
         }
         if (priv->conns[i].notify_fd > 0)
             close(priv->conns[i].notify_fd);
+        pthread_mutex_destroy(&priv->conns[i].mutex);
     }
 
     free(priv);
@@ -320,10 +327,17 @@ int media_server_notify(void* handle, void* cookie, media_parcel* parcel)
 {
     struct media_server_priv* priv = handle;
     struct media_server_conn* conn = cookie;
+    int ret;
+
+    pthread_mutex_lock(&conn->mutex);
 
     if (priv == NULL || conn == NULL || conn->notify_fd <= 0)
         return -EINVAL;
 
-    return media_parcel_send(parcel, conn->notify_fd,
+    ret = media_parcel_send(parcel, conn->notify_fd,
         MEDIA_PARCEL_NOTIFY, MSG_DONTWAIT);
+
+    pthread_mutex_unlock(&conn->mutex);
+
+    return ret;
 }
