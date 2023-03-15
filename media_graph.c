@@ -441,6 +441,12 @@ static void media_recorder_event_cb(void* cookie, int event,
 {
     MediaRecorderPriv* priv = cookie;
 
+    if (event == MEDIA_EVENT_NOP) {
+        priv->filter->opaque = NULL;
+        free(priv);
+        return;
+    }
+
     if (priv->event)
         media_stub_notify_event(priv->cookie, event, result, extra);
 }
@@ -762,21 +768,10 @@ int media_recorder_handler(void* handle, const char* target, const char* cmd,
         return ret;
     }
 
-    if (!strcmp(cmd, "pause") || !strcmp(cmd, "stop")) {
+    if (!strcmp(cmd, "close") || !strcmp(cmd, "pause") || !strcmp(cmd, "stop")) {
         ret = media_graph_queue_command(priv->filter, cmd, arg, NULL, 0, 0);
         if (ret >= 0)
             media_policy_set_stream_status(priv->filter->name, false);
-
-        return ret;
-    }
-
-    if (!strcmp(cmd, "close")) {
-        ret = media_graph_queue_command(priv->filter, cmd, arg, NULL, 0, 0);
-        if (ret >= 0) {
-            media_policy_set_stream_status(priv->filter->name, false);
-            priv->filter->opaque = NULL;
-            free(priv);
-        }
 
         return ret;
     }
