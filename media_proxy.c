@@ -48,6 +48,7 @@
 typedef struct MediaProxyPriv {
     void* proxy;
     char* cpu;
+    char* stream_type;
     uint64_t handle;
     atomic_int refs;
     int socket;
@@ -826,7 +827,24 @@ void media_policy_process_command(const char* target, const char* cmd, const cha
 
 void* media_session_open(const char* params)
 {
-    return media_open(MEDIA_SESSION_CONTROL, params);
+    MediaProxyPriv* priv;
+    char* stream_type;
+
+    if (!params)
+        return NULL;
+
+    stream_type = strdup(params);
+    if (!stream_type)
+        return NULL;
+
+    priv = media_open(MEDIA_SESSION_CONTROL, params);
+    if (!priv) {
+        free(stream_type);
+        return NULL;
+    }
+
+    priv->stream_type = stream_type;
+    return priv;
 }
 
 int media_session_set_event_callback(void* handle, void* cookie,
@@ -837,7 +855,17 @@ int media_session_set_event_callback(void* handle, void* cookie,
 
 int media_session_close(void* handle)
 {
-    return media_close(MEDIA_SESSION_CONTROL, handle, 0);
+    MediaProxyPriv* priv = handle;
+    int ret;
+
+    if (!handle)
+        return -EINVAL;
+
+    ret = media_close(MEDIA_SESSION_CONTROL, handle, 0);
+    if (ret >= 0)
+        free(priv->stream_type);
+
+    return ret;
 }
 
 int media_session_start(void* handle)
@@ -885,29 +913,44 @@ int media_session_get_duration(void* handle, unsigned int* msec)
     return ret;
 }
 
-int media_session_set_volume(void* handle, float volume)
+int media_session_set_volume(void* handle, int volume)
 {
-    char tmp[32];
+    MediaProxyPriv* priv = handle;
 
-    snprintf(tmp, sizeof(tmp), "%f", volume);
-    return media_transact_once(MEDIA_SESSION_CONTROL, handle, "volume", "volume", tmp, 0, NULL, 0);
-}
-
-int media_session_get_volume(void* handle, float* volume)
-{
-    char tmp[32];
-    int ret;
-
-    if (!volume)
+    if (!handle)
         return -EINVAL;
 
-    ret = media_transact_once(MEDIA_SESSION_CONTROL, handle, "volume", "dump", NULL, 0, tmp, sizeof(tmp));
-    if (ret >= 0) {
-        sscanf(tmp, "vol:%f", volume);
-        ret = 0;
-    }
+    return media_policy_set_stream_volume(priv->stream_type, volume);
+}
 
-    return ret;
+int media_session_get_volume(void* handle, int* volume)
+{
+    MediaProxyPriv* priv = handle;
+
+    if (!handle)
+        return -EINVAL;
+
+    return media_policy_get_stream_volume(priv->stream_type, volume);
+}
+
+int media_session_increase_volume(void* handle)
+{
+    MediaProxyPriv* priv = handle;
+
+    if (!handle)
+        return -EINVAL;
+
+    return media_policy_increase_stream_volume(priv->stream_type);
+}
+
+int media_session_decrease_volume(void* handle)
+{
+    MediaProxyPriv* priv = handle;
+
+    if (!handle)
+        return -EINVAL;
+
+    return media_policy_decrease_stream_volume(priv->stream_type);
 }
 
 int media_session_next_song(void* handle)
