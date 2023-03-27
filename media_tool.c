@@ -151,7 +151,7 @@ static struct mediatool_cmd_s g_mediatool_cmds[] = {
         "Set player/recorder/session pause (pause ID)" },
     { "volume",
         mediatool_player_cmd_volume,
-        "Set/Get player volume (volume ID ?/volume)" },
+        "Set/Get player/session volume (volume ID ?/volume)" },
     { "loop",
         mediatool_player_cmd_loop,
         "Set/Get player loop (loop ID 1/0)" },
@@ -747,7 +747,8 @@ static int mediatool_player_cmd_pause(struct mediatool_s* media, char* pargs)
 
 static int mediatool_player_cmd_volume(struct mediatool_s* media, char* pargs)
 {
-    float volume;
+    float volume_f;
+    int volume_i;
     int ret = 0;
     char* ptr;
     int id;
@@ -755,35 +756,45 @@ static int mediatool_player_cmd_volume(struct mediatool_s* media, char* pargs)
     if (!strlen(pargs))
         return -EINVAL;
 
-    ptr = strchr(pargs, '?');
-    if (ptr)
-        sscanf(pargs, "%d", &id);
-    else
-        sscanf(pargs, "%d %f", &id, &volume);
+    sscanf(pargs, "%d", &id);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
     switch (media->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        if (ptr)
-            ret = media_player_get_volume(media->chain[id].handle, &volume);
-        else
-            ret = media_player_set_volume(media->chain[id].handle, volume);
+        if ((ptr = strchr(pargs, '?'))) {
+            ret = media_player_get_volume(media->chain[id].handle, &volume_f);
+            printf("ID %d, get volume %f\n", id, volume_f);
+        } else {
+            sscanf(pargs, "%d %f", &id, &volume_f);
+            ret = media_player_set_volume(media->chain[id].handle, volume_f);
+            printf("ID %d, set volume %f\n", id, volume_f);
+        }
         break;
 
     case MEDIATOOL_SESSION:
-        if (ptr)
-            ret = media_session_get_volume(media->chain[id].handle, &volume);
-        else
-            ret = media_session_set_volume(media->chain[id].handle, volume);
+        if ((ptr = strchr(pargs, '?'))) {
+            ret = media_session_get_volume(media->chain[id].handle, &volume_i);
+            printf("ID %d, get volume %d\n", id, volume_i);
+        } else if ((ptr = strchr(pargs, '+'))) {
+            ret = media_session_get_volume(media->chain[id].handle, &volume_i);
+            ret = media_session_increase_volume(media->chain[id].handle);
+            printf("ID %d, increase volume %d++\n", id, volume_i);
+        } else if ((ptr = strchr(pargs, '-'))) {
+            ret = media_session_get_volume(media->chain[id].handle, &volume_i);
+            ret = media_session_decrease_volume(media->chain[id].handle);
+            printf("ID %d, decrease volume %d--\n", id, volume_i);
+        } else {
+            sscanf(pargs, "%d %d", &id, &volume_i);
+            ret = media_session_set_volume(media->chain[id].handle, volume_i);
+            printf("ID %d, set volume %d\n", id, volume_i);
+        }
         break;
 
     case MEDIATOOL_RECORDER:
         return 0;
     }
-
-    printf("ID %d, %s volume %f\n", id, ptr ? "get" : "set", volume);
 
     return ret;
 }

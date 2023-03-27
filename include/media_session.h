@@ -41,7 +41,7 @@ extern "C" {
 
 /**
  * Open one session path.
- * @param[in] params    Open params.
+ * @param[in] params    Stream type, use MEDIA_STREAM_*.
  * @return Pointer to created handle or NULL on failure.
  */
 void* media_session_open(const char* params);
@@ -104,18 +104,32 @@ int media_session_get_duration(void* handle, unsigned int* msec);
 /**
  * Set the most active player path volume through sessoin path.
  * @param[in] handle    The session path
- * @param[in] mesc      Volume with range of 0.0 - 1.0
+ * @param[in] volume    Volume index of stream type, with range of 1 - 10
  * @return Zero on success; a negated errno value on failure.
  */
-int media_session_set_volume(void* handle, float volume);
+int media_session_set_volume(void* handle, int volume);
 
 /**
  * Get the most active player path volume through sessoin path.
  * @param[in] handle    The session path
- * @param[in] mesc      Volume with range of 0.0 - 1.0
+ * @param[in] volume    Volume index of stream type, with range of 1 - 10
  * @return Zero on success; a negated errno value on failure.
  */
-int media_session_get_volume(void* handle, float* volume);
+int media_session_get_volume(void* handle, int* volume);
+
+/**
+ * Increase the most active player path volume through sessoin path.
+ * @param[in] handle    The session path
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_session_increase_volume(void* handle);
+
+/**
+ * Decrease the most active player path volume through sessoin path.
+ * @param[in] handle    The session path
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_session_decrease_volume(void* handle);
 
 /**
  * Play previous song in player list through sessoin path.
