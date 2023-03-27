@@ -796,27 +796,24 @@ void media_policy_dump(const char* options)
 
 int media_policy_get_stream_name(const char* stream, char* name, int len)
 {
-    void* handle;
-
-    handle = media_get_policy();
-    if (handle)
-        return media_policy_handler(handle, stream, "get_string", NULL, 0, &name, len);
-    else
-        return media_transact(MEDIA_POLICY_CONTROL, NULL, stream, "get_string", NULL, 0, name, len, true);
+#ifdef CONFIG_PFW
+    return media_policy_handler(media_get_policy(), stream, "get_string", NULL, 0, &name, len);
+#else
+    return media_transact(MEDIA_POLICY_CONTROL, NULL, stream, "get_string", NULL, 0, name, len, true);
+#endif
 }
 
 int media_policy_set_stream_status(const char* name, bool active)
 {
     const char* cmd = active ? "include" : "exclude";
-    void* handle;
 
     name = strchr(name, '@') + 1;
 
-    handle = media_get_policy();
-    if (handle)
-        return media_policy_handler(handle, "ActiveStreams", cmd, name, 0, NULL, 0);
-    else
-        return media_transact(MEDIA_POLICY_CONTROL, NULL, "ActiveStreams", cmd, name, 0, NULL, 0, true);
+#ifdef CONFIG_PFW
+    return media_policy_handler(media_get_policy(), "ActiveStreams", cmd, name, 1, NULL, 0);
+#else
+    return media_transact(MEDIA_POLICY_CONTROL, NULL, "ActiveStreams", cmd, name, 1, NULL, 0, true);
+#endif
 }
 
 void media_policy_process_command(const char* target, const char* cmd, const char* arg)
