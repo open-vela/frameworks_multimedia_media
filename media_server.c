@@ -327,16 +327,17 @@ int media_server_notify(void* handle, void* cookie, media_parcel* parcel)
 {
     struct media_server_priv* priv = handle;
     struct media_server_conn* conn = cookie;
-    int ret;
+    int ret = -EINVAL;
 
     pthread_mutex_lock(&conn->mutex);
 
     if (priv == NULL || conn == NULL || conn->notify_fd <= 0)
-        return -EINVAL;
+        goto out;
 
     ret = media_parcel_send(parcel, conn->notify_fd,
         MEDIA_PARCEL_NOTIFY, MSG_DONTWAIT);
 
+out:
     pthread_mutex_unlock(&conn->mutex);
 
     return ret;
