@@ -856,14 +856,16 @@ int media_session_set_event_callback(void* handle, void* cookie,
 int media_session_close(void* handle)
 {
     MediaProxyPriv* priv = handle;
+    char* stream_type;
     int ret;
 
     if (!handle)
         return -EINVAL;
 
+    stream_type = priv->stream_type;
     ret = media_close(MEDIA_SESSION_CONTROL, handle, 0);
     if (ret >= 0)
-        free(priv->stream_type);
+        free(stream_type);
 
     return ret;
 }

@@ -151,7 +151,7 @@ static struct mediatool_cmd_s g_mediatool_cmds[] = {
         "Set player/recorder/session pause (pause ID)" },
     { "volume",
         mediatool_player_cmd_volume,
-        "Set/Get player/session volume (volume ID ?/volume)" },
+        "Set/Get player/session volume (volume ID ?/+/-/volume)" },
     { "loop",
         mediatool_player_cmd_loop,
         "Set/Get player loop (loop ID 1/0)" },
