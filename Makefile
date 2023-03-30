@@ -60,7 +60,6 @@ endif
 
 ifneq ($(CONFIG_MEDIA_TOOL),)
   MAINSRC   += media_tool.c
-  CSRCS     += media_toolrpc.c
   PROGNAME  += mediatool
   PRIORITY  += $(CONFIG_MEDIA_TOOL_PRIORITY)
   STACKSIZE += $(CONFIG_MEDIA_TOOL_STACKSIZE)
