@@ -718,6 +718,36 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
     return media_transact_once(MEDIA_RECORDER_CONTROL, handle, target, key, NULL, 0, value, value_len);
 }
 
+int media_recorder_take_picture(char* params, char* filename, size_t number)
+{
+    char option[32];
+    void* handle;
+    int ret;
+
+    if (!number || number > INT_MAX)
+        return -EINVAL;
+
+    handle = media_recorder_open(params);
+    if (!handle)
+        return -EINVAL;
+
+    snprintf(option, sizeof(option), "total_number=%zu", number);
+
+    ret = media_recorder_prepare(handle, filename, option);
+    if (ret < 0)
+        goto error;
+
+    ret = media_recorder_start(handle);
+    if (ret < 0)
+        goto error;
+
+    return media_close(MEDIA_RECORDER_CONTROL, handle, 1);
+
+error:
+    media_recorder_close(handle);
+    return ret;
+}
+
 int media_policy_set_int(const char* name, int value, int apply)
 {
     char tmp[32];
