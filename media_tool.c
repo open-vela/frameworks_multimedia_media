@@ -73,6 +73,7 @@ struct mediatool_s {
 
 static int mediatool_player_cmd_open(struct mediatool_s* media, char* pargs);
 static int mediatool_recorder_cmd_open(struct mediatool_s* media, char* pargs);
+static int mediatool_recorder_cmd_take_picture(struct mediatool_s* media, char* pargs);
 static int mediatool_session_cmd_open(struct mediatool_s* media, char* pargs);
 static int mediatool_common_cmd_close(struct mediatool_s* media, char* pargs);
 static int mediatool_common_cmd_reset(struct mediatool_s* media, char* pargs);
@@ -173,6 +174,9 @@ static struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "next",
         mediatool_session_cmd_nextsong,
         "To play next song in player list(next ID)" },
+    { "takepic",
+        mediatool_recorder_cmd_take_picture,
+        "take picture from camera" },
     { "send",
         mediatool_common_cmd_send,
         "Send cmd to graph" },
@@ -974,6 +978,29 @@ static int mediatool_session_cmd_nextsong(struct mediatool_s* media, char* pargs
         return 0;
 
     return media_session_next_song(media->chain[id].handle);
+}
+
+static int mediatool_recorder_cmd_take_picture(struct mediatool_s* media, char* pargs)
+{
+    char* filtername;
+    char* filename;
+    size_t number;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+
+    /* pargs should look like "PictureSink /DATA/IMG_%d.jpg 3" */
+    filtername = strtok_r(pargs, " ", &pargs);
+    if (!filtername)
+        return -EINVAL;
+
+    filename = strtok_r(NULL, " ", &pargs);
+    if (!filename)
+        return -EINVAL;
+
+    number = strtoul(pargs, NULL, 10);
+
+    return media_recorder_take_picture(filtername, filename, number);
 }
 
 static int mediatool_common_cmd_send(struct mediatool_s* media, char* pargs)

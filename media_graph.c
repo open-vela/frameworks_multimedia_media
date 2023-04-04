@@ -735,7 +735,7 @@ int media_recorder_handler(void* handle, const char* target, const char* cmd,
         if (!*res)
             return -ENOMEM;
 
-        priv = malloc(sizeof(MediaRecorderPriv));
+        priv = zalloc(sizeof(MediaRecorderPriv));
         if (!priv)
             return -ENOMEM;
 

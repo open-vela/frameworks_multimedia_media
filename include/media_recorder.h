@@ -151,6 +151,16 @@ int media_recorder_set_property(void* handle, const char* target, const char* ke
  */
 int media_recorder_get_property(void* handle, const char* target, const char* key, char* value, int value_len);
 
+/**
+ * Take picture from camera
+ * Camera only
+ * @param[in] params    open params
+ * @param[in] filename  The store path for new picture
+ * @param[in] number    The number of taking picture
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_recorder_take_picture(char* params, char* filename, size_t number);
+
 #undef EXTERN
 #ifdef __cplusplus
 }
