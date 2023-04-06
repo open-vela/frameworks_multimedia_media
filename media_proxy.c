@@ -420,8 +420,10 @@ static ssize_t media_process_data(void* handle, bool player,
     ret = -errno;
 
 out:
-    if (atomic_fetch_sub(&priv->refs, 1) == 1)
+    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
+        free(priv->cpu);
         free(priv);
+    }
 
     return ret;
 }
@@ -511,6 +513,9 @@ int media_player_prepare(void* handle, const char* url, const char* options)
 
 int media_player_reset(void* handle)
 {
+    if (!handle)
+        return -EINVAL;
+
     media_close_socket(handle);
 
     return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "reset", NULL, 0, NULL, 0);
@@ -535,20 +540,16 @@ int media_player_start(void* handle)
 {
     if (!handle)
         return -EINVAL;
+
     return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "start", NULL, 0, NULL, 0);
 }
 
 int media_player_stop(void* handle)
 {
-    MediaProxyPriv* priv = handle;
-
-    if (!priv)
+    if (!handle)
         return -EINVAL;
 
-    if (atomic_load(&priv->refs) == 1 && priv->socket) {
-        close(priv->socket);
-        priv->socket = 0;
-    }
+    media_close_socket(handle);
 
     return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "stop", NULL, 0, NULL, 0);
 }
@@ -671,6 +672,9 @@ int media_recorder_prepare(void* handle, const char* url, const char* options)
 
 int media_recorder_reset(void* handle)
 {
+    if (!handle)
+        return -EINVAL;
+
     media_close_socket(handle);
 
     return media_transact_once(MEDIA_RECORDER_CONTROL, handle, NULL, "reset", NULL, 0, NULL, 0);
@@ -703,6 +707,9 @@ int media_recorder_pause(void* handle)
 
 int media_recorder_stop(void* handle)
 {
+    if (!handle)
+        return -EINVAL;
+
     media_close_socket(handle);
 
     return media_transact_once(MEDIA_RECORDER_CONTROL, handle, NULL, "stop", NULL, 0, NULL, 0);
