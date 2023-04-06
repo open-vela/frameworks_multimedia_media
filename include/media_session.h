@@ -86,6 +86,22 @@ int media_session_stop(void* handle);
 int media_session_pause(void* handle);
 
 /**
+ * Seek to msec position from begining
+ * @param[in] handle    The player path
+ * @param[in] mesc      Which postion should seek from begining
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_session_seek(void* handle, unsigned int msec);
+
+/**
+ * Get current player state through sessoin path.
+ * @param[in] handle    The session path.
+ * @param[out] state    Current state.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_session_get_state(void* handle, int* state);
+
+/**
  * Get playback position of the most active player through sessoin path.
  * @param[in] handle    The session path
  * @param[in] mesc      Playback position (from begining)
