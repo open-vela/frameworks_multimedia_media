@@ -418,8 +418,10 @@ static void media_player_event_cb(void* cookie, int event,
         pthread_mutex_unlock(&g_media_mutex);
         break;
 
+    case MEDIA_EVENT_SEEKED:
     case MEDIA_EVENT_PAUSED:
     case MEDIA_EVENT_STOPPED:
+    case MEDIA_EVENT_PREPARED:
     case MEDIA_EVENT_COMPLETED:
         pthread_mutex_lock(&g_media_mutex);
         if (media_player_is_most_active(priv))

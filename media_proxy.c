@@ -927,9 +927,32 @@ int media_session_pause(void* handle)
     return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "pause", NULL, 0, NULL, 0);
 }
 
+int media_session_seek(void* handle, unsigned int msec)
+{
+    char tmp[32];
+
+    snprintf(tmp, sizeof(tmp), "%u", msec);
+    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "seek", tmp, 0, NULL, 0);
+}
+
 int media_session_stop(void* handle)
 {
     return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "stop", NULL, 0, NULL, 0);
+}
+
+int media_session_get_state(void* handle, int* state)
+{
+    char tmp[32];
+    int ret;
+
+    if (!state)
+        return -EINVAL;
+
+    ret = media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "get_state", NULL, 0, tmp, sizeof(tmp));
+    if (ret >= 0)
+        *state = strtoul(tmp, NULL, 0);
+
+    return ret;
 }
 
 int media_session_get_position(void* handle, unsigned int* msec)
