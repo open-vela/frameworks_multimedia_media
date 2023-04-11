@@ -74,6 +74,18 @@ typedef struct MediaPoll {
  ****************************************************************************/
 
 static MediaPoll g_media[] = {
+#ifdef CONFIG_MEDIA_FOCUS
+    {
+        "media_focus",
+        NULL,
+        CONFIG_MEDIA_SERVER_CONFIG_PATH "media_focus.conf",
+        media_focus_create,
+        NULL,
+        NULL,
+        NULL,
+        media_focus_destroy,
+    },
+#endif
 #ifdef CONFIG_LIB_FFMPEG
     {
         "media_graph",
@@ -131,6 +143,11 @@ static void* media_get_handle(const char* name)
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+void* media_get_focus(void)
+{
+    return media_get_handle("media_focus");
+}
 
 void* media_get_graph(void)
 {

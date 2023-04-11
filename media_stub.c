@@ -64,6 +64,17 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         break;
 #endif
 
+#ifdef CONFIG_MEDIA_FOCUS
+    case MEDIA_FOCUS_CONTROL:
+        media_parcel_read_scanf(in, "%l%s%s%i", &param_u, &param_s1,
+            &param_s2, &param_i1);
+        handle = param_u ? (void*)(uintptr_t)param_u : cookie;
+        ret = media_focus_handler(handle, param_s1, param_s2,
+            &response, param_i1);
+        media_parcel_append_printf(out, "%i%s", ret, response);
+        break;
+#endif
+
 #ifdef CONFIG_LIB_FFMPEG
     case MEDIA_GRAPH_CONTROL:
         media_parcel_read_scanf(in, "%s%s%s%i", &param_s1, &param_s2,

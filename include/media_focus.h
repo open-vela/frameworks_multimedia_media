@@ -109,11 +109,6 @@ typedef struct media_focus_id {
  ****************************************************************************/
 
 /**
- * @brief peek focus top stream name.
- */
-const char* media_focus_peek(void);
-
-/**
  * @brief Display all focus request in audio focus stack.
  */
 void media_focus_debug_stack_display(void);
