@@ -236,6 +236,7 @@ out:
 int media_client_set_event_cb(void* handle, const char* cpu, void* event_cb, void* cookie)
 {
     struct media_client_priv* priv = handle;
+    struct sched_param param;
     pthread_attr_t pattr;
     int ret;
 
@@ -259,6 +260,8 @@ int media_client_set_event_cb(void* handle, const char* cpu, void* event_cb, voi
 
     pthread_attr_init(&pattr);
     pthread_attr_setstacksize(&pattr, CONFIG_MEDIA_CLIENT_LISTEN_STACKSIZE);
+    param.sched_priority = CONFIG_MEDIA_CLIENT_LISTEN_PRIORITY;
+    pthread_attr_setschedparam(&pattr, &param);
     ret = pthread_create(&priv->thread, &pattr, media_client_listen_thread, (pthread_addr_t)priv);
     if (ret < 0) {
         close(priv->listenfd);

@@ -70,4 +70,8 @@ config MEDIA_CLIENT_LISTEN_STACKSIZE
 	int "Media client listen thread stack size"
 	default 4096
 
+config MEDIA_CLIENT_LISTEN_PRIORITY
+	int "Media client listen thread priority"
+	default 100
+
 endif # MEDIA
