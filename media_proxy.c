@@ -64,6 +64,12 @@ typedef struct media_event_priv_t {
     MEDIA_EVENT_FIELDS
 } media_event_priv_t;
 
+typedef struct media_focus_priv_t {
+    MEDIA_COMMON_FIELDS
+    void* cookie;
+    media_focus_callback suggest;
+} media_focus_priv_t;
+
 typedef struct media_io_priv_t {
     MEDIA_COMMON_FIELDS
     MEDIA_EVENT_FIELDS
@@ -112,6 +118,12 @@ media_transact_once(void* handle, const char* target, const char* cmd,
     media_parcel_init(&out);
 
     switch (priv->type) {
+    case MEDIA_FOCUS_CONTROL:
+        name = "focus";
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%i", priv->type,
+            priv->handle, target, cmd, res_len);
+        break;
+
     case MEDIA_GRAPH_CONTROL:
         name = "graph";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
@@ -223,11 +235,12 @@ static int media_transact(int control, void* handle, const char* target, const c
 
         case MEDIA_POLICY_CONTROL:
             media_client_disconnect(priv->proxy);
-            if (ret != -ENOSYS) // return once found policy
-                return ret;
+            if (ret != -ENOSYS)
+                return ret; // return once found policy
 
             break;
 
+        case MEDIA_FOCUS_CONTROL:
         case MEDIA_PLAYER_CONTROL:
         case MEDIA_RECORDER_CONTROL:
         case MEDIA_SESSION_CONTROL:
@@ -236,10 +249,14 @@ static int media_transact(int control, void* handle, const char* target, const c
                 break;
             }
 
-            /* keep the connection */
+            /* keep the connection in need. */
 
-            priv->cpu = strdup(cpu);
-            DEBUGASSERT(priv->cpu);
+            if (handle) {
+                priv->cpu = strdup(cpu);
+                DEBUGASSERT(priv->cpu);
+            } else
+                media_client_disconnect(priv->proxy);
+
             return 0;
         }
     }
@@ -464,7 +481,18 @@ out:
     return ret;
 }
 
-static void media_proxy_event_cb(void* cookie, media_parcel* msg)
+static void media_suggest_cb(void* cookie, media_parcel* msg)
+{
+    media_focus_priv_t* priv = cookie;
+    const char* extra;
+    int32_t event;
+    int32_t ret;
+
+    media_parcel_read_scanf(msg, "%i%i%s", &event, &ret, &extra);
+    priv->suggest(event, priv->cookie);
+}
+
+static void media_event_cb(void* cookie, media_parcel* msg)
 {
     media_event_priv_t* priv = cookie;
     const char* extra;
@@ -486,7 +514,7 @@ static int media_set_event_cb(void* handle, void* cookie,
     if (!priv)
         return -EINVAL;
 
-    ret = media_client_set_event_cb(priv->proxy, priv->cpu, media_proxy_event_cb, priv);
+    ret = media_client_set_event_cb(priv->proxy, priv->cpu, media_event_cb, priv);
     if (ret < 0)
         return ret;
 
@@ -510,26 +538,74 @@ static int media_get_socket(void* handle)
     return priv->socket;
 }
 
-static const char* media_get_proper_stream(void* handle)
+static int media_get_proper_stream(void* handle, char* stream_type, int len)
 {
     media_session_priv_t* priv = handle;
-    const char* stream_type;
+    int ret;
 
     if (!handle)
-        return NULL;
+        return -EINVAL;
 
-#ifdef CONFIG_MEDIA_FOCUS
-    stream_type = media_focus_peek();
-    if (!stream_type)
-#endif
-        stream_type = priv->stream_type;
+    ret = media_transact(MEDIA_FOCUS_CONTROL, NULL, NULL, "peek", NULL, 0, stream_type, len, false);
+    if (ret <= 0)
+        ret = snprintf(stream_type, len, "%s", priv->stream_type);
 
-    return stream_type;
+    return ret;
 }
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+void* media_focus_request(int* suggestion, const char* stream_type,
+    media_focus_callback cb, void* cookie)
+{
+    media_focus_priv_t* priv;
+    char tmp[64];
+
+    if (!suggestion || !stream_type)
+        return NULL;
+
+    priv = zalloc(sizeof(media_focus_priv_t));
+    if (!priv)
+        return NULL;
+
+    priv->suggest = cb;
+    priv->cookie = cookie;
+
+    if (media_transact(MEDIA_FOCUS_CONTROL, priv, stream_type, "request", NULL, 0, tmp, sizeof(tmp), false) < 0)
+        goto err;
+
+    sscanf(tmp, "%llu:%d", &priv->handle, suggestion);
+    if (!priv->handle)
+        goto err;
+
+    if (media_client_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv) < 0)
+        goto err;
+
+    return priv;
+
+err:
+    media_disconnect(priv);
+    return NULL;
+}
+
+int media_focus_abandon(void* handle)
+{
+    media_focus_priv_t* priv = handle;
+    int ret;
+
+    ret = media_transact(MEDIA_FOCUS_CONTROL, priv, NULL, "abandon", NULL, 0, NULL, 0, false);
+    if (ret >= 0)
+        media_disconnect(priv);
+
+    return ret;
+}
+
+void media_focus_debug_stack_display(void)
+{
+    media_transact(MEDIA_FOCUS_CONTROL, NULL, NULL, "display", NULL, 0, NULL, 0, false);
+}
 
 int media_process_command(const char* target, const char* cmd,
     const char* arg, char* res, int res_len)
@@ -1059,46 +1135,50 @@ int media_session_get_duration(void* handle, unsigned int* msec)
 
 int media_session_set_volume(void* handle, int volume)
 {
-    const char* stream_type;
+    char tmp[32];
+    int ret;
 
-    stream_type = media_get_proper_stream(handle);
-    if (!stream_type)
-        return -EINVAL;
+    ret = media_get_proper_stream(handle, tmp, sizeof(tmp));
+    if (ret < 0)
+        return ret;
 
-    return media_policy_set_stream_volume(stream_type, volume);
+    return media_policy_set_stream_volume(tmp, volume);
 }
 
 int media_session_get_volume(void* handle, int* volume)
 {
-    const char* stream_type;
+    char tmp[32];
+    int ret;
 
-    stream_type = media_get_proper_stream(handle);
-    if (!stream_type)
-        return -EINVAL;
+    ret = media_get_proper_stream(handle, tmp, sizeof(tmp));
+    if (ret < 0)
+        return ret;
 
-    return media_policy_get_stream_volume(stream_type, volume);
+    return media_policy_get_stream_volume(tmp, volume);
 }
 
 int media_session_increase_volume(void* handle)
 {
-    const char* stream_type;
+    char tmp[32];
+    int ret;
 
-    stream_type = media_get_proper_stream(handle);
-    if (!stream_type)
-        return -EINVAL;
+    ret = media_get_proper_stream(handle, tmp, sizeof(tmp));
+    if (ret < 0)
+        return ret;
 
-    return media_policy_increase_stream_volume(stream_type);
+    return media_policy_increase_stream_volume(tmp);
 }
 
 int media_session_decrease_volume(void* handle)
 {
-    const char* stream_type;
+    char tmp[32];
+    int ret;
 
-    stream_type = media_get_proper_stream(handle);
-    if (!stream_type)
-        return -EINVAL;
+    ret = media_get_proper_stream(handle, tmp, sizeof(tmp));
+    if (ret < 0)
+        return ret;
 
-    return media_policy_decrease_stream_volume(stream_type);
+    return media_policy_decrease_stream_volume(tmp);
 }
 
 int media_session_next_song(void* handle)
