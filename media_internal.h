@@ -41,6 +41,7 @@ extern "C" {
 #define MEDIA_PLAYER_CONTROL 3
 #define MEDIA_RECORDER_CONTROL 4
 #define MEDIA_SESSION_CONTROL 5
+#define MEDIA_FOCUS_CONTROL 6
 
 #ifndef CONFIG_RPTUN_LOCAL_CPUNAME
 #define CONFIG_RPTUN_LOCAL_CPUNAME CONFIG_MEDIA_SERVER_CPUNAME
@@ -54,6 +55,7 @@ extern "C" {
  * Media Functions
  ****************************************************************************/
 
+void* media_get_focus(void);
 void* media_get_graph(void);
 void* media_get_policy(void);
 void* media_get_server(void);
@@ -67,6 +69,15 @@ void media_stub_notify_event(void* cookie, int event,
     int result, const char* extra);
 void media_stub_onreceive(void* cookie,
     struct media_parcel* in, struct media_parcel* out);
+
+/****************************************************************************
+ * Focus Functions
+ ****************************************************************************/
+
+void* media_focus_create(void* file);
+int media_focus_destroy(void* handle);
+int media_focus_handler(void* handle, const char* name, const char* cmd,
+    char** res, int res_len);
 
 /****************************************************************************
  * Graph Functions

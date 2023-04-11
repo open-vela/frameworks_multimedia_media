@@ -75,9 +75,6 @@ typedef struct media_focus {
     media_focus_cell* matrix;
 } media_focus;
 
-static media_focus* g_media_focus = NULL;
-static pthread_mutex_t g_media_focus_lock = PTHREAD_MUTEX_INITIALIZER;
-
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -165,7 +162,7 @@ static int media_focus_stream_type_counts(char* sl)
     return count;
 }
 
-static char* media_focus_streams_init(int col, char* line)
+static char* media_focus_streams_init(media_focus* focus, int col, char* line)
 {
     int s_count = 0;
     char* streams = NULL;
@@ -174,8 +171,8 @@ static char* media_focus_streams_init(int col, char* line)
         auderr("invalid input in matrix stream\n");
         return NULL;
     }
-    g_media_focus->num = media_focus_stream_type_counts(line);
-    streams = zalloc((g_media_focus->num * col) * sizeof(char));
+    focus->num = media_focus_stream_type_counts(line);
+    streams = zalloc((focus->num * col) * sizeof(char));
     if (streams == NULL) {
         auderr("no mem for creating streams\n");
         return NULL;
@@ -184,7 +181,7 @@ static char* media_focus_streams_init(int col, char* line)
     // filler streams content with line read
     while (ptr != NULL) {
         int ptr_len = strlen(ptr);
-        if (s_count < g_media_focus->num && ptr_len < col) {
+        if (s_count < focus->num && ptr_len < col) {
             memcpy((streams + s_count * col), ptr, ptr_len);
             s_count += 1;
         } else {
@@ -192,7 +189,7 @@ static char* media_focus_streams_init(int col, char* line)
         }
         ptr = strtok(NULL, ",");
     }
-    if (s_count != g_media_focus->num) {
+    if (s_count != focus->num) {
         return NULL;
     }
     return streams;
@@ -292,8 +289,10 @@ static int media_focus_play_arbitrate(app_focus_id* top_id, app_focus_id* cur_id
 {
     int inter_location;
     int play_ret = MEDIA_FOCUS_STOP;
+    media_focus* focus;
 
-    if (!g_media_focus) {
+    focus = media_get_focus();
+    if (!focus) {
         auderr("media focus intera matrix does not exist\n");
         return play_ret;
     }
@@ -305,9 +304,9 @@ static int media_focus_play_arbitrate(app_focus_id* top_id, app_focus_id* cur_id
         play_ret = MEDIA_FOCUS_STOP;
         break;
     case APP_FOCUS_STATE_STACK_UNDER:
-        inter_location = top_id->focus_level * g_media_focus->num + cur_id->focus_level;
-        if (inter_location < (g_media_focus->num * g_media_focus->num)) {
-            play_ret = (g_media_focus->matrix + inter_location)->pas_inter;
+        inter_location = top_id->focus_level * focus->num + cur_id->focus_level;
+        if (inter_location < (focus->num * focus->num)) {
+            play_ret = (focus->matrix + inter_location)->pas_inter;
         } else {
             auderr("no matched data\n");
             play_ret = MEDIA_FOCUS_STOP;
@@ -337,98 +336,6 @@ static void media_focus_stack_callback(
     }
 }
 
-static void media_focus_destory(void)
-{
-    if (g_media_focus) {
-        free(g_media_focus->stack);
-        free(g_media_focus->streams);
-        free(g_media_focus->matrix);
-        free(g_media_focus);
-        g_media_focus = NULL;
-    }
-}
-
-static int media_focus_init(void)
-{
-    FILE* fp;
-    char* buf = NULL;
-    int ret = 0;
-    int index = 0;
-    int shift_index = 0;
-
-    fp = fopen(CONFIG_MEDIA_FOCUS_CONFIG_PATH "/media_focus.conf", "r");
-    if (fp == NULL) {
-        auderr("no such interaction matrix file\n");
-        return -ENOENT;
-    }
-    buf = malloc(MAX_LEN * sizeof(char));
-    if (buf == NULL) {
-        ret = -ENOMEM;
-        goto out;
-    }
-    buf[MAX_LEN - 1] = '\0';
-
-    g_media_focus = zalloc(sizeof(media_focus));
-    if (g_media_focus == NULL) {
-        ret = -ENOMEM;
-        goto out;
-    }
-
-    while (fgets(buf, MAX_LEN - 1, fp) != NULL) {
-
-        // step 1: remove line and change line symbol from the buf reader result
-        char* line = media_focus_reformat(buf);
-
-        // step 2: analysis reformated line by its head
-        ret = media_focus_line_identity(line, &shift_index);
-
-        // get first valid str in line with index shift
-        line += shift_index;
-        switch (ret) {
-        case MEDIA_FOCUS_FILE_READ_STREAM_TYPE:
-
-            // step 3.1: malloc space for stream types array based on number of stream type and fill with line read
-            g_media_focus->streams = media_focus_streams_init(STREAM_TYPE_LEN, line);
-            if (!g_media_focus->streams) {
-                auderr("no mem for media focus streams\n");
-                ret = -ENOMEM;
-                goto out;
-            }
-
-            // step 3.2 malloc space and init media stack
-            g_media_focus->stack = app_focus_stack_init(CONFIG_MEDIA_FOCUS_STACK_DEPTH, &media_focus_stack_callback);
-            if (!g_media_focus->stack) {
-                auderr("no mem for media focus stack\n");
-                ret = -ENOMEM;
-                goto out;
-            }
-            break;
-
-        case MEDIA_FOCUS_FILE_READ_STREAM_NUM:
-            // step 4: filler interaction play result from each line
-            g_media_focus->matrix = media_focus_matrix_init(g_media_focus->num, line, &index, g_media_focus->matrix);
-            if (!g_media_focus->matrix) {
-                auderr("no mem for media focus stack\n");
-                ret = -ENOMEM;
-                goto out;
-            }
-            break;
-        case MEDIA_FOCUS_FILE_READ_JUMP:
-            break;
-        default:
-            ret = -EINVAL;
-            goto out;
-        }
-    }
-
-out:
-    fclose(fp);
-    free(buf);
-    if (ret < 0)
-        media_focus_destory();
-    return ret;
-}
-
 static int media_focus_focus_id_insert(void* x, app_focus_id* new_focus_id)
 {
     int index_value = 0;
@@ -450,11 +357,9 @@ static int media_focus_focus_id_insert(void* x, app_focus_id* new_focus_id)
     return 0;
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-
-void* media_focus_request(int* return_type,
+static void* media_focus_request_(
+    media_focus* focus,
+    int* return_type,
     const char* stream_type,
     media_focus_callback callback_method,
     void* callback_argv)
@@ -471,19 +376,10 @@ void* media_focus_request(int* return_type,
         auderr("wrong callback method input\n");
         return NULL;
     }
-    pthread_mutex_lock(&g_media_focus_lock);
 
-    // step 2: get media focus
-    if (!g_media_focus) {
-        if (media_focus_init() < 0) {
-            auderr("media focus initial failed\n");
-            goto err;
-        }
-    }
-
-    // step 3: trans stream type to valid num in interaction matrix
-    for (i = 0; i < g_media_focus->num; i++) {
-        if (strcmp((g_media_focus->streams + i * STREAM_TYPE_LEN), stream_type) == 0) {
+    // step 2: trans stream type to valid num in interaction matrix
+    for (i = 0; i < focus->num; i++) {
+        if (strcmp((focus->streams + i * STREAM_TYPE_LEN), stream_type) == 0) {
             new_stream_type = i;
             break;
         }
@@ -493,17 +389,17 @@ void* media_focus_request(int* return_type,
         goto err;
     }
 
-    // step 4: useless focus node clear
-    app_focus_stack_useless_clear(g_media_focus->stack, NONBLOCK_CALLBACK_FLAG);
+    // step 3: useless focus node clear
+    app_focus_stack_useless_clear(focus->stack, NONBLOCK_CALLBACK_FLAG);
 
-    // step 5: get valid id from focus stack
-    valid_id = app_focus_free_client_id(g_media_focus->stack);
+    // step 4: get valid id from focus stack
+    valid_id = app_focus_free_client_id(focus->stack);
     if (valid_id < 0) {
         auderr("audio focus stack is full\n");
         goto err;
     }
 
-    // step 6: specific app_focus_request assemable
+    // step 5: specific app_focus_request assemable
     new_id.client_id = valid_id;
     new_id.focus_level = new_stream_type;
     new_id.thread_id = gettid();
@@ -511,22 +407,22 @@ void* media_focus_request(int* return_type,
     new_id.focus_callback = callback_method;
     new_id.callback_argv = callback_argv;
 
-    // step 7: get exist top focus id
-    if (app_focus_stack_top(g_media_focus->stack, &tmp_id) == 0) {
+    // step 6: get exist top focus id
+    if (app_focus_stack_top(focus->stack, &tmp_id) == 0) {
 
-        // step 8.1: compare with stack top
-        int inter_location = new_id.focus_level * g_media_focus->num + tmp_id.focus_level;
-        if (inter_location < (g_media_focus->num * g_media_focus->num)) {
-            ret = (g_media_focus->matrix + inter_location)->pro_inter;
+        // step 7.1: compare with stack top
+        int inter_location = new_id.focus_level * focus->num + tmp_id.focus_level;
+        if (inter_location < (focus->num * focus->num)) {
+            ret = (focus->matrix + inter_location)->pro_inter;
             *return_type = ret;
             switch (ret) {
             case MEDIA_FOCUS_PLAY:
-                app_focus_stack_push(g_media_focus->stack, &new_id, BLOCK_CALLBACK_FLAG);
-                app_focus_stack_top_change_broadcast(g_media_focus->stack, NONBLOCK_CALLBACK_FLAG);
+                app_focus_stack_push(focus->stack, &new_id, BLOCK_CALLBACK_FLAG);
+                app_focus_stack_top_change_broadcast(focus->stack, NONBLOCK_CALLBACK_FLAG);
                 break;
             case MEDIA_FOCUS_PLAY_BUT_SILENT:
             case MEDIA_FOCUS_PLAY_WITH_DUCK:
-                if (media_focus_focus_id_insert(g_media_focus->stack, &new_id) < 0) {
+                if (media_focus_focus_id_insert(focus->stack, &new_id) < 0) {
                     ret = -EINVAL;
                     goto err;
                 }
@@ -540,14 +436,13 @@ void* media_focus_request(int* return_type,
             *return_type = MEDIA_FOCUS_STOP;
         }
     } else {
-        // step 8.2: stack top not exist, request directly
+        // step 7.2: stack top not exist, request directly
         *return_type = MEDIA_FOCUS_PLAY;
         ret = MEDIA_FOCUS_PLAY;
-        app_focus_stack_push(g_media_focus->stack, &new_id, BLOCK_CALLBACK_FLAG);
+        app_focus_stack_push(focus->stack, &new_id, BLOCK_CALLBACK_FLAG);
     }
 
 err:
-    pthread_mutex_unlock(&g_media_focus_lock);
     if (ret < 0) {
         return NULL;
     }
@@ -557,7 +452,7 @@ err:
     return (void*)ID_TO_HANDLE(valid_id);
 }
 
-int media_focus_abandon(void* handle)
+static int media_focus_abandon_(media_focus* focus, void* handle)
 {
     app_focus_id tmp_id;
     int ret = 0;
@@ -570,55 +465,179 @@ int media_focus_abandon(void* handle)
     }
     app_client_id = HANDLE_TO_ID(app_client_id);
 
-    pthread_mutex_lock(&g_media_focus_lock);
-    // step 3: useless focus id clear
-    app_focus_stack_useless_clear(g_media_focus->stack, NONBLOCK_CALLBACK_FLAG);
+    // step 2: useless focus id clear
+    app_focus_stack_useless_clear(focus->stack, NONBLOCK_CALLBACK_FLAG);
 
-    // step 4: get exist top focus id
-    if (app_focus_stack_top(g_media_focus->stack, &tmp_id) < 0) {
+    // step 3: get exist top focus id
+    if (app_focus_stack_top(focus->stack, &tmp_id) < 0) {
         auderr("media focus stack is empty\n");
-        ret = -ENOENT;
-        goto err;
+        return -ENOENT;
     }
     if (tmp_id.client_id == app_client_id) {
-        app_focus_stack_delete(g_media_focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
-        app_focus_stack_top_change_broadcast(g_media_focus->stack, NONBLOCK_CALLBACK_FLAG);
+        app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
+        app_focus_stack_top_change_broadcast(focus->stack, NONBLOCK_CALLBACK_FLAG);
     } else {
-        // step 5.2: abandon focus id in media focus stack
+        // step 4: abandon focus id in media focus stack
         tmp_id.client_id = app_client_id;
-        app_focus_stack_delete(g_media_focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
+        app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
     }
 
-err:
-    pthread_mutex_unlock(&g_media_focus_lock);
     return ret;
 }
 
-const char* media_focus_peek(void)
+static void media_focus_notify(int suggestion, void* cookie)
 {
-    app_focus_id tmp;
-    int ret;
-
-    if (!g_media_focus)
-        return NULL;
-
-    ret = app_focus_stack_top(g_media_focus->stack, &tmp);
-    if (ret < 0)
-        return NULL;
-
-    return g_media_focus->streams + tmp.focus_level * STREAM_TYPE_LEN;
+    media_stub_notify_event(cookie, suggestion, 0, NULL);
 }
 
-void media_focus_debug_stack_display(void)
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+int media_focus_destroy(void* handle)
 {
-    pthread_mutex_lock(&g_media_focus_lock);
-    if (g_media_focus) {
-        app_focus_stack_display(g_media_focus->stack);
+    media_focus* focus = handle;
+
+    if (focus) {
+        free(focus->stack);
+        free(focus->streams);
+        free(focus->matrix);
+        free(focus);
     }
-    pthread_mutex_unlock(&g_media_focus_lock);
+
+    return 0;
+}
+
+void* media_focus_create(void* file)
+{
+    FILE* fp;
+    char* buf = NULL;
+    int ret = 0;
+    int index = 0;
+    int shift_index = 0;
+    media_focus* focus = NULL;
+
+    fp = fopen(file, "r");
+    if (fp == NULL) {
+        auderr("no such interaction matrix file\n");
+        return NULL;
+    }
+
+    buf = malloc(MAX_LEN * sizeof(char));
+    if (buf == NULL)
+        goto err;
+    buf[MAX_LEN - 1] = '\0';
+
+    focus = zalloc(sizeof(media_focus));
+    if (focus == NULL)
+        goto err;
+
+    while (fgets(buf, MAX_LEN - 1, fp) != NULL) {
+
+        // step 1: remove line and change line symbol from the buf reader result
+        char* line = media_focus_reformat(buf);
+
+        // step 2: analysis reformated line by its head
+        ret = media_focus_line_identity(line, &shift_index);
+
+        // get first valid str in line with index shift
+        line += shift_index;
+        switch (ret) {
+        case MEDIA_FOCUS_FILE_READ_STREAM_TYPE:
+
+            // step 3.1: malloc space for stream types array based on number of stream type and fill with line read
+            focus->streams = media_focus_streams_init(focus, STREAM_TYPE_LEN, line);
+            if (!focus->streams) {
+                auderr("no mem for media focus streams\n");
+                goto err;
+            }
+
+            // step 3.2 malloc space and init media stack
+            focus->stack = app_focus_stack_init(CONFIG_MEDIA_FOCUS_STACK_DEPTH, &media_focus_stack_callback);
+            if (!focus->stack) {
+                auderr("no mem for media focus stack\n");
+                goto err;
+            }
+            break;
+
+        case MEDIA_FOCUS_FILE_READ_STREAM_NUM:
+            // step 4: filler interaction play result from each line
+            focus->matrix = media_focus_matrix_init(focus->num, line, &index, focus->matrix);
+            if (!focus->matrix) {
+                auderr("no mem for media focus stack\n");
+                goto err;
+            }
+            break;
+        case MEDIA_FOCUS_FILE_READ_JUMP:
+            break;
+        default:
+            goto err;
+        }
+    }
+
+    goto out;
+
+err:
+    media_focus_destroy(focus);
+    focus = NULL;
+out:
+    fclose(fp);
+    free(buf);
+    return focus;
 }
 
 int media_focus_debug_stack_return(media_focus_id* p_focus_list, int num)
 {
-    return app_focus_stack_return(g_media_focus->stack, (app_focus_id*)p_focus_list, num);
+    media_focus* focus;
+
+    focus = media_get_focus();
+    if (!focus)
+        return -EINVAL;
+
+    return app_focus_stack_return(focus->stack, (app_focus_id*)p_focus_list, num);
+}
+
+int media_focus_handler(void* handle, const char* name, const char* cmd,
+    char** res, int res_len)
+{
+    int ret, suggestion = 0;
+    media_focus* focus;
+    app_focus_id tmp;
+
+    focus = media_get_focus();
+    if (!focus)
+        return -ENOSYS;
+
+    if (res && res_len > 0) {
+        *res = zalloc(res_len);
+        if (!*res)
+            return -ENOMEM;
+    }
+
+    if (!strcmp(cmd, "request")) {
+        if (!res)
+            return -EINVAL;
+
+        handle = media_focus_request_(focus, &suggestion, name, media_focus_notify, handle);
+        if (!handle)
+            return -EPERM;
+
+        return snprintf(*res, res_len, "%llu:%d", (uint64_t)(uintptr_t)handle, suggestion);
+    } else if (!strcmp(cmd, "abandon")) {
+        return media_focus_abandon_(focus, handle);
+    } else if (!strcmp(cmd, "display")) {
+        app_focus_stack_display(focus->stack);
+        return 0;
+    } else if (!strcmp(cmd, "peek")) {
+        if (!res)
+            return -EINVAL;
+
+        ret = app_focus_stack_top(focus->stack, &tmp);
+        if (ret >= 0)
+            ret = snprintf(*res, res_len, "%s", focus->streams + tmp.focus_level * STREAM_TYPE_LEN);
+
+        return ret;
+    }
+
+    return -ENOSYS;
 }

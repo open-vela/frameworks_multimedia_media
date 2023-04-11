@@ -7,10 +7,6 @@ config MEDIA
 	tristate "Enable media"
 	default n
 
-config APP_FOCUS
-	bool "Enable app focus"
-	default n
-
 if MEDIA
 
 config MEDIA_SERVER
@@ -52,6 +48,18 @@ config MEDIA_SERVER_STACKSIZE
 config MEDIA_SERVER_PRIORITY
 	int "Media server priority"
 	default 245
+
+config MEDIA_FOCUS
+	bool "Enable media focus"
+	default n
+
+if MEDIA_FOCUS
+
+config MEDIA_FOCUS_STACK_DEPTH
+	int "Media focus configurable stack size"
+	default 8
+
+endif # MEDIA_FOCUS
 
 endif # MEDIA_SERVER
 
