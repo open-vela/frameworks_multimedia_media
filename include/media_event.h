@@ -37,11 +37,11 @@
 
 /* Control Message */
 
-#define MEDIA_EVENT_START 100
-#define MEDIA_EVENT_PAUSE 101
-#define MEDIA_EVENT_STOP 102
-#define MEDIA_EVENT_PREV 103
-#define MEDIA_EVENT_NEXT 104
+#define MEDIA_EVENT_START 200
+#define MEDIA_EVENT_PAUSE 201
+#define MEDIA_EVENT_STOP 202
+#define MEDIA_EVENT_PREV 203
+#define MEDIA_EVENT_NEXT 204
 
 /****************************************************************************
  * Public Types
