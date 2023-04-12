@@ -505,6 +505,17 @@ int media_player_set_event_callback(void* handle, void* cookie,
     return media_set_event_cb(MEDIA_PLAYER_CONTROL, handle, cookie, event_cb);
 }
 
+int media_player_notify(void* handle, int event, int result, const char* extra)
+{
+    char tmp[64];
+
+    if (!MEDIA_IS_STATUS_CHANGE(event))
+        return -EINVAL;
+
+    snprintf(tmp, sizeof(tmp), "%d:%d", event, result);
+    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, extra, "event", tmp, 0, NULL, 0);
+}
+
 int media_player_prepare(void* handle, const char* url, const char* options)
 {
     syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);

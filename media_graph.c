@@ -372,6 +372,9 @@ static void* media_find_filter(const char* prefix, bool input, bool available)
     return NULL;
 }
 
+/**
+ * @brief Determine whether the most active player of the same stream_type.
+ */
 static bool media_player_is_most_active(void* handle)
 {
     MediaPlayerPriv* priv = handle;
@@ -389,6 +392,9 @@ static bool media_player_is_most_active(void* handle)
     return false;
 }
 
+/**
+ * @brief Broadcast event to sessions that care about corresponding stream type.
+ */
 static void media_session_notify_event(const char* name, int event,
     int result, const char* extra)
 {
@@ -404,32 +410,32 @@ static void media_session_notify_event(const char* name, int event,
     }
 }
 
+static void media_session_event_cb(void* handle, int event,
+    int result, const char* extra)
+{
+    MediaPlayerPriv* priv = handle;
+
+    if (!MEDIA_IS_STATUS_CHANGE(event))
+        return;
+
+    pthread_mutex_lock(&g_media_mutex);
+
+    if (event == MEDIA_EVENT_STARTED) {
+        LIST_REMOVE(priv, entry);
+        LIST_INSERT_HEAD(&g_players, priv, entry);
+        media_session_notify_event(priv->name, event, result, extra);
+    } else if (media_player_is_most_active(priv))
+        media_session_notify_event(priv->name, event, result, extra);
+
+    pthread_mutex_unlock(&g_media_mutex);
+}
+
 static void media_player_event_cb(void* cookie, int event,
     int result, const char* extra)
 {
     MediaPlayerPriv* priv = cookie;
 
-    switch (event) {
-    case MEDIA_EVENT_STARTED:
-        pthread_mutex_lock(&g_media_mutex);
-        LIST_REMOVE(priv, entry);
-        LIST_INSERT_HEAD(&g_players, priv, entry);
-        media_session_notify_event(priv->name, event, result, extra);
-        pthread_mutex_unlock(&g_media_mutex);
-        break;
-
-    case MEDIA_EVENT_SEEKED:
-    case MEDIA_EVENT_PAUSED:
-    case MEDIA_EVENT_STOPPED:
-    case MEDIA_EVENT_PREPARED:
-    case MEDIA_EVENT_COMPLETED:
-        pthread_mutex_lock(&g_media_mutex);
-        if (media_player_is_most_active(priv))
-            media_session_notify_event(priv->name, event, result, extra);
-        pthread_mutex_unlock(&g_media_mutex);
-        break;
-
-    case AVMOVIE_ASYNC_EVENT_CLOSED:
+    if (event == AVMOVIE_ASYNC_EVENT_CLOSED) {
         pthread_mutex_lock(&g_media_mutex);
         LIST_REMOVE(priv, entry);
         pthread_mutex_unlock(&g_media_mutex);
@@ -438,6 +444,8 @@ static void media_player_event_cb(void* cookie, int event,
         free(priv);
         return;
     }
+
+    media_session_event_cb(cookie, event, result, extra);
 
     if (priv->event)
         media_stub_notify_event(priv->cookie, event, result, extra);
@@ -498,11 +506,18 @@ static int media_common_handler(void* handle, const char* target, const char* cm
     MediaFilterPriv* priv = handle;
     AVFilterContext* filter;
     bool start, quit;
+    int event, result;
     int ret;
 
     if (!strcmp(cmd, "set_event")) {
         priv->event = true;
 
+        return 0;
+    }
+
+    if (!strcmp(cmd, "event")) {
+        sscanf(arg, "%d:%d", &event, &result);
+        media_session_event_cb(handle, event, result, target);
         return 0;
     }
 
