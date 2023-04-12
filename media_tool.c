@@ -239,6 +239,10 @@ static void mediatool_event_callback(void* cookie, int event,
         str = "MEDIA_EVENT_PREPARED";
     } else if (event == MEDIA_EVENT_PAUSED) {
         str = "MEDIA_EVENT_PAUSED";
+    } else if (event == MEDIA_EVENT_PREVED) {
+        str = "MEDIA_EVENT_PREVED";
+    } else if (event == MEDIA_EVENT_NEXTED) {
+        str = "MEDIA_EVENT_NEXTED";
     } else if (event == MEDIA_EVENT_START) {
         str = "MEDIA_EVENT_START";
     } else if (event == MEDIA_EVENT_PAUSE) {
@@ -247,8 +251,10 @@ static void mediatool_event_callback(void* cookie, int event,
         str = "MEDIA_EVENT_STOP";
     } else if (event == MEDIA_EVENT_PREV) {
         str = "MEDIA_EVENT_PREV";
+        media_player_notify(chain->handle, MEDIA_EVENT_PREVED, 0, NULL);
     } else if (event == MEDIA_EVENT_NEXT) {
         str = "MEDIA_EVENT_NEXT";
+        media_player_notify(chain->handle, MEDIA_EVENT_NEXTED, 0, NULL);
     } else {
         str = "NORMAL EVENT";
     }
