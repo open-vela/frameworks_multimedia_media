@@ -42,6 +42,7 @@
 #define MEDIATOOL_PLAYER 1
 #define MEDIATOOL_RECORDER 2
 #define MEDIATOOL_SESSION 3
+#define MEDIATOOL_FOCUS 4
 
 /****************************************************************************
  * Public Type Declarations
@@ -101,6 +102,8 @@ static int mediatool_policy_cmd_exclude(struct mediatool_s* media, char* pargs);
 static int mediatool_policy_cmd_contain(struct mediatool_s* media, char* pargs);
 static int mediatool_policy_cmd_increase(struct mediatool_s* media, char* pargs);
 static int mediatool_policy_cmd_decrease(struct mediatool_s* media, char* pargs);
+static int mediatool_focus_cmd_request(struct mediatool_s* media, char* pargs);
+static int mediatool_focus_cmd_abandon(struct mediatool_s* media, char* pargs);
 static int mediatool_common_cmd_quit(struct mediatool_s* media, char* pargs);
 static int mediatool_common_cmd_help(struct mediatool_s* media, char* pargs);
 
@@ -210,6 +213,12 @@ static struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "decrease",
         mediatool_policy_cmd_decrease,
         "decrease criterion value by one(decrease NAME APPLY)" },
+    { "request",
+        mediatool_focus_cmd_request,
+        "request media focus(request NAME)" },
+    { "abandon",
+        mediatool_focus_cmd_abandon,
+        "abandon media focus(abandon ID)" },
     { "q",
         mediatool_common_cmd_quit,
         "Quit (q)" },
@@ -261,6 +270,31 @@ static void mediatool_event_callback(void* cookie, int event,
 
     printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
         __func__, chain->id, str, event, ret, __LINE__);
+}
+
+static void mediatool_focus_callback(int suggestion, void* cookie)
+{
+    struct mediatool_chain_s* chain = cookie;
+    char* str;
+
+    if (suggestion == MEDIA_FOCUS_PLAY) {
+        str = "MEDIA_FOCUS_PLAY";
+    } else if (suggestion == MEDIA_FOCUS_STOP) {
+        str = "MEDIA_FOCUS_STOP";
+    } else if (suggestion == MEDIA_FOCUS_PAUSE) {
+        str = "MEDIA_FOCUS_PAUSE";
+    } else if (suggestion == MEDIA_FOCUS_PLAY_BUT_SILENT) {
+        str = "MEDIA_FOCUS_PLAY_BUT_SILENT";
+    } else if (suggestion == MEDIA_FOCUS_PLAY_WITH_DUCK) {
+        str = "MEDIA_FOCUS_PLAY_WITH_DUCK";
+    } else if (suggestion == MEDIA_FOCUS_PLAY_WITH_KEEP) {
+        str = "MEDIA_FOCUS_PLAY_WITH_KEEP";
+    } else {
+        str = "UNKOWN";
+    }
+
+    printf("%s, id %d, suggestion %s, suggestion %d, line %d\n",
+        __func__, chain->id, str, suggestion, __LINE__);
 }
 
 static void mediatool_common_stop_thread(struct mediatool_chain_s* chain)
@@ -461,6 +495,10 @@ static int mediatool_common_cmd_close(struct mediatool_s* media, char* pargs)
 
     case MEDIATOOL_SESSION:
         ret = media_session_close(media->chain[id].handle);
+        break;
+
+    case MEDIATOOL_FOCUS:
+        ret = media_focus_abandon(media->chain[id].handle);
         break;
     }
 
@@ -1041,6 +1079,7 @@ static int mediatool_server_cmd_dump(struct mediatool_s* media, char* pargs)
      */
     media_policy_dump(pargs);
     media_graph_dump(pargs);
+    media_focus_debug_stack_display();
 
     return 0;
 }
@@ -1253,6 +1292,69 @@ static int mediatool_policy_cmd_decrease(struct mediatool_s* media, char* pargs)
     apply = pargs;
 
     return media_policy_decrease(name, atoi(apply));
+}
+
+static int mediatool_focus_cmd_request(struct mediatool_s* media, char* pargs)
+{
+    int suggestion;
+    long int i;
+
+    if (pargs && !strlen(pargs))
+        pargs = NULL;
+
+    if (pargs && isdigit(pargs[0])) {
+        i = strtol(pargs, NULL, 10);
+
+        if (media->chain[i].handle)
+            return -EBUSY;
+
+        pargs = NULL;
+    } else {
+        for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+            if (!media->chain[i].handle)
+                break;
+        }
+
+        if (i == MEDIATOOL_MAX_CHAIN)
+            return -ENOMEM;
+    }
+
+    media->chain[i].id = i;
+    media->chain[i].handle = media_focus_request(&suggestion, pargs,
+        mediatool_focus_callback, &media->chain[i]);
+    if (!media->chain[i].handle) {
+        printf("media_player_request failed\n");
+        return 0;
+    }
+
+    media->chain[i].type = MEDIATOOL_FOCUS;
+    printf("focus ID %ld, first suggestion %d\n", i, suggestion);
+    return 0;
+}
+
+static int mediatool_focus_cmd_abandon(struct mediatool_s* media, char* pargs)
+{
+    int ret = -EINVAL;
+    long int id;
+
+    if (!strlen(pargs))
+        return ret;
+
+    id = strtol(pargs, NULL, 10);
+
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+        return ret;
+
+    if (media->chain[id].type != MEDIATOOL_FOCUS)
+        return 0;
+
+    ret = media_focus_abandon(media->chain[id].handle);
+    if (ret >= 0) {
+        printf("abandon focus ID %ld\n", id);
+        media->chain[id].handle = NULL;
+    }
+
+    return ret;
 }
 
 static int mediatool_common_cmd_quit(struct mediatool_s* media, char* pargs)
