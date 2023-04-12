@@ -35,6 +35,11 @@
 #define MEDIA_EVENT_SEEKED 5
 #define MEDIA_EVENT_COMPLETED 6
 
+/* Status change of client */
+
+#define MEDIA_EVENT_PREVED 100
+#define MEDIA_EVENT_NEXTED 101
+
 /* Control Message */
 
 #define MEDIA_EVENT_START 200
