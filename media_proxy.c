@@ -474,6 +474,23 @@ static int media_get_socket(void* handle)
     return priv->socket;
 }
 
+static const char* media_get_proper_stream(void* handle)
+{
+    MediaProxyPriv* priv = handle;
+    const char* stream_type;
+
+    if (!handle)
+        return NULL;
+
+#ifdef CONFIG_MEDIA_FOCUS
+    stream_type = media_focus_peek();
+    if (!stream_type)
+#endif
+        stream_type = priv->stream_type;
+
+    return stream_type;
+}
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -998,42 +1015,46 @@ int media_session_get_duration(void* handle, unsigned int* msec)
 
 int media_session_set_volume(void* handle, int volume)
 {
-    MediaProxyPriv* priv = handle;
+    const char* stream_type;
 
-    if (!handle)
+    stream_type = media_get_proper_stream(handle);
+    if (!stream_type)
         return -EINVAL;
 
-    return media_policy_set_stream_volume(priv->stream_type, volume);
+    return media_policy_set_stream_volume(stream_type, volume);
 }
 
 int media_session_get_volume(void* handle, int* volume)
 {
-    MediaProxyPriv* priv = handle;
+    const char* stream_type;
 
-    if (!handle)
+    stream_type = media_get_proper_stream(handle);
+    if (!stream_type)
         return -EINVAL;
 
-    return media_policy_get_stream_volume(priv->stream_type, volume);
+    return media_policy_get_stream_volume(stream_type, volume);
 }
 
 int media_session_increase_volume(void* handle)
 {
-    MediaProxyPriv* priv = handle;
+    const char* stream_type;
 
-    if (!handle)
+    stream_type = media_get_proper_stream(handle);
+    if (!stream_type)
         return -EINVAL;
 
-    return media_policy_increase_stream_volume(priv->stream_type);
+    return media_policy_increase_stream_volume(stream_type);
 }
 
 int media_session_decrease_volume(void* handle)
 {
-    MediaProxyPriv* priv = handle;
+    const char* stream_type;
 
-    if (!handle)
+    stream_type = media_get_proper_stream(handle);
+    if (!stream_type)
         return -EINVAL;
 
-    return media_policy_decrease_stream_volume(priv->stream_type);
+    return media_policy_decrease_stream_volume(stream_type);
 }
 
 int media_session_next_song(void* handle)
