@@ -22,9 +22,7 @@ ifneq ($(CONFIG_MEDIA),)
 
 CONFIGURED_APPS += $(APPDIR)/frameworks/media
 
-CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" \
-	$(APPDIR)/frameworks/media/include}
-CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" \
-	$(APPDIR)/frameworks/media/include}
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/include
+CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/include
 
 endif

@@ -41,21 +41,21 @@ endif
 
 ifneq ($(CONFIG_LIB_FFMPEG),)
   CSRCS  += media_graph.c
-  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/ffmpeg/ffmpeg}
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/ffmpeg/ffmpeg
 endif
 
 ifneq ($(CONFIG_PFW),)
   CSRCS  += media_policy.c
-  CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/bindings/c}
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/bindings/c
 
   CXXEXT   := .cpp
   CXXSRCS  += media_policy_plugin.cpp
   CXXFLAGS += --std=c++11
-  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter}
-  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter/include}
-  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/parameter/log/include}
-  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/xmlserializer}
-  CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/external/parameter-framework/parameter-framework/utility}
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/parameter
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/parameter/include
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/parameter/log/include
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/xmlserializer
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/utility
 endif
 
 ifneq ($(CONFIG_MEDIA_TOOL),)
