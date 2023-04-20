@@ -427,7 +427,7 @@ static void media_player_event_cb(void* cookie, int event,
         pthread_mutex_unlock(&g_media_mutex);
         break;
 
-    case MEDIA_EVENT_NOP:
+    case AVMOVIE_ASYNC_EVENT_CLOSED:
         pthread_mutex_lock(&g_media_mutex);
         LIST_REMOVE(priv, entry);
         pthread_mutex_unlock(&g_media_mutex);
@@ -446,7 +446,7 @@ static void media_recorder_event_cb(void* cookie, int event,
 {
     MediaRecorderPriv* priv = cookie;
 
-    if (event == MEDIA_EVENT_NOP) {
+    if (event == AVMOVIE_ASYNC_EVENT_CLOSED) {
         priv->filter->opaque = NULL;
         free(priv);
         return;
