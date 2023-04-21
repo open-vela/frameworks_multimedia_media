@@ -118,6 +118,12 @@ int media_player_get_sockaddr(void* handle, struct sockaddr_storage* addr);
 int media_player_get_socket(void* handle);
 
 /**
+ * Close socket fd when player finish read data
+ * @param[in] handle    The player path
+ */
+void media_player_close_socket(void* handle);
+
+/**
  * Start the player path to play
  * @param[in] handle    The player path
  * @return Zero on success; a negated errno value on failure.
