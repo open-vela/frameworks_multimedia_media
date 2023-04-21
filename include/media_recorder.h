@@ -110,6 +110,12 @@ int media_recorder_get_sockaddr(void* handle, struct sockaddr_storage* addr);
 int media_recorder_get_socket(void* handle);
 
 /**
+ * Close socket fd when recorder finish recv data
+ * @param[in] handle    The player path
+ */
+void media_recorder_close_socket(void* handle);
+
+/**
  * Start the recorder path.
  * @param[in] handle    Current recorder path
  * @return Zero on success; a negated errno value on failure.
