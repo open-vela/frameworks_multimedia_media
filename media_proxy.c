@@ -531,6 +531,11 @@ int media_player_get_sockaddr(void* handle, struct sockaddr_storage* addr)
     return media_get_sockaddr(handle, addr);
 }
 
+void media_player_close_socket(void* handle)
+{
+    media_close_socket(handle);
+}
+
 int media_player_get_socket(void* handle)
 {
     return media_get_socket(handle);
@@ -693,6 +698,11 @@ int media_recorder_get_sockaddr(void* handle, struct sockaddr_storage* addr)
 int media_recorder_get_socket(void* handle)
 {
     return media_get_socket(handle);
+}
+
+void media_recorder_close_socket(void* handle)
+{
+    media_close_socket(handle);
 }
 
 int media_recorder_start(void* handle)
