@@ -545,8 +545,10 @@ static void* mediatool_buffer_thread(void* arg)
         while (1) {
             act = read(chain->fd, chain->buf, chain->size);
             assert(act >= 0);
-            if (act == 0)
+            if (act == 0) {
+                media_player_close_socket(chain->handle);
                 break;
+            }
 
             tmp = chain->buf;
             while (act > 0) {
@@ -576,6 +578,7 @@ static void* mediatool_buffer_thread(void* arg)
                 ret = media_recorder_read_data(chain->handle, chain->buf, chain->size);
 
             if (ret == 0) {
+                media_recorder_close_socket(chain->handle);
                 break;
             } else if (ret < 0 && errno == EAGAIN) {
                 continue;
