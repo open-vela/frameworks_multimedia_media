@@ -687,6 +687,12 @@ int media_graph_handler(void* handle, const char* target, const char* cmd,
 
         *res = avfilter_graph_dump_ext(priv->graph, arg);
         return 0;
+    } else if (!strcmp(cmd, "loglevel")) {
+        if (!arg)
+            return -EINVAL;
+
+        av_log_set_level(strtol(arg, NULL, 0));
+        return 0;
     }
 
     for (i = 0; i < priv->graph->nb_filters; i++) {
