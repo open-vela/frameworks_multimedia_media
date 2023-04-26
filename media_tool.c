@@ -179,7 +179,7 @@ static struct mediatool_cmd_s g_mediatool_cmds[] = {
         "take picture from camera" },
     { "send",
         mediatool_common_cmd_send,
-        "Send cmd to graph" },
+        "Send cmd to graph. PS:loglevel INFO:32 VERBOSE:40 DEBUG:48 TRACE:56" },
     { "dump",
         mediatool_server_cmd_dump,
         "Dump graph and policy" },
