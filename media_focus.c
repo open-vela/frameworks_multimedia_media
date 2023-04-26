@@ -593,6 +593,21 @@ err:
     return ret;
 }
 
+const char* media_focus_peek(void)
+{
+    app_focus_id tmp;
+    int ret;
+
+    if (!g_media_focus)
+        return NULL;
+
+    ret = app_focus_stack_top(g_media_focus->stack, &tmp);
+    if (ret < 0)
+        return NULL;
+
+    return g_media_focus->streams + tmp.focus_level * STREAM_TYPE_LEN;
+}
+
 void media_focus_debug_stack_display(void)
 {
     pthread_mutex_lock(&g_media_focus_lock);
