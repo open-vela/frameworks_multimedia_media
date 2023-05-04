@@ -41,20 +41,41 @@
 
 #define MEDIA_DELIM " ,;|"
 
+#define MEDIA_COMMON_FIELDS \
+    int type;               \
+    void* proxy;            \
+    char* cpu;              \
+    uint64_t handle;
+
+#define MEDIA_EVENT_FIELDS \
+    void* cookie;          \
+    media_event_callback event;
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
 
-typedef struct MediaProxyPriv {
-    void* proxy;
-    char* cpu;
-    char* stream_type;
-    uint64_t handle;
+typedef struct media_proxy_priv_t {
+    MEDIA_COMMON_FIELDS
+} media_proxy_priv_t;
+
+typedef struct media_event_priv_t {
+    MEDIA_COMMON_FIELDS
+    MEDIA_EVENT_FIELDS
+} media_event_priv_t;
+
+typedef struct media_io_priv_t {
+    MEDIA_COMMON_FIELDS
+    MEDIA_EVENT_FIELDS
     atomic_int refs;
     int socket;
-    void* cookie;
-    media_event_callback event;
-} MediaProxyPriv;
+} media_io_priv_t;
+
+typedef struct media_session_priv_t {
+    MEDIA_COMMON_FIELDS
+    MEDIA_EVENT_FIELDS
+    char* stream_type;
+} media_session_priv_t;
 
 /****************************************************************************
  * Private Functions
@@ -63,7 +84,6 @@ typedef struct MediaProxyPriv {
 /**
  * @brief Transact a command to server through existed long connection.
  *
- * @param control   Type ID.
  * @param handle    Instance handle.
  * @param target
  * @param cmd
@@ -74,10 +94,11 @@ typedef struct MediaProxyPriv {
  * @param res_len   Response max lenghth.
  * @return int      Zero on success; a negated errno value on failure.
  */
-static int media_transact_once(int control, void* handle, const char* target,
-    const char* cmd, const char* arg, int apply, char* res, int res_len)
+static int
+media_transact_once(void* handle, const char* target, const char* cmd,
+    const char* arg, int apply, char* res, int res_len)
 {
-    MediaProxyPriv* priv = handle;
+    media_proxy_priv_t* priv = handle;
     media_parcel in, out;
     const char* response;
     int ret = -EINVAL;
@@ -90,34 +111,34 @@ static int media_transact_once(int control, void* handle, const char* target,
     media_parcel_init(&in);
     media_parcel_init(&out);
 
-    switch (control) {
+    switch (priv->type) {
     case MEDIA_GRAPH_CONTROL:
         name = "graph";
-        ret = media_parcel_append_printf(&in, "%i%s%s%s%i", control,
+        ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
             target, cmd, arg, res_len);
         break;
 
     case MEDIA_POLICY_CONTROL:
         name = "policy";
-        ret = media_parcel_append_printf(&in, "%i%s%s%s%i%i", control,
+        ret = media_parcel_append_printf(&in, "%i%s%s%s%i%i", priv->type,
             target, cmd, arg, apply, res_len);
         break;
 
     case MEDIA_PLAYER_CONTROL:
         name = "player";
-        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", control,
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
             priv->handle, target, cmd, arg, res_len);
         break;
 
     case MEDIA_RECORDER_CONTROL:
         name = "recorder";
-        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", control,
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
             priv->handle, target, cmd, arg, res_len);
         break;
 
     case MEDIA_SESSION_CONTROL:
         name = "session";
-        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", control,
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
             priv->handle, target, cmd, arg, res_len);
         break;
 
@@ -171,15 +192,16 @@ out:
 static int media_transact(int control, void* handle, const char* target, const char* cmd,
     const char* arg, int apply, char* res, int res_len, bool remote)
 {
-    MediaProxyPriv *priv, priv_ = { 0 };
+    media_proxy_priv_t *priv, priv_ = { 0 };
     char *saveptr, *cpu;
     int ret = -ENOSYS;
     char tmp[128];
 
     priv = handle ? handle : &priv_;
+    priv->type = control;
 
     if (priv->proxy)
-        return media_transact_once(control, priv, target, cmd, arg, apply, res, res_len);
+        return media_transact_once(priv, target, cmd, arg, apply, res, res_len);
 
     strlcpy(tmp, CONFIG_MEDIA_SERVER_CPUNAME, sizeof(tmp));
     for (cpu = strtok_r(tmp, MEDIA_DELIM, &saveptr); cpu;
@@ -192,17 +214,15 @@ static int media_transact(int control, void* handle, const char* target, const c
             continue;
 
         priv->cpu = cpu;
-        ret = media_transact_once(control, priv, target, cmd, arg, apply, res, res_len);
+        ret = media_transact_once(priv, target, cmd, arg, apply, res, res_len);
         switch (control) {
         case MEDIA_GRAPH_CONTROL:
             media_client_disconnect(priv->proxy);
-            priv->proxy = NULL;
             ret = 0;
             break;
 
         case MEDIA_POLICY_CONTROL:
             media_client_disconnect(priv->proxy);
-            priv->proxy = NULL;
             if (ret != -ENOSYS) // return once found policy
                 return ret;
 
@@ -213,7 +233,6 @@ static int media_transact(int control, void* handle, const char* target, const c
         case MEDIA_SESSION_CONTROL:
             if (ret < 0) {
                 media_client_disconnect(priv->proxy);
-                priv->proxy = NULL;
                 break;
             }
 
@@ -225,39 +244,48 @@ static int media_transact(int control, void* handle, const char* target, const c
         }
     }
 
+    priv->proxy = NULL;
+    priv->cpu = NULL;
     return ret;
+}
+
+static void media_disconnect(void* handle)
+{
+    media_proxy_priv_t* priv = handle;
+
+    media_client_disconnect(priv->proxy);
+    free(priv->cpu);
+    free(priv);
 }
 
 static void* media_open(int control, const char* params)
 {
-    MediaProxyPriv* priv;
+    media_io_priv_t* priv;
     char tmp[32];
 
-    priv = zalloc(sizeof(MediaProxyPriv));
+    priv = zalloc(sizeof(media_io_priv_t));
     if (!priv)
         return NULL;
 
     if (media_transact(control, priv, NULL, "open", params, 0, tmp, sizeof(tmp), 0) < 0)
-        goto error1;
+        goto err;
 
     sscanf(tmp, "%llu", &priv->handle);
     if (!priv->handle)
-        goto error2;
+        goto err;
 
     atomic_store(&priv->refs, 1);
     syslog(LOG_INFO, "%s:%s handle:%p\n", __func__, params, (void*)(uintptr_t)priv->handle);
     return priv;
 
-error2:
-    free(priv->cpu);
-error1:
-    free(priv);
+err:
+    media_disconnect(priv);
     return NULL;
 }
 
 static void media_close_socket(void* handle)
 {
-    MediaProxyPriv* priv = handle;
+    media_io_priv_t* priv = handle;
 
     if (atomic_load(&priv->refs) == 1 && priv->socket) {
         close(priv->socket);
@@ -265,14 +293,14 @@ static void media_close_socket(void* handle)
     }
 }
 
-static int media_close(int control, void* handle, int pending_stop)
+static int media_close(void* handle, int pending_stop)
 {
-    MediaProxyPriv* priv = handle;
+    media_io_priv_t* priv = handle;
     char tmp[32];
     int ret;
 
     snprintf(tmp, sizeof(tmp), "%d", pending_stop);
-    ret = media_transact_once(control, priv, NULL, "close", tmp, 0, NULL, 0);
+    ret = media_transact_once(priv, NULL, "close", tmp, 0, NULL, 0);
     if (ret < 0)
         return ret;
 
@@ -280,18 +308,17 @@ static int media_close(int control, void* handle, int pending_stop)
     if (ret < 0)
         return ret;
 
+    priv->proxy = NULL;
     media_close_socket(priv);
-    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
-        free(priv->cpu);
-        free(priv);
-    }
+    if (atomic_fetch_sub(&priv->refs, 1) == 1)
+        media_disconnect(priv);
 
     return ret;
 }
 
 static int media_get_sockaddr(void* handle, struct sockaddr_storage* addr_)
 {
-    MediaProxyPriv* priv = handle;
+    media_io_priv_t* priv = handle;
 
     if (!handle || !addr_)
         return -EINVAL;
@@ -314,7 +341,7 @@ static int media_get_sockaddr(void* handle, struct sockaddr_storage* addr_)
 
 static int media_bind_socket(void* handle, char* url, size_t len)
 {
-    MediaProxyPriv* priv = handle;
+    media_io_priv_t* priv = handle;
     struct sockaddr_storage addr;
     int fd, ret;
 
@@ -347,10 +374,9 @@ out:
     return -errno;
 }
 
-static int media_prepare(int control, void* handle,
-    const char* url, const char* options)
+static int media_prepare(void* handle, const char* url, const char* options)
 {
-    MediaProxyPriv* priv = handle;
+    media_io_priv_t* priv = handle;
     int ret = -EINVAL;
     char tmp[32];
     int fd = 0;
@@ -367,12 +393,12 @@ static int media_prepare(int control, void* handle,
     }
 
     if (options && options[0] != '\0') {
-        ret = media_transact_once(control, priv, NULL, "set_options", options, 0, NULL, 0);
+        ret = media_transact_once(priv, NULL, "set_options", options, 0, NULL, 0);
         if (ret < 0)
             goto out;
     }
 
-    ret = media_transact_once(control, priv, NULL, "prepare", url, 0, NULL, 0);
+    ret = media_transact_once(priv, NULL, "prepare", url, 0, NULL, 0);
     if (ret < 0)
         goto out;
 
@@ -394,7 +420,7 @@ out:
 static ssize_t media_process_data(void* handle, bool player,
     void* data, size_t len)
 {
-    MediaProxyPriv* priv = handle;
+    media_io_priv_t* priv = handle;
     int ret = -EINVAL;
 
     if (!handle || !data || !len)
@@ -432,17 +458,15 @@ static ssize_t media_process_data(void* handle, bool player,
     ret = -errno;
 
 out:
-    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
-        free(priv->cpu);
-        free(priv);
-    }
+    if (atomic_fetch_sub(&priv->refs, 1) == 1)
+        media_disconnect(priv);
 
     return ret;
 }
 
 static void media_proxy_event_cb(void* cookie, media_parcel* msg)
 {
-    MediaProxyPriv* priv = cookie;
+    media_event_priv_t* priv = cookie;
     const char* extra;
     int32_t event;
     int32_t ret;
@@ -453,10 +477,10 @@ static void media_proxy_event_cb(void* cookie, media_parcel* msg)
     }
 }
 
-static int media_set_event_cb(int control, void* handle, void* cookie,
+static int media_set_event_cb(void* handle, void* cookie,
     media_event_callback event_cb)
 {
-    MediaProxyPriv* priv = handle;
+    media_event_priv_t* priv = handle;
     int ret;
 
     if (!priv)
@@ -466,7 +490,7 @@ static int media_set_event_cb(int control, void* handle, void* cookie,
     if (ret < 0)
         return ret;
 
-    ret = media_transact(control, handle, NULL, "set_event", NULL, 0, NULL, 0, false);
+    ret = media_transact_once(handle, NULL, "set_event", NULL, 0, NULL, 0);
     if (ret < 0)
         return ret;
 
@@ -478,7 +502,7 @@ static int media_set_event_cb(int control, void* handle, void* cookie,
 
 static int media_get_socket(void* handle)
 {
-    MediaProxyPriv* priv = handle;
+    media_io_priv_t* priv = handle;
 
     if (!priv || priv->socket <= 0)
         return -EINVAL;
@@ -488,7 +512,7 @@ static int media_get_socket(void* handle)
 
 static const char* media_get_proper_stream(void* handle)
 {
-    MediaProxyPriv* priv = handle;
+    media_session_priv_t* priv = handle;
     const char* stream_type;
 
     if (!handle)
@@ -525,13 +549,13 @@ void* media_player_open(const char* params)
 
 int media_player_close(void* handle, int pending_stop)
 {
-    return media_close(MEDIA_PLAYER_CONTROL, handle, pending_stop);
+    return media_close(handle, pending_stop);
 }
 
 int media_player_set_event_callback(void* handle, void* cookie,
     media_event_callback event_cb)
 {
-    return media_set_event_cb(MEDIA_PLAYER_CONTROL, handle, cookie, event_cb);
+    return media_set_event_cb(handle, cookie, event_cb);
 }
 
 int media_player_notify(void* handle, int event, int result, const char* extra)
@@ -542,13 +566,13 @@ int media_player_notify(void* handle, int event, int result, const char* extra)
         return -EINVAL;
 
     snprintf(tmp, sizeof(tmp), "%d:%d", event, result);
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, extra, "event", tmp, 0, NULL, 0);
+    return media_transact_once(handle, extra, "event", tmp, 0, NULL, 0);
 }
 
 int media_player_prepare(void* handle, const char* url, const char* options)
 {
     syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
-    return media_prepare(MEDIA_PLAYER_CONTROL, handle, url, options);
+    return media_prepare(handle, url, options);
 }
 
 int media_player_reset(void* handle)
@@ -558,7 +582,7 @@ int media_player_reset(void* handle)
 
     media_close_socket(handle);
 
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "reset", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "reset", NULL, 0, NULL, 0);
 }
 
 ssize_t media_player_write_data(void* handle, const void* data, size_t len)
@@ -586,7 +610,7 @@ int media_player_start(void* handle)
     if (!handle)
         return -EINVAL;
 
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "start", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "start", NULL, 0, NULL, 0);
 }
 
 int media_player_stop(void* handle)
@@ -596,12 +620,12 @@ int media_player_stop(void* handle)
 
     media_close_socket(handle);
 
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "stop", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "stop", NULL, 0, NULL, 0);
 }
 
 int media_player_pause(void* handle)
 {
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "pause", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "pause", NULL, 0, NULL, 0);
 }
 
 int media_player_seek(void* handle, unsigned int msec)
@@ -609,7 +633,7 @@ int media_player_seek(void* handle, unsigned int msec)
     char tmp[32];
 
     snprintf(tmp, sizeof(tmp), "%u", msec);
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "seek", tmp, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "seek", tmp, 0, NULL, 0);
 }
 
 int media_player_set_looping(void* handle, int loop)
@@ -617,7 +641,7 @@ int media_player_set_looping(void* handle, int loop)
     char tmp[32];
 
     snprintf(tmp, sizeof(tmp), "%d", loop);
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "set_loop", tmp, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "set_loop", tmp, 0, NULL, 0);
 }
 
 int media_player_is_playing(void* handle)
@@ -625,7 +649,7 @@ int media_player_is_playing(void* handle)
     char tmp[32];
     int ret;
 
-    ret = media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "get_playing", NULL, 0, tmp, sizeof(tmp));
+    ret = media_transact_once(handle, NULL, "get_playing", NULL, 0, tmp, sizeof(tmp));
     return ret < 0 ? ret : !!atoi(tmp);
 }
 
@@ -637,7 +661,7 @@ int media_player_get_position(void* handle, unsigned int* msec)
     if (!msec)
         return -EINVAL;
 
-    ret = media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "get_position", NULL, 0, tmp, sizeof(tmp));
+    ret = media_transact_once(handle, NULL, "get_position", NULL, 0, tmp, sizeof(tmp));
     if (ret >= 0)
         *msec = strtoul(tmp, NULL, 0);
 
@@ -652,7 +676,7 @@ int media_player_get_duration(void* handle, unsigned int* msec)
     if (!msec)
         return -EINVAL;
 
-    ret = media_transact_once(MEDIA_PLAYER_CONTROL, handle, NULL, "get_duration", NULL, 0, tmp, sizeof(tmp));
+    ret = media_transact_once(handle, NULL, "get_duration", NULL, 0, tmp, sizeof(tmp));
     if (ret >= 0)
         *msec = strtoul(tmp, NULL, 0);
 
@@ -664,7 +688,7 @@ int media_player_set_volume(void* handle, float volume)
     char tmp[32];
 
     snprintf(tmp, sizeof(tmp), "%f", volume);
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, "volume", "volume", tmp, 0, NULL, 0);
+    return media_transact_once(handle, "volume", "volume", tmp, 0, NULL, 0);
 }
 
 int media_player_get_volume(void* handle, float* volume)
@@ -675,7 +699,7 @@ int media_player_get_volume(void* handle, float* volume)
     if (!volume)
         return -EINVAL;
 
-    ret = media_transact_once(MEDIA_PLAYER_CONTROL, handle, "volume", "dump", NULL, 0, tmp, sizeof(tmp));
+    ret = media_transact_once(handle, "volume", "dump", NULL, 0, tmp, sizeof(tmp));
     if (ret >= 0) {
         sscanf(tmp, "vol:%f", volume);
         ret = 0;
@@ -686,12 +710,12 @@ int media_player_get_volume(void* handle, float* volume)
 
 int media_player_set_property(void* handle, const char* target, const char* key, const char* value)
 {
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, target, key, value, 0, NULL, 0);
+    return media_transact_once(handle, target, key, value, 0, NULL, 0);
 }
 
 int media_player_get_property(void* handle, const char* target, const char* key, char* value, int value_len)
 {
-    return media_transact_once(MEDIA_PLAYER_CONTROL, handle, target, key, NULL, 0, value, value_len);
+    return media_transact_once(handle, target, key, NULL, 0, value, value_len);
 }
 
 void* media_recorder_open(const char* params)
@@ -701,18 +725,18 @@ void* media_recorder_open(const char* params)
 
 int media_recorder_close(void* handle)
 {
-    return media_close(MEDIA_RECORDER_CONTROL, handle, 0);
+    return media_close(handle, 0);
 }
 
 int media_recorder_set_event_callback(void* handle, void* cookie,
     media_event_callback event_cb)
 {
-    return media_set_event_cb(MEDIA_RECORDER_CONTROL, handle, cookie, event_cb);
+    return media_set_event_cb(handle, cookie, event_cb);
 }
 
 int media_recorder_prepare(void* handle, const char* url, const char* options)
 {
-    return media_prepare(MEDIA_RECORDER_CONTROL, handle, url, options);
+    return media_prepare(handle, url, options);
 }
 
 int media_recorder_reset(void* handle)
@@ -722,7 +746,7 @@ int media_recorder_reset(void* handle)
 
     media_close_socket(handle);
 
-    return media_transact_once(MEDIA_RECORDER_CONTROL, handle, NULL, "reset", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "reset", NULL, 0, NULL, 0);
 }
 
 ssize_t media_recorder_read_data(void* handle, void* data, size_t len)
@@ -747,12 +771,12 @@ void media_recorder_close_socket(void* handle)
 
 int media_recorder_start(void* handle)
 {
-    return media_transact_once(MEDIA_RECORDER_CONTROL, handle, NULL, "start", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "start", NULL, 0, NULL, 0);
 }
 
 int media_recorder_pause(void* handle)
 {
-    return media_transact_once(MEDIA_RECORDER_CONTROL, handle, NULL, "pause", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "pause", NULL, 0, NULL, 0);
 }
 
 int media_recorder_stop(void* handle)
@@ -762,17 +786,17 @@ int media_recorder_stop(void* handle)
 
     media_close_socket(handle);
 
-    return media_transact_once(MEDIA_RECORDER_CONTROL, handle, NULL, "stop", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "stop", NULL, 0, NULL, 0);
 }
 
 int media_recorder_set_property(void* handle, const char* target, const char* key, const char* value)
 {
-    return media_transact_once(MEDIA_RECORDER_CONTROL, handle, target, key, value, 0, NULL, 0);
+    return media_transact_once(handle, target, key, value, 0, NULL, 0);
 }
 
 int media_recorder_get_property(void* handle, const char* target, const char* key, char* value, int value_len)
 {
-    return media_transact_once(MEDIA_RECORDER_CONTROL, handle, target, key, NULL, 0, value, value_len);
+    return media_transact_once(handle, target, key, NULL, 0, value, value_len);
 }
 
 int media_recorder_take_picture(char* params, char* filename, size_t number)
@@ -798,7 +822,7 @@ int media_recorder_take_picture(char* params, char* filename, size_t number)
     if (ret < 0)
         goto error;
 
-    return media_close(MEDIA_RECORDER_CONTROL, handle, 1);
+    return media_close(handle, 1);
 
 error:
     media_recorder_close(handle);
@@ -914,57 +938,65 @@ void media_policy_process_command(const char* target, const char* cmd, const cha
 
 void* media_session_open(const char* params)
 {
-    MediaProxyPriv* priv;
-    char* stream_type;
+    media_session_priv_t* priv;
+    char tmp[64];
 
     if (!params)
         return NULL;
 
-    stream_type = strdup(params);
-    if (!stream_type)
+    priv = zalloc(sizeof(media_session_priv_t));
+    if (!priv)
         return NULL;
 
-    priv = media_open(MEDIA_SESSION_CONTROL, params);
-    if (!priv) {
-        free(stream_type);
-        return NULL;
-    }
+    if (media_transact(MEDIA_SESSION_CONTROL, priv, NULL, "open", params, 0, tmp, sizeof(tmp), 0) < 0)
+        goto err;
 
-    priv->stream_type = stream_type;
+    sscanf(tmp, "%llu", &priv->handle);
+    if (!priv->handle)
+        goto err;
+
+    priv->stream_type = strdup(params);
+    if (!priv->stream_type)
+        goto err;
+
     return priv;
+
+err:
+    media_disconnect(priv);
+    return NULL;
 }
 
 int media_session_set_event_callback(void* handle, void* cookie,
     media_event_callback event_cb)
 {
-    return media_set_event_cb(MEDIA_SESSION_CONTROL, handle, cookie, event_cb);
+    return media_set_event_cb(handle, cookie, event_cb);
 }
 
 int media_session_close(void* handle)
 {
-    MediaProxyPriv* priv = handle;
-    char* stream_type;
+    media_session_priv_t* priv = handle;
     int ret;
 
     if (!handle)
         return -EINVAL;
 
-    stream_type = priv->stream_type;
-    ret = media_close(MEDIA_SESSION_CONTROL, handle, 0);
-    if (ret >= 0)
-        free(stream_type);
+    ret = media_transact_once(priv, NULL, "close", NULL, 0, NULL, 0);
+    if (ret < 0)
+        return ret;
 
+    free(priv->stream_type);
+    media_disconnect(priv);
     return ret;
 }
 
 int media_session_start(void* handle)
 {
-    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "start", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "start", NULL, 0, NULL, 0);
 }
 
 int media_session_pause(void* handle)
 {
-    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "pause", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "pause", NULL, 0, NULL, 0);
 }
 
 int media_session_seek(void* handle, unsigned int msec)
@@ -972,12 +1004,12 @@ int media_session_seek(void* handle, unsigned int msec)
     char tmp[32];
 
     snprintf(tmp, sizeof(tmp), "%u", msec);
-    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "seek", tmp, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "seek", tmp, 0, NULL, 0);
 }
 
 int media_session_stop(void* handle)
 {
-    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "stop", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "stop", NULL, 0, NULL, 0);
 }
 
 int media_session_get_state(void* handle, int* state)
@@ -988,7 +1020,7 @@ int media_session_get_state(void* handle, int* state)
     if (!state)
         return -EINVAL;
 
-    ret = media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "get_state", NULL, 0, tmp, sizeof(tmp));
+    ret = media_transact_once(handle, NULL, "get_state", NULL, 0, tmp, sizeof(tmp));
     if (ret >= 0)
         *state = strtoul(tmp, NULL, 0);
 
@@ -1003,7 +1035,7 @@ int media_session_get_position(void* handle, unsigned int* msec)
     if (!msec)
         return -EINVAL;
 
-    ret = media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "get_position", NULL, 0, tmp, sizeof(tmp));
+    ret = media_transact_once(handle, NULL, "get_position", NULL, 0, tmp, sizeof(tmp));
     if (ret >= 0)
         *msec = strtoul(tmp, NULL, 0);
 
@@ -1018,7 +1050,7 @@ int media_session_get_duration(void* handle, unsigned int* msec)
     if (!msec)
         return -EINVAL;
 
-    ret = media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "get_duration", NULL, 0, tmp, sizeof(tmp));
+    ret = media_transact_once(handle, NULL, "get_duration", NULL, 0, tmp, sizeof(tmp));
     if (ret >= 0)
         *msec = strtoul(tmp, NULL, 0);
 
@@ -1071,10 +1103,10 @@ int media_session_decrease_volume(void* handle)
 
 int media_session_next_song(void* handle)
 {
-    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "next", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "next", NULL, 0, NULL, 0);
 }
 
 int media_session_prev_song(void* handle)
 {
-    return media_transact_once(MEDIA_SESSION_CONTROL, handle, NULL, "prev", NULL, 0, NULL, 0);
+    return media_transact_once(handle, NULL, "prev", NULL, 0, NULL, 0);
 }
