@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
+#include <fcntl.h>
+#include <nuttx/audio/audio.h>
 #include <nuttx/compiler.h>
 #include <nuttx/symtab.h>
 #include <string>
+#include <sys/ioctl.h>
 
 #include "InstanceConfigurableElement.h"
 #include "LoggingElementBuilderTemplate.h"
@@ -90,6 +93,54 @@ protected:
     }
 };
 
+class MixerCommander : public CSubsystemObject {
+private:
+    const size_t paramSize;
+
+public:
+    MixerCommander(const std::string& mappingValue,
+        CInstanceConfigurableElement* instanceConfigurableElement,
+        const CMappingContext& context, core::log::Logger& logger)
+        : CSubsystemObject(instanceConfigurableElement, logger)
+        , paramSize(getSize())
+    {
+    }
+
+protected:
+    bool sendToHW(std::string& /*error*/)
+    {
+        char *target, *arg, *params;
+        char *outptr, *saveptr;
+        int fd;
+
+        params = new char[paramSize];
+        if (!params)
+            return false;
+        blackboardRead(params, paramSize);
+
+        outptr = strtok_r(params, ";", &saveptr);
+        target = strtok_r(outptr, ",", &saveptr);
+        /*open audio mixer*/
+        fd = open(target, O_RDWR | O_CLOEXEC);
+        if (fd < 0)
+            return false;
+
+        while (1) {
+            arg = strtok_r(NULL, ",", &saveptr);
+            if (arg == NULL)
+                break;
+            if (ioctl(fd, AUDIOIOC_SETPARAMTER, arg) < 0)
+                return false;
+        }
+
+        delete[] params;
+        /*close audio mixer*/
+        close(fd);
+
+        return true;
+    }
+};
+
 /****************************************************************************
  * FFmpegSubsystem : define mapping keys and syner creators
  ****************************************************************************/
@@ -109,15 +160,33 @@ private:
     FFmpegSubsystem& operator=(const FFmpegSubsystem& object);
 };
 
+class MixerSubsystem : public CSubsystem {
+public:
+    MixerSubsystem(const std::string& name, core::log::Logger& logger)
+        : CSubsystem(name, logger)
+    {
+        addSubsystemObjectFactory(
+            new TSubsystemObjectFactory<MixerCommander>("Commander", 0));
+    }
+
+private:
+    /* Copy facilities are put private to disable copy. */
+    MixerSubsystem(const MixerSubsystem& object);
+    MixerSubsystem& operator=(const MixerSubsystem& object);
+};
+
 /****************************************************************************
  * plugin entry point
  ****************************************************************************/
 
-static void entrypoint(CSubsystemLibrary* subsystemLibrary, core::log::Logger& logger)
+static void entrypoint(CSubsystemLibrary* subsystemLibrary,
+    core::log::Logger& logger)
 {
     subsystemLibrary->addElementBuilder(
-        "FFmpeg",
-        new TLoggingElementBuilderTemplate<FFmpegSubsystem>(logger));
+        "FFmpeg", new TLoggingElementBuilderTemplate<FFmpegSubsystem>(logger));
+
+    subsystemLibrary->addElementBuilder(
+        "Mixer", new TLoggingElementBuilderTemplate<MixerSubsystem>(logger));
 }
 
 /* let linker find symbol in parameter-framework lib */
@@ -125,8 +194,7 @@ extern const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[];
 extern int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE;
 
 const symtab_s PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[] = {
-    { QUOTE(PARAMETER_FRAMEWORK_PLUGIN_ENTRYPOINT_V1),
-        (const void*)entrypoint },
+    { QUOTE(PARAMETER_FRAMEWORK_PLUGIN_ENTRYPOINT_V1), (const void*)entrypoint },
 };
 
 int PARAMETER_FRAMEWORK_PLUGIN_SYMTAB_SIZE = sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB) / sizeof(PARAMETER_FRAMEWORK_PLUGIN_SYMTAB[0]);
