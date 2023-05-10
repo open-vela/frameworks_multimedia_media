@@ -129,8 +129,11 @@ protected:
             arg = strtok_r(NULL, ",", &saveptr);
             if (arg == NULL)
                 break;
-            if (ioctl(fd, AUDIOIOC_SETPARAMTER, arg) < 0)
+            if (ioctl(fd, AUDIOIOC_SETPARAMTER, arg) < 0) {
+                delete[] params;
+                close(fd);
                 return false;
+            }
         }
 
         delete[] params;
