@@ -354,7 +354,7 @@ static int media_prepare(int control, void* handle,
     if (!priv || priv->socket > 0)
         return ret;
 
-    if (!url) {
+    if (!url || !url[0]) {
         fd = media_bind_socket(handle, tmp, sizeof(tmp));
         if (fd < 0)
             return fd;
