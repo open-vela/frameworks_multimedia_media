@@ -118,27 +118,37 @@ protected:
             return false;
         blackboardRead(params, paramSize);
 
-        outptr = strtok_r(params, ";", &saveptr);
-        target = strtok_r(outptr, ",", &saveptr);
-        /*open audio mixer*/
-        fd = open(target, O_RDWR | O_CLOEXEC);
-        if (fd < 0)
-            return false;
+        /* params format : target_1,args_1;target_2,args_2;...;target_n,args_n
+         * example : dev/audio/mixer1,mode=normal,outdev0=speaker;dev/audio/mixer2,indev=mic;
+         */
 
-        while (1) {
-            arg = strtok_r(NULL, ",", &saveptr);
-            if (arg == NULL)
-                break;
-            if (ioctl(fd, AUDIOIOC_SETPARAMTER, arg) < 0) {
+        outptr = strtok_r(params, ";", &saveptr);
+
+        while (outptr) {
+            target = strtok_r(outptr, ",", &arg);
+            if (target == NULL) {
                 delete[] params;
-                close(fd);
                 return false;
             }
+
+            if (arg != NULL && target != NULL) {
+                fd = open(target, O_RDWR | O_CLOEXEC);
+                if (fd < 0) {
+                    delete[] params;
+                    return false;
+                }
+                if (ioctl(fd, AUDIOIOC_SETPARAMTER, arg) < 0) {
+                    delete[] params;
+                    close(fd);
+                    return false;
+                }
+                close(fd);
+            }
+
+            outptr = strtok_r(NULL, ";", &saveptr);
         }
 
         delete[] params;
-        /*close audio mixer*/
-        close(fd);
 
         return true;
     }
