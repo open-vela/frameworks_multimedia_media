@@ -405,14 +405,22 @@ static ssize_t media_process_data(void* handle, bool player,
         ret = send(priv->socket, data, len, 0);
         if (ret == len)
             goto out;
-        else if (ret >= 0)
+        else if (ret == 0)
             errno = ECONNRESET;
+        else if (ret < 0 && errno == EINTR) {
+            ret = -errno;
+            goto out;
+        }
     } else {
         ret = recv(priv->socket, data, len, 0);
         if (ret > 0)
             goto out;
         else if (ret == 0)
             errno = ECONNRESET;
+        else if (ret < 0 && errno == EINTR) {
+            ret = -errno;
+            goto out;
+        }
     }
 
     close(priv->socket);
