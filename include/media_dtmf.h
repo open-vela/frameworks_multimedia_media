@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/include/media_api.h
+ * frameworks/media/include/media_dtmf.h
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,21 +18,16 @@
  *
  ****************************************************************************/
 
-#ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_API_H
-#define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_API_H
+#ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_DTMF_H
+#define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_DTMF_H
 
 /****************************************************************************
- * Included Files
+ * Pre-processor Definitions
  ****************************************************************************/
 
-#include <media_dtmf.h>
-#include <media_event.h>
-#include <media_focus.h>
-#include <media_player.h>
-#include <media_policy.h>
-#include <media_recorder.h>
-#include <media_session.h>
-#include <media_wrapper.h>
+/* DTMF default tone format */
+
+#define MEDIA_TONE_DTMF_FORMAT "format=s16le:sample_rate=8000:ch_layout=mono"
 
 #ifdef __cplusplus
 #define EXTERN extern "C"
@@ -41,33 +36,31 @@ extern "C" {
 #define EXTERN extern
 #endif
 
-/**
- * Send command to media
- * @param[in] target    target name
- * @param[in] cmd       command
- * @param[in] arg       argument
- * @param[out] res      response
- * @param[in] res_len   response msg len
- * @return Zero on success; a negated errno value on failure
- */
-int media_process_command(const char* target, const char* cmd,
-    const char* arg, char* res, int res_len);
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
 
 /**
- * Dump media graph
- * @param[in] options   dump options
+ * Generate one or continuous multiple DTMF signal and save the result in
+ * the input buffer.
+ * @param[in] numbers   Dialbuttons numbers.
+ * @param[out] buffer   Buffer address.
+ * @return Zero on success; a negated errno value on failure.
+ * @note To play dtmf tone format should fixed as MEDIA_TONE_DTMF_FORMAT.
  */
-void media_graph_dump(const char* options);
+int media_dtmf_generate(char* numbers, short int* buffer);
 
 /**
- * Dump media policy
- * @param[in] options   dump options
+ * Get one DTMF tone buffer size.
+ * @return Buffer size of one DTMF tone.
+ * @note The application need to multiply the count when generate multiple
+ *       DTMF tones.
  */
-void media_policy_dump(const char* options);
+int media_dtmf_get_buffer_size(void);
 
 #undef EXTERN
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_API_H */
+#endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_DTMF_H */
