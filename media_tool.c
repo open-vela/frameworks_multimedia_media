@@ -88,6 +88,7 @@ static int mediatool_player_cmd_seek(struct mediatool_s* media, char* pargs);
 static int mediatool_player_cmd_position(struct mediatool_s* media, char* pargs);
 static int mediatool_player_cmd_duration(struct mediatool_s* media, char* pargs);
 static int mediatool_player_cmd_isplaying(struct mediatool_s* media, char* pargs);
+static int mediatool_player_cmd_dtmf(struct mediatool_s* media, char* pargs);
 static int mediatool_session_cmd_prevsong(struct mediatool_s* media, char* pargs);
 static int mediatool_session_cmd_nextsong(struct mediatool_s* media, char* pargs);
 static int mediatool_common_stop_inner(struct mediatool_chain_s* chain);
@@ -171,6 +172,9 @@ static struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "isplay",
         mediatool_player_cmd_isplaying,
         "Get position is playing or not(isplay ID)" },
+    { "playdtmf",
+        mediatool_player_cmd_dtmf,
+        "To play dtmf tone(start ID direct/buffer dialbuttons)" },
     { "prev",
         mediatool_session_cmd_prevsong,
         "To play previous song in player list(prev ID)" },
@@ -987,6 +991,89 @@ static int mediatool_player_cmd_isplaying(struct mediatool_s* media, char* pargs
     printf("Is_playing %d\n", ret);
 
     return 0;
+}
+
+static int mediatool_player_cmd_dtmf(struct mediatool_s* media, char* pargs)
+{
+    bool direct = false;
+    short int* buffer;
+    int buffer_size;
+    char* numbers;
+    long int id;
+    int count;
+    int ret;
+    int fd;
+
+    if (!strlen(pargs))
+        return -EINVAL;
+
+    numbers = pargs;
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+
+    *pargs++ = 0;
+
+    id = strtol(numbers, NULL, 10);
+
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+        return -EINVAL;
+
+    numbers = pargs;
+    pargs = strchr(pargs, ' ');
+    if (!pargs)
+        return -EINVAL;
+
+    *pargs++ = 0;
+
+    if (!strcmp(numbers, "direct"))
+        direct = true;
+
+    numbers = pargs;
+    pargs = strchr(pargs, ' ');
+    if (pargs)
+        *pargs++ = 0;
+
+    if (!numbers || numbers[0] == '\0')
+        return -EINVAL;
+
+    count = strlen(numbers);
+
+    buffer_size = media_dtmf_get_buffer_size();
+    buffer = (short int*)malloc(buffer_size * count);
+    assert(buffer);
+
+    ret = media_dtmf_generate(numbers, buffer);
+    if (ret < 0)
+        goto out;
+
+    ret = media_player_prepare(media->chain[id].handle, NULL, "format=s16le:sample_rate=8000:ch_layout=mono");
+    if (ret < 0)
+        goto out;
+
+    if (direct) {
+        fd = media_player_get_socket(media->chain[id].handle);
+        if (fd < 0)
+            goto out;
+
+        if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK) < 0)
+            goto out;
+
+        ret = mediatool_process_data(fd, true, buffer, buffer_size * count);
+    } else
+        ret = media_player_write_data(media->chain[id].handle, buffer, buffer_size * count);
+
+    if (ret == buffer_size * count) {
+        media_player_close_socket(media->chain[id].handle);
+        ret = 0;
+    } else {
+        printf("Failed to play DTMF tone.");
+    }
+out:
+    free(buffer);
+    buffer = NULL;
+
+    return ret;
 }
 
 static int mediatool_session_cmd_prevsong(struct mediatool_s* media, char* pargs)
