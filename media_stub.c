@@ -54,7 +54,7 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
     media_parcel_read_int32(in, &cmd);
 
     switch (cmd) {
-#ifdef CONFIG_PFW
+#ifdef CONFIG_LIB_PFW
     case MEDIA_POLICY_CONTROL:
         media_parcel_read_scanf(in, "%s%s%s%i%i", &param_s1, &param_s2,
             &param_s3, &param_i1, &param_i2);
