@@ -21,7 +21,7 @@
 include $(APPDIR)/Make.defs
 
 MODULE = $(CONFIG_MEDIA_SERVER)
-CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c
+CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c media_dtmf.c
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
   CSRCS  += media_focus.c focus_stack.c
