@@ -40,18 +40,9 @@ ifneq ($(CONFIG_LIB_FFMPEG),)
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/ffmpeg/ffmpeg
 endif
 
-ifneq ($(CONFIG_PFW),)
+ifneq ($(CONFIG_LIB_PFW),)
   CSRCS  += media_policy.c
-  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/bindings/c
-
-  CXXEXT   := .cpp
-  CXXSRCS  += media_policy_plugin.cpp
-  CXXFLAGS += --std=c++11
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/parameter
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/parameter/include
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/parameter/log/include
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/xmlserializer
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/parameter-framework/parameter-framework/utility
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/pfw/include
 endif
 
 ifneq ($(CONFIG_MEDIA_TOOL),)
