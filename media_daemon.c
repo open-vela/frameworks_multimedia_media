@@ -98,13 +98,13 @@ static MediaPoll g_media[] = {
         media_graph_destroy,
     },
 #endif
-#ifdef CONFIG_PFW
+#ifdef CONFIG_LIB_PFW
     {
         "media_policy",
         NULL,
         (const char*[]) {
-            CONFIG_MEDIA_SERVER_CONFIG_PATH "configurations.xml",
-            CONFIG_MEDIA_SERVER_CONFIG_PATH "criteria.txt" },
+            CONFIG_MEDIA_SERVER_CONFIG_PATH "criteria.txt",
+            CONFIG_MEDIA_SERVER_CONFIG_PATH "settings.pfw" },
         media_policy_create,
         NULL,
         NULL,

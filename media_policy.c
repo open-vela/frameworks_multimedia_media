@@ -22,12 +22,15 @@
  * Included Files
  ****************************************************************************/
 
-#include <ParameterFramework.h>
+#include <nuttx/audio/audio.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <kvdb.h>
+#include <pfw.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <syslog.h>
 
 #include "media_internal.h"
@@ -37,212 +40,116 @@
  ****************************************************************************/
 
 #define MEDIA_PERSIST "persist.media."
-#define MEDIA_CRITERIA_MAXNUM 64
-#define MEDIA_CRITERIA_LINE_MAXLENGTH 256
+
+/****************************************************************************
+ * Private Functions Prototype
+ ****************************************************************************/
+
+void pfw_ffmpeg_command_callback(void* cookie, const char* params);
+void pfw_set_parameter_callback(void* cookie, const char* params);
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
 
-typedef struct MediaPolicyPriv {
-    PfwHandler* pfw;
-} MediaPolicyPriv;
+static pfw_plugin_def_t g_media_policy_plugins[] = {
+    { "FFmpegCommand", NULL, pfw_ffmpeg_command_callback },
+    { "SetParameter", NULL, pfw_set_parameter_callback }
+};
+
+static const size_t g_media_policy_nb_plugins = sizeof(g_media_policy_plugins)
+    / sizeof(g_media_policy_plugins[0]);
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-/**
- * Save criterion value to kvdb.
- *
- * Criterion has int32_t type, though users can set/get criterion with
- * integer or string, here we just save criterion's integer value.
- *
- * Only for criteria whose real name start with MEDIA_PERSIST.
- *
- * @param pfw           parameter-framework manager instance handle.
- * @param name          criterion name.
- * @return Zero on success; a negated errno value on failure.
- */
-static int media_policy_save_kvdb(PfwHandler* pfw, const char* name)
+void pfw_ffmpeg_command_callback(void* cookie, const char* params)
 {
-    char real_name[64];
-    int value;
+    char *target, *cmd, *arg, *outptr, *inptr, *str;
 
-    if (!pfwGetCriterionRealName(pfw, name, real_name, sizeof(real_name)))
-        return -EINVAL;
-
-    if (strncmp(real_name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
-        return 0;
-
-    if (!pfwGetCriterion(pfw, real_name, &value))
-        return -EINVAL;
-
-    return property_set_int32(real_name, value);
-}
-
-/**
- * Load criteria values from kvdb.
- *
- * Only for criteria whose real name start with MEDIA_PERSIST.
- *
- * @param criteria  criteria data structure.
- * @param ncriteria criteria number.
- */
-static void media_policy_load_kvdb(PfwCriterion* criteria, int ncriteria)
-{
-    int i;
-
-    for (i = 0; i < ncriteria; i++) {
-        const char* real_name = criteria[i].names[0];
-
-        if (strncmp(real_name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
-            continue;
-
-        criteria[i].initial = property_get_int32(real_name, criteria[i].initial);
-    }
-}
-
-static void media_policy_free_criteria(PfwCriterion* criteria, int ncriteria)
-{
-    int i, j;
-
-    // free criteria
-    if (criteria) {
-        for (i = 0; i < ncriteria; i++) {
-            // free criterion names
-            if (criteria[i].names) {
-                for (j = 0; criteria[i].names[j]; j++)
-                    free((void*)criteria[i].names[j]);
-                free(criteria[i].names);
-            }
-
-            // free criterion values
-            if (criteria[i].values) {
-                for (j = 0; criteria[i].values[j]; j++)
-                    free((void*)criteria[i].values[j]);
-                free(criteria[i].values);
-            }
-        }
-        free(criteria);
-    }
-}
-
-static int media_policy_parse_criteria(PfwCriterion** pcriteria, const char* path)
-{
-    const char* delim = " \t\r\n";
-    char* saveptr;
-    FILE* fp;
-    PfwCriterion* criteria;
-    int ret = -EINVAL;
-    int i = 0, j;
-
-    if (!(fp = fopen(path, "r")))
-        return -errno;
-
-    // prase criteria definition : calloc + parse
-    criteria = calloc(MEDIA_CRITERIA_MAXNUM, sizeof(PfwCriterion));
-    if (!criteria)
-        goto err_alloc;
-
-    /** one criterion definition each line, example:
-     *
-     * text to be parsed:
-     *  ExclusiveCriterion Color Colour : Red Grean Blue : 1
-     *  InclusiveCriterion Alphabet     : A B C D E F G
-     *
-     * after parsing:
-     * {
-     *     {
-     *         .names     = { "Color", "Colour", NULL },
-     *         .inclusive = false,
-     *         .values    = { "Red", "Grean", "Blue", NULL },
-     *         .initial   = 1,
-     *     },
-     *     {
-     *         .names     = { "Alphabet", NULL },
-     *         .inclusive = true,
-     *         .values    = { "A", "B", "C", "D", "E", "F", "G", NULL },
-     *         .initial   = 0,
-     *     },
-     * }
-     *
+    /* fmt:
+     *  {target,cmd,arg;}*
+     * example:
+     *  sco,sample_rate,16000;sco,play,;
      */
-    for (; !feof(fp) && i < MEDIA_CRITERIA_MAXNUM; i++) {
-        char line[MEDIA_CRITERIA_LINE_MAXLENGTH];
-        char* token;
 
-        if (!fgets(line, sizeof(line), fp)) {
-            i--; // ignore empty line
-            continue;
-        }
+    str = strdup(params);
+    if (!str)
+        return;
 
-        // parse criterion type
-        if (!(token = strtok_r(line, delim, &saveptr)))
-            goto err_parse;
+    target = strtok_r(str, ";", &outptr);
+    while (target) {
+        target = strtok_r(target, ",", &inptr);
+        if (!target)
+            goto out;
 
-        if (!strcmp("InclusiveCriterion", token))
-            criteria[i].inclusive = true;
-        else if (!strcmp("ExclusiveCriterion", token))
-            criteria[i].inclusive = false;
-        else
-            goto err_parse;
+        cmd = strtok_r(NULL, ",", &inptr);
+        if (!cmd)
+            goto out;
 
-        // parse criterion names : calloc + parse
-        criteria[i].names = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char*));
-        if (!criteria[i].names)
-            goto err_alloc;
+        arg = strtok_r(NULL, ",", &inptr);
+        media_policy_process_command(target, cmd, arg);
 
-        for (j = 0; j < MEDIA_CRITERIA_MAXNUM; j++) {
-            if (!(token = strtok_r(NULL, delim, &saveptr)))
-                goto err_parse;
-            if (!strcmp(":", token)) {
-                if (j == 0)
-                    goto err_parse;
-                break; // end of names definition
-            }
-            if (!(token = strdup(token)))
-                goto err_alloc;
-            criteria[i].names[j] = token;
-        }
-
-        // parse criterion values : calloc + parse
-        criteria[i].values = calloc(MEDIA_CRITERIA_MAXNUM + 1, sizeof(char*));
-        if (!criteria[i].values)
-            goto err_alloc;
-
-        for (j = 0; j < MEDIA_CRITERIA_MAXNUM; j++) {
-            if (!(token = strtok_r(NULL, delim, &saveptr))) {
-                if (j == 0)
-                    goto err_parse;
-                break; // end of values definition
-            }
-            if (!strcmp(":", token)) {
-                if (j == 0)
-                    goto err_parse;
-                if (!(token = strtok_r(NULL, delim, &saveptr)))
-                    goto err_parse;
-                criteria[i].initial = atoi(token);
-                break; // end of initial value definition
-            }
-            if (!(token = strdup(token)))
-                goto err_alloc;
-            criteria[i].values[j] = token;
-        }
+        target = strtok_r(NULL, ";", &outptr);
     }
 
-    fclose(fp);
+out:
+    free(str);
+}
 
-    *pcriteria = criteria;
-    return i; //< ncriteria
+void pfw_set_parameter_callback(void* cookie, const char* params)
+{
+    char *target, *arg, *outptr, *saveptr, *str;
+    int fd = 0;
 
-err_alloc:
-    ret = -ENOMEM;
-err_parse:
-    media_policy_free_criteria(criteria, i + 1); // failed on (i + 1)'th.
-    fclose(fp);
+    /* fmt:
+     *  target_1,args_1;target_2,args_2;...;target_n,args_n
+     * example:
+     *  dev/audio/mixer1,mode=normal,outdev0=speaker;dev/audio/mixer2,indev=mic;
+     */
 
-    return ret;
+    str = strdup(params);
+    if (!str)
+        return;
+
+    outptr = strtok_r(str, ";", &saveptr);
+
+    while (outptr) {
+        target = strtok_r(outptr, ",", &arg);
+        if (target == NULL)
+            goto out;
+
+        if (arg != NULL && target != NULL) {
+            fd = open(target, O_RDWR | O_CLOEXEC);
+            if (fd < 0)
+                goto out;
+
+            if (ioctl(fd, AUDIOIOC_SETPARAMTER, arg) < 0) {
+                close(fd);
+                goto out;
+            }
+
+            close(fd);
+        }
+
+        outptr = strtok_r(NULL, ";", &saveptr);
+    }
+
+out:
+    free(str);
+}
+
+static void pfw_load_criterion(const char* name, int32_t* state)
+{
+    if (!strncmp(name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
+        *state = property_get_int32(name, *state);
+}
+
+static void pfw_save_criterion(const char* name, int32_t state)
+{
+    if (!strncmp(name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
+        property_set_int32(name, state);
 }
 
 /****************************************************************************
@@ -252,11 +159,7 @@ err_parse:
 int media_policy_handler(void* handle, const char* name, const char* cmd,
     const char* value, int apply, char** res, int res_len)
 {
-    MediaPolicyPriv* priv = handle;
-    int ret = 0, tmp;
-
-    if (!priv || !priv->pfw)
-        return -EINVAL;
+    int ret = -ENOSYS, tmp;
 
     if (res_len && res && !*res) {
         *res = malloc(res_len);
@@ -265,112 +168,72 @@ int media_policy_handler(void* handle, const char* name, const char* cmd,
     }
 
     if (!strcmp(cmd, "dump")) {
-        if (!res)
-            return -EINVAL;
-
-        *res = pfwDump(priv->pfw, value);
+        pfw_dump(handle);
         return 0;
-    } else if (!name) {
-        return -EINVAL;
     } else if (!strcmp(cmd, "set_int")) {
-        ret = pfwSetCriterion(priv->pfw, name, atoi(value));
+        ret = pfw_setint(handle, name, atoi(value));
     } else if (!strcmp(cmd, "increase")) {
-        ret = pfwIncreaseCriterion(priv->pfw, name);
+        ret = pfw_increase(handle, name);
     } else if (!strcmp(cmd, "decrease")) {
-        ret = pfwDecreaseCriterion(priv->pfw, name);
+        ret = pfw_decrease(handle, name);
     } else if (!strcmp(cmd, "set_string")) {
-        if (!value)
-            return -EINVAL;
-
-        ret = pfwSetCriterionString(priv->pfw, name, value);
+        ret = pfw_setstring(handle, name, value);
     } else if (!strcmp(cmd, "include")) {
-        if (!value)
-            return -EINVAL;
-
-        ret = pfwIncludeCriterion(priv->pfw, name, value);
+        ret = pfw_include(handle, name, value);
     } else if (!strcmp(cmd, "exclude")) {
-        if (!value)
-            return -EINVAL;
-
-        ret = pfwExcludeCriterion(priv->pfw, name, value);
+        ret = pfw_exclude(handle, name, value);
     } else if (!strcmp(cmd, "contain")) {
-        if (!res || !*res || !pfwContainCriterion(priv->pfw, name, value, &tmp))
+        if (!res || !*res)
             return -EINVAL;
 
-        return snprintf(*res, res_len, "%d", tmp);
+        ret = pfw_contain(handle, name, value, &tmp);
+        if (ret >= 0)
+            return snprintf(*res, res_len, "%d", tmp);
     } else if (!strcmp(cmd, "get_int")) {
-        if (!res || !*res || !pfwGetCriterion(priv->pfw, name, &tmp))
+        if (!res || !*res)
             return -EINVAL;
 
-        return snprintf(*res, res_len, "%d", tmp);
+        ret = pfw_getint(handle, name, &tmp);
+        if (ret >= 0)
+            return snprintf(*res, res_len, "%d", tmp);
     } else if (!strcmp(cmd, "get_string")) {
         if (!res || !*res)
             return -EINVAL;
 
-        return pfwGetCriterionString(priv->pfw, name, *res, res_len) ? 0 : -EINVAL;
+        return pfw_getstring(handle, name, *res, res_len) ? 0 : -EINVAL;
     }
 
-    if (!ret) {
+    if (ret < 0) {
         syslog(LOG_ERR, "%s, unkown name:%s cmd:%s value:%s\n",
             __func__, name, cmd, value);
         return -EINVAL;
     }
 
-    if (apply && !pfwApplyConfigurations(priv->pfw))
-        return -EINVAL;
-
-    return media_policy_save_kvdb(priv->pfw, name);
-}
-
-int media_policy_destroy(void* handle)
-{
-    MediaPolicyPriv* priv = handle;
-
-    if (!priv)
-        return -EINVAL;
-
-    if (priv->pfw)
-        pfwDestroy(priv->pfw);
-    free(priv);
+    if (apply)
+        pfw_apply(handle);
 
     return 0;
 }
 
-void* media_policy_create(void* files)
+int media_policy_destroy(void* handle)
 {
-    const char** file_paths = files;
-    MediaPolicyPriv* priv;
-    PfwCriterion* criteria;
-    PfwLogger logger = {};
-    int ncriteria;
+    pfw_destroy(handle);
+    return 0;
+}
 
-    if (!files)
+void* media_policy_create(void* params)
+{
+    const char** paths = params;
+    void* handle;
+
+    if (!params)
         return NULL;
 
-    priv = calloc(1, sizeof(MediaPolicyPriv));
-    if (!priv)
+    handle = pfw_create(paths[0], paths[1], g_media_policy_plugins,
+        g_media_policy_nb_plugins, pfw_load_criterion, pfw_save_criterion);
+    if (!handle)
         return NULL;
 
-    // parse criteria.
-    ncriteria = media_policy_parse_criteria(&criteria, file_paths[1]);
-    if (ncriteria <= 0)
-        goto err_parse;
-
-    // load persist criteria values from kvdb.
-    media_policy_load_kvdb(criteria, ncriteria);
-
-    // create and start parameter-framework manager.
-    if (!(priv->pfw = pfwCreate()))
-        goto err_pfw;
-    if (!pfwStart(priv->pfw, file_paths[0], criteria, ncriteria, &logger))
-        goto err_pfw;
-
-    media_policy_free_criteria(criteria, ncriteria);
-    return priv;
-
-err_pfw:
-    media_policy_free_criteria(criteria, ncriteria);
-err_parse:
-    media_policy_destroy(priv);
-    return NULL;
+    pfw_apply(handle);
+    return handle;
 }
