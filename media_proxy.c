@@ -120,6 +120,10 @@ static int media_transact_once(int control, void* handle, const char* target,
         ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", control,
             priv->handle, target, cmd, arg, res_len);
         break;
+
+    default:
+        name = "none";
+        goto out;
     }
 
     if (ret < 0)
