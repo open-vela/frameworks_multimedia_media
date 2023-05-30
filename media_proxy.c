@@ -602,9 +602,9 @@ int media_focus_abandon(void* handle)
     return ret;
 }
 
-void media_focus_debug_stack_display(void)
+void media_focus_dump(const char* options)
 {
-    media_transact(MEDIA_FOCUS_CONTROL, NULL, NULL, "display", NULL, 0, NULL, 0, false);
+    media_transact(MEDIA_FOCUS_CONTROL, NULL, NULL, "dump", options, 0, NULL, 0, false);
 }
 
 int media_process_command(const char* target, const char* cmd,
