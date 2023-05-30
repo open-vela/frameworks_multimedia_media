@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/utils/app_focus.c
+ * frameworks/media/focus_stack.c
  *
  * Copyright (C) 2020 Xiaomi Corporation
  *
@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <syslog.h>
 
-#include "media_focus.h"
+#include "focus_stack.h"
 
 /****************************************************************************
  * Private Types
