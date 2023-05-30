@@ -1079,7 +1079,7 @@ static int mediatool_server_cmd_dump(struct mediatool_s* media, char* pargs)
      */
     media_policy_dump(pargs);
     media_graph_dump(pargs);
-    media_focus_debug_stack_display();
+    media_focus_dump(pargs);
 
     return 0;
 }
