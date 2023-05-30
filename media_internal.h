@@ -30,6 +30,7 @@ extern "C" {
  ****************************************************************************/
 
 #include <media_event.h>
+#include <media_focus.h>
 #include <poll.h>
 
 /****************************************************************************
@@ -50,6 +51,19 @@ extern "C" {
 #define MEDIA_SOCKADDR_NAME "md:%s"
 
 #define MEDIA_IS_STATUS_CHANGE(x) ((x) < 200)
+
+/****************************************************************************
+ * Media Types
+ ****************************************************************************/
+
+typedef struct media_focus_id {
+    int client_id;
+    int stream_type;
+    unsigned int thread_id;
+    int focus_state;
+    media_focus_callback callback_method;
+    void* callback_argv;
+} media_focus_id;
 
 /****************************************************************************
  * Media Functions
@@ -78,6 +92,8 @@ void* media_focus_create(void* file);
 int media_focus_destroy(void* handle);
 int media_focus_handler(void* handle, const char* name, const char* cmd,
     char** res, int res_len);
+void media_focus_debug_stack_display(void);
+int media_focus_debug_stack_return(media_focus_id* focus_list, int num);
 
 /****************************************************************************
  * Graph Functions

@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "media_focus.h"
+#include "focus_stack.h"
 #include "media_internal.h"
 #include "media_wrapper.h"
 
@@ -586,6 +586,17 @@ out:
     return focus;
 }
 
+void media_focus_debug_stack_display(void)
+{
+    media_focus* focus;
+
+    focus = media_get_focus();
+    if (!focus)
+        return;
+
+    app_focus_stack_display(focus->stack);
+}
+
 int media_focus_debug_stack_return(media_focus_id* p_focus_list, int num)
 {
     media_focus* focus;
@@ -625,8 +636,8 @@ int media_focus_handler(void* handle, const char* name, const char* cmd,
         return snprintf(*res, res_len, "%llu:%d", (uint64_t)(uintptr_t)handle, suggestion);
     } else if (!strcmp(cmd, "abandon")) {
         return media_focus_abandon_(focus, handle);
-    } else if (!strcmp(cmd, "display")) {
-        app_focus_stack_display(focus->stack);
+    } else if (!strcmp(cmd, "dump")) {
+        media_focus_debug_stack_display();
         return 0;
     } else if (!strcmp(cmd, "peek")) {
         if (!res)

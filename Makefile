@@ -24,7 +24,7 @@ MODULE = $(CONFIG_MEDIA_SERVER)
 CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
-  CSRCS  += media_focus.c app_focus.c
+  CSRCS  += media_focus.c focus_stack.c
 endif
 
 ifneq ($(CONFIG_MEDIA_SERVER),)
