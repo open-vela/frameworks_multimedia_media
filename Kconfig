@@ -14,23 +14,6 @@ config MEDIA_SERVER
 	default n
 	select EVENT_FD
 
-config MEDIA_FOCUS
-	bool "Enable media focus"
-	default n
-	select APP_FOCUS
-
-if MEDIA_FOCUS
-
-config MEDIA_FOCUS_STACK_DEPTH
-	int "Media focus configurable stack size"
-	default 8
-
-config MEDIA_FOCUS_CONFIG_PATH
-	string "Media focus configure file path"
-	default "/etc/media/"
-
-endif # MEDIA_FOCUS
-
 if MEDIA_SERVER
 
 config MEDIA_SERVER_CONFIG_PATH
