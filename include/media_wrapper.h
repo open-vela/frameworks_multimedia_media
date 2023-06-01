@@ -59,6 +59,7 @@ extern "C" {
 #define MEDIA_STREAM_SPORT "Sport"
 #define MEDIA_STREAM_INFO "Info"
 #define MEDIA_STREAM_MUSIC "Music"
+#define MEDIA_STREAM_EMERGENCY "Emergency"
 
 /****************************************************************************
  * Public Functions for Mode Control
