@@ -329,15 +329,15 @@ int media_server_notify(void* handle, void* cookie, media_parcel* parcel)
     struct media_server_conn* conn = cookie;
     int ret = -EINVAL;
 
+    if (priv == NULL || conn == NULL)
+        return ret;
+
     pthread_mutex_lock(&conn->mutex);
 
-    if (priv == NULL || conn == NULL || conn->notify_fd <= 0)
-        goto out;
+    if (conn->notify_fd > 0)
+        ret = media_parcel_send(parcel, conn->notify_fd,
+            MEDIA_PARCEL_NOTIFY, MSG_DONTWAIT);
 
-    ret = media_parcel_send(parcel, conn->notify_fd,
-        MEDIA_PARCEL_NOTIFY, MSG_DONTWAIT);
-
-out:
     pthread_mutex_unlock(&conn->mutex);
 
     return ret;
