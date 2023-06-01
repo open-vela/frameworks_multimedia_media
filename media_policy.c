@@ -200,14 +200,13 @@ int media_policy_handler(void* handle, const char* name, const char* cmd,
         if (!res || !*res)
             return -EINVAL;
 
-        return pfw_getstring(handle, name, *res, res_len) ? 0 : -EINVAL;
+        ret = pfw_getstring(handle, name, *res, res_len);
+        if (ret >= 0)
+            return 0;
     }
 
-    if (ret < 0) {
-        syslog(LOG_ERR, "%s, unkown name:%s cmd:%s value:%s\n",
-            __func__, name, cmd, value);
-        return -EINVAL;
-    }
+    if (ret < 0)
+        return ret;
 
     if (apply)
         pfw_apply(handle);
