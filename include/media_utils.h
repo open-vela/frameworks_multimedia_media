@@ -18,8 +18,8 @@
  *
  ****************************************************************************/
 
-#ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_DTMF_H
-#define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_DTMF_H
+#ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_UTILS_H
+#define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_UTILS_H
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -41,6 +41,38 @@ extern "C" {
  ****************************************************************************/
 
 /**
+ * Send command to media
+ * @param[in] target    target name
+ * @param[in] cmd       command
+ * @param[in] arg       argument
+ * @param[out] res      response
+ * @param[in] res_len   response msg len
+ * @return Zero on success; a negated errno value on failure
+ */
+int media_process_command(const char* target, const char* cmd,
+    const char* arg, char* res, int res_len);
+
+/**
+ * Dump media graph
+ * @param[in] options   dump options
+ */
+void media_graph_dump(const char* options);
+
+/**
+ * Dump media policy
+ * @param[in] options   dump options
+ */
+void media_policy_dump(const char* options);
+
+/**
+ * Get DTMF tone buffer size.
+ * @param[in] numbers   Dialbuttons numbers.
+ * @return Buffer size of DTMF tone on success; a negated errno value on
+ *         failure.
+ */
+int media_dtmf_get_buffer_size(const char* numbers);
+
+/**
  * Generate one or continuous multiple DTMF signal and save the result in
  * the input buffer.
  * @param[in] numbers   Dialbuttons numbers.
@@ -48,19 +80,11 @@ extern "C" {
  * @return Zero on success; a negated errno value on failure.
  * @note Format should fixed as MEDIA_TONE_DTMF_FORMAT when to play dtmf tone.
  */
-int media_dtmf_generate(const char* numbers, short int* buffer);
-
-/**
- * Get one DTMF tone buffer size.
- * @return Buffer size of one DTMF tone.
- * @note The application need to multiply the count when generate multiple
- *       DTMF tones.
- */
-int media_dtmf_get_buffer_size(void);
+int media_dtmf_generate(const char* numbers, void* buffer);
 
 #undef EXTERN
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_DTMF_H */
+#endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_UTILS_H */
