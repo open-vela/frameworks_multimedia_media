@@ -1000,7 +1000,6 @@ static int mediatool_player_cmd_dtmf(struct mediatool_s* media, char* pargs)
     int buffer_size;
     char* numbers;
     long int id;
-    int count;
     int ret;
     int fd;
 
@@ -1037,10 +1036,8 @@ static int mediatool_player_cmd_dtmf(struct mediatool_s* media, char* pargs)
     if (numbers[0] == '\0')
         return -EINVAL;
 
-    count = strlen(numbers);
-
-    buffer_size = media_dtmf_get_buffer_size();
-    buffer = (short int*)malloc(buffer_size * count);
+    buffer_size = media_dtmf_get_buffer_size(numbers);
+    buffer = (short int*)malloc(buffer_size);
     assert(buffer);
 
     ret = media_dtmf_generate(numbers, buffer);
@@ -1059,11 +1056,11 @@ static int mediatool_player_cmd_dtmf(struct mediatool_s* media, char* pargs)
         if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK) < 0)
             goto out;
 
-        ret = mediatool_process_data(fd, true, buffer, buffer_size * count);
+        ret = mediatool_process_data(fd, true, buffer, buffer_size);
     } else
-        ret = media_player_write_data(media->chain[id].handle, buffer, buffer_size * count);
+        ret = media_player_write_data(media->chain[id].handle, buffer, buffer_size);
 
-    if (ret == buffer_size * count) {
+    if (ret == buffer_size) {
         media_player_close_socket(media->chain[id].handle);
         ret = 0;
     } else {
