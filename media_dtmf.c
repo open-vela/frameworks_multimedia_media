@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "media_dtmf.h"
+#include "media_utils.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -346,7 +346,7 @@ static void media_dtmf_generating(char numbers, short int* buffer)
  *
  ****************************************************************************/
 
-int media_dtmf_generate(const char* numbers, short int* buffer)
+int media_dtmf_generate(const char* numbers, void* buffer)
 {
     int i;
     int count;
@@ -357,7 +357,7 @@ int media_dtmf_generate(const char* numbers, short int* buffer)
     count = strlen(numbers);
 
     for (i = 0; i < count; i++) {
-        media_dtmf_generating(numbers[i], buffer + i * FRAME_SIZE);
+        media_dtmf_generating(numbers[i], (short int*)buffer + i * FRAME_SIZE);
     }
 
     return 0;
@@ -367,16 +367,17 @@ int media_dtmf_generate(const char* numbers, short int* buffer)
  * Name: media_dtmf_get_buffer_size
  *
  * Description:
- *   The purpose of this function is to get one DTMF tone buffer size.
- *   The application need to multiply the count when generate multiple
- *   DTMF tones.
+ *   The purpose of this function is to get DTMF tone buffer size.
  *
  * Returned Value:
- *   Buffer size of one DTMF tone.
+ *   Buffer size of DTMF tone on success; a negated errno value on failure.
  *
  ****************************************************************************/
 
-int media_dtmf_get_buffer_size(void)
+int media_dtmf_get_buffer_size(const char* numbers)
 {
-    return FRAME_SIZE * sizeof(short int);
+    if (!numbers || numbers[0] == '\0')
+        return -EINVAL;
+
+    return FRAME_SIZE * sizeof(short int) * strlen(numbers);
 }
