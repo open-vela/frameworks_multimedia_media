@@ -25,49 +25,13 @@
  * Included Files
  ****************************************************************************/
 
-#include <media_dtmf.h>
 #include <media_event.h>
 #include <media_focus.h>
 #include <media_player.h>
 #include <media_policy.h>
 #include <media_recorder.h>
 #include <media_session.h>
+#include <media_utils.h>
 #include <media_wrapper.h>
-
-#ifdef __cplusplus
-#define EXTERN extern "C"
-extern "C" {
-#else
-#define EXTERN extern
-#endif
-
-/**
- * Send command to media
- * @param[in] target    target name
- * @param[in] cmd       command
- * @param[in] arg       argument
- * @param[out] res      response
- * @param[in] res_len   response msg len
- * @return Zero on success; a negated errno value on failure
- */
-int media_process_command(const char* target, const char* cmd,
-    const char* arg, char* res, int res_len);
-
-/**
- * Dump media graph
- * @param[in] options   dump options
- */
-void media_graph_dump(const char* options);
-
-/**
- * Dump media policy
- * @param[in] options   dump options
- */
-void media_policy_dump(const char* options);
-
-#undef EXTERN
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_API_H */
