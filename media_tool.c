@@ -1034,7 +1034,7 @@ static int mediatool_player_cmd_dtmf(struct mediatool_s* media, char* pargs)
     if (pargs)
         *pargs++ = 0;
 
-    if (!numbers || numbers[0] == '\0')
+    if (numbers[0] == '\0')
         return -EINVAL;
 
     count = strlen(numbers);
@@ -1047,7 +1047,7 @@ static int mediatool_player_cmd_dtmf(struct mediatool_s* media, char* pargs)
     if (ret < 0)
         goto out;
 
-    ret = media_player_prepare(media->chain[id].handle, NULL, "format=s16le:sample_rate=8000:ch_layout=mono");
+    ret = media_player_prepare(media->chain[id].handle, NULL, MEDIA_TONE_DTMF_FORMAT);
     if (ret < 0)
         goto out;
 
