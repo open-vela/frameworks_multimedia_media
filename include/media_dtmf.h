@@ -46,9 +46,9 @@ extern "C" {
  * @param[in] numbers   Dialbuttons numbers.
  * @param[out] buffer   Buffer address.
  * @return Zero on success; a negated errno value on failure.
- * @note To play dtmf tone format should fixed as MEDIA_TONE_DTMF_FORMAT.
+ * @note Format should fixed as MEDIA_TONE_DTMF_FORMAT when to play dtmf tone.
  */
-int media_dtmf_generate(char* numbers, short int* buffer);
+int media_dtmf_generate(const char* numbers, short int* buffer);
 
 /**
  * Get one DTMF tone buffer size.
