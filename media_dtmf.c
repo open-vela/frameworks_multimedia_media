@@ -334,8 +334,8 @@ static void media_dtmf_generating(char numbers, short int* buffer)
  *
  * Description:
  *   The purpose of this function is to generate one or continuous multiple
- *   DTMF signal and save the result in the input buffer.When to play dtmf
- *   tone format should fixed as MEDIA_TONE_DTMF_FORMAT definition.
+ *   DTMF signal and save the result in the input buffer.format should fixed
+ *   as MEDIA_TONE_DTMF_FORMAT when to play dtmf tone.
  *
  * Input Parameters:
  *   numbers - Dialbuttons numbers.
@@ -346,7 +346,7 @@ static void media_dtmf_generating(char numbers, short int* buffer)
  *
  ****************************************************************************/
 
-int media_dtmf_generate(char* numbers, short int* buffer)
+int media_dtmf_generate(const char* numbers, short int* buffer)
 {
     int i;
     int count;
