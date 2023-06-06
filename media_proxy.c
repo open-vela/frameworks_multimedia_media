@@ -892,7 +892,8 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
     return media_transact_once(handle, target, key, NULL, 0, value, value_len);
 }
 
-int media_recorder_take_picture(char* params, char* filename, size_t number)
+int media_recorder_take_picture(char* params, char* filename, size_t number,
+    media_event_callback event_cb, void* cookie)
 {
     char option[32];
     void* handle;
@@ -904,6 +905,10 @@ int media_recorder_take_picture(char* params, char* filename, size_t number)
     handle = media_recorder_open(params);
     if (!handle)
         return -EINVAL;
+
+    ret = media_recorder_set_event_callback(handle, cookie, event_cb);
+    if (ret < 0)
+        goto error;
 
     snprintf(option, sizeof(option), "total_number=%zu", number);
 

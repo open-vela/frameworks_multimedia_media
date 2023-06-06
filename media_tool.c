@@ -875,7 +875,7 @@ CMD1(nextsong, int, id)
 
 CMD3(take_picture, string_t, filtername, string_t, filename, int, number)
 {
-    return media_recorder_take_picture(filtername, filename, number);
+    return media_recorder_take_picture(filtername, filename, number, mediatool_event_callback, media->chain);
 }
 
 CMD3(send, string_t, target, string_t, cmd, string_t, arg)

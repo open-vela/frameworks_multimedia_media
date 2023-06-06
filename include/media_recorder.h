@@ -163,9 +163,11 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
  * @param[in] params    open params
  * @param[in] filename  The store path for new picture
  * @param[in] number    The number of taking picture
+ * @param[in] event_cb  The callback to handle state feedback
+ * @param[in] cookie    The private data of user
  * @return Zero on success; a negated errno value on failure.
  */
-int media_recorder_take_picture(char* params, char* filename, size_t number);
+int media_recorder_take_picture(char* params, char* filename, size_t number, media_event_callback event_cb, void* cookie);
 
 #undef EXTERN
 #ifdef __cplusplus
