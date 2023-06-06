@@ -38,11 +38,78 @@
  ****************************************************************************/
 
 #define MEDIATOOL_MAX_CHAIN 16
-#define MEDIATOOL_FILE_MAX 64
+#define MEDIATOOL_MAX_ARGC 8
 #define MEDIATOOL_PLAYER 1
 #define MEDIATOOL_RECORDER 2
 #define MEDIATOOL_SESSION 3
 #define MEDIATOOL_FOCUS 4
+
+#define GET_ARG_FUNC(out_type, arg)                  \
+    static out_type get_##out_type##_arg(char* arg); \
+    static out_type get_##out_type##_arg(char* arg)
+
+#define GET_ARG(out_type, arg) \
+    get_##out_type##_arg(arg)
+
+#define CMD0(func)                                                                    \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media);                \
+    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv) \
+    {                                                                                 \
+        return mediatool_cmd_##func##_exec(media);                                    \
+    }                                                                                 \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media)
+
+#define CMD1(func, type1, arg1)                                                       \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1);    \
+    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv) \
+    {                                                                                 \
+        type1 arg1;                                                                   \
+        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                              \
+        return mediatool_cmd_##func##_exec(media, arg1);                              \
+    }                                                                                 \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1)
+
+#define CMD2(func, type1, arg1, type2, arg2)                                                   \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2); \
+    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv)          \
+    {                                                                                          \
+        type1 arg1;                                                                            \
+        type2 arg2;                                                                            \
+        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                                       \
+        arg2 = (argc > 2) ? GET_ARG(type2, argv[2]) : 0;                                       \
+        return mediatool_cmd_##func##_exec(media, arg1, arg2);                                 \
+    }                                                                                          \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2)
+
+#define CMD3(func, type1, arg1, type2, arg2, type3, arg3)                                                  \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3); \
+    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv)                      \
+    {                                                                                                      \
+        type1 arg1;                                                                                        \
+        type2 arg2;                                                                                        \
+        type3 arg3;                                                                                        \
+        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                                                   \
+        arg2 = (argc > 2) ? GET_ARG(type2, argv[2]) : 0;                                                   \
+        arg3 = (argc > 3) ? GET_ARG(type3, argv[3]) : 0;                                                   \
+        return mediatool_cmd_##func##_exec(media, arg1, arg2, arg3);                                       \
+    }                                                                                                      \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3)
+
+#define CMD4(func, type1, arg1, type2, arg2, type3, arg3, type4, arg4)                                                 \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3, type4 arg4); \
+    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv)                                  \
+    {                                                                                                                  \
+        type1 arg1;                                                                                                    \
+        type2 arg2;                                                                                                    \
+        type3 arg3;                                                                                                    \
+        type4 arg4;                                                                                                    \
+        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                                                               \
+        arg2 = (argc > 2) ? GET_ARG(type2, argv[2]) : 0;                                                               \
+        arg3 = (argc > 3) ? GET_ARG(type3, argv[3]) : 0;                                                               \
+        arg4 = (argc > 4) ? GET_ARG(type4, argv[4]) : 0;                                                               \
+        return mediatool_cmd_##func##_exec(media, arg1, arg2, arg3, arg4);                                             \
+    }                                                                                                                  \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3, type4 arg4)
 
 /****************************************************************************
  * Public Type Declarations
@@ -69,50 +136,10 @@ struct mediatool_s {
 };
 
 /****************************************************************************
- * Private Function Prototypes
- ****************************************************************************/
-
-static int mediatool_player_cmd_open(struct mediatool_s* media, char* pargs);
-static int mediatool_recorder_cmd_open(struct mediatool_s* media, char* pargs);
-static int mediatool_recorder_cmd_take_picture(struct mediatool_s* media, char* pargs);
-static int mediatool_session_cmd_open(struct mediatool_s* media, char* pargs);
-static int mediatool_common_cmd_close(struct mediatool_s* media, char* pargs);
-static int mediatool_common_cmd_reset(struct mediatool_s* media, char* pargs);
-static int mediatool_common_cmd_prepare(struct mediatool_s* media, char* pargs);
-static int mediatool_common_cmd_start(struct mediatool_s* media, char* pargs);
-static int mediatool_common_cmd_stop(struct mediatool_s* media, char* pargs);
-static int mediatool_player_cmd_pause(struct mediatool_s* media, char* pargs);
-static int mediatool_player_cmd_volume(struct mediatool_s* media, char* pargs);
-static int mediatool_player_cmd_loop(struct mediatool_s* media, char* pargs);
-static int mediatool_player_cmd_seek(struct mediatool_s* media, char* pargs);
-static int mediatool_player_cmd_position(struct mediatool_s* media, char* pargs);
-static int mediatool_player_cmd_duration(struct mediatool_s* media, char* pargs);
-static int mediatool_player_cmd_isplaying(struct mediatool_s* media, char* pargs);
-static int mediatool_player_cmd_dtmf(struct mediatool_s* media, char* pargs);
-static int mediatool_session_cmd_prevsong(struct mediatool_s* media, char* pargs);
-static int mediatool_session_cmd_nextsong(struct mediatool_s* media, char* pargs);
-static int mediatool_common_stop_inner(struct mediatool_chain_s* chain);
-static int mediatool_common_cmd_send(struct mediatool_s* media, char* pargs);
-static int mediatool_server_cmd_dump(struct mediatool_s* media, char* pargs);
-static int mediatool_policy_cmd_setint(struct mediatool_s* media, char* pargs);
-static int mediatool_policy_cmd_getint(struct mediatool_s* media, char* pargs);
-static int mediatool_policy_cmd_setstring(struct mediatool_s* media, char* pargs);
-static int mediatool_policy_cmd_getstring(struct mediatool_s* media, char* pargs);
-static int mediatool_policy_cmd_include(struct mediatool_s* media, char* pargs);
-static int mediatool_policy_cmd_exclude(struct mediatool_s* media, char* pargs);
-static int mediatool_policy_cmd_contain(struct mediatool_s* media, char* pargs);
-static int mediatool_policy_cmd_increase(struct mediatool_s* media, char* pargs);
-static int mediatool_policy_cmd_decrease(struct mediatool_s* media, char* pargs);
-static int mediatool_focus_cmd_request(struct mediatool_s* media, char* pargs);
-static int mediatool_focus_cmd_abandon(struct mediatool_s* media, char* pargs);
-static int mediatool_common_cmd_quit(struct mediatool_s* media, char* pargs);
-static int mediatool_common_cmd_help(struct mediatool_s* media, char* pargs);
-
-/****************************************************************************
  * Private Type Declarations
  ****************************************************************************/
 
-typedef int (*mediatool_func)(struct mediatool_s* media, char* pargs);
+typedef int (*mediatool_func)(struct mediatool_s* media, int argc, char** argv);
 
 struct mediatool_cmd_s {
     const char* cmd; /* The command text */
@@ -120,121 +147,23 @@ struct mediatool_cmd_s {
     const char* help; /* The help text */
 };
 
-/****************************************************************************
- * Private Data
- ****************************************************************************/
-
-static struct mediatool_s g_mediatool;
-
-static struct mediatool_cmd_s g_mediatool_cmds[] = {
-    { "open",
-        mediatool_player_cmd_open,
-        "Create player channel return ID (open [policy-phrase/filter-name])" },
-    { "copen",
-        mediatool_recorder_cmd_open,
-        "Create recorder channel return ID (copen [policy-phrase])" },
-    { "sopen",
-        mediatool_session_cmd_open,
-        "Create session channel return ID (sopen policy-phrase)" },
-    { "close",
-        mediatool_common_cmd_close,
-        "Destroy player/recorder/session channel (close ID)" },
-    { "reset",
-        mediatool_common_cmd_reset,
-        "Reset player/recorder channel (reset ID)" },
-    { "prepare",
-        mediatool_common_cmd_prepare,
-        "Set player/recorder prepare (start ID url/buffer options)" },
-    { "start",
-        mediatool_common_cmd_start,
-        "Set player/recorder/session start (start ID)" },
-    { "stop",
-        mediatool_common_cmd_stop,
-        "Set player/recorder/session stop (stop ID)" },
-    { "pause",
-        mediatool_player_cmd_pause,
-        "Set player/recorder/session pause (pause ID)" },
-    { "volume",
-        mediatool_player_cmd_volume,
-        "Set/Get player/session volume (volume ID ?/+/-/volume)" },
-    { "loop",
-        mediatool_player_cmd_loop,
-        "Set/Get player loop (loop ID 1/0)" },
-    { "seek",
-        mediatool_player_cmd_seek,
-        "Set player seek (seek ID time)" },
-    { "position",
-        mediatool_player_cmd_position,
-        "Get player position time ms(position ID)" },
-    { "duration",
-        mediatool_player_cmd_duration,
-        "Get player duration time ms(duration ID)" },
-    { "isplay",
-        mediatool_player_cmd_isplaying,
-        "Get position is playing or not(isplay ID)" },
-    { "playdtmf",
-        mediatool_player_cmd_dtmf,
-        "To play dtmf tone(start ID direct/buffer dialbuttons)" },
-    { "prev",
-        mediatool_session_cmd_prevsong,
-        "To play previous song in player list(prev ID)" },
-    { "next",
-        mediatool_session_cmd_nextsong,
-        "To play next song in player list(next ID)" },
-    { "takepic",
-        mediatool_recorder_cmd_take_picture,
-        "take picture from camera" },
-    { "send",
-        mediatool_common_cmd_send,
-        "Send cmd to graph. PS:loglevel INFO:32 VERBOSE:40 DEBUG:48 TRACE:56" },
-    { "dump",
-        mediatool_server_cmd_dump,
-        "Dump graph and policy" },
-    { "setint",
-        mediatool_policy_cmd_setint,
-        "set criterion value with integer(setint NAME VALUE APPLY)" },
-    { "getint",
-        mediatool_policy_cmd_getint,
-        "get criterion value in integer(getint NAME)" },
-    { "setstring",
-        mediatool_policy_cmd_setstring,
-        "set criterion value with string(setstring NAME VALUE APPLY)" },
-    { "getstring",
-        mediatool_policy_cmd_getstring,
-        "get criterion value in string(getstring NAME)" },
-    { "include",
-        mediatool_policy_cmd_include,
-        "include inclusive criterion values(include NAME VALUE APPLY)" },
-    { "exclude",
-        mediatool_policy_cmd_exclude,
-        "exclude inclusive criterion values(exclude NAME VALUE APPLY)" },
-    { "contain",
-        mediatool_policy_cmd_contain,
-        "check wether contain criterion values(contain NAME VALUE)" },
-    { "increase",
-        mediatool_policy_cmd_increase,
-        "increase criterion value by one(increase NAME APPLY)" },
-    { "decrease",
-        mediatool_policy_cmd_decrease,
-        "decrease criterion value by one(decrease NAME APPLY)" },
-    { "request",
-        mediatool_focus_cmd_request,
-        "request media focus(request NAME)" },
-    { "abandon",
-        mediatool_focus_cmd_abandon,
-        "abandon media focus(abandon ID)" },
-    { "q",
-        mediatool_common_cmd_quit,
-        "Quit (q)" },
-    { "help",
-        mediatool_common_cmd_help,
-        "Show this message (help)" },
-    { 0 },
-};
+typedef char* string_t;
 
 /****************************************************************************
  * Private Function
  ****************************************************************************/
+
+GET_ARG_FUNC(int, arg)
+{
+    return strtol(arg, NULL, 0);
+}
+
+GET_ARG_FUNC(string_t, arg)
+{
+    if (arg && !strlen(arg))
+        return NULL;
+    return arg;
+}
 
 static void mediatool_event_callback(void* cookie, int event,
     int ret, const char* data)
@@ -340,33 +269,21 @@ static int mediatool_common_stop_inner(struct mediatool_chain_s* chain)
     return ret;
 }
 
-static int mediatool_player_cmd_open(struct mediatool_s* media, char* pargs)
+CMD1(player_open, string_t, stream_type)
 {
     long int i;
     int ret;
 
-    if (pargs && !strlen(pargs))
-        pargs = NULL;
-
-    if (pargs && isdigit(pargs[0])) {
-        i = strtol(pargs, NULL, 10);
-
-        if (media->chain[i].handle)
-            return -EBUSY;
-
-        pargs = NULL;
-    } else {
-        for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-            if (!media->chain[i].handle)
-                break;
-        }
-
-        if (i == MEDIATOOL_MAX_CHAIN)
-            return -ENOMEM;
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!media->chain[i].handle)
+            break;
     }
 
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
     media->chain[i].id = i;
-    media->chain[i].handle = media_player_open(pargs);
+    media->chain[i].handle = media_player_open(stream_type);
     if (!media->chain[i].handle) {
         printf("media_player_open error\n");
         return -EINVAL;
@@ -384,33 +301,21 @@ static int mediatool_player_cmd_open(struct mediatool_s* media, char* pargs)
     return 0;
 }
 
-static int mediatool_recorder_cmd_open(struct mediatool_s* media, char* pargs)
+CMD1(recorder_open, string_t, stream_type)
 {
     long int i;
     int ret;
 
-    if (pargs && !strlen(pargs))
-        pargs = NULL;
-
-    if (pargs && isdigit(pargs[0])) {
-        i = strtol(pargs, NULL, 10);
-
-        if (media->chain[i].handle)
-            return -EBUSY;
-
-        pargs = NULL;
-    } else {
-        for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-            if (!media->chain[i].handle)
-                break;
-        }
-
-        if (i == MEDIATOOL_MAX_CHAIN)
-            return -ENOMEM;
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!media->chain[i].handle)
+            break;
     }
 
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
     media->chain[i].id = i;
-    media->chain[i].handle = media_recorder_open(pargs);
+    media->chain[i].handle = media_recorder_open(stream_type);
     if (!media->chain[i].handle) {
         printf("media_recorder_open error\n");
         return -EINVAL;
@@ -428,33 +333,21 @@ static int mediatool_recorder_cmd_open(struct mediatool_s* media, char* pargs)
     return 0;
 }
 
-static int mediatool_session_cmd_open(struct mediatool_s* media, char* pargs)
+CMD1(session_open, string_t, stream_type)
 {
     long int i;
     int ret;
 
-    if (pargs && !strlen(pargs))
-        pargs = NULL;
-
-    if (pargs && isdigit(pargs[0])) {
-        i = strtol(pargs, NULL, 10);
-
-        if (media->chain[i].handle)
-            return -EBUSY;
-
-        pargs = NULL;
-    } else {
-        for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-            if (!media->chain[i].handle)
-                break;
-        }
-
-        if (i == MEDIATOOL_MAX_CHAIN)
-            return -ENOMEM;
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!media->chain[i].handle)
+            break;
     }
 
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
     media->chain[i].id = i;
-    media->chain[i].handle = media_session_open(pargs);
+    media->chain[i].handle = media_session_open(stream_type);
     if (!media->chain[i].handle) {
         printf("media_session_open error\n");
         return -EINVAL;
@@ -472,19 +365,12 @@ static int mediatool_session_cmd_open(struct mediatool_s* media, char* pargs)
     return 0;
 }
 
-static int mediatool_common_cmd_close(struct mediatool_s* media, char* pargs)
+CMD2(close, int, id, int, pending_stop)
 {
-    int id;
-    int pending_stop;
     int ret = -EINVAL;
 
-    if (!strlen(pargs))
-        return ret;
-
-    sscanf(pargs, "%d %d", &id, &pending_stop);
-
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
-        return ret;
+        return -EINVAL;
 
     switch (media->chain[id].type) {
     case MEDIATOOL_PLAYER:
@@ -511,15 +397,9 @@ static int mediatool_common_cmd_close(struct mediatool_s* media, char* pargs)
     return ret;
 }
 
-static int mediatool_common_cmd_reset(struct mediatool_s* media, char* pargs)
+CMD1(reset, int, id)
 {
-    long int id;
     int ret;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -639,53 +519,31 @@ out:
     return NULL;
 }
 
-static int mediatool_common_cmd_prepare(struct mediatool_s* media, char* pargs)
+CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
 {
     bool url_mode = false;
     bool direct = false;
-    char *ptr, *file;
     pthread_t thread;
-    long int id;
     int ret = 0;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    ptr = strchr(pargs, ' ');
-    if (!ptr)
-        return -EINVAL;
-
-    *ptr++ = 0;
-
-    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    file = ptr;
-    ptr = strchr(ptr, ' ');
-    if (!ptr)
+    if (!mode || !path)
         return -EINVAL;
 
-    *ptr++ = 0;
-
-    if (!strcmp(file, "url"))
+    if (!strcmp(mode, "url"))
         url_mode = true;
-    else if (!strcmp(file, "direct"))
+    else if (!strcmp(mode, "direct"))
         direct = true;
-
-    file = ptr;
-    ptr = strchr(ptr, ' ');
-    if (ptr)
-        *ptr++ = 0;
 
     switch (media->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        ret = media_player_prepare(media->chain[id].handle, url_mode ? file : NULL, ptr);
+        ret = media_player_prepare(media->chain[id].handle, url_mode ? path : NULL, options);
         break;
 
     case MEDIATOOL_RECORDER:
-        ret = media_recorder_prepare(media->chain[id].handle, url_mode ? file : NULL, ptr);
+        ret = media_recorder_prepare(media->chain[id].handle, url_mode ? path : NULL, options);
         break;
 
     default:
@@ -702,9 +560,9 @@ static int mediatool_common_cmd_prepare(struct mediatool_s* media, char* pargs)
         }
 
         if (media->chain[id].type == MEDIATOOL_RECORDER)
-            unlink(file);
+            unlink(path);
 
-        media->chain[id].fd = open(file, media->chain[id].type == MEDIATOOL_PLAYER ? O_RDONLY : O_CREAT | O_RDWR);
+        media->chain[id].fd = open(path, media->chain[id].type == MEDIATOOL_PLAYER ? O_RDONLY : O_CREAT | O_RDWR);
         if (media->chain[id].fd < 0) {
             printf("buffer mode, file can't open\n");
             return -EINVAL;
@@ -725,18 +583,12 @@ static int mediatool_common_cmd_prepare(struct mediatool_s* media, char* pargs)
     return ret;
 }
 
-static int mediatool_common_cmd_start(struct mediatool_s* media, char* pargs)
+CMD1(start, int, id)
 {
     int ret = -EINVAL;
-    long int id;
-
-    if (!strlen(pargs))
-        return ret;
-
-    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
-        return ret;
+        return -EINVAL;
 
     switch (media->chain[id].type) {
     case MEDIATOOL_PLAYER:
@@ -755,30 +607,17 @@ static int mediatool_common_cmd_start(struct mediatool_s* media, char* pargs)
     return ret;
 }
 
-static int mediatool_common_cmd_stop(struct mediatool_s* media, char* pargs)
+CMD1(stop, int, id)
 {
-    long int id;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    id = strtol(pargs, NULL, 10);
-
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
     return mediatool_common_stop_inner(&media->chain[id]);
 }
 
-static int mediatool_player_cmd_pause(struct mediatool_s* media, char* pargs)
+CMD1(pause, int, id)
 {
-    long int id;
     int ret = 0;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -800,50 +639,45 @@ static int mediatool_player_cmd_pause(struct mediatool_s* media, char* pargs)
     return ret;
 }
 
-static int mediatool_player_cmd_volume(struct mediatool_s* media, char* pargs)
+CMD2(volume, int, id, string_t, volume_cmd)
 {
     float volume_f;
     int volume_i;
     int ret = 0;
     char* ptr;
-    int id;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    sscanf(pargs, "%d", &id);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
+    if (!volume_cmd)
+        return -EINVAL;
+
     switch (media->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        if ((ptr = strchr(pargs, '?'))) {
+        if ((ptr = strchr(volume_cmd, '?'))) {
             ret = media_player_get_volume(media->chain[id].handle, &volume_f);
             printf("ID %d, get volume %f\n", id, volume_f);
         } else {
-            sscanf(pargs, "%d %f", &id, &volume_f);
-            ret = media_player_set_volume(media->chain[id].handle, volume_f);
-            printf("ID %d, set volume %f\n", id, volume_f);
+            ret = media_player_set_volume(media->chain[id].handle, strtof(volume_cmd, NULL));
+            printf("ID %d, set volume %f\n", id, strtof(volume_cmd, NULL));
         }
         break;
 
     case MEDIATOOL_SESSION:
-        if ((ptr = strchr(pargs, '?'))) {
+        if ((ptr = strchr(volume_cmd, '?'))) {
             ret = media_session_get_volume(media->chain[id].handle, &volume_i);
             printf("ID %d, get volume %d\n", id, volume_i);
-        } else if ((ptr = strchr(pargs, '+'))) {
+        } else if ((ptr = strchr(volume_cmd, '+'))) {
             ret = media_session_get_volume(media->chain[id].handle, &volume_i);
             ret = media_session_increase_volume(media->chain[id].handle);
             printf("ID %d, increase volume %d++\n", id, volume_i);
-        } else if ((ptr = strchr(pargs, '-'))) {
+        } else if ((ptr = strchr(volume_cmd, '-'))) {
             ret = media_session_get_volume(media->chain[id].handle, &volume_i);
             ret = media_session_decrease_volume(media->chain[id].handle);
             printf("ID %d, decrease volume %d--\n", id, volume_i);
         } else {
-            sscanf(pargs, "%d %d", &id, &volume_i);
-            ret = media_session_set_volume(media->chain[id].handle, volume_i);
-            printf("ID %d, set volume %d\n", id, volume_i);
+            ret = media_session_set_volume(media->chain[id].handle, strtol(volume_cmd, NULL, 10));
+            printf("ID %d, set volume %d\n", id, (int)strtol(volume_cmd, NULL, 10));
         }
         break;
 
@@ -854,54 +688,32 @@ static int mediatool_player_cmd_volume(struct mediatool_s* media, char* pargs)
     return ret;
 }
 
-static int mediatool_player_cmd_loop(struct mediatool_s* media, char* pargs)
+CMD2(loop, int, id, int, isloop)
 {
-    int loop;
-    int id;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    sscanf(pargs, "%d %d", &id, &loop);
-
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
     if (media->chain[id].type != MEDIATOOL_PLAYER)
         return 0;
 
-    return media_player_set_looping(media->chain[id].handle, loop);
+    return media_player_set_looping(media->chain[id].handle, isloop);
 }
 
-static int mediatool_player_cmd_seek(struct mediatool_s* media, char* pargs)
+CMD2(seek, int, id, int, msec)
 {
-    unsigned int seek;
-    int id;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    sscanf(pargs, "%d %d", &id, &seek);
-
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
     if (media->chain[id].type != MEDIATOOL_PLAYER)
         return 0;
 
-    return media_player_seek(media->chain[id].handle, seek);
+    return media_player_seek(media->chain[id].handle, msec);
 }
 
-static int mediatool_player_cmd_position(struct mediatool_s* media, char* pargs)
+CMD1(position, int, id)
 {
     unsigned int position;
-    long int id;
     int ret;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    id = strtol(pargs, NULL, 0);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -929,16 +741,10 @@ static int mediatool_player_cmd_position(struct mediatool_s* media, char* pargs)
     return 0;
 }
 
-static int mediatool_player_cmd_duration(struct mediatool_s* media, char* pargs)
+CMD1(duration, int, id)
 {
     unsigned int duration;
-    long int id;
     int ret;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -966,15 +772,9 @@ static int mediatool_player_cmd_duration(struct mediatool_s* media, char* pargs)
     return 0;
 }
 
-static int mediatool_player_cmd_isplaying(struct mediatool_s* media, char* pargs)
+CMD1(isplaying, int, id)
 {
-    long int id;
     int ret;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
@@ -993,54 +793,30 @@ static int mediatool_player_cmd_isplaying(struct mediatool_s* media, char* pargs
     return 0;
 }
 
-static int mediatool_player_cmd_dtmf(struct mediatool_s* media, char* pargs)
+CMD3(playdtmf, int, id, string_t, mode, string_t, dial_number)
 {
     bool direct = false;
     short int* buffer;
     int buffer_size;
-    char* numbers;
-    long int id;
     int ret;
     int fd;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    numbers = pargs;
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-
-    *pargs++ = 0;
-
-    id = strtol(numbers, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    numbers = pargs;
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
+    if (!mode || !dial_number)
         return -EINVAL;
 
-    *pargs++ = 0;
-
-    if (!strcmp(numbers, "direct"))
+    if (!strcmp(mode, "direct"))
         direct = true;
+    else
+        direct = false;
 
-    numbers = pargs;
-    pargs = strchr(pargs, ' ');
-    if (pargs)
-        *pargs++ = 0;
-
-    if (numbers[0] == '\0')
-        return -EINVAL;
-
-    buffer_size = media_dtmf_get_buffer_size(numbers);
+    buffer_size = media_dtmf_get_buffer_size(dial_number);
     buffer = (short int*)malloc(buffer_size);
     assert(buffer);
 
-    ret = media_dtmf_generate(numbers, buffer);
+    ret = media_dtmf_generate(dial_number, buffer);
     if (ret < 0)
         goto out;
 
@@ -1071,20 +847,14 @@ out:
     buffer = NULL;
 
     return ret;
+
+    return 0;
 }
 
-static int mediatool_session_cmd_prevsong(struct mediatool_s* media, char* pargs)
+CMD1(prevsong, int, id)
 {
-    int ret = -EINVAL;
-    long int id;
-
-    if (!strlen(pargs))
-        return ret;
-
-    id = strtol(pargs, NULL, 10);
-
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
-        return ret;
+        return -EINVAL;
 
     if (media->chain[id].type != MEDIATOOL_SESSION)
         return 0;
@@ -1092,18 +862,10 @@ static int mediatool_session_cmd_prevsong(struct mediatool_s* media, char* pargs
     return media_session_prev_song(media->chain[id].handle);
 }
 
-static int mediatool_session_cmd_nextsong(struct mediatool_s* media, char* pargs)
+CMD1(nextsong, int, id)
 {
-    int ret = -EINVAL;
-    long int id;
-
-    if (!strlen(pargs))
-        return ret;
-
-    id = strtol(pargs, NULL, 10);
-
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
-        return ret;
+        return -EINVAL;
 
     if (media->chain[id].type != MEDIATOOL_SESSION)
         return 0;
@@ -1111,99 +873,38 @@ static int mediatool_session_cmd_nextsong(struct mediatool_s* media, char* pargs
     return media_session_next_song(media->chain[id].handle);
 }
 
-static int mediatool_recorder_cmd_take_picture(struct mediatool_s* media, char* pargs)
+CMD3(take_picture, string_t, filtername, string_t, filename, int, number)
 {
-    char* filtername;
-    char* filename;
-    size_t number;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-
-    /* pargs should look like "PictureSink /DATA/IMG_%d.jpg 3" */
-    filtername = strtok_r(pargs, " ", &pargs);
-    if (!filtername)
-        return -EINVAL;
-
-    filename = strtok_r(NULL, " ", &pargs);
-    if (!filename)
-        return -EINVAL;
-
-    number = strtoul(pargs, NULL, 10);
-
     return media_recorder_take_picture(filtername, filename, number);
 }
 
-static int mediatool_common_cmd_send(struct mediatool_s* media, char* pargs)
+CMD3(send, string_t, target, string_t, cmd, string_t, arg)
 {
-    char* target;
-    char* cmd;
-    if (!strlen(pargs))
-        return -EINVAL;
-    target = pargs;
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    cmd = pargs;
-    pargs = strchr(pargs, ' ');
-    if (pargs) {
-        *pargs = 0;
-        pargs++;
-    }
-
-    return media_process_command(target, cmd, pargs, NULL, 0);
+    return media_process_command(target, cmd, arg, NULL, 0);
 }
 
-static int mediatool_server_cmd_dump(struct mediatool_s* media, char* pargs)
+CMD1(dump, string_t, options)
 {
     /* pargs not used in neither graph_dump nor policy_dump,
      * so let's make it simple, just "dump".
      */
-    media_policy_dump(pargs);
-    media_graph_dump(pargs);
-    media_focus_dump(pargs);
+
+    media_policy_dump(options);
+    media_graph_dump(options);
+    media_focus_dump(options);
 
     return 0;
 }
 
-static int mediatool_policy_cmd_setint(struct mediatool_s* media, char* pargs)
+CMD3(setint, string_t, name, int, value, int, apply)
 {
-    char* name;
-    char* value;
-    char* apply;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-    name = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    value = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    apply = pargs;
-
-    return media_policy_set_int(name, atoi(value), atoi(apply));
+    return media_policy_set_int(name, value, apply);
 }
 
-static int mediatool_policy_cmd_getint(struct mediatool_s* media, char* pargs)
+CMD1(getint, string_t, name)
 {
-    char* name;
     int value;
     int ret;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-    name = pargs;
 
     ret = media_policy_get_int(name, &value);
     if (ret < 0)
@@ -1214,42 +915,15 @@ static int mediatool_policy_cmd_getint(struct mediatool_s* media, char* pargs)
     return 0;
 }
 
-static int mediatool_policy_cmd_setstring(struct mediatool_s* media, char* pargs)
+CMD3(setstring, string_t, name, string_t, value, int, apply)
 {
-    char* name;
-    char* value;
-    char* apply;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-    name = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    value = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    apply = pargs;
-
-    return media_policy_set_string(name, value, atoi(apply));
+    return media_policy_set_string(name, value, apply);
 }
 
-static int mediatool_policy_cmd_getstring(struct mediatool_s* media, char* pargs)
+CMD1(getstring, string_t, name)
 {
-    char* name;
     char value[64];
     int ret;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-    name = pargs;
 
     ret = media_policy_get_string(name, value, sizeof(value));
     if (ret < 0)
@@ -1260,151 +934,54 @@ static int mediatool_policy_cmd_getstring(struct mediatool_s* media, char* pargs
     return 0;
 }
 
-static int mediatool_policy_cmd_include(struct mediatool_s* media, char* pargs)
+CMD3(include, string_t, name, string_t, value, int, apply)
 {
-    char* name;
-    char* values;
-    char* apply;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-    name = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    values = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    apply = pargs;
-
-    return media_policy_include(name, values, atoi(apply));
+    return media_policy_include(name, value, apply);
 }
 
-static int mediatool_policy_cmd_exclude(struct mediatool_s* media, char* pargs)
+CMD3(exclude, string_t, name, string_t, value, int, apply)
 {
-    char* name;
-    char* values;
-    char* apply;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-    name = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    values = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    apply = pargs;
-
-    return media_policy_exclude(name, values, atoi(apply));
+    return media_policy_exclude(name, value, apply);
 }
 
-static int mediatool_policy_cmd_contain(struct mediatool_s* media, char* pargs)
+CMD2(contain, string_t, name, string_t, value)
 {
-    char* name;
-    char* values;
     int result, ret;
 
-    if (!strlen(pargs))
-        return -EINVAL;
-    name = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    values = pargs;
-
-    ret = media_policy_contain(name, values, &result);
+    ret = media_policy_contain(name, value, &result);
     if (ret < 0)
         return -EINVAL;
 
-    printf("criterion %s %s value %s\n", name, result ? "contains" : "doesn't contain", values);
+    printf("criterion %s %s value %s\n", name, result ? "contains" : "doesn't contain", value);
 
     return 0;
 }
 
-static int mediatool_policy_cmd_increase(struct mediatool_s* media, char* pargs)
+CMD2(increase, string_t, name, int, apply)
 {
-    char* name;
-    char* apply;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-    name = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    apply = pargs;
-
-    return media_policy_increase(name, atoi(apply));
+    return media_policy_increase(name, apply);
 }
 
-static int mediatool_policy_cmd_decrease(struct mediatool_s* media, char* pargs)
+CMD2(decrease, string_t, name, int, apply)
 {
-    char* name;
-    char* apply;
-
-    if (!strlen(pargs))
-        return -EINVAL;
-    name = pargs;
-
-    pargs = strchr(pargs, ' ');
-    if (!pargs)
-        return -EINVAL;
-    *pargs = 0;
-    pargs++;
-    apply = pargs;
-
-    return media_policy_decrease(name, atoi(apply));
+    return media_policy_decrease(name, apply);
 }
 
-static int mediatool_focus_cmd_request(struct mediatool_s* media, char* pargs)
+CMD1(focus_request, string_t, name)
 {
     int suggestion;
     long int i;
 
-    if (pargs && !strlen(pargs))
-        pargs = NULL;
-
-    if (pargs && isdigit(pargs[0])) {
-        i = strtol(pargs, NULL, 10);
-
-        if (media->chain[i].handle)
-            return -EBUSY;
-
-        pargs = NULL;
-    } else {
-        for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-            if (!media->chain[i].handle)
-                break;
-        }
-
-        if (i == MEDIATOOL_MAX_CHAIN)
-            return -ENOMEM;
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!media->chain[i].handle)
+            break;
     }
 
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
     media->chain[i].id = i;
-    media->chain[i].handle = media_focus_request(&suggestion, pargs,
+    media->chain[i].handle = media_focus_request(&suggestion, name,
         mediatool_focus_callback, &media->chain[i]);
     if (!media->chain[i].handle) {
         printf("media_player_request failed\n");
@@ -1416,81 +993,199 @@ static int mediatool_focus_cmd_request(struct mediatool_s* media, char* pargs)
     return 0;
 }
 
-static int mediatool_focus_cmd_abandon(struct mediatool_s* media, char* pargs)
+CMD1(focus_abandon, int, id)
 {
     int ret = -EINVAL;
-    long int id;
-
-    if (!strlen(pargs))
-        return ret;
-
-    id = strtol(pargs, NULL, 10);
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
-        return ret;
+        return -EINVAL;
 
     if (media->chain[id].type != MEDIATOOL_FOCUS)
         return 0;
 
     ret = media_focus_abandon(media->chain[id].handle);
     if (ret >= 0) {
-        printf("abandon focus ID %ld\n", id);
+        printf("abandon focus ID %d\n", id);
         media->chain[id].handle = NULL;
     }
 
     return ret;
 }
 
-static int mediatool_common_cmd_quit(struct mediatool_s* media, char* pargs)
+CMD0(quit)
 {
-    char tmp[8];
     int i;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (media->chain[i].handle) {
-            snprintf(tmp, 8, "%d", i);
-            mediatool_common_cmd_close(media, tmp);
-        }
+        if (media->chain[i].handle)
+            mediatool_cmd_close(media, i, 0);
     }
 
     return 0;
 }
 
-static int mediatool_common_cmd_help(struct mediatool_s* media, char* pargs)
+static int mediatool_cmd_help(const struct mediatool_cmd_s cmds[])
 {
     int i;
 
-    for (i = 0; g_mediatool_cmds[i].cmd; i++)
-        printf("%-16s %s\n", g_mediatool_cmds[i].cmd, g_mediatool_cmds[i].help);
+    for (i = 0; cmds[i].cmd; i++)
+        printf("%-16s %s\n", cmds[i].cmd, cmds[i].help);
 
     return 0;
 }
 
-static int mediatool_execute(struct mediatool_s* media, char* cmd, char* arg)
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+static const struct mediatool_cmd_s g_mediatool_cmds[] = {
+    { "open",
+        mediatool_cmd_player_open,
+        "Create player channel return ID (open [policy-phrase/filter-name])" },
+    { "copen",
+        mediatool_cmd_recorder_open,
+        "Create recorder channel return ID (copen [policy-phrase])" },
+    { "sopen",
+        mediatool_cmd_session_open,
+        "Create session channel return ID (sopen policy-phrase)" },
+    { "close",
+        mediatool_cmd_close,
+        "Destroy player/recorder/session channel (close ID [pending_stop(1/0)])" },
+    { "reset",
+        mediatool_cmd_reset,
+        "Reset player/recorder channel (reset ID)" },
+    { "prepare",
+        mediatool_cmd_prepare,
+        "Set player/recorder prepare (ID url/buffer/direct url options)" },
+    { "start",
+        mediatool_cmd_start,
+        "Set player/recorder/session start (start ID)" },
+    { "stop",
+        mediatool_cmd_stop,
+        "Set player/recorder/session stop (stop ID)" },
+    { "pause",
+        mediatool_cmd_pause,
+        "Set player/recorder/session pause (pause ID)" },
+    { "volume",
+        mediatool_cmd_volume,
+        "Set/Get player/session volume (volume ID ?/+/-/volume)" },
+    { "loop",
+        mediatool_cmd_loop,
+        "Set/Get player loop (loop ID 1/0)" },
+    { "seek",
+        mediatool_cmd_seek,
+        "Set player seek (seek ID time)" },
+    { "position",
+        mediatool_cmd_position,
+        "Get player position time ms(position ID)" },
+    { "duration",
+        mediatool_cmd_duration,
+        "Get player duration time ms(duration ID)" },
+    { "isplay",
+        mediatool_cmd_isplaying,
+        "Get position is playing or not(isplay ID)" },
+    { "playdtmf",
+        mediatool_cmd_playdtmf,
+        "To play dtmf tone(start ID direct/buffer dialbuttons)" },
+    { "prev",
+        mediatool_cmd_prevsong,
+        "To play previous song in player list(prev ID)" },
+    { "next",
+        mediatool_cmd_nextsong,
+        "To play next song in player list(next ID)" },
+    { "takepic",
+        mediatool_cmd_take_picture,
+        "Take picture from camera" },
+    { "send",
+        mediatool_cmd_send,
+        "Send cmd to graph. PS:loglevel INFO:32 VERBOSE:40 DEBUG:48 TRACE:56" },
+    { "dump",
+        mediatool_cmd_dump,
+        "Dump graph and policy" },
+    { "setint",
+        mediatool_cmd_setint,
+        "Set criterion value with integer(setint NAME VALUE APPLY)" },
+    { "getint",
+        mediatool_cmd_getint,
+        "Get criterion value in integer(getint NAME)" },
+    { "setstring",
+        mediatool_cmd_setstring,
+        "Set criterion value with string(setstring NAME VALUE APPLY)" },
+    { "getstring",
+        mediatool_cmd_getstring,
+        "Get criterion value in string(getstring NAME)" },
+    { "include",
+        mediatool_cmd_include,
+        "Include inclusive criterion values(include NAME VALUE APPLY)" },
+    { "exclude",
+        mediatool_cmd_exclude,
+        "Exclude inclusive criterion values(exclude NAME VALUE APPLY)" },
+    { "contain",
+        mediatool_cmd_contain,
+        "Check wether contain criterion values(contain NAME VALUE)" },
+    { "increase",
+        mediatool_cmd_increase,
+        "Increase criterion value by one(increase NAME APPLY)" },
+    { "decrease",
+        mediatool_cmd_decrease,
+        "Decrease criterion value by one(decrease NAME APPLY)" },
+    { "request",
+        mediatool_cmd_focus_request,
+        "Request media focus(request NAME)" },
+    { "abandon",
+        mediatool_cmd_focus_abandon,
+        "Abandon media focus(abandon ID)" },
+    { "q",
+        mediatool_cmd_quit,
+        "Quit (q)" },
+    { "help",
+        NULL,
+        "Show this message(help)" },
+
+    { 0 },
+};
+
+static int mediatool_execute(struct mediatool_s* media, char* buffer)
 {
+    char* argv[MEDIATOOL_MAX_ARGC] = { NULL };
+    char* saveptr = NULL;
     int ret = 0;
+    int argc;
     int x;
+
+    argv[0] = strtok_r(buffer, " ", &saveptr);
+    for (argc = 1; argc < MEDIATOOL_MAX_ARGC - 1; argc++) {
+        argv[argc] = strtok_r(NULL, " ", &saveptr);
+        if (argv[argc] == NULL)
+            break;
+    }
 
     /* Find the command in our cmd array */
 
     for (x = 0; g_mediatool_cmds[x].cmd; x++) {
-        if (strcmp(cmd, g_mediatool_cmds[x].cmd) == 0) {
+        if (!strcmp(argv[0], "help")) {
+            mediatool_cmd_help(g_mediatool_cmds);
+            break;
+        }
 
-            ret = g_mediatool_cmds[x].pfunc(media, arg);
+        if (!strcmp(argv[0], g_mediatool_cmds[x].cmd)) {
+            ret = g_mediatool_cmds[x].pfunc(media, argc, argv);
             if (ret < 0) {
-                printf("cmd %s error %d\n", cmd, ret);
+                printf("cmd %s error %d\n", argv[0], ret);
                 ret = 0;
             }
 
-            if (g_mediatool_cmds[x].pfunc == mediatool_common_cmd_quit)
+            if (g_mediatool_cmds[x].pfunc == mediatool_cmd_quit)
                 ret = -1;
 
             break;
         }
     }
 
-    if (x == sizeof(g_mediatool_cmds) / sizeof(g_mediatool_cmds[0]))
-        printf("Unknown cmd: %s\n", cmd);
+    if (g_mediatool_cmds[x].cmd == NULL) {
+        printf("Unknown cmd: %s\n", argv[0]);
+        mediatool_cmd_help(g_mediatool_cmds);
+    }
 
     return ret;
 }
@@ -1501,8 +1196,8 @@ static int mediatool_execute(struct mediatool_s* media, char* cmd, char* arg)
 
 int main(int argc, char* argv[])
 {
-    int ret, len, arg_len;
-    char *cmd, *arg;
+    struct mediatool_s mediatool = { 0 };
+    int ret, len;
     char* buffer;
 
     buffer = malloc(CONFIG_NSH_LINELEN);
@@ -1514,9 +1209,9 @@ int main(int argc, char* argv[])
         fflush(stdout);
 
         len = readline(buffer, CONFIG_NSH_LINELEN, stdin, stdout);
-        buffer[len] = '\0';
-        if (len < 0)
+        if (len <= 0)
             continue;
+        buffer[len] = '\0';
 
         if (buffer[0] == '!') {
 #ifdef CONFIG_SYSTEM_SYSTEM
@@ -1528,23 +1223,15 @@ int main(int argc, char* argv[])
         if (buffer[len - 1] == '\n')
             buffer[len - 1] = '\0';
 
-        cmd = strtok_r(buffer, " \n", &arg);
-        if (cmd == NULL)
+        if (buffer[0] == '\0')
             continue;
 
-        while (*arg == ' ')
-            arg++;
+        ret = mediatool_execute(&mediatool, buffer);
 
-        arg_len = strlen(arg);
-
-        while (isspace(arg[arg_len - 1]))
-            arg_len--;
-
-        arg[arg_len] = '\0';
-
-        ret = mediatool_execute(&g_mediatool, cmd, arg);
-        if (ret < 0)
+        if (ret < 0) {
+            printf("cmd %s error %d\n", argv[0], ret);
             break;
+        }
     }
 
     free(buffer);
