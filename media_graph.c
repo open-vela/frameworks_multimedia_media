@@ -439,6 +439,7 @@ static void media_player_event_cb(void* cookie, int event,
         pthread_mutex_lock(&g_media_mutex);
         LIST_REMOVE(priv, entry);
         pthread_mutex_unlock(&g_media_mutex);
+        media_stub_notify_finalize(&priv->cookie);
         priv->filter->opaque = NULL;
         free(priv->name);
         free(priv);
@@ -457,6 +458,7 @@ static void media_recorder_event_cb(void* cookie, int event,
     MediaRecorderPriv* priv = cookie;
 
     if (event == AVMOVIE_ASYNC_EVENT_CLOSED) {
+        media_stub_notify_finalize(&priv->cookie);
         priv->filter->opaque = NULL;
         free(priv);
         return;
@@ -825,7 +827,7 @@ int media_session_handler(void* handle, const char* target, const char* cmd,
         pthread_mutex_lock(&g_media_mutex);
         LIST_REMOVE(priv, entry);
         pthread_mutex_unlock(&g_media_mutex);
-
+        media_stub_notify_finalize(&priv->cookie);
         free(priv->name);
         free(priv);
 
