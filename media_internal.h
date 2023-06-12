@@ -79,6 +79,7 @@ void* media_get_server(void);
  ****************************************************************************/
 
 struct media_parcel;
+void media_stub_notify_finalize(void** cookie);
 void media_stub_notify_event(void* cookie, int event,
     int result, const char* extra);
 void media_stub_onreceive(void* cookie,

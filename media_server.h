@@ -37,6 +37,7 @@ int media_server_get_pollfds(void* handle, struct pollfd* fds, void** conns, int
 int media_server_poll_available(void* handle, struct pollfd* fd, void* conn);
 
 int media_server_notify(void* handle, void* cookie, media_parcel* parcel);
+void media_server_finalize(void* handle, void* cookie);
 
 #ifdef __cplusplus
 }
