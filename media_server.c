@@ -121,14 +121,8 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
 
     if (fd->revents == POLLERR || fd->revents == POLLHUP) {
         close(fd->fd);
-        pthread_mutex_lock(&conn->mutex);
-        if (conn->notify_fd > 0) {
-            close(conn->notify_fd);
-            conn->notify_fd = 0;
-        }
-        pthread_mutex_unlock(&conn->mutex);
+        conn->tran_fd = -EPERM;
         media_parcel_deinit(&conn->parcel);
-        conn->tran_fd = 0;
         return 0;
     }
 
@@ -162,6 +156,39 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
     return ret;
 }
 
+/**
+ * @brief Try to enable an entry for a new connection.
+ *
+ * There are 3 conditions:
+ * 1. busy:      trans/notify socket are all in use.
+ * 2. closing:   trans socket has disconnected, while notify socket not.
+ * 3. available: trans/notify socket have all been disconnected,
+ *               or the entry has not been initialized.
+ */
+static bool media_server_conn_init(struct media_server_conn* conn, int fd)
+{
+    bool available;
+
+    if (conn->tran_fd > 0)
+        return false;
+
+    if (conn->tran_fd == 0) {
+        pthread_mutex_init(&conn->mutex, NULL);
+        available = true;
+    } else {
+        pthread_mutex_lock(&conn->mutex);
+        available = conn->notify_fd <= 0;
+        pthread_mutex_unlock(&conn->mutex);
+    }
+
+    if (available) {
+        media_parcel_init(&conn->parcel);
+        conn->tran_fd = fd;
+    }
+
+    return available;
+}
+
 static int media_server_accept(void* handle, struct pollfd* fd)
 {
     struct media_server_priv* priv = handle;
@@ -176,13 +203,10 @@ static int media_server_accept(void* handle, struct pollfd* fd)
         return -errno;
 
     for (i = 0; i < MEDIA_SERVER_MAXCONN; i++) {
-        if (priv->conns[i].tran_fd <= 0) {
-            priv->conns[i].tran_fd = new_fd;
-            media_parcel_init(&priv->conns[i].parcel);
-            pthread_mutex_init(&priv->conns[i].mutex, NULL);
+        if (media_server_conn_init(&priv->conns[i], new_fd))
             return 0;
-        }
     }
+
     close(new_fd);
     return -EMFILE;
 }
@@ -341,4 +365,22 @@ int media_server_notify(void* handle, void* cookie, media_parcel* parcel)
     pthread_mutex_unlock(&conn->mutex);
 
     return ret;
+}
+
+void media_server_finalize(void* handle, void* cookie)
+{
+    struct media_server_priv* priv = handle;
+    struct media_server_conn* conn = cookie;
+
+    if (priv == NULL || conn == NULL)
+        return;
+
+    pthread_mutex_lock(&conn->mutex);
+
+    if (conn->notify_fd > 0) {
+        close(conn->notify_fd);
+        conn->notify_fd = 0;
+    }
+
+    pthread_mutex_unlock(&conn->mutex);
 }

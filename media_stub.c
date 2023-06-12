@@ -32,6 +32,14 @@
  * Public Functions
  ****************************************************************************/
 
+void media_stub_notify_finalize(void** cookie)
+{
+    if (cookie) {
+        media_server_finalize(media_get_server(), *cookie);
+        *cookie = NULL;
+    }
+}
+
 void media_stub_notify_event(void* cookie, int event,
     int result, const char* extra)
 {
