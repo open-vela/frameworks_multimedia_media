@@ -160,6 +160,7 @@ int media_policy_handler(void* handle, const char* name, const char* cmd,
     const char* value, int apply, char** res, int res_len)
 {
     int ret = -ENOSYS, tmp;
+    char* dump;
 
     if (res_len && res && !*res) {
         *res = malloc(res_len);
@@ -167,10 +168,7 @@ int media_policy_handler(void* handle, const char* name, const char* cmd,
             return -ENOMEM;
     }
 
-    if (!strcmp(cmd, "dump")) {
-        pfw_dump(handle);
-        return 0;
-    } else if (!strcmp(cmd, "set_int")) {
+    if (!strcmp(cmd, "set_int")) {
         ret = pfw_setint(handle, name, atoi(value));
     } else if (!strcmp(cmd, "increase")) {
         ret = pfw_increase(handle, name);
@@ -203,6 +201,11 @@ int media_policy_handler(void* handle, const char* name, const char* cmd,
         ret = pfw_getstring(handle, name, *res, res_len);
         if (ret >= 0)
             return 0;
+    } else if (!strcmp(cmd, "dump")) {
+        dump = pfw_dump(handle);
+        syslog(LOG_INFO, "\n%s", dump);
+        free(dump);
+        return 0;
     }
 
     if (ret < 0)
