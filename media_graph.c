@@ -506,9 +506,9 @@ static int media_common_handler(void* handle, const char* target, const char* cm
     const char* arg, char** res, int res_len, bool player)
 {
     MediaFilterPriv* priv = handle;
+    bool active, inactive, quit;
+    int pending, event, result;
     AVFilterContext* filter;
-    bool start, quit;
-    int event, result;
     int ret;
 
     if (!strcmp(cmd, "set_event")) {
@@ -523,12 +523,20 @@ static int media_common_handler(void* handle, const char* target, const char* cm
         return 0;
     }
 
-    start = !strcmp(cmd, "start");
-    quit = !strcmp(cmd, "close") || !strcmp(cmd, "pause") || !strcmp(cmd, "stop");
-    if (start || quit) {
+    active = !strcmp(cmd, "start");
+    inactive = !strcmp(cmd, "pause") || !strcmp(cmd, "stop");
+    quit = !strcmp(cmd, "close");
+
+    if (quit) {
+        sscanf(arg, "%d", &pending);
+        if (!pending)
+            media_stub_notify_finalize(&priv->cookie);
+    }
+
+    if (active || inactive || quit) {
         ret = media_graph_queue_command(priv->filter, cmd, arg, NULL, 0, 0);
         if (ret >= 0)
-            media_policy_set_stream_status(priv->filter->name, start);
+            media_policy_set_stream_status(priv->filter->name, active);
 
         return ret;
     }
