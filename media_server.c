@@ -268,10 +268,10 @@ int media_server_destroy(void* handle)
         if (priv->conns[i].tran_fd > 0) {
             media_parcel_deinit(&priv->conns[i].parcel);
             close(priv->conns[i].tran_fd);
+            pthread_mutex_destroy(&priv->conns[i].mutex);
         }
         if (priv->conns[i].notify_fd > 0)
             close(priv->conns[i].notify_fd);
-        pthread_mutex_destroy(&priv->conns[i].mutex);
     }
 
     free(priv);
