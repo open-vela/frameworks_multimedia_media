@@ -38,6 +38,9 @@ typedef void (*media_client_event_cb)(void* cookie, media_parcel* parcel);
 int media_client_set_event_cb(void* handle, const char* cpu,
     void* event_cb, void* cookie);
 
+typedef void (*media_client_release_cb)(void* cookie);
+int media_client_set_release_cb(void* handle, void* release_cb, void* cookie);
+
 #ifdef __cplusplus
 }
 #endif

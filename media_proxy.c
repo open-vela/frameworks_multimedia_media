@@ -266,13 +266,39 @@ static int media_transact(int control, void* handle, const char* target, const c
     return ret;
 }
 
-static void media_disconnect(void* handle)
+/**
+ * @brief Common release method.
+ */
+static void media_default_release_cb(void* handle)
 {
     media_proxy_priv_t* priv = handle;
 
-    media_client_disconnect(priv->proxy);
     free(priv->cpu);
     free(priv);
+}
+
+static void media_transact_finalize(void* handle, void* release_cb)
+{
+    media_proxy_priv_t* priv = handle;
+
+    if (!release_cb)
+        release_cb = media_default_release_cb;
+
+    media_client_set_release_cb(priv->proxy, release_cb, handle);
+    media_client_disconnect(priv->proxy);
+}
+
+/**
+ * @brief Player/Recorder release method.
+ */
+static void media_release_cb(void* handle)
+{
+    media_io_priv_t* priv = handle;
+
+    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
+        free(priv->cpu);
+        free(priv);
+    }
 }
 
 static void* media_open(int control, const char* params)
@@ -296,7 +322,7 @@ static void* media_open(int control, const char* params)
     return priv;
 
 err:
-    media_disconnect(priv);
+    media_transact_finalize(priv, media_release_cb);
     return NULL;
 }
 
@@ -321,16 +347,8 @@ static int media_close(void* handle, int pending_stop)
     if (ret < 0)
         return ret;
 
-    ret = media_client_disconnect(priv->proxy);
-    if (ret < 0)
-        return ret;
-
     media_close_socket(priv);
-    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
-        free(priv->cpu);
-        free(priv);
-    }
-
+    media_transact_finalize(priv, media_release_cb);
     return ret;
 }
 
@@ -476,11 +494,7 @@ static ssize_t media_process_data(void* handle, bool player,
     ret = -errno;
 
 out:
-    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
-        free(priv->cpu);
-        free(priv);
-    }
-
+    media_release_cb(priv);
     return ret;
 }
 
@@ -589,7 +603,7 @@ void* media_focus_request(int* suggestion, const char* stream_type,
     return priv;
 
 err:
-    media_disconnect(priv);
+    media_transact_finalize(priv, NULL);
     return NULL;
 }
 
@@ -600,7 +614,7 @@ int media_focus_abandon(void* handle)
 
     ret = media_transact(MEDIA_FOCUS_CONTROL, priv, NULL, "abandon", NULL, 0, NULL, 0, false);
     if (ret >= 0)
-        media_disconnect(priv);
+        media_transact_finalize(priv, NULL);
 
     return ret;
 }
@@ -1041,7 +1055,7 @@ void* media_session_open(const char* params)
     return priv;
 
 err:
-    media_disconnect(priv);
+    media_transact_finalize(priv, NULL);
     return NULL;
 }
 
@@ -1064,7 +1078,7 @@ int media_session_close(void* handle)
         return ret;
 
     free(priv->stream_type);
-    media_disconnect(priv);
+    media_transact_finalize(priv, NULL);
     return ret;
 }
 

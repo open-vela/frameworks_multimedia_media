@@ -23,6 +23,7 @@
  ****************************************************************************/
 
 #include <netpacket/rpmsg.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -38,15 +39,38 @@
 struct media_client_priv {
     int fd;
     int listenfd;
-    void* cookie;
-    media_client_event_cb event_cb;
     pthread_t thread;
     pthread_mutex_t mutex;
+    void* event_cookie;
+    void* release_cookie;
+    media_client_event_cb event_cb;
+    media_client_release_cb release_cb;
+    atomic_int refs;
 };
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+static void media_client_ref(void* handle)
+{
+    struct media_client_priv* priv = handle;
+
+    atomic_fetch_add(&priv->refs, 1);
+}
+
+static void media_client_unref(void* handle)
+{
+    struct media_client_priv* priv = handle;
+
+    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
+        if (priv->release_cb)
+            priv->release_cb(priv->release_cookie);
+
+        pthread_mutex_destroy(&priv->mutex);
+        free(priv);
+    }
+}
 
 static void media_client_get_sockaddr(int* family, socklen_t* len, void* addr,
     const char* cpu, const char* key)
@@ -128,14 +152,16 @@ static void* media_client_listen_thread(pthread_addr_t pvarg)
         if (code != MEDIA_PARCEL_NOTIFY)
             break;
 
-        priv->event_cb(priv->cookie, &parcel);
+        priv->event_cb(priv->event_cookie, &parcel);
         media_parcel_deinit(&parcel);
     }
 
     media_parcel_deinit(&parcel);
     close(acceptfd);
+
 thread_error:
     close(priv->listenfd);
+    media_client_unref(priv);
     return NULL;
 }
 
@@ -165,6 +191,7 @@ void* media_client_connect(const char* cpu)
         goto connect_error;
 
     pthread_mutex_init(&priv->mutex, NULL);
+    atomic_store(&priv->refs, 1);
     return priv;
 
 connect_error:
@@ -181,12 +208,12 @@ int media_client_disconnect(void* handle)
     if (priv == NULL)
         return -EINVAL;
 
-    if (priv->fd > 0)
+    if (priv->fd > 0) {
         close(priv->fd);
-    if (priv->thread > 0)
-        pthread_join(priv->thread, NULL);
-    pthread_mutex_destroy(&priv->mutex);
-    free(priv);
+        priv->fd = 0;
+        media_client_unref(handle);
+    }
+
     return 0;
 }
 
@@ -246,7 +273,7 @@ int media_client_set_event_cb(void* handle, const char* cpu, void* event_cb, voi
     pthread_mutex_lock(&priv->mutex);
 
     priv->event_cb = event_cb;
-    priv->cookie = cookie;
+    priv->event_cookie = cookie;
     if (priv->thread > 0) {
         pthread_mutex_unlock(&priv->mutex);
         return 0;
@@ -258,6 +285,8 @@ int media_client_set_event_cb(void* handle, const char* cpu, void* event_cb, voi
         return ret;
     }
 
+    media_client_ref(handle);
+
     pthread_attr_init(&pattr);
     pthread_attr_setstacksize(&pattr, CONFIG_MEDIA_CLIENT_LISTEN_STACKSIZE);
     param.sched_priority = CONFIG_MEDIA_CLIENT_LISTEN_PRIORITY;
@@ -265,12 +294,26 @@ int media_client_set_event_cb(void* handle, const char* cpu, void* event_cb, voi
     ret = pthread_create(&priv->thread, &pattr, media_client_listen_thread, (pthread_addr_t)priv);
     if (ret < 0) {
         close(priv->listenfd);
+        media_client_unref(handle);
     }
 
     pthread_attr_destroy(&pattr);
     pthread_mutex_unlock(&priv->mutex);
 
     return ret;
+}
+
+int media_client_set_release_cb(void* handle, void* release_cb, void* cookie)
+{
+    struct media_client_priv* priv = handle;
+
+    if (priv == NULL || release_cb == NULL)
+        return -EINVAL;
+
+    priv->release_cb = release_cb;
+    priv->release_cookie = cookie;
+
+    return 0;
 }
 
 int media_client_send_recieve(void* handle, const char* in_fmt, const char* out_fmt, ...)
