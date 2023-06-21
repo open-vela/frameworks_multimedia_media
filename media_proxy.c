@@ -325,10 +325,11 @@ static int media_close(void* handle, int pending_stop)
     if (ret < 0)
         return ret;
 
-    priv->proxy = NULL;
     media_close_socket(priv);
-    if (atomic_fetch_sub(&priv->refs, 1) == 1)
-        media_disconnect(priv);
+    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
+        free(priv->cpu);
+        free(priv);
+    }
 
     return ret;
 }
@@ -475,8 +476,10 @@ static ssize_t media_process_data(void* handle, bool player,
     ret = -errno;
 
 out:
-    if (atomic_fetch_sub(&priv->refs, 1) == 1)
-        media_disconnect(priv);
+    if (atomic_fetch_sub(&priv->refs, 1) == 1) {
+        free(priv->cpu);
+        free(priv);
+    }
 
     return ret;
 }
