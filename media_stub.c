@@ -117,6 +117,11 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         (void)handle;
         (void)param_u;
         (void)param_i2;
+        (void)param_s3;
+        (void)param_i1;
+        (void)param_s1;
+        (void)param_s2;
+        (void)ret;
         media_parcel_append_printf(out, "%i", -ENOSYS);
         break;
     }
