@@ -804,7 +804,7 @@ CMD3(playdtmf, int, id, string_t, mode, string_t, dial_number)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    if (!mode || !dial_number)
+    if (!mode || mode[0] == '\0' || !dial_number || dial_number[0] == '\0')
         return -EINVAL;
 
     if (!strcmp(mode, "direct"))
