@@ -1056,7 +1056,7 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
         "Reset player/recorder channel (reset ID)" },
     { "prepare",
         mediatool_cmd_prepare,
-        "Set player/recorder prepare (ID url/buffer/direct url options)" },
+        "Set player/recorder prepare (prepare ID url/buffer/direct url [options])" },
     { "start",
         mediatool_cmd_start,
         "Set player/recorder/session start (start ID)" },
@@ -1086,7 +1086,7 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
         "Get position is playing or not(isplay ID)" },
     { "playdtmf",
         mediatool_cmd_playdtmf,
-        "To play dtmf tone(start ID direct/buffer dialbuttons)" },
+        "To play dtmf tone(playdtmf ID direct/buffer dialbuttons)" },
     { "prev",
         mediatool_cmd_prevsong,
         "To play previous song in player list(prev ID)" },
@@ -1229,7 +1229,7 @@ int main(int argc, char* argv[])
         ret = mediatool_execute(&mediatool, buffer);
 
         if (ret < 0) {
-            printf("cmd %s error %d\n", argv[0], ret);
+            printf("Bye-Bye!\n");
             break;
         }
     }
