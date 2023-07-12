@@ -1160,6 +1160,9 @@ static int mediatool_execute(struct mediatool_s* media, char* buffer)
             break;
     }
 
+    if (!argv[0])
+        return ret;
+
     /* Find the command in our cmd array */
 
     for (x = 0; g_mediatool_cmds[x].cmd; x++) {
