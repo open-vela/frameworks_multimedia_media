@@ -157,16 +157,10 @@ static void pfw_save_criterion(const char* name, int32_t state)
  ****************************************************************************/
 
 int media_policy_handler(void* handle, const char* name, const char* cmd,
-    const char* value, int apply, char** res, int res_len)
+    const char* value, int apply, char* res, int res_len)
 {
     int ret = -ENOSYS, tmp;
     char* dump;
-
-    if (res_len && res && !*res) {
-        *res = malloc(res_len);
-        if (!*res)
-            return -ENOMEM;
-    }
 
     if (!strcmp(cmd, "set_int")) {
         ret = pfw_setint(handle, name, atoi(value));
@@ -181,31 +175,19 @@ int media_policy_handler(void* handle, const char* name, const char* cmd,
     } else if (!strcmp(cmd, "exclude")) {
         ret = pfw_exclude(handle, name, value);
     } else if (!strcmp(cmd, "contain")) {
-        if (!res || !*res)
-            return -EINVAL;
-
         ret = pfw_contain(handle, name, value, &tmp);
         if (ret >= 0)
-            return snprintf(*res, res_len, "%d", tmp);
+            return snprintf(res, res_len, "%d", tmp);
     } else if (!strcmp(cmd, "get_int")) {
-        if (!res || !*res)
-            return -EINVAL;
-
         ret = pfw_getint(handle, name, &tmp);
         if (ret >= 0)
-            return snprintf(*res, res_len, "%d", tmp);
+            return snprintf(res, res_len, "%d", tmp);
     } else if (!strcmp(cmd, "get_string")) {
-        if (!res || !*res)
-            return -EINVAL;
-
-        ret = pfw_getstring(handle, name, *res, res_len);
+        ret = pfw_getstring(handle, name, res, res_len);
         if (ret >= 0)
             return 0;
     } else if (!strcmp(cmd, "get_parameter")) {
-        if (!res || !*res)
-            return -EINVAL;
-
-        ret = pfw_getparameter(handle, name, *res, res_len);
+        ret = pfw_getparameter(handle, name, res, res_len);
         if (ret >= 0)
             return 0;
     } else if (!strcmp(cmd, "dump")) {
