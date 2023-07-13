@@ -236,8 +236,7 @@ out:
 }
 
 static int media_graph_queue_command(AVFilterContext* filter,
-    const char* cmd, const char* arg,
-    char** res, int res_len, int flags)
+    const char* cmd, const char* arg, char* res, int res_len, int flags)
 {
     MediaGraphPriv* priv;
     MediaCommand* tmp;
@@ -246,14 +245,8 @@ static int media_graph_queue_command(AVFilterContext* filter,
     if (!priv)
         return -EINVAL;
 
-    if (res_len && res && !*res) {
-        *res = malloc(res_len);
-        if (!*res)
-            return -ENOMEM;
-    }
-
-    if (res && *res)
-        return avfilter_process_command(filter, cmd, arg, *res, res_len, flags);
+    if (res && res_len > 0)
+        return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
 
     if (!priv->cmdhead && !ff_filter_graph_has_pending_status(filter->graph)) {
         av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
@@ -503,7 +496,7 @@ err:
 }
 
 static int media_common_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char** res, int res_len, bool player)
+    const char* arg, char* res, int res_len, bool player)
 {
     MediaFilterPriv* priv = handle;
     bool active, inactive, quit;
@@ -683,19 +676,21 @@ int media_graph_run_once(void* handle)
 }
 
 int media_graph_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char** res, int res_len)
+    const char* arg, char* res, int res_len)
 {
     MediaGraphPriv* priv = handle;
     int i, ret = 0;
+    char* dump;
 
     if (!priv || !priv->graph)
         return -EINVAL;
 
     if (!strcmp(cmd, "dump")) {
-        if (!res)
-            return -EINVAL;
+        dump = avfilter_graph_dump_ext(priv->graph, arg);
+        if (dump)
+            syslog(LOG_INFO, "\n%s\n", dump);
 
-        *res = avfilter_graph_dump_ext(priv->graph, arg);
+        free(dump);
         return 0;
     } else if (!strcmp(cmd, "loglevel")) {
         if (!arg)
@@ -725,25 +720,17 @@ int media_graph_handler(void* handle, const char* target, const char* cmd,
 }
 
 int media_player_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char** res, int res_len)
+    const char* arg, char* res, int res_len)
 {
     MediaPlayerPriv* priv;
-    char* name;
+    char* name = NULL;
 
     if (!strcmp(cmd, "open")) {
-        if (!res)
-            return -EINVAL;
-
-        *res = zalloc(res_len);
-        if (!*res)
-            return -ENOMEM;
-
         if (arg) {
             name = strdup(arg);
             if (!name)
                 return -ENOMEM;
-        } else
-            name = NULL;
+        }
 
         priv = media_common_open(arg, handle, true);
         if (!priv) {
@@ -757,37 +744,30 @@ int media_player_handler(void* handle, const char* target, const char* cmd,
         LIST_INSERT_HEAD(&g_players, priv, entry);
         pthread_mutex_unlock(&g_media_mutex);
 
-        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+        return snprintf(res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
     }
 
     return media_common_handler(handle, target, cmd, arg, res, res_len, true);
 }
 
 int media_recorder_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char** res, int res_len)
+    const char* arg, char* res, int res_len)
 {
     MediaRecorderPriv* priv;
 
     if (!strcmp(cmd, "open")) {
-        if (!res)
-            return -EINVAL;
-
-        *res = zalloc(res_len);
-        if (!*res)
-            return -ENOMEM;
-
         priv = media_common_open(arg, handle, false);
         if (!priv)
             return -EINVAL;
 
-        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+        return snprintf(res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
     }
 
     return media_common_handler(handle, target, cmd, arg, res, res_len, false);
 }
 
 int media_session_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char** res, int res_len)
+    const char* arg, char* res, int res_len)
 {
     MediaPlayerPriv *tmp, *player = NULL;
     AVFilterContext* filter;
@@ -795,7 +775,7 @@ int media_session_handler(void* handle, const char* target, const char* cmd,
     int ret;
 
     if (!strcmp(cmd, "open")) {
-        if (!res || !arg)
+        if (!arg)
             return -EINVAL;
 
         filter = media_find_filter(arg, true, false);
@@ -815,18 +795,11 @@ int media_session_handler(void* handle, const char* target, const char* cmd,
             return -ENOMEM;
         }
 
-        *res = malloc(res_len);
-        if (!*res) {
-            free(priv->name);
-            free(priv);
-            return -ENOMEM;
-        }
-
         pthread_mutex_lock(&g_media_mutex);
         LIST_INSERT_HEAD(&g_sessions, priv, entry);
         pthread_mutex_unlock(&g_media_mutex);
 
-        return snprintf(*res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+        return snprintf(res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
     }
 
     priv = handle;

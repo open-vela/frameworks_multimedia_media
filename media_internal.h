@@ -37,12 +37,12 @@ extern "C" {
  * Media Definations
  ****************************************************************************/
 
-#define MEDIA_GRAPH_CONTROL 1
-#define MEDIA_POLICY_CONTROL 2
-#define MEDIA_PLAYER_CONTROL 3
-#define MEDIA_RECORDER_CONTROL 4
-#define MEDIA_SESSION_CONTROL 5
-#define MEDIA_FOCUS_CONTROL 6
+#define MEDIA_ID_GRAPH 1
+#define MEDIA_ID_POLICY 2
+#define MEDIA_ID_PLAYER 3
+#define MEDIA_ID_RECORDER 4
+#define MEDIA_ID_SESSION 5
+#define MEDIA_ID_FOCUS 6
 
 #ifndef CONFIG_RPTUN_LOCAL_CPUNAME
 #define CONFIG_RPTUN_LOCAL_CPUNAME CONFIG_MEDIA_SERVER_CPUNAME
@@ -92,7 +92,7 @@ void media_stub_onreceive(void* cookie,
 void* media_focus_create(void* file);
 int media_focus_destroy(void* handle);
 int media_focus_handler(void* handle, const char* name, const char* cmd,
-    char** res, int res_len);
+    char* res, int res_len);
 void media_focus_debug_stack_display(void);
 int media_focus_debug_stack_return(media_focus_id* focus_list, int num);
 
@@ -107,14 +107,14 @@ int media_graph_get_pollfds(void* handle, struct pollfd* fds,
 int media_graph_poll_available(void* handle, struct pollfd* fd, void* cookie);
 int media_graph_run_once(void* handle);
 int media_graph_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char** res, int res_len);
+    const char* arg, char* res, int res_len);
 
 int media_player_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char** res, int res_len);
+    const char* arg, char* res, int res_len);
 int media_recorder_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char** res, int res_len);
+    const char* arg, char* res, int res_len);
 int media_session_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char** res, int res_len);
+    const char* arg, char* res, int res_len);
 
 /****************************************************************************
  * Policy Functions
@@ -123,7 +123,7 @@ int media_session_handler(void* handle, const char* target, const char* cmd,
 void* media_policy_create(void* file);
 int media_policy_destroy(void* handle);
 int media_policy_handler(void* handle, const char* name, const char* cmd,
-    const char* value, int apply, char** res, int res_len);
+    const char* value, int apply, char* res, int res_len);
 int media_policy_get_stream_name(const char* stream, char* name, int len);
 int media_policy_set_stream_status(const char* name, bool active);
 void media_policy_process_command(const char* target, const char* cmd,
