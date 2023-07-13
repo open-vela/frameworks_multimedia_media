@@ -609,7 +609,7 @@ int media_focus_debug_stack_return(media_focus_id* p_focus_list, int num)
 }
 
 int media_focus_handler(void* handle, const char* name, const char* cmd,
-    char** res, int res_len)
+    char* res, int res_len)
 {
     int ret, suggestion = 0;
     media_focus* focus;
@@ -619,33 +619,21 @@ int media_focus_handler(void* handle, const char* name, const char* cmd,
     if (!focus)
         return -ENOSYS;
 
-    if (res && res_len > 0) {
-        *res = zalloc(res_len);
-        if (!*res)
-            return -ENOMEM;
-    }
-
     if (!strcmp(cmd, "request")) {
-        if (!res)
-            return -EINVAL;
-
         handle = media_focus_request_(focus, &suggestion, name, media_focus_notify, handle);
         if (!handle)
             return -EPERM;
 
-        return snprintf(*res, res_len, "%llu:%d", (uint64_t)(uintptr_t)handle, suggestion);
+        return snprintf(res, res_len, "%llu:%d", (uint64_t)(uintptr_t)handle, suggestion);
     } else if (!strcmp(cmd, "abandon")) {
         return media_focus_abandon_(focus, handle);
     } else if (!strcmp(cmd, "dump")) {
         media_focus_debug_stack_display();
         return 0;
     } else if (!strcmp(cmd, "peek")) {
-        if (!res)
-            return -EINVAL;
-
         ret = app_focus_stack_top(focus->stack, &tmp);
         if (ret >= 0)
-            ret = snprintf(*res, res_len, "%s", focus->streams + tmp.focus_level * STREAM_TYPE_LEN);
+            ret = snprintf(res, res_len, "%s", focus->streams + tmp.focus_level * STREAM_TYPE_LEN);
 
         return ret;
     }

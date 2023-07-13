@@ -118,37 +118,37 @@ media_transact_once(void* handle, const char* target, const char* cmd,
     media_parcel_init(&out);
 
     switch (priv->type) {
-    case MEDIA_FOCUS_CONTROL:
+    case MEDIA_ID_FOCUS:
         name = "focus";
         ret = media_parcel_append_printf(&in, "%i%l%s%s%i", priv->type,
             priv->handle, target, cmd, res_len);
         break;
 
-    case MEDIA_GRAPH_CONTROL:
+    case MEDIA_ID_GRAPH:
         name = "graph";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
             target, cmd, arg, res_len);
         break;
 
-    case MEDIA_POLICY_CONTROL:
+    case MEDIA_ID_POLICY:
         name = "policy";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i%i", priv->type,
             target, cmd, arg, apply, res_len);
         break;
 
-    case MEDIA_PLAYER_CONTROL:
+    case MEDIA_ID_PLAYER:
         name = "player";
         ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
             priv->handle, target, cmd, arg, res_len);
         break;
 
-    case MEDIA_RECORDER_CONTROL:
+    case MEDIA_ID_RECORDER:
         name = "recorder";
         ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
             priv->handle, target, cmd, arg, res_len);
         break;
 
-    case MEDIA_SESSION_CONTROL:
+    case MEDIA_ID_SESSION:
         name = "session";
         ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
             priv->handle, target, cmd, arg, res_len);
@@ -228,22 +228,22 @@ static int media_transact(int control, void* handle, const char* target, const c
         priv->cpu = cpu;
         ret = media_transact_once(priv, target, cmd, arg, apply, res, res_len);
         switch (control) {
-        case MEDIA_GRAPH_CONTROL:
+        case MEDIA_ID_GRAPH:
             media_client_disconnect(priv->proxy);
             ret = 0;
             break;
 
-        case MEDIA_POLICY_CONTROL:
+        case MEDIA_ID_POLICY:
             media_client_disconnect(priv->proxy);
             if (ret != -ENOSYS)
                 return ret; // return once found policy
 
             break;
 
-        case MEDIA_FOCUS_CONTROL:
-        case MEDIA_PLAYER_CONTROL:
-        case MEDIA_RECORDER_CONTROL:
-        case MEDIA_SESSION_CONTROL:
+        case MEDIA_ID_FOCUS:
+        case MEDIA_ID_PLAYER:
+        case MEDIA_ID_RECORDER:
+        case MEDIA_ID_SESSION:
             if (ret < 0) {
                 media_client_disconnect(priv->proxy);
                 break;
@@ -563,7 +563,7 @@ static int media_get_proper_stream(void* handle, char* stream_type, int len)
     if (!handle)
         return -EINVAL;
 
-    ret = media_transact(MEDIA_FOCUS_CONTROL, NULL, NULL, "peek", NULL, 0, stream_type, len, false);
+    ret = media_transact(MEDIA_ID_FOCUS, NULL, NULL, "peek", NULL, 0, stream_type, len, false);
     if (ret <= 0)
         ret = snprintf(stream_type, len, "%s", priv->stream_type);
 
@@ -590,7 +590,7 @@ void* media_focus_request(int* suggestion, const char* stream_type,
     priv->suggest = cb;
     priv->cookie = cookie;
 
-    if (media_transact(MEDIA_FOCUS_CONTROL, priv, stream_type, "request", NULL, 0, tmp, sizeof(tmp), false) < 0)
+    if (media_transact(MEDIA_ID_FOCUS, priv, stream_type, "request", NULL, 0, tmp, sizeof(tmp), false) < 0)
         goto err;
 
     sscanf(tmp, "%llu:%d", &priv->handle, suggestion);
@@ -612,7 +612,7 @@ int media_focus_abandon(void* handle)
     media_focus_priv_t* priv = handle;
     int ret;
 
-    ret = media_transact(MEDIA_FOCUS_CONTROL, priv, NULL, "abandon", NULL, 0, NULL, 0, false);
+    ret = media_transact(MEDIA_ID_FOCUS, priv, NULL, "abandon", NULL, 0, NULL, 0, false);
     if (ret >= 0)
         media_transact_finalize(priv, NULL);
 
@@ -621,23 +621,23 @@ int media_focus_abandon(void* handle)
 
 void media_focus_dump(const char* options)
 {
-    media_transact(MEDIA_FOCUS_CONTROL, NULL, NULL, "dump", options, 0, NULL, 0, false);
+    media_transact(MEDIA_ID_FOCUS, NULL, NULL, "dump", options, 0, NULL, 0, false);
 }
 
 int media_process_command(const char* target, const char* cmd,
     const char* arg, char* res, int res_len)
 {
-    return media_transact(MEDIA_GRAPH_CONTROL, NULL, target, cmd, arg, 0, res, res_len, false);
+    return media_transact(MEDIA_ID_GRAPH, NULL, target, cmd, arg, 0, res, res_len, false);
 }
 
 void media_graph_dump(const char* options)
 {
-    media_transact(MEDIA_GRAPH_CONTROL, NULL, NULL, "dump", options, 0, NULL, 0, false);
+    media_transact(MEDIA_ID_GRAPH, NULL, NULL, "dump", options, 0, NULL, 0, false);
 }
 
 void* media_player_open(const char* params)
 {
-    return media_open(MEDIA_PLAYER_CONTROL, params);
+    return media_open(MEDIA_ID_PLAYER, params);
 }
 
 int media_player_close(void* handle, int pending_stop)
@@ -813,7 +813,7 @@ int media_player_get_property(void* handle, const char* target, const char* key,
 
 void* media_recorder_open(const char* params)
 {
-    return media_open(MEDIA_RECORDER_CONTROL, params);
+    return media_open(MEDIA_ID_RECORDER, params);
 }
 
 int media_recorder_close(void* handle)
@@ -932,7 +932,7 @@ int media_policy_set_int(const char* name, int value, int apply)
     char tmp[32];
 
     snprintf(tmp, sizeof(tmp), "%d", value);
-    return media_transact(MEDIA_POLICY_CONTROL, NULL, name, "set_int", tmp, apply, NULL, 0, false);
+    return media_transact(MEDIA_ID_POLICY, NULL, name, "set_int", tmp, apply, NULL, 0, false);
 }
 
 int media_policy_get_int(const char* name, int* value)
@@ -943,7 +943,7 @@ int media_policy_get_int(const char* name, int* value)
     if (!value)
         return -EINVAL;
 
-    ret = media_transact(MEDIA_POLICY_CONTROL, NULL, name, "get_int", NULL, 0, tmp, sizeof(tmp), false);
+    ret = media_transact(MEDIA_ID_POLICY, NULL, name, "get_int", NULL, 0, tmp, sizeof(tmp), false);
     if (ret >= 0) {
         *value = atoi(tmp);
         ret = 0;
@@ -960,7 +960,7 @@ int media_policy_contain(const char* name, const char* values, int* result)
     if (!result)
         return -EINVAL;
 
-    ret = media_transact(MEDIA_POLICY_CONTROL, NULL, name, "contain", values, 0, tmp, sizeof(tmp), false);
+    ret = media_transact(MEDIA_ID_POLICY, NULL, name, "contain", values, 0, tmp, sizeof(tmp), false);
     if (ret >= 0) {
         *result = atoi(tmp);
         ret = 0;
@@ -971,45 +971,45 @@ int media_policy_contain(const char* name, const char* values, int* result)
 
 int media_policy_set_string(const char* name, const char* value, int apply)
 {
-    return media_transact(MEDIA_POLICY_CONTROL, NULL, name, "set_string", value, apply, NULL, 0, false);
+    return media_transact(MEDIA_ID_POLICY, NULL, name, "set_string", value, apply, NULL, 0, false);
 }
 
 int media_policy_get_string(const char* name, char* value, int len)
 {
-    return media_transact(MEDIA_POLICY_CONTROL, NULL, name, "get_string", NULL, 0, value, len, false);
+    return media_transact(MEDIA_ID_POLICY, NULL, name, "get_string", NULL, 0, value, len, false);
 }
 
 int media_policy_include(const char* name, const char* values, int apply)
 {
-    return media_transact(MEDIA_POLICY_CONTROL, NULL, name, "include", values, apply, NULL, 0, false);
+    return media_transact(MEDIA_ID_POLICY, NULL, name, "include", values, apply, NULL, 0, false);
 }
 
 int media_policy_exclude(const char* name, const char* values, int apply)
 {
-    return media_transact(MEDIA_POLICY_CONTROL, NULL, name, "exclude", values, apply, NULL, 0, false);
+    return media_transact(MEDIA_ID_POLICY, NULL, name, "exclude", values, apply, NULL, 0, false);
 }
 
 int media_policy_increase(const char* name, int apply)
 {
-    return media_transact(MEDIA_POLICY_CONTROL, NULL, name, "increase", NULL, apply, NULL, 0, false);
+    return media_transact(MEDIA_ID_POLICY, NULL, name, "increase", NULL, apply, NULL, 0, false);
 }
 
 int media_policy_decrease(const char* name, int apply)
 {
-    return media_transact(MEDIA_POLICY_CONTROL, NULL, name, "decrease", NULL, apply, NULL, 0, false);
+    return media_transact(MEDIA_ID_POLICY, NULL, name, "decrease", NULL, apply, NULL, 0, false);
 }
 
 void media_policy_dump(const char* options)
 {
-    media_transact(MEDIA_POLICY_CONTROL, NULL, NULL, "dump", options, 0, NULL, 0, false);
+    media_transact(MEDIA_ID_POLICY, NULL, NULL, "dump", options, 0, NULL, 0, false);
 }
 
 int media_policy_get_stream_name(const char* stream, char* name, int len)
 {
 #ifdef CONFIG_LIB_PFW
-    return media_policy_handler(media_get_policy(), stream, "get_string", NULL, 0, &name, len);
+    return media_policy_handler(media_get_policy(), stream, "get_string", NULL, 0, name, len);
 #else
-    return media_transact(MEDIA_POLICY_CONTROL, NULL, stream, "get_string", NULL, 0, name, len, true);
+    return media_transact(MEDIA_ID_POLICY, NULL, stream, "get_string", NULL, 0, name, len, true);
 #endif
 }
 
@@ -1022,7 +1022,7 @@ int media_policy_set_stream_status(const char* name, bool active)
 #ifdef CONFIG_LIB_PFW
     return media_policy_handler(media_get_policy(), "ActiveStreams", cmd, name, 1, NULL, 0);
 #else
-    return media_transact(MEDIA_POLICY_CONTROL, NULL, "ActiveStreams", cmd, name, 1, NULL, 0, true);
+    return media_transact(MEDIA_ID_POLICY, NULL, "ActiveStreams", cmd, name, 1, NULL, 0, true);
 #endif
 }
 
@@ -1031,7 +1031,7 @@ void media_policy_process_command(const char* target, const char* cmd, const cha
 #ifdef CONFIG_LIB_FFMPEG
     media_graph_handler(media_get_graph(), target, cmd, arg, NULL, 0);
 #endif
-    media_transact(MEDIA_GRAPH_CONTROL, NULL, target, cmd, arg, 0, NULL, 0, true);
+    media_transact(MEDIA_ID_GRAPH, NULL, target, cmd, arg, 0, NULL, 0, true);
 }
 
 void* media_session_open(const char* params)
@@ -1046,7 +1046,7 @@ void* media_session_open(const char* params)
     if (!priv)
         return NULL;
 
-    if (media_transact(MEDIA_SESSION_CONTROL, priv, NULL, "open", params, 0, tmp, sizeof(tmp), 0) < 0)
+    if (media_transact(MEDIA_ID_SESSION, priv, NULL, "open", params, 0, tmp, sizeof(tmp), 0) < 0)
         goto err;
 
     sscanf(tmp, "%llu", &priv->handle);
