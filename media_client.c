@@ -208,6 +208,8 @@ int media_client_disconnect(void* handle)
     if (priv == NULL)
         return -EINVAL;
 
+    pthread_join(priv->thread, NULL);
+
     if (priv->fd > 0) {
         close(priv->fd);
         priv->fd = 0;
