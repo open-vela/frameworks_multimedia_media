@@ -97,6 +97,16 @@ static MediaPoll g_media[] = {
         media_graph_run_once,
         media_graph_destroy,
     },
+    {
+        "media_session",
+        NULL,
+        NULL,
+        media_session_create,
+        NULL,
+        NULL,
+        NULL,
+        media_session_destroy,
+    },
 #endif
 #ifdef CONFIG_LIB_PFW
     {
@@ -157,6 +167,11 @@ void* media_get_graph(void)
 void* media_get_policy(void)
 {
     return media_get_handle("media_policy");
+}
+
+void* media_get_session(void)
+{
+    return media_get_handle("media_session");
 }
 
 void* media_get_server(void)
