@@ -42,10 +42,10 @@ extern "C" {
 
 /**
  * Open one player path.
- * @param[in] params    open params
+ * @param[in] stream    Stream type @see MEDIA_STREAM_*
  * @return Pointer to created handle or NULL on failure.
  */
-void* media_player_open(const char* params);
+void* media_player_open(const char* stream);
 
 /**
  * Close the player path
@@ -68,18 +68,6 @@ int media_player_close(void* handle, int pending_stop);
  */
 int media_player_set_event_callback(void* handle, void* cookie,
     media_event_callback event_cb);
-
-/**
- * Report event to media sessions.
- * @note Should only report event that media framework cannot know,
- * such as MEDIA_EVENT_DONENEXT.
- * @param[in] handle    The player path.
- * @param[in] event     Event, use MEDIA_EVENT_*.
- * @param[in] result    Exec result.
- * @param[in] extra     Extra message.
- * @return Zero on success; a negated errno value on failure.
- */
-int media_player_notify(void* handle, int event, int result, const char* extra);
 
 /**
  * Prepare the player path.

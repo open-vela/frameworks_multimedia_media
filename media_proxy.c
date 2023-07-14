@@ -651,17 +651,6 @@ int media_player_set_event_callback(void* handle, void* cookie,
     return media_set_event_cb(handle, cookie, event_cb);
 }
 
-int media_player_notify(void* handle, int event, int result, const char* extra)
-{
-    char tmp[64];
-
-    if (!MEDIA_IS_STATUS_CHANGE(event))
-        return -EINVAL;
-
-    snprintf(tmp, sizeof(tmp), "%d:%d", event, result);
-    return media_transact_once(handle, extra, "event", tmp, 0, NULL, 0);
-}
-
 int media_player_prepare(void* handle, const char* url, const char* options)
 {
     syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
@@ -1112,47 +1101,17 @@ int media_session_stop(void* handle)
 
 int media_session_get_state(void* handle, int* state)
 {
-    char tmp[32];
-    int ret;
-
-    if (!state)
-        return -EINVAL;
-
-    ret = media_transact_once(handle, NULL, "get_state", NULL, 0, tmp, sizeof(tmp));
-    if (ret >= 0)
-        *state = strtoul(tmp, NULL, 0);
-
-    return ret;
+    return -ENOSYS;
 }
 
 int media_session_get_position(void* handle, unsigned int* msec)
 {
-    char tmp[32];
-    int ret;
-
-    if (!msec)
-        return -EINVAL;
-
-    ret = media_transact_once(handle, NULL, "get_position", NULL, 0, tmp, sizeof(tmp));
-    if (ret >= 0)
-        *msec = strtoul(tmp, NULL, 0);
-
-    return ret;
+    return -ENOSYS;
 }
 
 int media_session_get_duration(void* handle, unsigned int* msec)
 {
-    char tmp[32];
-    int ret;
-
-    if (!msec)
-        return -EINVAL;
-
-    ret = media_transact_once(handle, NULL, "get_duration", NULL, 0, tmp, sizeof(tmp));
-    if (ret >= 0)
-        *msec = strtoul(tmp, NULL, 0);
-
-    return ret;
+    return -ENOSYS;
 }
 
 int media_session_set_volume(void* handle, int volume)
@@ -1211,4 +1170,60 @@ int media_session_next_song(void* handle)
 int media_session_prev_song(void* handle)
 {
     return media_transact_once(handle, NULL, "prev", NULL, 0, NULL, 0);
+}
+
+void* media_session_register(void* cookie, media_event_callback event_cb)
+{
+    media_session_priv_t* priv;
+    char tmp[64];
+
+    priv = zalloc(sizeof(media_session_priv_t));
+    if (!priv)
+        return NULL;
+
+    if (media_transact(MEDIA_ID_SESSION, priv, NULL, "register", NULL, 0, tmp, sizeof(tmp), 0) < 0)
+        goto err;
+
+    sscanf(tmp, "%llu", &priv->handle);
+    if (!priv->handle)
+        goto err;
+
+    if (media_client_set_event_cb(priv->proxy, priv->cpu, media_event_cb, priv) < 0)
+        goto err;
+
+    priv->event = event_cb;
+    priv->cookie = cookie;
+
+    return priv;
+
+err:
+    media_transact_finalize(priv, NULL);
+    return NULL;
+}
+
+int media_session_notify(void* handle, int event, int result, const char* extra)
+{
+    char tmp[64];
+
+    if (!MEDIA_IS_STATUS_CHANGE(event))
+        return -EINVAL;
+
+    snprintf(tmp, sizeof(tmp), "%d:%d", event, result);
+    return media_transact_once(handle, extra, "event", tmp, 0, NULL, 0);
+}
+
+int media_session_unregister(void* handle)
+{
+    media_session_priv_t* priv = handle;
+    int ret;
+
+    if (!handle)
+        return -EINVAL;
+
+    ret = media_transact_once(priv, NULL, "unregister", NULL, 0, NULL, 0);
+    if (ret < 0)
+        return ret;
+
+    media_transact_finalize(priv, NULL);
+    return ret;
 }

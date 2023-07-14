@@ -41,8 +41,9 @@
 #define MEDIATOOL_MAX_ARGC 8
 #define MEDIATOOL_PLAYER 1
 #define MEDIATOOL_RECORDER 2
-#define MEDIATOOL_SESSION 3
-#define MEDIATOOL_FOCUS 4
+#define MEDIATOOL_CONTROLLER 3
+#define MEDIATOOL_CONTROLLEE 4
+#define MEDIATOOL_FOCUS 5
 
 #define GET_ARG_FUNC(out_type, arg)                  \
     static out_type get_##out_type##_arg(char* arg); \
@@ -119,6 +120,7 @@ struct mediatool_chain_s {
     int id;
     int type;
     void* handle;
+    void* extra;
 
     pthread_t thread;
     int fd;
@@ -165,44 +167,118 @@ GET_ARG_FUNC(string_t, arg)
     return arg;
 }
 
+static const char* mediatool_event2str(int event)
+{
+    if (event == MEDIA_EVENT_STARTED) {
+        return "MEDIA_EVENT_STARTED";
+    } else if (event == MEDIA_EVENT_STOPPED) {
+        return "MEDIA_EVENT_STOPPED";
+    } else if (event == MEDIA_EVENT_COMPLETED) {
+        return "MEDIA_EVENT_COMPLETED";
+    } else if (event == MEDIA_EVENT_PREPARED) {
+        return "MEDIA_EVENT_PREPARED";
+    } else if (event == MEDIA_EVENT_PAUSED) {
+        return "MEDIA_EVENT_PAUSED";
+    } else if (event == MEDIA_EVENT_PREVED) {
+        return "MEDIA_EVENT_PREVED";
+    } else if (event == MEDIA_EVENT_NEXTED) {
+        return "MEDIA_EVENT_NEXTED";
+    } else if (event == MEDIA_EVENT_START) {
+        return "MEDIA_EVENT_START";
+    } else if (event == MEDIA_EVENT_STOP) {
+        return "MEDIA_EVENT_STOP";
+    } else if (event == MEDIA_EVENT_PAUSE) {
+        return "MEDIA_EVENT_PAUSE";
+    } else if (event == MEDIA_EVENT_PREV) {
+        return "MEDIA_EVENT_PREV";
+    } else if (event == MEDIA_EVENT_NEXT) {
+        return "MEDIA_EVENT_NEXT";
+    } else {
+        return "NORMAL EVENT";
+    }
+}
+
+static void mediatool_controller_callback(void* cookie, int event,
+    int ret, const char* data)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
+        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
+}
+
+static void mediatool_controllee_callback(void* cookie, int event,
+    int ret, const char* data)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
+        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
+
+    switch (event) {
+    case MEDIA_EVENT_START:
+        media_session_notify(chain->handle, MEDIA_EVENT_STARTED, 0, NULL);
+        break;
+
+    case MEDIA_EVENT_PAUSE:
+        media_session_notify(chain->handle, MEDIA_EVENT_PAUSED, 0, NULL);
+        break;
+
+    case MEDIA_EVENT_STOP:
+        media_session_notify(chain->handle, MEDIA_EVENT_STOPPED, 0, NULL);
+        break;
+
+    case MEDIA_EVENT_PREV:
+        media_session_notify(chain->handle, MEDIA_EVENT_PREVED, 0, NULL);
+        break;
+
+    case MEDIA_EVENT_NEXT:
+        media_session_notify(chain->handle, MEDIA_EVENT_NEXTED, 0, NULL);
+        break;
+    }
+}
+
+static void mediatool_music_callback(void* cookie, int event,
+    int ret, const char* data)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
+        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
+
+    switch (event) {
+    case MEDIA_EVENT_START:
+        media_player_start(chain->handle);
+        break;
+
+    case MEDIA_EVENT_PAUSE:
+        media_player_pause(chain->handle);
+        break;
+
+    case MEDIA_EVENT_STOP:
+        media_player_stop(chain->handle);
+        break;
+
+    case MEDIA_EVENT_PREV:
+        media_session_notify(chain->handle, MEDIA_EVENT_PREVED, 0, NULL);
+        break;
+
+    case MEDIA_EVENT_NEXT:
+        media_session_notify(chain->handle, MEDIA_EVENT_NEXTED, 0, NULL);
+        break;
+    }
+}
+
 static void mediatool_event_callback(void* cookie, int event,
     int ret, const char* data)
 {
     struct mediatool_chain_s* chain = cookie;
-    char* str;
-
-    if (event == MEDIA_EVENT_STARTED) {
-        str = "MEDIA_EVENT_STARTED";
-    } else if (event == MEDIA_EVENT_STOPPED) {
-        str = "MEDIA_EVENT_STOPPED";
-    } else if (event == MEDIA_EVENT_COMPLETED) {
-        str = "MEDIA_EVENT_COMPLETED";
-    } else if (event == MEDIA_EVENT_PREPARED) {
-        str = "MEDIA_EVENT_PREPARED";
-    } else if (event == MEDIA_EVENT_PAUSED) {
-        str = "MEDIA_EVENT_PAUSED";
-    } else if (event == MEDIA_EVENT_PREVED) {
-        str = "MEDIA_EVENT_PREVED";
-    } else if (event == MEDIA_EVENT_NEXTED) {
-        str = "MEDIA_EVENT_NEXTED";
-    } else if (event == MEDIA_EVENT_START) {
-        str = "MEDIA_EVENT_START";
-    } else if (event == MEDIA_EVENT_PAUSE) {
-        str = "MEDIA_EVENT_PAUSE";
-    } else if (event == MEDIA_EVENT_STOP) {
-        str = "MEDIA_EVENT_STOP";
-    } else if (event == MEDIA_EVENT_PREV) {
-        str = "MEDIA_EVENT_PREV";
-        media_player_notify(chain->handle, MEDIA_EVENT_PREVED, 0, NULL);
-    } else if (event == MEDIA_EVENT_NEXT) {
-        str = "MEDIA_EVENT_NEXT";
-        media_player_notify(chain->handle, MEDIA_EVENT_NEXTED, 0, NULL);
-    } else {
-        str = "NORMAL EVENT";
-    }
 
     printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
-        __func__, chain->id, str, event, ret, __LINE__);
+        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
+
+    if (chain->extra)
+        media_session_notify(chain->extra, event, ret, data);
 }
 
 static void mediatool_focus_callback(int suggestion, void* cookie)
@@ -256,10 +332,6 @@ static int mediatool_common_stop_inner(struct mediatool_chain_s* chain)
     case MEDIATOOL_RECORDER:
         ret = media_recorder_stop(chain->handle);
         break;
-
-    case MEDIATOOL_SESSION:
-        ret = media_session_stop(chain->handle);
-        return ret;
     }
 
     usleep(1000);
@@ -290,9 +362,13 @@ CMD1(player_open, string_t, stream_type)
     }
 
     ret = media_player_set_event_callback(media->chain[i].handle,
-        &media->chain[i],
-        mediatool_event_callback);
+        &media->chain[i], mediatool_event_callback);
     assert(!ret);
+
+    if (!strcmp(stream_type, MEDIA_STREAM_MUSIC)) {
+        media->chain[i].extra = media_session_register(
+            &media->chain[i], mediatool_music_callback);
+    }
 
     media->chain[i].type = MEDIATOOL_PLAYER;
 
@@ -354,13 +430,39 @@ CMD1(session_open, string_t, stream_type)
     }
 
     ret = media_session_set_event_callback(media->chain[i].handle,
-        &media->chain[i],
-        mediatool_event_callback);
+        &media->chain[i], mediatool_controller_callback);
     assert(!ret);
 
-    media->chain[i].type = MEDIATOOL_SESSION;
+    media->chain[i].type = MEDIATOOL_CONTROLLER;
 
-    printf("session ID %ld\n", i);
+    printf("session controller ID %ld\n", i);
+
+    return 0;
+}
+
+CMD0(session_register)
+{
+    long int i;
+
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!media->chain[i].handle)
+            break;
+    }
+
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
+    media->chain[i].id = i;
+    media->chain[i].handle = media_session_register(
+        &media->chain[i], mediatool_controllee_callback);
+    if (!media->chain[i].handle) {
+        printf("media_session_register error\n");
+        return -EINVAL;
+    }
+
+    media->chain[i].type = MEDIATOOL_CONTROLLEE;
+
+    printf("session controllee ID %ld\n", i);
 
     return 0;
 }
@@ -375,6 +477,8 @@ CMD2(close, int, id, int, pending_stop)
     switch (media->chain[id].type) {
     case MEDIATOOL_PLAYER:
         ret = media_player_close(media->chain[id].handle, pending_stop);
+        if (ret >= 0 && media->chain[id].extra)
+            ret = media_session_unregister(media->chain[id].extra);
         break;
 
     case MEDIATOOL_RECORDER:
@@ -382,8 +486,12 @@ CMD2(close, int, id, int, pending_stop)
         ret = media_recorder_close(media->chain[id].handle);
         break;
 
-    case MEDIATOOL_SESSION:
+    case MEDIATOOL_CONTROLLER:
         ret = media_session_close(media->chain[id].handle);
+        break;
+
+    case MEDIATOOL_CONTROLLEE:
+        ret = media_session_unregister(media->chain[id].handle);
         break;
 
     case MEDIATOOL_FOCUS:
@@ -598,7 +706,7 @@ CMD1(start, int, id)
         ret = media_recorder_start(media->chain[id].handle);
         break;
 
-    case MEDIATOOL_SESSION:
+    case MEDIATOOL_CONTROLLER:
         ret = media_session_start(media->chain[id].handle);
         break;
     }
@@ -630,7 +738,7 @@ CMD1(pause, int, id)
         ret = media_recorder_pause(media->chain[id].handle);
         break;
 
-    case MEDIATOOL_SESSION:
+    case MEDIATOOL_CONTROLLER:
         ret = media_session_pause(media->chain[id].handle);
         break;
     }
@@ -662,7 +770,7 @@ CMD2(volume, int, id, string_t, volume_cmd)
         }
         break;
 
-    case MEDIATOOL_SESSION:
+    case MEDIATOOL_CONTROLLER:
         if ((ptr = strchr(volume_cmd, '?'))) {
             ret = media_session_get_volume(media->chain[id].handle, &volume_i);
             printf("ID %d, get volume %d\n", id, volume_i);
@@ -722,7 +830,7 @@ CMD1(position, int, id)
         ret = media_player_get_position(media->chain[id].handle, &position);
         break;
 
-    case MEDIATOOL_SESSION:
+    case MEDIATOOL_CONTROLLER:
         ret = media_session_get_position(media->chain[id].handle, &position);
         break;
 
@@ -753,7 +861,7 @@ CMD1(duration, int, id)
         ret = media_player_get_duration(media->chain[id].handle, &duration);
         break;
 
-    case MEDIATOOL_SESSION:
+    case MEDIATOOL_CONTROLLER:
         ret = media_session_get_duration(media->chain[id].handle, &duration);
         break;
 
@@ -855,7 +963,7 @@ CMD1(prevsong, int, id)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    if (media->chain[id].type != MEDIATOOL_SESSION)
+    if (media->chain[id].type != MEDIATOOL_CONTROLLER)
         return 0;
 
     return media_session_prev_song(media->chain[id].handle);
@@ -866,7 +974,7 @@ CMD1(nextsong, int, id)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    if (media->chain[id].type != MEDIATOOL_SESSION)
+    if (media->chain[id].type != MEDIATOOL_CONTROLLER)
         return 0;
 
     return media_session_next_song(media->chain[id].handle);
@@ -992,25 +1100,6 @@ CMD1(focus_request, string_t, name)
     return 0;
 }
 
-CMD1(focus_abandon, int, id)
-{
-    int ret = -EINVAL;
-
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
-        return -EINVAL;
-
-    if (media->chain[id].type != MEDIATOOL_FOCUS)
-        return 0;
-
-    ret = media_focus_abandon(media->chain[id].handle);
-    if (ret >= 0) {
-        printf("abandon focus ID %d\n", id);
-        media->chain[id].handle = NULL;
-    }
-
-    return ret;
-}
-
 CMD0(quit)
 {
     int i;
@@ -1050,6 +1139,12 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "close",
         mediatool_cmd_close,
         "Destroy player/recorder/session channel (close ID [pending_stop(1/0)])" },
+    { "sregister",
+        mediatool_cmd_session_register,
+        "Register as session channel return ID (sregister policy-phrase)" },
+    { "sunregister",
+        mediatool_cmd_close,
+        "Unregister session channel (sunregister ID)" },
     { "reset",
         mediatool_cmd_reset,
         "Reset player/recorder channel (reset ID)" },
@@ -1132,7 +1227,7 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
         mediatool_cmd_focus_request,
         "Request media focus(request NAME)" },
     { "abandon",
-        mediatool_cmd_focus_abandon,
+        mediatool_cmd_close,
         "Abandon media focus(abandon ID)" },
     { "q",
         mediatool_cmd_quit,

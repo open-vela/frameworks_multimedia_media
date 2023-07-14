@@ -53,25 +53,13 @@ extern "C" {
 #define MEDIA_IS_STATUS_CHANGE(x) ((x) < 200)
 
 /****************************************************************************
- * Media Types
- ****************************************************************************/
-
-typedef struct media_focus_id {
-    int client_id;
-    int stream_type;
-    unsigned int thread_id;
-    int focus_state;
-    media_focus_callback callback_method;
-    void* callback_argv;
-} media_focus_id;
-
-/****************************************************************************
  * Media Functions
  ****************************************************************************/
 
 void* media_get_focus(void);
 void* media_get_graph(void);
 void* media_get_policy(void);
+void* media_get_session(void);
 void* media_get_server(void);
 
 /****************************************************************************
@@ -88,6 +76,15 @@ void media_stub_onreceive(void* cookie,
 /****************************************************************************
  * Focus Functions
  ****************************************************************************/
+
+typedef struct media_focus_id {
+    int client_id;
+    int stream_type;
+    unsigned int thread_id;
+    int focus_state;
+    media_focus_callback callback_method;
+    void* callback_argv;
+} media_focus_id;
 
 void* media_focus_create(void* file);
 int media_focus_destroy(void* handle);
@@ -113,6 +110,13 @@ int media_player_handler(void* handle, const char* target, const char* cmd,
     const char* arg, char* res, int res_len);
 int media_recorder_handler(void* handle, const char* target, const char* cmd,
     const char* arg, char* res, int res_len);
+
+/****************************************************************************
+ * Session Functions
+ ****************************************************************************/
+
+void* media_session_create(void* file);
+int media_session_destroy(void* session);
 int media_session_handler(void* handle, const char* target, const char* cmd,
     const char* arg, char* res, int res_len);
 

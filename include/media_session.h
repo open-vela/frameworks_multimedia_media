@@ -36,11 +36,11 @@ extern "C" {
 #endif
 
 /****************************************************************************
- * Public Functions
+ * Public Controller Functions
  ****************************************************************************/
 
 /**
- * Open one session path.
+ * Open a session path as controller.
  * @param[in] params    Stream type, use MEDIA_STREAM_*.
  * @return Pointer to created handle or NULL on failure.
  */
@@ -164,6 +164,38 @@ int media_session_prev_song(void* handle);
  * implemented by player.
  */
 int media_session_next_song(void* handle);
+
+/****************************************************************************
+ * Public Controllee Functions
+ ****************************************************************************/
+
+/**
+ * Register a session path as player(controllee).
+ * @param[in] cookie    User cookie, will bring back to user when do event_cb.
+ * @param[in] event_cb  Event callback.
+ * @return Pointer to created handle or NULL on failure.
+ */
+void* media_session_register(void* cookie, media_event_callback event_cb);
+
+/**
+ * Unregister the session path.
+ * @param[in] handle    The session path to be destroyed.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_session_unregister(void* handle);
+
+/**
+ * Report event to media sessions as player(controllee).
+ * @note Should only report event that media framework cannot know,
+ * such as MEDIA_EVENT_DONENEXT.
+ * @param[in] handle    The session path.
+ * @param[in] event     Event, use MEDIA_EVENT_*.
+ * @param[in] result    Exec result.
+ * @param[in] extra     Extra message.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_session_notify(void* handle, int event,
+    int result, const char* extra);
 
 #undef EXTERN
 #ifdef __cplusplus
