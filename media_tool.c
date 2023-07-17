@@ -1018,7 +1018,7 @@ CMD0(quit)
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
         if (media->chain[i].handle)
-            mediatool_cmd_close(media, i, 0);
+            mediatool_cmd_close_exec(media, i, 0);
     }
 
     return 0;
