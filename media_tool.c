@@ -374,7 +374,6 @@ CMD2(close, int, id, int, pending_stop)
 
     switch (media->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        mediatool_common_stop_inner(&media->chain[id]);
         ret = media_player_close(media->chain[id].handle, pending_stop);
         break;
 
