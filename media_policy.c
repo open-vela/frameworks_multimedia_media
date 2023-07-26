@@ -149,7 +149,7 @@ static void pfw_load_criterion(const char* name, int32_t* state)
 static void pfw_save_criterion(const char* name, int32_t state)
 {
     if (!strncmp(name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
-        property_set_int32(name, state);
+        property_set_int32_oneway(name, state);
 }
 
 /****************************************************************************
