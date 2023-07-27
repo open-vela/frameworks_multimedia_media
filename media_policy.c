@@ -156,42 +156,42 @@ static void pfw_save_criterion(const char* name, int32_t state)
  * Public Functions
  ****************************************************************************/
 
-int media_policy_handler(void* handle, const char* name, const char* cmd,
+int media_policy_handler(void* policy, const char* name, const char* cmd,
     const char* value, int apply, char* res, int res_len)
 {
     int ret = -ENOSYS, tmp;
     char* dump;
 
     if (!strcmp(cmd, "set_int")) {
-        ret = pfw_setint(handle, name, atoi(value));
+        ret = pfw_setint(policy, name, atoi(value));
     } else if (!strcmp(cmd, "increase")) {
-        ret = pfw_increase(handle, name);
+        ret = pfw_increase(policy, name);
     } else if (!strcmp(cmd, "decrease")) {
-        ret = pfw_decrease(handle, name);
+        ret = pfw_decrease(policy, name);
     } else if (!strcmp(cmd, "set_string")) {
-        ret = pfw_setstring(handle, name, value);
+        ret = pfw_setstring(policy, name, value);
     } else if (!strcmp(cmd, "include")) {
-        ret = pfw_include(handle, name, value);
+        ret = pfw_include(policy, name, value);
     } else if (!strcmp(cmd, "exclude")) {
-        ret = pfw_exclude(handle, name, value);
+        ret = pfw_exclude(policy, name, value);
     } else if (!strcmp(cmd, "contain")) {
-        ret = pfw_contain(handle, name, value, &tmp);
+        ret = pfw_contain(policy, name, value, &tmp);
         if (ret >= 0)
             return snprintf(res, res_len, "%d", tmp);
     } else if (!strcmp(cmd, "get_int")) {
-        ret = pfw_getint(handle, name, &tmp);
+        ret = pfw_getint(policy, name, &tmp);
         if (ret >= 0)
             return snprintf(res, res_len, "%d", tmp);
     } else if (!strcmp(cmd, "get_string")) {
-        ret = pfw_getstring(handle, name, res, res_len);
+        ret = pfw_getstring(policy, name, res, res_len);
         if (ret >= 0)
             return 0;
     } else if (!strcmp(cmd, "get_parameter")) {
-        ret = pfw_getparameter(handle, name, res, res_len);
+        ret = pfw_getparameter(policy, name, res, res_len);
         if (ret >= 0)
             return 0;
     } else if (!strcmp(cmd, "dump")) {
-        dump = pfw_dump(handle);
+        dump = pfw_dump(policy);
         syslog(LOG_INFO, "\n%s", dump);
         free(dump);
         return 0;
@@ -201,30 +201,30 @@ int media_policy_handler(void* handle, const char* name, const char* cmd,
         return ret;
 
     if (apply)
-        pfw_apply(handle);
+        pfw_apply(policy);
 
     return 0;
 }
 
-int media_policy_destroy(void* handle)
+int media_policy_destroy(void* policy)
 {
-    pfw_destroy(handle);
+    pfw_destroy(policy);
     return 0;
 }
 
 void* media_policy_create(void* params)
 {
     const char** paths = params;
-    void* handle;
+    void* policy;
 
     if (!params)
         return NULL;
 
-    handle = pfw_create(paths[0], paths[1], g_media_policy_plugins,
+    policy = pfw_create(paths[0], paths[1], g_media_policy_plugins,
         g_media_policy_nb_plugins, pfw_load_criterion, pfw_save_criterion);
-    if (!handle)
+    if (!policy)
         return NULL;
 
-    pfw_apply(handle);
-    return handle;
+    pfw_apply(policy);
+    return policy;
 }

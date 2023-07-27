@@ -224,12 +224,12 @@ int media_session_destroy(void* session)
     return 0;
 }
 
-int media_session_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char* res, int res_len)
+int media_session_handler(void* session, void* handle, const char* target,
+    const char* cmd, const char* arg, char* res, int res_len)
 {
-    MediaSessionPriv* priv = media_get_session();
     MediaControllerPriv* controller = handle;
     MediaControlleePriv* controllee = handle;
+    MediaSessionPriv* priv = session;
     int event, result;
 
     /* Controllee methods. */
