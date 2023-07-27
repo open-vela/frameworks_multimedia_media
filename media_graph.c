@@ -209,15 +209,10 @@ out:
     return ret;
 }
 
-static int media_graph_queue_command(AVFilterContext* filter,
+static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filter,
     const char* cmd, const char* arg, char* res, int res_len, int flags)
 {
-    MediaGraphPriv* priv;
     MediaCommand* tmp;
-
-    priv = media_get_graph();
-    if (!priv)
-        return -EINVAL;
 
     if (res && res_len > 0)
         return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
@@ -264,15 +259,10 @@ err1:
     return -ENOMEM;
 }
 
-static int media_graph_dequeue_command(bool process)
+static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 {
-    MediaGraphPriv* priv;
     MediaCommand* tmp;
     int ret = 0;
-
-    priv = media_get_graph();
-    if (!priv)
-        return -EINVAL;
 
     tmp = priv->cmdhead;
     if (!tmp)
@@ -299,19 +289,15 @@ static int media_graph_dequeue_command(bool process)
     return ret;
 }
 
-static void* media_find_filter(const char* prefix, bool input, bool available)
+static void* media_find_filter(MediaGraphPriv* priv, const char* prefix,
+    bool input, bool available)
 {
     AVFilterContext* filter = NULL;
-    MediaGraphPriv* media;
     char name[64];
     int i, j;
 
-    media = media_get_graph();
-    if (!media || !media->graph)
-        return NULL;
-
-    for (i = 0; i < media->graph->nb_filters; i++) {
-        filter = media->graph->filters[i];
+    for (i = 0; i < priv->graph->nb_filters; i++) {
+        filter = priv->graph->filters[i];
 
         if (!available || !filter->opaque) {
             if (!prefix) {
@@ -342,92 +328,94 @@ static void* media_find_filter(const char* prefix, bool input, bool available)
 static void media_common_notify_cb(void* cookie, int event,
     int result, const char* extra)
 {
-    MediaFilterPriv* priv = cookie;
+    MediaFilterPriv* ctx = cookie;
 
-    if (priv->event)
-        media_stub_notify_event(priv->cookie, event, result, extra);
+    if (ctx->event)
+        media_stub_notify_event(ctx->cookie, event, result, extra);
 }
 
 static void media_common_event_cb(void* cookie, int event,
     int result, const char* extra)
 {
-    MediaFilterPriv* priv = cookie;
+    MediaFilterPriv* ctx = cookie;
 
     switch (event) {
     case AVMOVIE_ASYNC_EVENT_STARTED:
         if (result == 0)
-            media_policy_set_stream_status(priv->filter->name, true);
+            media_policy_set_stream_status(ctx->filter->name, true);
         break;
 
     case AVMOVIE_ASYNC_EVENT_PAUSED:
     case AVMOVIE_ASYNC_EVENT_STOPPED:
     case AVMOVIE_ASYNC_EVENT_COMPLETED:
-        media_policy_set_stream_status(priv->filter->name, false);
+        media_policy_set_stream_status(ctx->filter->name, false);
         break;
 
     case AVMOVIE_ASYNC_EVENT_CLOSED:
-        media_policy_set_stream_status(priv->filter->name, false);
-        media_stub_notify_finalize(&priv->cookie);
-        priv->filter->opaque = NULL;
-        free(priv);
+        media_policy_set_stream_status(ctx->filter->name, false);
+        media_stub_notify_finalize(&ctx->cookie);
+        ctx->filter->opaque = NULL;
+        free(ctx);
         return;
     }
 
-    media_common_notify_cb(priv, event, result, extra);
+    media_common_notify_cb(ctx, event, result, extra);
 }
 
-static void* media_common_open(const char* arg, void* cookie, bool player)
+static MediaFilterPriv* media_common_open(MediaGraphPriv* priv,
+    const char* arg, void* cookie, bool player)
 {
     AVMovieAsyncEventCookie event;
-    MediaFilterPriv* priv;
+    MediaFilterPriv* ctx;
 
-    priv = zalloc(sizeof(MediaFilterPriv));
-    if (!priv)
+    ctx = zalloc(sizeof(MediaFilterPriv));
+    if (!ctx)
         return NULL;
 
-    priv->filter = media_find_filter(arg, player, true);
-    if (!priv->filter)
+    ctx->filter = media_find_filter(priv, arg, player, true);
+    if (!ctx->filter)
         goto err;
 
     /* Launch filter worker thread. */
-    if (avfilter_process_command(priv->filter, "open", NULL, NULL, 0, 0) < 0)
+    if (avfilter_process_command(ctx->filter, "open", NULL, NULL, 0, 0) < 0)
         goto err;
 
-    event.cookie = priv;
+    event.cookie = ctx;
     event.event = media_common_event_cb;
 
-    if (avfilter_process_command(priv->filter, "set_event", (const char*)&event, NULL, 0, 0) < 0) {
-        avfilter_process_command(priv->filter, "close", NULL, NULL, 0, 0);
+    if (avfilter_process_command(ctx->filter, "set_event", (const char*)&event, NULL, 0, 0) < 0) {
+        avfilter_process_command(ctx->filter, "close", NULL, NULL, 0, 0);
         goto err;
     }
 
-    priv->cookie = cookie;
-    priv->filter->opaque = priv;
+    ctx->cookie = cookie;
+    ctx->filter->opaque = ctx;
 
-    return priv;
+    return ctx;
 
 err:
-    free(priv);
+    free(ctx);
     return NULL;
 }
 
-static int media_common_handler(void* handle, const char* target, const char* cmd,
-    const char* arg, char* res, int res_len, bool player)
+static int media_common_handler(MediaGraphPriv* priv, void* handle,
+    const char* target, const char* cmd, const char* arg,
+    char* res, int res_len, bool player)
 {
-    MediaFilterPriv* priv = handle;
+    MediaFilterPriv* ctx = handle;
     AVFilterContext* filter;
     int pending;
 
     if (!strcmp(cmd, "open")) {
-        priv = media_common_open(arg, handle, player);
-        if (!priv)
+        ctx = media_common_open(priv, arg, handle, player);
+        if (!ctx)
             return -EINVAL;
 
-        return snprintf(res, res_len, "%llu", (uint64_t)(uintptr_t)priv);
+        return snprintf(res, res_len, "%llu", (uint64_t)(uintptr_t)ctx);
     }
 
     if (!strcmp(cmd, "set_event")) {
-        priv->event = true;
+        ctx->event = true;
 
         return 0;
     }
@@ -435,17 +423,17 @@ static int media_common_handler(void* handle, const char* target, const char* cm
     if (!strcmp(cmd, "close")) {
         sscanf(arg, "%d", &pending);
         if (!pending)
-            media_stub_notify_finalize(&priv->cookie);
+            media_stub_notify_finalize(&ctx->cookie);
     }
 
     if (target) {
-        filter = avfilter_find_on_link(priv->filter, target, NULL, player, NULL);
+        filter = avfilter_find_on_link(ctx->filter, target, NULL, player, NULL);
         if (!filter)
             return -EINVAL;
     } else
-        filter = priv->filter;
+        filter = ctx->filter;
 
-    return media_graph_queue_command(filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
+    return media_graph_queue_command(priv, filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
 }
 
 /****************************************************************************
@@ -485,16 +473,13 @@ err:
     return NULL;
 }
 
-int media_graph_destroy(void* handle)
+int media_graph_destroy(void* graph)
 {
-    MediaGraphPriv* priv = handle;
+    MediaGraphPriv* priv = graph;
     int ret;
 
-    if (!priv || !priv->graph)
-        return -EINVAL;
-
     do {
-        ret = media_graph_dequeue_command(false);
+        ret = media_graph_dequeue_command(priv, false);
     } while (ret >= 0);
 
     avfilter_graph_free(&priv->graph);
@@ -503,13 +488,13 @@ int media_graph_destroy(void* handle)
     return 0;
 }
 
-int media_graph_get_pollfds(void* handle, struct pollfd* fds,
+int media_graph_get_pollfds(void* graph, struct pollfd* fds,
     void** cookies, int count)
 {
-    MediaGraphPriv* priv = handle;
+    MediaGraphPriv* priv = graph;
     int ret, nfd, i;
 
-    if (!priv || !priv->graph || !fds || count < 2)
+    if (!fds || count < 2)
         return -EINVAL;
 
     fds[0].fd = priv->fd;
@@ -536,12 +521,12 @@ int media_graph_get_pollfds(void* handle, struct pollfd* fds,
     return nfd;
 }
 
-int media_graph_poll_available(void* handle, struct pollfd* fd, void* cookie)
+int media_graph_poll_available(void* graph, struct pollfd* fd, void* cookie)
 {
-    MediaGraphPriv* priv = handle;
+    MediaGraphPriv* priv = graph;
     eventfd_t unuse;
 
-    if (!priv || !priv->graph || !fd)
+    if (!fd)
         return -EINVAL;
 
     if (cookie)
@@ -554,34 +539,28 @@ int media_graph_poll_available(void* handle, struct pollfd* fd, void* cookie)
     return 0;
 }
 
-int media_graph_run_once(void* handle)
+int media_graph_run_once(void* graph)
 {
-    MediaGraphPriv* priv = handle;
+    MediaGraphPriv* priv = graph;
     int ret;
-
-    if (!priv || !priv->graph)
-        return -EINVAL;
 
     ret = ff_filter_graph_run_all(priv->graph);
     if (ret < 0)
         return ret;
 
     do {
-        ret = media_graph_dequeue_command(true);
+        ret = media_graph_dequeue_command(priv, true);
     } while (ret >= 0);
 
     return ret == -EAGAIN ? 0 : ret;
 }
 
-int media_graph_handler(void* handle, const char* target, const char* cmd,
+int media_graph_handler(void* graph, const char* target, const char* cmd,
     const char* arg, char* res, int res_len)
 {
-    MediaGraphPriv* priv = handle;
+    MediaGraphPriv* priv = graph;
     int i, ret = 0;
     char* dump;
-
-    if (!priv || !priv->graph)
-        return -EINVAL;
 
     if (!strcmp(cmd, "dump")) {
         dump = avfilter_graph_dump_ext(priv->graph, arg);
@@ -602,12 +581,12 @@ int media_graph_handler(void* handle, const char* target, const char* cmd,
         AVFilterContext* filter = priv->graph->filters[i];
 
         if (!strcmp(target, filter->name))
-            ret = media_graph_queue_command(filter, cmd, arg, res, res_len, 0);
+            ret = media_graph_queue_command(priv, filter, cmd, arg, res, res_len, 0);
         else {
             const char* tmp = strchr(filter->name, '@');
 
             if (tmp && !strncmp(tmp + 1, target, strlen(target)))
-                ret = media_graph_queue_command(filter, cmd, arg, res, res_len, 0);
+                ret = media_graph_queue_command(priv, filter, cmd, arg, res, res_len, 0);
         }
 
         if (ret < 0)
@@ -617,14 +596,14 @@ int media_graph_handler(void* handle, const char* target, const char* cmd,
     return 0;
 }
 
-int media_player_handler(void* handle, const char* target, const char* cmd,
+int media_player_handler(void* graph, void* handle, const char* target, const char* cmd,
     const char* arg, char* res, int res_len)
 {
-    return media_common_handler(handle, target, cmd, arg, res, res_len, true);
+    return media_common_handler(graph, handle, target, cmd, arg, res, res_len, true);
 }
 
-int media_recorder_handler(void* handle, const char* target, const char* cmd,
+int media_recorder_handler(void* graph, void* handle, const char* target, const char* cmd,
     const char* arg, char* res, int res_len)
 {
-    return media_common_handler(handle, target, cmd, arg, res, res_len, false);
+    return media_common_handler(graph, handle, target, cmd, arg, res, res_len, false);
 }
