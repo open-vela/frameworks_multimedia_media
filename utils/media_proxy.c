@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_client.c
+ * frameworks/media/utils/media_proxy.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -22,46 +22,52 @@
  * Included Files
  ****************************************************************************/
 
+#include <assert.h>
 #include <netpacket/rpmsg.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <syslog.h>
 
-#include "media_client.h"
-#include "media_internal.h"
+#include "media_proxy.h"
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
 
-struct media_client_priv {
+typedef struct MediaClientPriv {
     int fd;
     int listenfd;
     pthread_t thread;
     pthread_mutex_t mutex;
     void* event_cookie;
     void* release_cookie;
-    media_client_event_cb event_cb;
-    media_client_release_cb release_cb;
+    media_proxy_event_cb event_cb;
+    media_proxy_release_cb release_cb;
     atomic_int refs;
-};
+} MediaClientPriv;
+
+typedef struct MediaProxyPriv {
+    MEDIA_COMMON_FIELDS
+} MediaProxyPriv;
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-static void media_client_ref(void* handle)
+static void media_proxy_ref(void* handle)
 {
-    struct media_client_priv* priv = handle;
+    MediaClientPriv* priv = handle;
 
     atomic_fetch_add(&priv->refs, 1);
 }
 
-static void media_client_unref(void* handle)
+static void media_proxy_unref(void* handle)
 {
-    struct media_client_priv* priv = handle;
+    MediaClientPriv* priv = handle;
 
     if (atomic_fetch_sub(&priv->refs, 1) == 1) {
         if (priv->release_cb)
@@ -72,7 +78,7 @@ static void media_client_unref(void* handle)
     }
 }
 
-static void media_client_get_sockaddr(int* family, socklen_t* len, void* addr,
+static void media_proxy_get_sockaddr(int* family, socklen_t* len, void* addr,
     const char* cpu, const char* key)
 {
     if (!strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME)) {
@@ -93,7 +99,7 @@ static void media_client_get_sockaddr(int* family, socklen_t* len, void* addr,
     }
 }
 
-static int media_client_create_listenfd(struct media_client_priv* priv, const char* cpu)
+static int media_proxy_create_listenfd(MediaClientPriv* priv, const char* cpu)
 {
     struct sockaddr_storage addr;
     socklen_t socklen;
@@ -103,7 +109,7 @@ static int media_client_create_listenfd(struct media_client_priv* priv, const ch
     int ret;
 
     sprintf(key, "md_%p", priv);
-    media_client_get_sockaddr(&family, &socklen, &addr, cpu, key);
+    media_proxy_get_sockaddr(&family, &socklen, &addr, cpu, key);
 
     priv->listenfd = socket(family, SOCK_STREAM, 0);
     if (priv->listenfd < 0)
@@ -130,9 +136,9 @@ err:
     return ret;
 }
 
-static void* media_client_listen_thread(pthread_addr_t pvarg)
+static void* media_proxy_listen_thread(pthread_addr_t pvarg)
 {
-    struct media_client_priv* priv = pvarg;
+    MediaClientPriv* priv = pvarg;
     media_parcel parcel;
     uint32_t code;
     int acceptfd;
@@ -163,7 +169,7 @@ static void* media_client_listen_thread(pthread_addr_t pvarg)
 
 thread_error:
     close(priv->listenfd);
-    media_client_unref(priv);
+    media_proxy_unref(priv);
     return NULL;
 }
 
@@ -171,20 +177,20 @@ thread_error:
  * Public Functions
  ****************************************************************************/
 
-void* media_client_connect(const char* cpu)
+void* media_proxy_connect(const char* cpu)
 {
-    struct media_client_priv* priv;
+    MediaClientPriv* priv;
     struct sockaddr_storage addr;
     socklen_t len;
     char key[32];
     int family;
 
-    priv = zalloc(sizeof(struct media_client_priv));
+    priv = zalloc(sizeof(MediaClientPriv));
     if (priv == NULL)
         return NULL;
 
     snprintf(key, sizeof(key), MEDIA_SOCKADDR_NAME, cpu);
-    media_client_get_sockaddr(&family, &len, &addr, cpu, key);
+    media_proxy_get_sockaddr(&family, &len, &addr, cpu, key);
     priv->fd = socket(family, SOCK_STREAM, 0);
     if (priv->fd <= 0)
         goto socket_error;
@@ -203,9 +209,9 @@ socket_error:
     return NULL;
 }
 
-int media_client_disconnect(void* handle)
+int media_proxy_disconnect(void* handle)
 {
-    struct media_client_priv* priv = handle;
+    MediaClientPriv* priv = handle;
     int ret;
 
     if (priv == NULL)
@@ -218,15 +224,15 @@ int media_client_disconnect(void* handle)
     if (priv->fd > 0) {
         close(priv->fd);
         priv->fd = 0;
-        media_client_unref(handle);
+        media_proxy_unref(handle);
     }
 
     return 0;
 }
 
-int media_client_send(void* handle, media_parcel* in)
+int media_proxy_send(void* handle, media_parcel* in)
 {
-    struct media_client_priv* priv = handle;
+    MediaClientPriv* priv = handle;
     int ret;
 
     if (priv == NULL || in == NULL)
@@ -240,9 +246,9 @@ int media_client_send(void* handle, media_parcel* in)
     return ret;
 }
 
-int media_client_send_with_ack(void* handle, media_parcel* in, media_parcel* out)
+int media_proxy_send_with_ack(void* handle, media_parcel* in, media_parcel* out)
 {
-    struct media_client_priv* priv = handle;
+    MediaClientPriv* priv = handle;
     int ret;
 
     if (priv == NULL || in == NULL || out == NULL)
@@ -267,9 +273,9 @@ out:
     return ret;
 }
 
-int media_client_set_event_cb(void* handle, const char* cpu, void* event_cb, void* cookie)
+int media_proxy_set_event_cb(void* handle, const char* cpu, void* event_cb, void* cookie)
 {
-    struct media_client_priv* priv = handle;
+    MediaClientPriv* priv = handle;
     struct sched_param param;
     pthread_attr_t pattr;
     int ret;
@@ -286,22 +292,22 @@ int media_client_set_event_cb(void* handle, const char* cpu, void* event_cb, voi
         return 0;
     }
 
-    ret = media_client_create_listenfd(priv, cpu);
+    ret = media_proxy_create_listenfd(priv, cpu);
     if (ret < 0) {
         pthread_mutex_unlock(&priv->mutex);
         return ret;
     }
 
-    media_client_ref(handle);
+    media_proxy_ref(handle);
 
     pthread_attr_init(&pattr);
-    pthread_attr_setstacksize(&pattr, CONFIG_MEDIA_CLIENT_LISTEN_STACKSIZE);
-    param.sched_priority = CONFIG_MEDIA_CLIENT_LISTEN_PRIORITY;
+    pthread_attr_setstacksize(&pattr, CONFIG_MEDIA_PROXY_LISTEN_STACKSIZE);
+    param.sched_priority = CONFIG_MEDIA_PROXY_LISTEN_PRIORITY;
     pthread_attr_setschedparam(&pattr, &param);
-    ret = pthread_create(&priv->thread, &pattr, media_client_listen_thread, (pthread_addr_t)priv);
+    ret = pthread_create(&priv->thread, &pattr, media_proxy_listen_thread, (pthread_addr_t)priv);
     if (ret < 0) {
         close(priv->listenfd);
-        media_client_unref(handle);
+        media_proxy_unref(handle);
     }
 
     pthread_attr_destroy(&pattr);
@@ -310,9 +316,9 @@ int media_client_set_event_cb(void* handle, const char* cpu, void* event_cb, voi
     return ret;
 }
 
-int media_client_set_release_cb(void* handle, void* release_cb, void* cookie)
+int media_proxy_set_release_cb(void* handle, void* release_cb, void* cookie)
 {
-    struct media_client_priv* priv = handle;
+    MediaClientPriv* priv = handle;
 
     if (priv == NULL || release_cb == NULL)
         return -EINVAL;
@@ -323,7 +329,7 @@ int media_client_set_release_cb(void* handle, void* release_cb, void* cookie)
     return 0;
 }
 
-int media_client_send_recieve(void* handle, const char* in_fmt, const char* out_fmt, ...)
+int media_proxy_send_recieve(void* handle, const char* in_fmt, const char* out_fmt, ...)
 {
     media_parcel in, out;
     va_list ap;
@@ -337,7 +343,7 @@ int media_client_send_recieve(void* handle, const char* in_fmt, const char* out_
     if (ret < 0)
         goto out;
 
-    ret = media_client_send_with_ack(handle, &in, &out);
+    ret = media_proxy_send_with_ack(handle, &in, &out);
     if (ret < 0)
         goto out;
 
@@ -349,4 +355,161 @@ out:
 
     va_end(ap);
     return ret;
+}
+
+int media_proxy_once(void* handle, const char* target, const char* cmd,
+    const char* arg, int apply, char* res, int res_len)
+{
+    MediaProxyPriv* priv = handle;
+    media_parcel in, out;
+    const char* response;
+    int ret = -EINVAL;
+    int32_t resp = 0;
+    const char* name;
+
+    if (!priv || !priv->proxy)
+        return ret;
+
+    media_parcel_init(&in);
+    media_parcel_init(&out);
+
+    switch (priv->type) {
+    case MEDIA_ID_FOCUS:
+        name = "focus";
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%i", priv->type,
+            priv->handle, target, cmd, res_len);
+        break;
+
+    case MEDIA_ID_GRAPH:
+        name = "graph";
+        ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
+            target, cmd, arg, res_len);
+        break;
+
+    case MEDIA_ID_POLICY:
+        name = "policy";
+        ret = media_parcel_append_printf(&in, "%i%s%s%s%i%i", priv->type,
+            target, cmd, arg, apply, res_len);
+        break;
+
+    case MEDIA_ID_PLAYER:
+        name = "player";
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
+            priv->handle, target, cmd, arg, res_len);
+        break;
+
+    case MEDIA_ID_RECORDER:
+        name = "recorder";
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
+            priv->handle, target, cmd, arg, res_len);
+        break;
+
+    case MEDIA_ID_SESSION:
+        name = "session";
+        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
+            priv->handle, target, cmd, arg, res_len);
+        break;
+
+    default:
+        name = "none";
+        goto out;
+    }
+
+    if (ret < 0)
+        goto out;
+
+    ret = media_proxy_send_with_ack(priv->proxy, &in, &out);
+    if (ret < 0)
+        goto out;
+
+    ret = media_parcel_read_scanf(&out, "%i%s", &resp, &response);
+    if (ret < 0 || resp < 0)
+        goto out;
+
+    if (res_len > 0)
+        strlcpy(res, response, res_len);
+    else if (response && strlen(response) > 0)
+        syslog(LOG_INFO, "\n%s\n", response);
+
+out:
+    media_parcel_deinit(&in);
+    media_parcel_deinit(&out);
+
+    syslog(LOG_INFO, "%s:%s:%p %s %s %s %s ret:%d resp:%d\n",
+        name, priv->cpu, (void*)(uintptr_t)priv->handle, target ? target : "_",
+        cmd, arg ? arg : "_", apply ? "apply" : "_", ret, (int)resp);
+    return ret < 0 ? ret : resp;
+}
+
+int media_proxy(int id, void* handle, const char* target, const char* cmd,
+    const char* arg, int apply, char* res, int res_len, bool remote)
+{
+    MediaProxyPriv *priv, priv_ = { 0 };
+    char *saveptr, *cpu;
+    int ret = -ENOSYS;
+    char tmp[128];
+
+    priv = handle ? handle : &priv_;
+    priv->type = id;
+
+    if (priv->proxy)
+        return media_proxy_once(priv, target, cmd, arg, apply, res, res_len);
+
+    strlcpy(tmp, CONFIG_MEDIA_SERVER_CPUNAME, sizeof(tmp));
+    for (cpu = strtok_r(tmp, " ,;|", &saveptr); cpu;
+         cpu = strtok_r(NULL, " ,;|", &saveptr)) {
+        if (remote && !strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME))
+            continue;
+
+        priv->proxy = media_proxy_connect(cpu);
+        if (!priv->proxy)
+            continue;
+
+        priv->cpu = cpu;
+        ret = media_proxy_once(priv, target, cmd, arg, apply, res, res_len);
+        switch (id) {
+        case MEDIA_ID_GRAPH:
+            media_proxy_disconnect(priv->proxy);
+            ret = 0;
+            break;
+
+        case MEDIA_ID_POLICY:
+            media_proxy_disconnect(priv->proxy);
+            if (ret != -ENOSYS)
+                return ret; // return once found policy
+
+            break;
+
+        case MEDIA_ID_FOCUS:
+        case MEDIA_ID_PLAYER:
+        case MEDIA_ID_RECORDER:
+        case MEDIA_ID_SESSION:
+            if (ret < 0) {
+                media_proxy_disconnect(priv->proxy);
+                break;
+            }
+
+            /* keep the connection in need. */
+
+            if (handle) {
+                priv->cpu = strdup(cpu);
+                DEBUGASSERT(priv->cpu);
+            } else
+                media_proxy_disconnect(priv->proxy);
+
+            return 0;
+        }
+    }
+
+    priv->proxy = NULL;
+    priv->cpu = NULL;
+    return ret;
+}
+
+void media_default_release_cb(void* handle)
+{
+    MediaProxyPriv* priv = handle;
+
+    free(priv->cpu);
+    free(priv);
 }

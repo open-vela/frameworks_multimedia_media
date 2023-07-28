@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_policy.c
+ * frameworks/media/server/media_policy.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -33,7 +33,8 @@
 #include <sys/ioctl.h>
 #include <syslog.h>
 
-#include "media_internal.h"
+#include "media_proxy.h"
+#include "media_server.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -45,8 +46,8 @@
  * Private Functions Prototype
  ****************************************************************************/
 
-void pfw_ffmpeg_command_callback(void* cookie, const char* params);
-void pfw_set_parameter_callback(void* cookie, const char* params);
+static void pfw_ffmpeg_command_callback(void* cookie, const char* params);
+static void pfw_set_parameter_callback(void* cookie, const char* params);
 
 /****************************************************************************
  * Private Data
@@ -64,7 +65,15 @@ static const size_t g_media_policy_nb_plugins = sizeof(g_media_policy_plugins)
  * Private Functions
  ****************************************************************************/
 
-void pfw_ffmpeg_command_callback(void* cookie, const char* params)
+static void policy_process_command(const char* target, const char* cmd, const char* arg)
+{
+#ifdef CONFIG_LIB_FFMPEG
+    media_graph_handler(media_get_graph(), target, cmd, arg, NULL, 0);
+#endif
+    media_proxy(MEDIA_ID_GRAPH, NULL, target, cmd, arg, 0, NULL, 0, true);
+}
+
+static void pfw_ffmpeg_command_callback(void* cookie, const char* params)
 {
     char *target, *cmd, *arg, *outptr, *inptr, *str;
 
@@ -89,7 +98,7 @@ void pfw_ffmpeg_command_callback(void* cookie, const char* params)
             goto out;
 
         arg = strtok_r(NULL, ",", &inptr);
-        media_policy_process_command(target, cmd, arg);
+        policy_process_command(target, cmd, arg);
 
         target = strtok_r(NULL, ";", &outptr);
     }
@@ -98,7 +107,7 @@ out:
     free(str);
 }
 
-void pfw_set_parameter_callback(void* cookie, const char* params)
+static void pfw_set_parameter_callback(void* cookie, const char* params)
 {
     char *target, *arg, *outptr, *saveptr, *str;
     int fd = 0;

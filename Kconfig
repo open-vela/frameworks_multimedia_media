@@ -67,12 +67,12 @@ config MEDIA_TOOL_PRIORITY
 
 endif # MEDIA_TOOL
 
-config MEDIA_CLIENT_LISTEN_STACKSIZE
-	int "Media client listen thread stack size"
+config MEDIA_PROXY_LISTEN_STACKSIZE
+	int "Media proxy listen thread stack size"
 	default 4096
 
-config MEDIA_CLIENT_LISTEN_PRIORITY
-	int "Media client listen thread priority"
+config MEDIA_PROXY_LISTEN_PRIORITY
+	int "Media proxy listen thread priority"
 	default 100
 
 endif # MEDIA

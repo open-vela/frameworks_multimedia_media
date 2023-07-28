@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_server.c
+ * frameworks/media/server/media_server.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -31,7 +31,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "media_internal.h"
+#include "media_proxy.h"
 #include "media_server.h"
 
 /****************************************************************************

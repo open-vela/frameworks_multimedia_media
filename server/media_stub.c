@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_stub.c
+ * frameworks/media/server/media_stub.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <malloc.h>
 
-#include "media_internal.h"
+#include "media_proxy.h"
 #include "media_server.h"
 
 /****************************************************************************

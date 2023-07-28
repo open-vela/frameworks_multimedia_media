@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/meida_parcel.h
+ * frameworks/media/utils/meida_parcel.h
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,8 +18,8 @@
  *
  ****************************************************************************/
 
-#ifndef __FRAMEWORKS_MEDIA_MEDIA_PARCEL_H
-#define __FRAMEWORKS_MEDIA_MEDIA_PARCEL_H
+#ifndef __FRAMEWORKS_MEDIA_UTILS_MEDIA_PARCEL_H
+#define __FRAMEWORKS_MEDIA_UTILS_MEDIA_PARCEL_H
 
 #include <stdarg.h>
 #include <stdint.h>
