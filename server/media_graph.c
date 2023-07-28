@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_graph.c
+ * frameworks/media/server/media_graph.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -40,7 +40,8 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "media_internal.h"
+#include "media_proxy.h"
+#include "media_server.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -289,6 +290,28 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
     return ret;
 }
 
+static int media_get_stream_name(const char* stream, char* name, int len)
+{
+#ifdef CONFIG_LIB_PFW
+    return media_policy_handler(media_get_policy(), stream, "get_string", NULL, 0, name, len);
+#else
+    return media_proxy(MEDIA_ID_POLICY, NULL, stream, "get_string", NULL, 0, name, len, true);
+#endif
+}
+
+static int media_set_stream_status(const char* name, bool active)
+{
+    const char* cmd = active ? "include" : "exclude";
+
+    name = strchr(name, '@') + 1;
+
+#ifdef CONFIG_LIB_PFW
+    return media_policy_handler(media_get_policy(), "ActiveStreams", cmd, name, 1, NULL, 0);
+#else
+    return media_proxy(MEDIA_ID_POLICY, NULL, "ActiveStreams", cmd, name, 1, NULL, 0, true);
+#endif
+}
+
 static void* media_find_filter(MediaGraphPriv* priv, const char* prefix,
     bool input, bool available)
 {
@@ -313,7 +336,7 @@ static void* media_find_filter(MediaGraphPriv* priv, const char* prefix,
                 }
             } else {
                 // policy might do mapping (e.g. "Music" => "amovie_async@Music")
-                if (0 == media_policy_get_stream_name(prefix, name, sizeof(name)))
+                if (0 == media_get_stream_name(prefix, name, sizeof(name)))
                     prefix = name;
 
                 if (!strncmp(filter->name, prefix, strlen(prefix)))
@@ -342,17 +365,17 @@ static void media_common_event_cb(void* cookie, int event,
     switch (event) {
     case AVMOVIE_ASYNC_EVENT_STARTED:
         if (result == 0)
-            media_policy_set_stream_status(ctx->filter->name, true);
+            media_set_stream_status(ctx->filter->name, true);
         break;
 
     case AVMOVIE_ASYNC_EVENT_PAUSED:
     case AVMOVIE_ASYNC_EVENT_STOPPED:
     case AVMOVIE_ASYNC_EVENT_COMPLETED:
-        media_policy_set_stream_status(ctx->filter->name, false);
+        media_set_stream_status(ctx->filter->name, false);
         break;
 
     case AVMOVIE_ASYNC_EVENT_CLOSED:
-        media_policy_set_stream_status(ctx->filter->name, false);
+        media_set_stream_status(ctx->filter->name, false);
         media_stub_notify_finalize(&ctx->cookie);
         ctx->filter->opaque = NULL;
         free(ctx);

@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_daemon.c
+ * frameworks/media/server/media_daemon.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -30,7 +30,6 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "media_internal.h"
 #include "media_server.h"
 
 /****************************************************************************

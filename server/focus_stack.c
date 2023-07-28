@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/focus_stack.c
+ * frameworks/media/server/focus_stack.c
  *
  * Copyright (C) 2020 Xiaomi Corporation
  *
