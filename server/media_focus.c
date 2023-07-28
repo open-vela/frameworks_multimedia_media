@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_focus.c
+ * frameworks/media/server/media_focus.c
  *
  * Copyright (C) 2020 Xiaomi Corporation
  *
@@ -30,8 +30,7 @@
 #include <string.h>
 
 #include "focus_stack.h"
-#include "media_internal.h"
-#include "media_wrapper.h"
+#include "media_server.h"
 
 /****************************************************************************
  * Pre-processor Definitions

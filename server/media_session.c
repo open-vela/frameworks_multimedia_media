@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_session.c
+ * frameworks/media/server/media_session.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <sys/queue.h>
 
-#include "media_internal.h"
+#include "media_server.h"
 
 /****************************************************************************
  * Private Types

@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_internal.h
+ * frameworks/media/media_server.h
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,39 +18,18 @@
  *
  ****************************************************************************/
 
-#ifndef FRAMEWORKS_MEDIA_MEDIA_INTERNAL_H
-#define FRAMEWORKS_MEDIA_MEDIA_INTERNAL_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/****************************************************************************
- * Included Files
- ****************************************************************************/
+#ifndef __FRAMEWORKS_MEDIA_MEDIA_SERVER_H__
+#define __FRAMEWORKS_MEDIA_MEDIA_SERVER_H__
 
 #include <media_event.h>
 #include <media_focus.h>
 #include <poll.h>
 
-/****************************************************************************
- * Media Definations
- ****************************************************************************/
+#include "media_parcel.h"
 
-#define MEDIA_ID_GRAPH 1
-#define MEDIA_ID_POLICY 2
-#define MEDIA_ID_PLAYER 3
-#define MEDIA_ID_RECORDER 4
-#define MEDIA_ID_SESSION 5
-#define MEDIA_ID_FOCUS 6
-
-#ifndef CONFIG_RPTUN_LOCAL_CPUNAME
-#define CONFIG_RPTUN_LOCAL_CPUNAME CONFIG_MEDIA_SERVER_CPUNAME
+#ifdef __cplusplus
+extern "C" {
 #endif
-
-#define MEDIA_SOCKADDR_NAME "md:%s"
-
-#define MEDIA_IS_STATUS_CHANGE(x) ((x) < 200)
 
 /****************************************************************************
  * Media Functions
@@ -72,6 +51,22 @@ void media_stub_notify_event(void* cookie, int event,
     int result, const char* extra);
 void media_stub_onreceive(void* cookie,
     struct media_parcel* in, struct media_parcel* out);
+
+/****************************************************************************
+ * Server Functions
+ ****************************************************************************/
+
+typedef void (*media_server_onreceive)(void* cookie,
+    media_parcel* in, media_parcel* out);
+void* media_server_create(void* cb);
+int media_server_destroy(void* handle);
+
+int media_server_get_pollfds(void* handle, struct pollfd* fds,
+    void** conns, int count);
+int media_server_poll_available(void* handle, struct pollfd* fd, void* conn);
+
+int media_server_notify(void* handle, void* cookie, media_parcel* parcel);
+void media_server_finalize(void* handle, void* cookie);
 
 /****************************************************************************
  * Focus Functions
@@ -139,4 +134,4 @@ void media_policy_process_command(const char* target, const char* cmd,
 }
 #endif
 
-#endif /* FRAMEWORKS_MEDIA_INTERNAL_H */
+#endif

@@ -20,28 +20,30 @@
 
 include $(APPDIR)/Make.defs
 
-MODULE = $(CONFIG_MEDIA_SERVER)
-CSRCS += media_proxy.c media_parcel.c media_client.c media_wrapper.c media_dtmf.c
+MODULE  = $(CONFIG_MEDIA_SERVER)
+CSRCS  += $(wildcard client/*.c)
+CSRCS  += $(wildcard utils/*.c)
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/utils
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
-  CSRCS  += media_focus.c focus_stack.c
+  CSRCS  += server/media_focus.c server/focus_stack.c
 endif
 
 ifneq ($(CONFIG_MEDIA_SERVER),)
-  CSRCS    += media_stub.c media_server.c
-  MAINSRC   = media_daemon.c
+  CSRCS    += server/media_stub.c server/media_server.c
+  MAINSRC   = server/media_daemon.c
   PROGNAME  = $(CONFIG_MEDIA_SERVER_PROGNAME)
   PRIORITY  = $(CONFIG_MEDIA_SERVER_PRIORITY)
   STACKSIZE = $(CONFIG_MEDIA_SERVER_STACKSIZE)
 endif
 
 ifneq ($(CONFIG_LIB_FFMPEG),)
-  CSRCS  += media_graph.c media_session.c
+  CSRCS  += server/media_graph.c server/media_session.c
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/ffmpeg/ffmpeg
 endif
 
 ifneq ($(CONFIG_LIB_PFW),)
-  CSRCS  += media_policy.c
+  CSRCS  += server/media_policy.c
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/pfw/include
 endif
 
