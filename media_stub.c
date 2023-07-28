@@ -68,8 +68,10 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_policy_handler(media_get_policy(), target, cmd, arg, flags, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
+        if (response) {
+            ret = media_policy_handler(media_get_policy(), target, cmd, arg, flags, response, len);
+            media_parcel_append_printf(out, "%i%s", ret, response);
+        }
         break;
 #endif
 
@@ -80,8 +82,11 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         handle = param_u ? (void*)(uintptr_t)param_u : cookie;
-        ret = media_focus_handler(handle, target, cmd, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
+
+        if (response) {
+            ret = media_focus_handler(handle, target, cmd, response, len);
+            media_parcel_append_printf(out, "%i%s", ret, response);
+        }
         break;
 #endif
 
@@ -91,8 +96,10 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_graph_handler(media_get_graph(), target, cmd, arg, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
+        if (response) {
+            ret = media_graph_handler(media_get_graph(), target, cmd, arg, response, len);
+            media_parcel_append_printf(out, "%i%s", ret, response);
+        }
         break;
 
     case MEDIA_ID_PLAYER:
@@ -101,8 +108,11 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         handle = param_u ? (void*)(uintptr_t)param_u : cookie;
-        ret = media_player_handler(handle, target, cmd, arg, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
+
+        if (response) {
+            ret = media_player_handler(handle, target, cmd, arg, response, len);
+            media_parcel_append_printf(out, "%i%s", ret, response);
+        }
         break;
 
     case MEDIA_ID_RECORDER:
@@ -111,8 +121,11 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         handle = param_u ? (void*)(uintptr_t)param_u : cookie;
-        ret = media_recorder_handler(handle, target, cmd, arg, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
+
+        if (response) {
+            ret = media_recorder_handler(handle, target, cmd, arg, response, len);
+            media_parcel_append_printf(out, "%i%s", ret, response);
+        }
         break;
 
     case MEDIA_ID_SESSION:
@@ -121,8 +134,11 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         handle = param_u ? (void*)(uintptr_t)param_u : cookie;
-        ret = media_session_handler(handle, target, cmd, arg, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
+
+        if (response) {
+            ret = media_session_handler(handle, target, cmd, arg, response, len);
+            media_parcel_append_printf(out, "%i%s", ret, response);
+        }
         break;
 
 #endif // CONFIG_LIB_FFMPEG
