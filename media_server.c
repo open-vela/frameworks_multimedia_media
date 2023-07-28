@@ -84,20 +84,20 @@ static int media_server_create_notify(struct media_server_priv* priv, media_parc
     if (strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME)) {
         family = AF_RPMSG;
         rpmsg_addr.rp_family = AF_RPMSG;
-        strcpy(rpmsg_addr.rp_name, key);
-        strcpy(rpmsg_addr.rp_cpu, cpu);
+        strlcpy(rpmsg_addr.rp_name, key, RPMSG_SOCKET_NAME_SIZE);
+        strlcpy(rpmsg_addr.rp_cpu, cpu, RPMSG_SOCKET_CPU_SIZE);
         addr = (struct sockaddr*)&rpmsg_addr;
         len = sizeof(struct sockaddr_rpmsg);
     } else {
         family = PF_LOCAL;
         local_addr.sun_family = AF_LOCAL;
-        strcpy(local_addr.sun_path, key);
+        strlcpy(local_addr.sun_path, key, UNIX_PATH_MAX);
         addr = (struct sockaddr*)&local_addr;
         len = sizeof(struct sockaddr_un);
     }
 
     fd = socket(family, SOCK_STREAM, 0);
-    if (fd <= 0)
+    if (fd < 0)
         return -errno;
 
     ret = connect(fd, addr, len);
@@ -199,7 +199,7 @@ static int media_server_accept(void* handle, struct pollfd* fd)
         return -EINVAL;
 
     new_fd = accept(fd->fd, NULL, NULL);
-    if (new_fd <= 0)
+    if (new_fd < 0)
         return -errno;
 
     for (i = 0; i < MEDIA_SERVER_MAXCONN; i++) {
@@ -220,7 +220,7 @@ static int media_server_listen(struct media_server_priv* priv, int family)
     int len;
 
     fd = socket(family, SOCK_STREAM | SOCK_NONBLOCK, 0);
-    if (fd <= 0)
+    if (fd < 0)
         return -errno;
 
     if (family == PF_LOCAL) {
