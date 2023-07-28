@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_dtmf.c
+ * frameworks/media/client/media_dtmf.c
  *
  * Copyright (C) 2020 Xiaomi Corporation
  *
@@ -21,10 +21,9 @@
  ****************************************************************************/
 
 #include <errno.h>
+#include <media_utils.h>
 #include <stdio.h>
 #include <string.h>
-
-#include "media_utils.h"
 
 /****************************************************************************
  * Pre-processor Definitions

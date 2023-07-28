@@ -26,6 +26,7 @@
  ****************************************************************************/
 
 #include <media_event.h>
+#include <media_stream.h>
 #include <stddef.h>
 #include <sys/socket.h>
 

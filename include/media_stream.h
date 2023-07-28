@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/media_server.h
+ * frameworks/media/include/media_stream.h
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,29 +18,28 @@
  *
  ****************************************************************************/
 
-#ifndef __FRAMEWORKS_MEDIA_MEDIA_SERVER_H__
-#define __FRAMEWORKS_MEDIA_MEDIA_SERVER_H__
-
-#include <poll.h>
-
-#include "media_parcel.h"
+#ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_STREAM_H
+#define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_STREAM_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef void (*media_server_onreceive)(void* cookie, media_parcel* in, media_parcel* out);
-void* media_server_create(void* cb);
-int media_server_destroy(void* handle);
-
-int media_server_get_pollfds(void* handle, struct pollfd* fds, void** conns, int count);
-int media_server_poll_available(void* handle, struct pollfd* fd, void* conn);
-
-int media_server_notify(void* handle, void* cookie, media_parcel* parcel);
-void media_server_finalize(void* handle, void* cookie);
+#define MEDIA_STREAM_SCO "SCO" /*!< in call */
+#define MEDIA_STREAM_RING "Ring"
+#define MEDIA_STREAM_ALARM "Alarm"
+#define MEDIA_STREAM_SYSTEM_ENFORCED "Enforced"
+#define MEDIA_STREAM_NOTIFICATION "Notify" /*!< message notification */
+#define MEDIA_STREAM_RECORD "Record"
+#define MEDIA_STREAM_TTS "TTS" /*!< text-to-speech */
+#define MEDIA_STREAM_ACCESSIBILITY "Health" /*!< health notification */
+#define MEDIA_STREAM_SPORT "Sport"
+#define MEDIA_STREAM_INFO "Info"
+#define MEDIA_STREAM_MUSIC "Music"
+#define MEDIA_STREAM_EMERGENCY "Emergency"
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_STREAM_H */
