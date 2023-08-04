@@ -365,7 +365,7 @@ CMD1(player_open, string_t, stream_type)
         &media->chain[i], mediatool_event_callback);
     assert(!ret);
 
-    if (!strcmp(stream_type, MEDIA_STREAM_MUSIC)) {
+    if (stream_type && !strcmp(stream_type, MEDIA_STREAM_MUSIC)) {
         media->chain[i].extra = media_session_register(
             &media->chain[i], mediatool_music_callback);
     }
