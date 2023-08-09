@@ -235,7 +235,7 @@ int media_session_handler(void* session, void* handle, const char* target,
     /* Controllee methods. */
     if (!strcmp(cmd, "register")) {
         controllee = media_session_controllee_register(priv, handle);
-        return snprintf(res, res_len, "%llu", (uint64_t)(uintptr_t)controllee);
+        return snprintf(res, res_len, "%" PRIu64 "", (uint64_t)(uintptr_t)controllee);
     }
 
     if (!strcmp(cmd, "unregister")) {
@@ -253,7 +253,7 @@ int media_session_handler(void* session, void* handle, const char* target,
     /* Controller methods. */
     if (!strcmp(cmd, "open")) {
         controller = media_session_controller_open(priv, handle);
-        return snprintf(res, res_len, "%llu", (uint64_t)(uintptr_t)controller);
+        return snprintf(res, res_len, "%" PRIu64 "", (uint64_t)(uintptr_t)controller);
     }
 
     if (!strcmp(cmd, "close")) {
