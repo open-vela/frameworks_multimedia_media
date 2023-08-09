@@ -411,7 +411,7 @@ static int media_common_handler(MediaGraphPriv* priv, void* handle,
         if (!ctx)
             return -EINVAL;
 
-        return snprintf(res, res_len, "%llu", (uint64_t)(uintptr_t)ctx);
+        return snprintf(res, res_len, "%" PRIu64 "", (uint64_t)(uintptr_t)ctx);
     }
 
     if (!strcmp(cmd, "set_event")) {
