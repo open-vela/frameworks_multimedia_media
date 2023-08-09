@@ -313,7 +313,7 @@ static void* media_open(int control, const char* params)
     if (media_transact(control, priv, NULL, "open", params, 0, tmp, sizeof(tmp), 0) < 0)
         goto err;
 
-    sscanf(tmp, "%llu", &priv->handle);
+    sscanf(tmp, "%" PRIu64 "", &priv->handle);
     if (!priv->handle)
         goto err;
 
@@ -363,12 +363,12 @@ static int media_get_sockaddr(void* handle, struct sockaddr_storage* addr_)
         struct sockaddr_un* addr = (struct sockaddr_un*)addr_;
 
         addr->sun_family = AF_UNIX;
-        snprintf(addr->sun_path, UNIX_PATH_MAX, "med%llx", priv->handle);
+        snprintf(addr->sun_path, UNIX_PATH_MAX, "med%" PRIx64 "", priv->handle);
     } else {
         struct sockaddr_rpmsg* addr = (struct sockaddr_rpmsg*)addr_;
 
         addr->rp_family = AF_RPMSG;
-        snprintf(addr->rp_name, RPMSG_SOCKET_NAME_SIZE, "med%llx", priv->handle);
+        snprintf(addr->rp_name, RPMSG_SOCKET_NAME_SIZE, "med%" PRIx64 "", priv->handle);
         snprintf(addr->rp_cpu, RPMSG_SOCKET_CPU_SIZE, "%s", priv->cpu);
     }
 
@@ -398,9 +398,9 @@ static int media_bind_socket(void* handle, char* url, size_t len)
         goto out;
 
     if (addr.ss_family == AF_UNIX)
-        snprintf(url, len, "unix:med%llx?listen=0", priv->handle);
+        snprintf(url, len, "unix:med%" PRIx64 "?listen=0", priv->handle);
     else
-        snprintf(url, len, "rpmsg:med%llx:%s?listen=0", priv->handle,
+        snprintf(url, len, "rpmsg:med%" PRIx64 ":%s?listen=0", priv->handle,
             CONFIG_RPTUN_LOCAL_CPUNAME);
 
     return fd;
@@ -593,7 +593,7 @@ void* media_focus_request(int* suggestion, const char* stream_type,
     if (media_transact(MEDIA_ID_FOCUS, priv, stream_type, "request", NULL, 0, tmp, sizeof(tmp), false) < 0)
         goto err;
 
-    sscanf(tmp, "%llu:%d", &priv->handle, suggestion);
+    sscanf(tmp, "%" PRIu64 ":%d", &priv->handle, suggestion);
     if (!priv->handle)
         goto err;
 
@@ -1038,7 +1038,7 @@ void* media_session_open(const char* params)
     if (media_transact(MEDIA_ID_SESSION, priv, NULL, "open", params, 0, tmp, sizeof(tmp), 0) < 0)
         goto err;
 
-    sscanf(tmp, "%llu", &priv->handle);
+    sscanf(tmp, "%" PRIu64 "", &priv->handle);
     if (!priv->handle)
         goto err;
 
@@ -1184,7 +1184,7 @@ void* media_session_register(void* cookie, media_event_callback event_cb)
     if (media_transact(MEDIA_ID_SESSION, priv, NULL, "register", NULL, 0, tmp, sizeof(tmp), 0) < 0)
         goto err;
 
-    sscanf(tmp, "%llu", &priv->handle);
+    sscanf(tmp, "%" PRIu64 "", &priv->handle);
     if (!priv->handle)
         goto err;
 
