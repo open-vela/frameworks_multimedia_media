@@ -449,14 +449,14 @@ err:
     if (*return_type == MEDIA_FOCUS_STOP) {
         valid_id += CONFIG_MEDIA_FOCUS_STACK_DEPTH;
     }
-    return (void*)ID_TO_HANDLE(valid_id);
+    return (void*)(uintptr_t)ID_TO_HANDLE(valid_id);
 }
 
 static int media_focus_abandon_(media_focus* focus, void* handle)
 {
     app_focus_id tmp_id;
     int ret = 0;
-    int app_client_id = (int)handle;
+    int app_client_id = (int)(uintptr_t)handle;
 
     // step 1: invalid app client id check
     if (app_client_id < ID_SHIFT - 1) {
@@ -620,7 +620,7 @@ int media_focus_handler(void* focus, void* handle, const char* name, const char*
         if (!handle)
             return -EPERM;
 
-        return snprintf(res, res_len, "%llu:%d", (uint64_t)(uintptr_t)handle, suggestion);
+        return snprintf(res, res_len, "%" PRIu64 ":%d", (uint64_t)(uintptr_t)handle, suggestion);
     } else if (!strcmp(cmd, "abandon")) {
         return media_focus_abandon_(priv, handle);
     } else if (!strcmp(cmd, "dump")) {
