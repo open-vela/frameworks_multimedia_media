@@ -38,7 +38,7 @@
  ****************************************************************************/
 
 #define MEDIATOOL_MAX_CHAIN 16
-#define MEDIATOOL_MAX_ARGC 8
+#define MEDIATOOL_MAX_ARGC 16
 #define MEDIATOOL_PLAYER 1
 #define MEDIATOOL_RECORDER 2
 #define MEDIATOOL_CONTROLLER 3
@@ -985,9 +985,16 @@ CMD3(take_picture, string_t, filtername, string_t, filename, int, number)
     return media_recorder_take_picture(filtername, filename, number, mediatool_event_callback, media->chain);
 }
 
-CMD3(send, string_t, target, string_t, cmd, string_t, arg)
+static int mediatool_cmd_send(struct mediatool_s* media, int argc, char** argv)
 {
-    return media_process_command(target, cmd, arg, NULL, 0);
+    char arg[64] = {};
+
+    for (int i = 3; i < argc; i++) {
+        strlcat(arg, argv[i], sizeof(arg));
+        strlcat(arg, " ", sizeof(arg));
+    }
+
+    return media_process_command(argv[1], argv[2], arg, NULL, 0);
 }
 
 CMD1(dump, string_t, options)
