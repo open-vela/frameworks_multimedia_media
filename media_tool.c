@@ -500,6 +500,7 @@ CMD2(close, int, id, int, pending_stop)
     }
 
     media->chain[id].handle = NULL;
+    media->chain[id].extra = NULL;
 
     return ret;
 }
