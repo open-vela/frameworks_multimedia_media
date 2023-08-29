@@ -474,11 +474,13 @@ static int media_focus_abandon_(media_focus* focus, void* handle)
         return -ENOENT;
     }
     if (tmp_id.client_id == app_client_id) {
+        media_stub_notify_finalize(&tmp_id.callback_argv);
         app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
         app_focus_stack_top_change_broadcast(focus->stack, NONBLOCK_CALLBACK_FLAG);
     } else {
         // step 4: abandon focus id in media focus stack
         tmp_id.client_id = app_client_id;
+        media_stub_notify_finalize(&tmp_id.callback_argv);
         app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
     }
 
@@ -613,7 +615,7 @@ int media_focus_handler(void* focus, void* handle, const char* name, const char*
 {
     media_focus* priv = focus;
     int ret, suggestion = 0;
-    app_focus_id tmp;
+    app_focus_id top;
 
     if (!strcmp(cmd, "request")) {
         handle = media_focus_request_(priv, &suggestion, name, media_focus_notify, handle);
@@ -627,9 +629,9 @@ int media_focus_handler(void* focus, void* handle, const char* name, const char*
         media_focus_debug_stack_display();
         return 0;
     } else if (!strcmp(cmd, "peek")) {
-        ret = app_focus_stack_top(priv->stack, &tmp);
+        ret = app_focus_stack_top(priv->stack, &top);
         if (ret >= 0)
-            ret = snprintf(res, res_len, "%s", priv->streams + tmp.focus_level * STREAM_TYPE_LEN);
+            ret = snprintf(res, res_len, "%s", priv->streams + top.focus_level * STREAM_TYPE_LEN);
 
         return ret;
     }
