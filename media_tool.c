@@ -994,6 +994,7 @@ static int mediatool_cmd_send(struct mediatool_s* media, int argc, char** argv)
         strlcat(arg, argv[i], sizeof(arg));
         strlcat(arg, " ", sizeof(arg));
     }
+    arg[strlen(arg) - 1] = '\0';
 
     return media_process_command(argv[1], argv[2], arg, NULL, 0);
 }
