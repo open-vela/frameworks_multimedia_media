@@ -66,18 +66,21 @@ extern "C" {
  ****************************************************************************/
 
 /**
- * Set audio mode.
- * @param[in] mode  new audio mode, MEDIA_AUDIO_MODE_XXX.
+ * @brief Set audio mode.
+ *
+ * @param[in] mode  New audio mode, in the format of "MEDIA_AUDIO_MODE_XXX".
+ *                  There are five macros to define audio mode，details
+ *                  @see MEDIA_DEVICE_* in media_wrapper.h
  * @return Zero on success; a negated errno value on failure.
- * @note Before changing mode, call media_policy_set_btsco_use(0), which
- *       can turn off SCO and avoid noise.
+ * @note Before changing mode, SCO should be turned off.
  */
 int media_policy_set_audio_mode(const char* mode);
 
 /**
- * Get audio mode.
- * @param[in] mode  current audio mode.
- * @param[out] len  sizeof mode.
+ * @brief Get audio mode.
+ *
+ * @param[in] mode  A pointer to save current audio mode.
+ * @param[out] len  Size of current mode.
  * @return Zero on success; a negated errno value on failure.
  */
 int media_policy_get_audio_mode(char* mode, int len);
