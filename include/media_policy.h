@@ -54,6 +54,44 @@ extern "C" {
 #define MEDIA_SAMPLERATE_96000 "96000"
 #define MEDIA_SAMPLERATE_192000 "192000"
 
+/*
+ * @code HFP telephony app example.
+ *  // 1. On init, you should request audio focus as telephone APP.
+ *  focus_handle = media_focus_request(&first_suggest, MEDIA_STREAM_SCO, cb, cookie);
+ *
+ *  // 2. Then you should set audio mode to RINGTONE or PHONE,
+ *  //    and you should always set mode before setting devices.
+ *  ret = media_policy_set_audio_mode(MEDIA_MODE_RINGTONE);
+ *
+ *  // 3. Then you should choose the devices to use,
+ *  //    Under different audio mode, same devices has different meaning,
+ *  //    here under PHONE mode, SCO is for hfp.
+ *  ret = media_policy_set_devices_use(MEDIA_DEVICE_SCO);
+ *
+ *  // 4. Do your work.
+ *
+ *  // 5. On exit, you should restore the devices status,
+ *  //    and set audio mode back to NORMAL.
+ *  ret = media_policy_set_devices_unuse(MEDIA_DEVICE_SCO);
+ *  ret = media_policy_set_audio_mode(MEDIA_MODE_NORMAL);
+ * @endcode
+ *
+ * @code btsco monitor example.
+ *  // update media policy when status of btsco changed;
+ *  // this usually happened in poll_callback.
+ *  if (msbc) {
+ *      ret = media_policy_set_hfp_samplerate(MEDIA_SAMPLERATE_8000);
+ *      ret = media_policy_set_devices_available(MEDIA_DEVICE_SCO);
+ *  } else if (cvsd) {
+ *      ret = media_policy_set_hfp_samplerate(MEDIA_SAMPLERATE_16000);
+ *      ret = media_policy_set_devices_available(MEDIA_DEVICE_SCO);
+ *  } else {
+ *      // disconnected.
+ *      ret = media_policy_set_devices_unavailable(MEDIA_DEVICE_SCO);
+ *  }
+ * @endcode
+ */
+
 /****************************************************************************
  * Public Functions for Mode Control
  ****************************************************************************/
@@ -221,9 +259,13 @@ int media_policy_decrease_stream_volume(const char* stream);
 
 /**
  * @brief Set criterion with interger value.
+ * This function is used to set the value of an integer-type policy
+ * criterion. You should use this function when you need to update or
+ * configure an integer-based policy criterion.
  * @param[in] name      criterion name
  * @param[in] value     new integer value
- * @param[in] apply     whether apply configurations
+ * @param[in] apply     Indicates whether to apply the configurations.
+ * Set to non-zero to apply configurations, zero to not apply
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  */
@@ -231,8 +273,11 @@ int media_policy_set_int(const char* name, int value, int apply);
 
 /**
  * @brief Get criterion in interger value.
+ * This function is used to retrieve the value of an integer-type policy
+ * criterion. You should use this function when you need to access the
+ * current value of an integer-based policy criterion.
  * @param[in] name      criterion name
- * @param[out] value    current integer value
+ * @param[out] value    A pointer to store the current integer value
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  */
@@ -240,9 +285,13 @@ int media_policy_get_int(const char* name, int* value);
 
 /**
  * @brief Set criterion with string value.
+ * This function is used to set the value of a string-type policy
+ * criterion. You should use this function when you need to update
+ * or configure a string-based policy criterion.
  * @param[in] name      criterion name
  * @param[in] value     new string value
- * @param[in] apply     whether apply configurations
+ * @param[in] apply     Indicates whether to apply the configurations.
+ * Set to non-zero to apply configurations, zero to not apply.
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  */
@@ -250,19 +299,26 @@ int media_policy_set_string(const char* name, const char* value, int apply);
 
 /**
  * @brief Get criterion in string value.
+ * This function is used to retrieve the value of a string-type
+ * policy criterion. You should use this function when you need
+ * to access the current value of a string-based policy criterion.
  * @param[in] name      criterion name
- * @param[out] value    current string value
- * @param[in] len       sizeof value
+ * @param[out] value    A buffer to store the current string value
+ * @param[in] len       The size of the 'value' buffer
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  */
 int media_policy_get_string(const char* name, char* value, int len);
 
 /**
- * @brief Include(insert) string values to InclusiveCriterion.
+ * @brief Insert string values to InclusiveCriterion.
+ * This function is used to insert string values into the
+ * InclusiveCriterion of a policy. You should use this function
+ * when you need to add string values to an InclusiveCriterion policy.
  * @param[in] name      criterion name
  * @param[in] values    string values
- * @param[in] apply     whether apply configurations
+ * @param[in] apply     Indicates whether to apply the configurations.
+ * Set to non-zero to apply configurations, zero to not apply.
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
@@ -270,10 +326,15 @@ int media_policy_get_string(const char* name, char* value, int len);
 int media_policy_include(const char* name, const char* values, int apply);
 
 /**
- * @brief Exclude(remove) string values from InclusiveCriterion.
+ * @brief Remove string values from InclusiveCriterion.
+ * This function is used to remove string values from the
+ * InclusiveCriterion of a policy. You should use this function
+ * when you need to remove specific string values from an
+ * InclusiveCriterion policy.
  * @param[in] name      criterion name
  * @param[in] values    string values
- * @param[in] apply     whether apply configurations
+ * @param[in] apply     Indicates whether to apply the configurations.
+ * Set to non-zero to apply configurations, zero to not apply.
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
@@ -282,9 +343,13 @@ int media_policy_exclude(const char* name, const char* values, int apply);
 
 /**
  * @brief Check whether string values included in InclusiveCriterion.
+ * This function is used to check whether a set of string values is
+ * included in an InclusiveCriterion policy. You should use this
+ * function when you need to determine if specific string values
+ * are part of an InclusiveCriterion policy.
  * @param[in] name      criterion name
  * @param[in] values    string values
- * @param[out] result   whether included or not
+ * @param[out] result   whether the values are included or not
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
@@ -292,9 +357,14 @@ int media_policy_exclude(const char* name, const char* values, int apply);
 int media_policy_contain(const char* name, const char* values, int* result);
 
 /**
- * @brief Increase criterion interger value by 1.
+ * @brief Increase interger value of criterion by 1.
+ * This function is used to increment the integer value of an
+ * ExclusiveCriterion policy by 1. You should use this function
+ * when you need to increment the integer value of an
+ * ExclusiveCriterion policy.
  * @param[in] name      criterion name
- * @param[in] apply     whether apply configurations
+ * @param[in] apply     Indicates whether to apply the configurations.
+ * Set to non-zero to apply configurations, zero to not apply.
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for ExclusiveCriterion, never call on InclusiveCriterion.
@@ -303,8 +373,13 @@ int media_policy_increase(const char* name, int apply);
 
 /**
  * @brief Decrease criterion interger value by 1.
+ * This function is used to decrement the integer value of an
+ * ExclusiveCriterion policy by 1. You should use this function
+ * when you need to decrement the integer value of an
+ * ExclusiveCriterion policy.
  * @param[in] name      criterion name
- * @param[in] apply     whether apply configurations
+ * @param[in] apply     Indicates whether to apply the configurations.
+ * Set to non-zero to apply configurations, zero to not apply.
  * @return Zero on success; a negated errno value on failure.
  * @note Should use wrapper functions rather than using this directly.
  * @warning only for ExclusiveCriterion, never call on InclusiveCriterion.
