@@ -50,12 +50,54 @@ typedef void (*media_focus_callback)(int return_type, void* callback_argv);
 /**
  * @brief Allow application to request audio focus.
  *
- * @param[out] return_type      pointer of play return suggestion for app
- * @param[in]  stream_type      one of stream types defined in media_wrapper.h
- * @param[in]  callback_method  callback method of request app
- * @param[in]  callback_argv    argument of callback
- * @return     NULL when request failed, void* handle for request.
+ * @param[out] return_type   Initial suggestion given by focus policy, details
+ *                           @see MEIDA_FOCUS_* in media_focus.h
+ * @param[in]  stream_type   Represent the type of the incoming stream to get
+ *                           the focus. Stream type macro defines detail,
+ *                           @see MEDIA_STREAM_* in media_wrapper.h
+ * @param[in]  callback_method  Callback method of request app
+ * @param[in]  callback_argv    Argument needed by the callback_method
+ * @return     NULL when request failed, void* handle(mostly) for request.
  * @note       Value of return_type are announced above.
+ *
+ * Here is a example of how to use it:
+ * @code
+ *  @note Do this callback after get focus suggestion.
+ * void* example_focu_callback(int return_type, void* cookie)
+ * {
+ *      struct chain_s* chain = cookie;
+ *      switch(return_type) {
+ *          case MEDIA_FOCUS_PLAY:
+ *              chain->name = "MEDIA_FOCUS_PLAY";
+ *              break;
+ *          case MEDIA_FOCUS_STOP:
+ *              chain->name = "MEDIA_FOCUS_STOP";
+ *              break;
+ *          case MEDIA_FOCUS_PAUSE:
+ *              chain->name = "MEDIA_FOCUS_PAUSE";
+ *              break;
+ *          case MEDIA_FOCUS_PLAY_BUT_SILENT:
+ *              chain->name = "MEDIA_FOCUS_PLAY_BUT_SILENT";
+ *              break;
+ *          case MEDIA_FOCUS_PLAY_WITH_DUCK:
+ *              chain->name = "MEDIA_FOCUS_PLAY_WITH_DUCK";
+ *              break;
+ *          case MEDIA_FOCUS_PLAY_WITH_KEEP:
+ *              chain->name = "MEDIA_FOCUS_PLAY_WITH_KEEP";
+ *              break;
+ *          default:
+ *              chain->name = "UNKOWN_SUGGESTION";
+ *              break;
+ *      }
+ *      printf("[%s], suggestion value: %d, suggestion name: %s\n",
+ *              __func__, suggestion, chain->name, suggestion);
+ * }
+ *
+ *  @note Get focus and store suggestion in address "&suggestion".
+ * handle = media_focus_request(&suggestion, MEDIA_STREAM_ALARM,
+                                    example_focu_callback, &context);
+ * @endcode
+ *
  */
 void* media_focus_request(int* return_type,
     const char* stream_type,
@@ -65,14 +107,16 @@ void* media_focus_request(int* return_type,
 /**
  * @brief Allow application to abandon its audio focus.
  *
- * @param[in] handle    app identify id in audio focus stack
- * @return 0 if specific abandon success, negative number when abandon failed.
+ * @param[in]  handle    The focus handle to lose focus, @see media_focus_request()
+ * @return     Zero when request succeed, negative on failure.
+ *
  */
 int media_focus_abandon(void* handle);
 
 /**
  * @brief Dump focus stack
- * @param[in] options   dump options
+ *
+ * @param[in] options   Dump options(unused so far).
  */
 void media_focus_dump(const char* options);
 

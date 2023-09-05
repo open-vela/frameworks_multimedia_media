@@ -52,6 +52,47 @@
  * Public Types
  ****************************************************************************/
 
+/**
+ * @brief Define a event-callback function pointer when media comes.
+ *
+ * Notify some events back to users, such as MEDIA_EVENT_STARTED, which means
+ * the av stream is successfully played.
+ *
+ * @param[in] cookie Usr's private context.
+ * @param[in] event  The type of current event, all macro definitions of
+ *                   events are listed as following:
+ *                   controller's callback can receive status-changed
+ *                   notifications as events:
+ *                   -   MEDIA_EVENT_NOP
+ *                   -   MEDIA_EVENT_PREPARED
+ *                   -   MEDIA_EVENT_STARTED
+ *                   -   MEDIA_EVENT_PAUSED
+ *                   -   MEDIA_EVENT_STOPPED
+ *                   -   MEDIA_EVENT_SEEKED
+ *                   -   MEDIA_EVENT_COMPLETED
+ *                   -   MEDIA_EVENT_PREVED
+ *                   -   MEDIA_EVENT_NEXTED
+ *                  controllee's callback can receive control message as events:
+ *                   -   MEDIA_EVENT_START
+ *                   -   MEDIA_EVENT_PAUSE
+ *                   -   MEDIA_EVENT_STOP
+ *                   -   MEDIA_EVENT_PREV
+ *                   -   MEDIA_EVENT_NEXT
+ *                  player/recorder's can receive status-changed notifications
+ *                  as events:
+ *                   -   MEDIA_EVENT_PREPARED
+ *                   -   MEDIA_EVENT_STARTED
+ *                   -   MEDIA_EVENT_PAUSED
+ *                   -   MEDIA_EVENT_STOPPED
+ *                   -   MEDIA_EVENT_SEEKED
+ *                   -   MEDIA_EVENT_COMPLETED
+ * @param[in] ret   The result of this callback function
+ * @param[in] extra Extra data needed to complete this callback function.
+ * @note There is no playlist in the media framework,so PREVED/NEXTED will not be
+ *       notified to player's callback, but the controllee user can actively notify PREVED/NEXTED
+ *       to controller user through the media framework.
+ *
+ */
 typedef void (*media_event_callback)(void* cookie, int event, int ret,
     const char* extra);
 

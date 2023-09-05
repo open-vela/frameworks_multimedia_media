@@ -41,31 +41,35 @@ extern "C" {
  ****************************************************************************/
 
 /**
- * Send command to media
- * @param[in] target    target name
- * @param[in] cmd       command
- * @param[in] arg       argument
- * @param[out] res      response
- * @param[in] res_len   response msg len
- * @return Zero on success; a negated errno value on failure
+ * @brief Send a media graph command to media server.
+ *
+ * @param[in] target    Name of graph_filter instance target name.
+ * @param[in] cmd       Type of command.
+ * @param[in] arg       Argument for cmd.
+ * @param[out] res      Response msg of cmd.
+ * @param[in] res_len   Length of response msg.
+ * @return Zero on success; a negated errno value on failure.
  */
 int media_process_command(const char* target, const char* cmd,
     const char* arg, char* res, int res_len);
 
 /**
- * Dump media graph
+ * @brief Dump media graph
+ *
  * @param[in] options   dump options
  */
 void media_graph_dump(const char* options);
 
 /**
- * Dump media policy
+ * @brief Dump media policy
+ *
  * @param[in] options   dump options
  */
 void media_policy_dump(const char* options);
 
 /**
- * Get DTMF tone buffer size.
+ * @brief Get DTMF tone buffer size.
+ *
  * @param[in] numbers   Dialbuttons numbers.
  * @return Buffer size of DTMF tone on success; a negated errno value on
  *         failure.
@@ -73,10 +77,16 @@ void media_policy_dump(const char* options);
 int media_dtmf_get_buffer_size(const char* numbers);
 
 /**
- * Generate one or continuous multiple DTMF signal and save the result in
- * the input buffer.
- * @param[in] numbers   Dialbuttons numbers.
- * @param[out] buffer   Buffer address.
+ * @brief Generate one or continuous multiple DTMF signal.
+ *
+ * The purpose of this function is to generate one or continuous multiple
+ * DTMF signal and save the result in the input buffer.format should fixed
+ * as MEDIA_TONE_DTMF_FORMAT when to play dtmf tone.
+ *
+ * @param[in] numbers   Dialbuttons numbers which vary from "0-9" as well
+ *                      as "*#ABCD"
+ * @param[out] buffer   Buffer address points to the buffer generated
+ *                      through this function.
  * @return Zero on success; a negated errno value on failure.
  * @note Format should fixed as MEDIA_TONE_DTMF_FORMAT when to play dtmf tone.
  */
