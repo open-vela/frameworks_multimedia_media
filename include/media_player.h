@@ -18,6 +18,147 @@
  *
  ****************************************************************************/
 
+/**
+ * @brief Media Player Interface
+ *
+ * This interface provides functions for media playback.
+ * here is an example for using these functions
+ * @code
+    #include <media_api.h>
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <syslog.h>
+
+    #define PLAYER_IDLE      0
+    #define PLAYER_PREPARED  1
+    #define PLAYER_STARTED   2
+    #define PLAYER_COMPLETED 3
+    #define PLAYER_STOPPED   4
+
+    static struct player_priv_s
+    {
+    sem_t sem;
+    int   state;
+    } g_priv;
+
+    static void music_event_callback(void* cookie, int event,
+                                     int ret, const char *data)
+    {
+        char *str;
+        if (event == MEDIA_EVENT_STARTED) {
+            g_priv.state = PLAYER_STARTED;
+            str = "MEDIA_EVENT_STARTED";
+            sem_post(&g_priv.sem);
+        } else if (event == MEDIA_EVENT_STOPPED) {
+            str = "MEDIA_EVENT_STOPPED";
+        } else if (event == MEDIA_EVENT_COMPLETED) {
+            g_priv.state = PLAYER_COMPLETED;
+            str = "MEDIA_EVENT_COMPLETED";
+        } else if (event == MEDIA_EVENT_PREPARED) {
+            g_priv.state = PLAYER_PREPARED;
+            str = "MEDIA_EVENT_PREPARED";
+            sem_post(&g_priv.sem);
+        } else if (event == MEDIA_EVENT_PAUSED) {
+            str = "MEDIA_EVENT_PAUSED";
+        } else if (event == MEDIA_EVENT_SEEKED) {
+            str = "MEDIA_EVENT_SEEKED";
+        } else {
+            str = "UNKNOW EVENT";
+        }
+
+        syslog(LOG_INFO, "%s, music event %s, event %d, ret %d,
+               info %s line %d\n", __func__, str, event, ret,
+               data ? data : "NULL", __LINE__);
+    }
+
+    int main(int argc, char *argv[])
+    {
+        unsigned int duration, position;
+        float volume;
+        void *player;
+        int ret;
+
+        sem_init(&g_priv.sem, 0, 0);
+        g_priv.state = PLAYER_IDLE;
+
+        player = media_player_open("Music");
+        if (!player) {
+            syslog(LOG_ERR, "Player: open failed.\n");
+            return -1;
+        }
+
+        ret = media_player_set_event_callback(player, player,
+                                              music_event_callback);
+        if (ret < 0) {
+            syslog(LOG_ERR, "Player: set callback failed.\n");
+            goto out;
+        }
+
+        ret = media_player_set_volume(player, 0.2);
+        if (ret < 0) {
+            syslog(LOG_ERR, "Player: set_volume failed.\n");
+            goto out;
+        }
+
+        ret = media_player_prepare(player, argv[1], NULL);
+        if (ret < 0) {
+            syslog(LOG_ERR, "Player: prepare failed.\n");
+            goto out;
+        }
+
+        sem_wait(&g_priv.sem);
+
+        if (g_priv.state != PLAYER_PREPARED) {
+            syslog(LOG_INFO, "Player: prepare event return failed.\n");
+            goto out;
+        }
+
+        ret = media_player_start(player);
+        if (ret < 0) {
+            syslog(LOG_ERR, "Player: start failed.\n");
+            goto out;
+        }
+
+        sem_wait(&g_priv.sem);
+        if (g_priv.state != PLAYER_STARTED) {
+            syslog(LOG_ERR, "Player: start event return failed.\n");
+            goto out;
+        }
+
+        syslog(LOG_INFO, "Player: playing %d.\n",
+               media_player_is_playing(player));
+        media_player_get_duration(player, &duration);
+        syslog(LOG_INFO, "Player: get_duration ret %d %d.\n",
+               ret, duration);
+
+        media_player_get_volume(player, &volume);
+        syslog(LOG_INFO, "Player: get_volume %f.\n", volume);
+
+        while (g_priv.state == PLAYER_STARTED) {
+            media_player_get_position(player, &position);
+            syslog(LOG_ERR, "Player: get_position %d.\n", position);
+            usleep(300 * 1000);
+        }
+
+        ret = media_player_stop(player);
+        if (ret < 0) {
+            syslog(LOG_ERR, "Player: stop failed.\n");
+            goto out;
+        }
+
+    out:
+        media_player_close(player, 0);
+        sem_destroy(&g_priv.sem);
+        syslog(LOG_INFO, "Player: closed.\n");
+
+        return 0;
+    }
+ * @endcond
+ *
+ * @file media_player.h
+ *
+ */
+
 #ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_PLAYER_H
 #define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_PLAYER_H
 
@@ -42,15 +183,16 @@ extern "C" {
  ****************************************************************************/
 
 /**
- * Open one player path.
- * @param[in] stream    Stream type @see MEDIA_STREAM_*
- * @return Pointer to created handle or NULL on failure.
+ * @brief Open media with player type.
+ * @param[in] stream    Stream type, @see MEDIA_STREAM_* in media_wrapper.h.)
+ * @return Pointer to created handle on success; NULL on failure.
  */
 void* media_player_open(const char* stream);
 
 /**
- * Close the player path
- * @param[in] handle       The player path to be destroyed.
+ * @brief Close the player with handle.
+ * @param[in] handle       The player path to be destroyed, return value of
+ * media_player_open function.
  * @param[in] pending_stop whether pending command.
  *                         - 0: close immediately
  *                         - 1: pending command,
@@ -60,54 +202,66 @@ void* media_player_open(const char* stream);
 int media_player_close(void* handle, int pending_stop);
 
 /**
- * Set event callback to the player path, the callback will be called
- * when state changed.
- * @param[in] handle    The player path
- * @param[in] cookie    User cookie, will bring back to user when do event_cb
- * @param[in] event_cb  Event callback
+ * @brief  Set event callback to the player path, the callback will be
+ * called when state changed.
+ * @param[in] handle    The player path, return value of media_player_open
+ * function.
+ * @param[in] cookie    User cookie, will be brought back to user when do
+ * event_cb
+ * @param[in] event_cb  The function pointer of event callback
  * @return Zero on success; a negated errno value on failure.
  */
 int media_player_set_event_callback(void* handle, void* cookie,
     media_event_callback event_cb);
 
 /**
- * Prepare the player path.
- * @param[in] handle    The player path
- * @param[in] url       Data source to be played
+ * @brief Prepare resource file to be played by media.
+ * @param[in] handle    The player path, return value of media_player_open
+ * function.
+ * @param[in] url       the path of resource file to be played by media, can
+ * be a local path(e.g. /music/1.mp3) or an online path(e.g.
+ * http://10.221.110.236/1.mp3) or NULL(buffer mode).
  * @param[in] options   Extra options configure
- *                      - If url is not NULL: options is the url addtional description
- *                      - If url is NULL: options descript "buffer" mode, exmaple:
- *                        - "format=s16le,sample_rate=44100,channels=2"
- *                        - "format=unknown"
- *
- *                        then use media_player_write_data() write data
+ *   - If url is not NULL: options is the url addtional description
+ *   - If url is NULL: options descript "buffer" mode, exmaple:
+ *     - "format=s16le,sample_rate=44100,channels=2"
+ *     - "format=unknown"
+ *   then use media_player_write_data() or fd returned by
+ *   media_player_get_socket() to write data
  * @return Zero on success; a negated errno value on failure.
  */
 int media_player_prepare(void* handle, const char* url, const char* options);
 
 /**
- * Reset the player path.
- * @param[in] handle The player path
+ * @brief Reset media with player type.
+ * @param[in] handle The player path, return value of media_player_open
+ * function.
  * @return Zero on success; a negated errno value on failure.
  */
 int media_player_reset(void* handle);
 
 /**
- * Write data to player path.
- * This need media_player_prepare() url set to NULL.
- * Note: this function is blocked
- * @param[in] handle    The player path
+ * @brief Write data to media with player type.
+ * Used only in buffer mode, need media_player_prepare() url set to NULL.
+ * Only need to choose either this function or the media_player_get_socket()
+ * to transfer data for the media.
+ * @note: this function is blocked
+ * @param[in] handle    The player path, return value of media_player_open
+ * function.
  * @param[in] data      Buffer will be played
  * @param[in] len       Buffer len
- * @return returned >= 0, Actly sent len; a negated errno value on failure.
+ * @return Actly sent len on succeed; a negated errno value on failure.
  */
 ssize_t media_player_write_data(void* handle, const void* data, size_t len);
 
 /**
- * Get sockaddr for unblock mode write data
- * @param[in] handle    The player path
+ * @brief Get sockaddr for unblock mode write data.
+ * @deprecated This function is deprecated now, please use the new function
+ * media_player_get_socket() instead.
+ * @param[in] handle    The player path, return value of media_player_open
+ * function.
  * @param[in] addr      The sockaddr pointer
- * @return returned >= 0, Actly sent len; a negated errno value on failure.
+ * @return Actly sent len on succeed; a negated errno value on failure.
  */
 int media_player_get_sockaddr(void* handle, struct sockaddr_storage* addr);
 
