@@ -476,6 +476,8 @@ CMD2(close, int, id, int, pending_stop)
 
     switch (media->chain[id].type) {
     case MEDIATOOL_PLAYER:
+        if (!pending_stop)
+            mediatool_common_stop_inner(&media->chain[id]);
         ret = media_player_close(media->chain[id].handle, pending_stop);
         if (ret >= 0 && media->chain[id].extra)
             ret = media_session_unregister(media->chain[id].extra);
