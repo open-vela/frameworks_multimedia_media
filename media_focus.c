@@ -156,7 +156,6 @@ static int media_focus_stream_type_counts(char* sl)
         if (*front_str == '\0') {
             break;
         }
-        sl = front_str + 1;
         front_str++;
     }
     return count;
