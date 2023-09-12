@@ -260,6 +260,8 @@ int app_focus_stack_delete(void* x, app_focus_id* value, int callback_flag)
 
     //  node need to be deleted at stack top
     if (p_tmp_node->focus_id.client_id == value->client_id) {
+        value->focus_callback = p_tmp_node->focus_id.focus_callback;
+        value->callback_argv = p_tmp_node->focus_id.callback_argv;
         return app_focus_stack_pop(s, value, callback_flag);
     }
 
@@ -272,6 +274,8 @@ int app_focus_stack_delete(void* x, app_focus_id* value, int callback_flag)
     {
         if (p_tmp_node->focus_id.client_id == value->client_id) {
             p_tmp_node->focus_id.focus_state = APP_FOCUS_STATE_STACK_QUIT;
+            value->focus_callback = p_tmp_node->focus_id.focus_callback;
+            value->callback_argv = p_tmp_node->focus_id.callback_argv;
             list_delete(&p_tmp_node->node);
             app_focus_node_list_remove(s, p_tmp_node->focus_id.client_id);
             s->cur_size -= 1;
