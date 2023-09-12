@@ -579,6 +579,7 @@ void* media_focus_request(int* suggestion, const char* stream_type,
 {
     media_focus_priv_t* priv;
     char tmp[64];
+    int ret;
 
     if (!suggestion || !stream_type)
         return NULL;
@@ -587,18 +588,27 @@ void* media_focus_request(int* suggestion, const char* stream_type,
     if (!priv)
         return NULL;
 
-    priv->suggest = cb;
-    priv->cookie = cookie;
-
-    if (media_transact(MEDIA_ID_FOCUS, priv, stream_type, "request", NULL, 0, tmp, sizeof(tmp), false) < 0)
+    ret = media_transact(MEDIA_ID_FOCUS, priv, stream_type, "request", NULL, 0,
+        tmp, sizeof(tmp), false);
+    if (ret < 0)
         goto err;
 
     sscanf(tmp, "%" PRIu64 ":%d", &priv->handle, suggestion);
     if (!priv->handle)
         goto err;
 
-    if (media_client_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv) < 0)
-        goto err;
+    /**
+     * NOTE: on STOP suggestion, we still receive a handle, but we actually
+     * didn't enter the focus stack; thus there are no more suggestions from
+     * server, we shall not create listener thread.
+     */
+    if (*suggestion != MEDIA_FOCUS_STOP) {
+        priv->suggest = cb;
+        priv->cookie = cookie;
+        ret = media_client_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv);
+        if (ret < 0)
+            goto err;
+    }
 
     return priv;
 
