@@ -474,14 +474,14 @@ static int media_focus_abandon_(media_focus* focus, void* handle)
         return -ENOENT;
     }
     if (tmp_id.client_id == app_client_id) {
-        media_stub_notify_finalize(&tmp_id.callback_argv);
         app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
+        media_stub_notify_finalize(&tmp_id.callback_argv);
         app_focus_stack_top_change_broadcast(focus->stack, NONBLOCK_CALLBACK_FLAG);
     } else {
         // step 4: abandon focus id in media focus stack
         tmp_id.client_id = app_client_id;
-        media_stub_notify_finalize(&tmp_id.callback_argv);
         app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
+        media_stub_notify_finalize(&tmp_id.callback_argv);
     }
 
     return ret;
