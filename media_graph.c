@@ -562,7 +562,7 @@ int media_graph_handler(void* graph, const char* target, const char* cmd,
     int i, ret = 0;
     char* dump;
 
-    if (!strcmp(cmd, "dump")) {
+    if (!target && !strcmp(cmd, "dump")) {
         dump = avfilter_graph_dump_ext(priv->graph, arg);
         if (dump)
             syslog(LOG_INFO, "\n%s\n", dump);
