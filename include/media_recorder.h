@@ -128,8 +128,7 @@ int media_recorder_set_event_callback(void* handle, void* cookie,
  *                        then use media_recorder_read_data() read data
  * @return Zero on success; a negative errno value on failure.
  */
-int media_recorder_prepare(void* handle, const char* url,
-                           const char* options);
+int media_recorder_prepare(void* handle, const char* url, const char* options);
 
 /**
  * @brief Reset the recorder, clear the origin record and record new one.
@@ -242,18 +241,19 @@ int media_recorder_pause(void* handle);
 int media_recorder_stop(void* handle);
 
 /**
- * Set properties of the recorder path.
+ * @brief Set properties of the recorder path.
+ *
  * @param[in] handle      Current recorder path
  * @param[in] target      Target filter
  * @param[in] key         Key
  * @param[in] value       Value
  * @return Zero on success; a negative errno value on failure.
  */
-int media_recorder_set_property(void* handle, const char* target,
-                                const char* key, const char* value);
+int media_recorder_set_property(void* handle, const char* target, const char* key, const char* value);
 
 /**
- * Get properties of the recorder path.
+ * @brief Get properties of the recorder path.
+ *
  * @param[in] handle      Current recorder path
  * @param[in] target      Target filter
  * @param[in] key         Key
@@ -261,8 +261,7 @@ int media_recorder_set_property(void* handle, const char* target,
  * @param[in] value_len   Buffer length of value
  * @return Zero on success; a negated errno value on failure.
  */
-int media_recorder_get_property(void* handle, const char* target,
-                                const char* key, char* value, int value_len);
+int media_recorder_get_property(void* handle, const char* target, const char* key, char* value, int value_len);
 
 /**
  * @brief Take picture from camera.
@@ -276,8 +275,7 @@ int media_recorder_get_property(void* handle, const char* target,
  * @param[in] cookie    The private data of user
  * @return Zero on success; a negative errno value on failure.
  */
-int media_recorder_take_picture(char* params, char* filename, size_t number,
-                                media_event_callback event_cb, void* cookie);
+int media_recorder_take_picture(char* params, char* filename, size_t number, media_event_callback event_cb, void* cookie);
 
 #undef EXTERN
 #ifdef __cplusplus
