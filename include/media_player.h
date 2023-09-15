@@ -111,15 +111,27 @@ ssize_t media_player_write_data(void* handle, const void* data, size_t len);
 int media_player_get_sockaddr(void* handle, struct sockaddr_storage* addr);
 
 /**
- * Get socket fd for unblock mode write data
- * @param[in] handle    The player path
+ * @brief Get socket fd for unblock mode write data.
+ *
+ * @code
+ *  int  ret;
+ *  void *handle;
+ *  handle = media_player_open(MEDIA_STREAM_MUSIC);
+ *  // set event callback
+ *  // set prepare mode buffer
+ *  ret = media_player_prepare(handle, NULL, NULL);
+ *  int socketfd = media_player_get_socket(handle);
+ * @endcode
+ *
+ * @param[in] handle    The player handle.
  * @return fd; a negated errno value on failure.
  */
 int media_player_get_socket(void* handle);
 
 /**
- * Close socket fd when player finish read data
- * @param[in] handle    The player path
+ * @brief Close socket fd when player finish read data.
+ *
+ * @param[in] handle    The player handle.
  */
 void media_player_close_socket(void* handle);
 
@@ -161,46 +173,105 @@ int media_player_seek(void* handle, unsigned int msec);
 int media_player_set_looping(void* handle, int loop);
 
 /**
- * Get play path is playing or not
- * @param[in] handle    The player path
- * @return Zero on success; a negated errno value on failure.
+ * @brief Check if the media player is currently playing.
+ *
+ * @code
+ *  // Example
+ *  void *handle;
+ *  int ret;
+ *  handle = media_player_open("Music");
+ *  // set event callback
+ *  ret = media_player_prepare(handle, "/music/1.mp3", NULL);
+ *  ret = media_player_start(handle);
+ *  ret = media_player_is_playing(handle);
+ *  syslog(LOG_INFO, "Player: playing %d.\n", ret);
+ * @endcode
+ *
+ * @param[in] handle    The player handle.
+ * @return 1 on playing, 0 on not-playing, else on error.
  */
 int media_player_is_playing(void* handle);
 
 /**
- * Get player playback position
- * @param[in] handle    The player path
+ * @brief Get the playing duration after the music starts playing.
+ *
+ * @code
+ *  void *handle;
+ *  int ret;
+ *  unsigned int position;
+ *  handle = media_player_open(MEDIA_STREAM_MUSIC);
+ *  // set event callback
+ *  ret = media_player_prepare(handle, "/music/1.mp3", NULL);
+ *  ret = media_player_start(handle);
+ *  ret = media_player_get_position(handle, &position);
+ * @endcode
+ *
+ * @param[in] handle    The player handle.
  * @param[in] mesc      Playback postion (from begining)
  * @return Zero on success; a negated errno value on failure.
  */
 int media_player_get_position(void* handle, unsigned int* msec);
 
 /**
- * Get playback file duration (Total play time)
- * @param[in] handle    The player path
+ * @brief Get playback file duration (Total play time).
+ *
+ * @code
+ *  void *handle;
+ *  int ret;
+ *  unsigned int duration;
+ *  handle = media_player_open(MEDIA_STREAM_MUSIC);
+ *  // set event callback
+ *  ret = media_player_prepare(handle, "/music/1.mp3", NULL);
+ *  ret = media_player_start(handle);
+ *  ret = media_player_get_duration(handle, &duration);
+ * @endcode
+ *
+ * @param[in] handle    The player handle.
+ * @param[in] mesc      Store playing time of the media.
  * @param[in] mesc      File duration
  * @return Zero on success; a negated errno value on failure.
  */
 int media_player_get_duration(void* handle, unsigned int* msec);
 
 /**
- * Set the player path volume
- * @param[in] handle    The player path
- * @param[in] mesc      Volume with range of 0.0 - 1.0
+ * @brief Set the player path volume.
+ *
+ * @code
+ *  void *handle;
+ *  int ret;
+ *  handle = media_player_open(MEDIA_STREAM_MUSIC);
+ *  ret = media_player_set_volume(handle, 0.2);
+ * @endcode
+ *
+ * @param[in] handle    The player handle.
+ * @param[in] volume    Volume with range of 0.0 - 1.0
  * @return Zero on success; a negated errno value on failure.
  */
 int media_player_set_volume(void* handle, float volume);
 
 /**
- * Get the player path volume
+ * @brief Get the player handle volume.
+ *
+ * @code
+ *  void *handle;
+ *  int ret;
+ *  float volume;
+ *  handle = media_player_open(MEDIA_STREAM_MUSIC);
+ *  // set event callback
+ *  ret = media_player_prepare(handle, "/music/1.mp3", NULL);
+ *  ret = media_player_start(handle);
+ *  ret = media_player_get_volume(player, &volume);
+ * @endcode
+ *
  * @param[in] handle    The player path
- * @param[in] mesc      Volume with range of 0.0 - 1.0
+ * @param[in] volume    Volume with range of 0.0 - 1.0
  * @return Zero on success; a negated errno value on failure.
  */
 int media_player_get_volume(void* handle, float* volume);
 
 /**
- * Set properties of the player path.
+ * @brief Set properties of the player path.
+ *
  * @param[in] handle      Current player path
  * @param[in] target      Target filter
  * @param[in] key         Key
@@ -210,7 +281,8 @@ int media_player_get_volume(void* handle, float* volume);
 int media_player_set_property(void* handle, const char* target, const char* key, const char* value);
 
 /**
- * Get properties of the player path.
+ * @brief Get properties of the player path.
+ *
  * @param[in] handle      Current player path
  * @param[in] target      Target filter
  * @param[in] key         Key
