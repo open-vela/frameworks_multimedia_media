@@ -449,7 +449,7 @@ void* media_graph_create(void* file)
     if (!priv)
         return NULL;
 
-    priv->fd = eventfd(0, 0);
+    priv->fd = eventfd(0, EFD_CLOEXEC);
     if (priv->fd < 0)
         goto err;
 
