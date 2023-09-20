@@ -672,7 +672,7 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
         if (media->chain[id].type == MEDIATOOL_RECORDER)
             unlink(path);
 
-        media->chain[id].fd = open(path, media->chain[id].type == MEDIATOOL_PLAYER ? O_RDONLY : O_CREAT | O_RDWR);
+        media->chain[id].fd = open(path, media->chain[id].type == MEDIATOOL_PLAYER ? O_RDONLY : O_CREAT | O_RDWR, 0666);
         if (media->chain[id].fd < 0) {
             printf("buffer mode, file can't open\n");
             return -EINVAL;
