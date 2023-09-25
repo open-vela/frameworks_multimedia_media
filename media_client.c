@@ -145,7 +145,9 @@ static void* media_client_listen_thread(pthread_addr_t pvarg)
     while (1) {
         media_parcel_init(&parcel);
         ret = media_parcel_recv(&parcel, acceptfd, NULL, 0);
-        if (ret < 0)
+        if (ret == -EINTR)
+            continue;
+        else if (ret < 0)
             break;
 
         code = media_parcel_get_code(&parcel);
