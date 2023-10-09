@@ -99,6 +99,11 @@ void media_parcel_reinit(media_parcel* parcel)
     media_parcel_init(parcel);
 }
 
+bool media_parcel_completed(media_parcel* parcel, size_t offset)
+{
+    return MEDIA_PARCEL_HEADER_LEN + parcel->chunk->len == offset;
+}
+
 int media_parcel_append(media_parcel* parcel, const void* data, size_t size)
 {
     int rv;
@@ -287,6 +292,31 @@ int media_parcel_recv(media_parcel* parcel, int fd, uint32_t* offset, int flags)
     }
 
     return 0;
+}
+
+ssize_t media_parcel_recvfrom(media_parcel* parcel, size_t* offset, char* buf, size_t len)
+{
+    size_t expected = 0;
+    int ret = 0;
+
+    if (*offset < MEDIA_PARCEL_HEADER_LEN) {
+        expected = MEDIA_PARCEL_HEADER_LEN - *offset;
+    } else {
+        expected = parcel->chunk->len + MEDIA_PARCEL_HEADER_LEN - *offset;
+    }
+
+    if (expected <= len) {
+        memcpy((char*)parcel->chunk + *offset, buf, expected);
+        *offset += expected;
+        if (*offset == MEDIA_PARCEL_HEADER_LEN)
+            ret = media_parcel_grow(parcel, 0, parcel->chunk->len);
+
+        return ret < 0 ? ret : expected;
+    }
+
+    memcpy((char*)parcel->chunk + *offset, buf, len);
+    *offset += len;
+    return len;
 }
 
 uint32_t media_parcel_get_code(media_parcel* parcel)
