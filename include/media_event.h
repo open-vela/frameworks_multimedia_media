@@ -96,4 +96,12 @@
 typedef void (*media_event_callback)(void* cookie, int event, int ret,
     const char* extra);
 
+/**
+ * @brief Common async callback.
+ *
+ * @param[out] cookie   Private context.
+ * @param[out] ret      Result of process, zero on success, negative errno on failure.
+ */
+typedef void (*media_uv_callback)(void* cookie, int ret);
+
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H */

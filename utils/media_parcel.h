@@ -22,6 +22,8 @@
 #define __FRAMEWORKS_MEDIA_UTILS_MEDIA_PARCEL_H
 
 #include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -53,6 +55,7 @@ typedef struct media_parcel {
 void media_parcel_init(media_parcel* parcel);
 void media_parcel_deinit(media_parcel* parcel);
 void media_parcel_reinit(media_parcel* parcel);
+bool media_parcel_completed(media_parcel* parcel, size_t offset);
 
 int media_parcel_append(media_parcel* parcel, const void* data, size_t size);
 int media_parcel_append_uint8(media_parcel* parcel, uint8_t val);
@@ -71,6 +74,7 @@ int media_parcel_append_vprintf(media_parcel* parcel, const char* fmt, va_list* 
 
 int media_parcel_send(media_parcel* parcel, int fd, uint32_t code, int flags);
 int media_parcel_recv(media_parcel* parcel, int fd, uint32_t* offset, int flags);
+ssize_t media_parcel_recvfrom(media_parcel* parcel, size_t* offset, char* buf, size_t len);
 
 uint32_t media_parcel_get_code(media_parcel* parcel);
 
