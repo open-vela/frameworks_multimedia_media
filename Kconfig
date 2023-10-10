@@ -12,7 +12,8 @@ if MEDIA
 config MEDIA_SERVER
 	bool "Enable media server"
 	default n
-	select EVENT_FD
+	depends on EVENT_FD
+
 
 if MEDIA_SERVER
 
