@@ -905,9 +905,11 @@ int media_recorder_take_picture(char* params, char* filename, size_t number,
     if (!handle)
         return -EINVAL;
 
-    ret = media_recorder_set_event_callback(handle, cookie, event_cb);
-    if (ret < 0)
-        goto error;
+    if (event_cb) {
+        ret = media_recorder_set_event_callback(handle, cookie, event_cb);
+        if (ret < 0)
+            goto error;
+    }
 
     snprintf(option, sizeof(option), "total_number=%zu", number);
 
