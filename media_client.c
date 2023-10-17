@@ -206,11 +206,14 @@ socket_error:
 int media_client_disconnect(void* handle)
 {
     struct media_client_priv* priv = handle;
+    int ret;
 
     if (priv == NULL)
         return -EINVAL;
 
-    pthread_join(priv->thread, NULL);
+    ret = pthread_join(priv->thread, NULL);
+    if (ret == EDEADLK)
+        pthread_detach(priv->thread);
 
     if (priv->fd > 0) {
         close(priv->fd);
