@@ -23,6 +23,7 @@
  ****************************************************************************/
 
 #include <errno.h>
+#include <netinet/in.h>
 #include <netpacket/rpmsg.h>
 #include <poll.h>
 #include <stdio.h>
@@ -39,6 +40,13 @@
  ****************************************************************************/
 
 #define MEDIA_SERVER_MAXCONN 10
+#define SAFE_CLOSE(fd) \
+    do {               \
+        if (fd > 0) {  \
+            close(fd); \
+            fd = 0;    \
+        }              \
+    } while (0)
 
 /****************************************************************************
  * Private Types
@@ -55,6 +63,9 @@ struct media_server_conn {
 struct media_server_priv {
     int local_fd;
     int rpmsg_fd;
+#if CONFIG_MEDIA_SERVER_PORT >= 0
+    int inet_fd;
+#endif
     media_server_onreceive onreceive;
     struct media_server_conn conns[MEDIA_SERVER_MAXCONN];
 };
@@ -119,7 +130,7 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
     if (priv == NULL || fd->fd <= 0)
         return -EINVAL;
 
-    if (fd->revents == POLLERR || fd->revents == POLLHUP) {
+    if ((fd->revents & POLLERR) || (fd->revents & POLLHUP)) {
         close(fd->fd);
         conn->tran_fd = -EPERM;
         media_parcel_deinit(&conn->parcel);
@@ -216,6 +227,9 @@ static int media_server_listen(struct media_server_priv* priv, int family)
     struct sockaddr* addr;
     struct sockaddr_un local_addr;
     struct sockaddr_rpmsg rpmsg_addr;
+#if CONFIG_MEDIA_SERVER_PORT >= 0
+    struct sockaddr_in in_addr;
+#endif
     int fd;
     int len;
 
@@ -230,6 +244,17 @@ static int media_server_listen(struct media_server_priv* priv, int family)
             MEDIA_SOCKADDR_NAME, CONFIG_RPTUN_LOCAL_CPUNAME);
         addr = (struct sockaddr*)&local_addr;
         len = sizeof(struct sockaddr_un);
+#if CONFIG_MEDIA_SERVER_PORT >= 0
+    } else if (family == AF_INET) {
+        int opt = 1;
+        priv->inet_fd = fd;
+        in_addr.sin_family = AF_INET;
+        in_addr.sin_addr.s_addr = INADDR_ANY;
+        in_addr.sin_port = htons(CONFIG_MEDIA_SERVER_PORT);
+        addr = (struct sockaddr*)&in_addr;
+        len = sizeof(in_addr);
+        setsockopt(priv->inet_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+#endif
     } else {
         priv->rpmsg_fd = fd;
         rpmsg_addr.rp_family = AF_RPMSG;
@@ -256,7 +281,7 @@ static int media_server_listen(struct media_server_priv* priv, int family)
 void* media_server_create(void* cb)
 {
     struct media_server_priv* priv;
-    int ret1, ret2;
+    int ret1 = -1, ret2 = -1, ret3 = -1;
 
     if (cb == NULL)
         return NULL;
@@ -267,7 +292,10 @@ void* media_server_create(void* cb)
 
     ret1 = media_server_listen(priv, PF_LOCAL);
     ret2 = media_server_listen(priv, AF_RPMSG);
-    if (ret1 < 0 && ret2 < 0) {
+#if CONFIG_MEDIA_SERVER_PORT >= 0
+    ret3 = media_server_listen(priv, AF_INET);
+#endif
+    if (ret1 < 0 && ret2 < 0 && ret3 < 0) {
         media_server_destroy(priv);
         return NULL;
     }
@@ -283,10 +311,11 @@ int media_server_destroy(void* handle)
     if (priv == NULL)
         return -EINVAL;
 
-    if (priv->local_fd > 0)
-        close(priv->local_fd);
-    if (priv->rpmsg_fd > 0)
-        close(priv->rpmsg_fd);
+    SAFE_CLOSE(priv->local_fd);
+    SAFE_CLOSE(priv->rpmsg_fd);
+#if CONFIG_MEDIA_SERVER_PORT >= 0
+    SAFE_CLOSE(priv->inet_fd);
+#endif
 
     for (i = 0; i < MEDIA_SERVER_MAXCONN; i++) {
         if (priv->conns[i].tran_fd > 0) {
@@ -322,7 +351,13 @@ int media_server_get_pollfds(void* handle, struct pollfd* fds, void** conns, int
         fds[i].events = POLLIN;
         conns[i++] = NULL;
     }
-
+#if CONFIG_MEDIA_SERVER_PORT >= 0
+    if (priv->inet_fd > 0) {
+        fds[i].fd = priv->inet_fd;
+        fds[i].events = POLLIN;
+        conns[i++] = NULL;
+    }
+#endif
     for (j = 0; j < MEDIA_SERVER_MAXCONN; j++) {
         if (priv->conns[j].tran_fd > 0) {
             fds[i].fd = priv->conns[j].tran_fd;
