@@ -37,6 +37,10 @@ config MEDIA_FOCUS
 	bool "Enable media focus"
 	default n
 
+config MEDIA_SERVER_PORT
+	int "Media server AF_INET listening port"
+	default -1
+
 if MEDIA_FOCUS
 
 config MEDIA_FOCUS_STACK_DEPTH
