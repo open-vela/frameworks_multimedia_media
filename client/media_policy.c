@@ -43,6 +43,7 @@
 #define MEDIA_POLICY_HFP_SAMPLERATE "HFPSampleRate"
 #define MEDIA_POLICY_MUTE_MODE "MuteMode"
 #define MEDIA_POLICY_VOLUME "Volume"
+#define MEDIA_POLICY_MIC_MODE "MicMode"
 
 /****************************************************************************
  * Public Functions
@@ -243,4 +244,10 @@ int media_policy_decrease(const char* name, int apply)
 void media_policy_dump(const char* options)
 {
     media_proxy(MEDIA_ID_POLICY, NULL, NULL, "dump", options, 0, NULL, 0, false);
+}
+
+int media_policy_set_mic_mute(int mute)
+{
+    return media_policy_set_string(MEDIA_POLICY_MIC_MODE, mute ? "off" : "on",
+        MEDIA_POLICY_APPLY);
 }
