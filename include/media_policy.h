@@ -311,6 +311,15 @@ int media_policy_increase(const char* name, int apply);
  */
 int media_policy_decrease(const char* name, int apply);
 
+/**
+ * Mute microphone for builtin_mic or bluetooth_mic.
+ * @param[in] mute   mute mode.
+ *                  - 1: mute mode is off.
+ *                  - 0: mute mode is on.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_set_mic_mute(int mute);
+
 #ifdef __cplusplus
 }
 #endif
