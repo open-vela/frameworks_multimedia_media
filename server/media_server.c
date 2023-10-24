@@ -96,7 +96,7 @@ static int media_server_create_notify(struct media_server_priv* priv, media_parc
         len = sizeof(struct sockaddr_un);
     }
 
-    fd = socket(family, SOCK_STREAM, 0);
+    fd = socket(family, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0)
         return -errno;
 
@@ -198,7 +198,7 @@ static int media_server_accept(void* handle, struct pollfd* fd)
     if (priv == NULL || fd->fd <= 0 || fd->revents == 0)
         return -EINVAL;
 
-    new_fd = accept(fd->fd, NULL, NULL);
+    new_fd = accept4(fd->fd, NULL, NULL, SOCK_CLOEXEC);
     if (new_fd < 0)
         return -errno;
 
@@ -219,7 +219,7 @@ static int media_server_listen(struct media_server_priv* priv, int family)
     int fd;
     int len;
 
-    fd = socket(family, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    fd = socket(family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
     if (fd < 0)
         return -errno;
 

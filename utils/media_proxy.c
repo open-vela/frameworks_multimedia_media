@@ -111,7 +111,7 @@ static int media_proxy_create_listenfd(MediaClientPriv* priv, const char* cpu)
     sprintf(key, "md_%p", priv);
     media_proxy_get_sockaddr(&family, &socklen, &addr, cpu, key);
 
-    priv->listenfd = socket(family, SOCK_STREAM, 0);
+    priv->listenfd = socket(family, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (priv->listenfd < 0)
         return priv->listenfd;
 
@@ -144,7 +144,7 @@ static void* media_proxy_listen_thread(pthread_addr_t pvarg)
     int acceptfd;
     int ret;
 
-    acceptfd = accept(priv->listenfd, NULL, NULL);
+    acceptfd = accept4(priv->listenfd, NULL, NULL, SOCK_CLOEXEC);
     if (acceptfd <= 0)
         goto thread_error;
 
@@ -191,7 +191,7 @@ void* media_proxy_connect(const char* cpu)
 
     snprintf(key, sizeof(key), MEDIA_SOCKADDR_NAME, cpu);
     media_proxy_get_sockaddr(&family, &len, &addr, cpu, key);
-    priv->fd = socket(family, SOCK_STREAM, 0);
+    priv->fd = socket(family, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (priv->fd <= 0)
         goto socket_error;
 

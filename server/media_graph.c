@@ -153,7 +153,7 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
 
     av_log(NULL, AV_LOG_INFO, "%s, loadgraph from file: %s\n", __func__, conf);
 
-    fd = open(conf, O_RDONLY | O_BINARY);
+    fd = open(conf, O_RDONLY | O_BINARY | O_CLOEXEC);
     if (fd < 0) {
         av_log(NULL, AV_LOG_ERROR, "%s, can't open media graph file\n", __func__);
         return -errno;
