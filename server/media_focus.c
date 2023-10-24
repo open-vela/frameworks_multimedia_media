@@ -517,7 +517,7 @@ void* media_focus_create(void* file)
     int shift_index = 0;
     media_focus* focus = NULL;
 
-    fp = fopen(file, "r");
+    fp = fopen(file, "re");
     if (fp == NULL) {
         auderr("no such interaction matrix file\n");
         return NULL;
