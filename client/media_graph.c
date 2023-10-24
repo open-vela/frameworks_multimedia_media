@@ -146,7 +146,7 @@ static int media_bind_socket(void* handle, char* url, size_t len)
     if (ret < 0)
         return ret;
 
-    fd = socket(addr.ss_family, SOCK_STREAM, 0);
+    fd = socket(addr.ss_family, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0)
         return -errno;
 
@@ -200,7 +200,7 @@ static int media_prepare(void* handle, const char* url, const char* options)
         goto out;
 
     if (fd > 0) {
-        priv->socket = accept(fd, NULL, NULL);
+        priv->socket = accept4(fd, NULL, NULL, SOCK_CLOEXEC);
         if (priv->socket < 0) {
             priv->socket = 0;
             ret = -errno;
