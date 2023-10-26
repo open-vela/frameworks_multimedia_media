@@ -38,6 +38,7 @@ extern "C" {
 #define MEDIA_AUDIO_MODE_NORMAL "normal" /*!< play and capture audio */
 #define MEDIA_AUDIO_MODE_PHONE "phone"
 #define MEDIA_AUDIO_MODE_RINGTONE "ringtone"
+#define MEDIA_AUDIO_MODE_VOIP "voip"
 
 #define MEDIA_DEVICE_A2DP "a2dp" /*!< bt cellphone */
 #define MEDIA_DEVICE_A2DP_SNK "a2dpsnk"
