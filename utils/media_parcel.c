@@ -67,9 +67,10 @@ static int media_parcel_copy(media_parcel* parcel, void* val, size_t size)
     if (parcel->next + size > parcel->chunk->len)
         return -ENOSPC;
 
-    memcpy(val, &parcel->chunk->buf[parcel->next], size);
-    parcel->next += size;
+    if (val)
+        memcpy(val, &parcel->chunk->buf[parcel->next], size);
 
+    parcel->next += size;
     return 0;
 }
 
@@ -416,7 +417,10 @@ int media_parcel_read_vscanf(media_parcel* parcel, const char* fmt, va_list* ap)
             break;
         case 's':
             p_s = va_arg(*ap, const char**);
-            *p_s = media_parcel_read_string(parcel);
+            if (p_s)
+                *p_s = media_parcel_read_string(parcel);
+            else
+                media_parcel_read_string(parcel);
             break;
         default:
             break;
