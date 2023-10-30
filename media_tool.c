@@ -647,22 +647,6 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
     else if (!strcmp(mode, "direct"))
         direct = true;
 
-    switch (media->chain[id].type) {
-    case MEDIATOOL_PLAYER:
-        ret = media_player_prepare(media->chain[id].handle, url_mode ? path : NULL, options);
-        break;
-
-    case MEDIATOOL_RECORDER:
-        ret = media_recorder_prepare(media->chain[id].handle, url_mode ? path : NULL, options);
-        break;
-
-    default:
-        return 0;
-    }
-
-    if (ret < 0)
-        return ret;
-
     if (!url_mode) {
         if (media->chain[id].thread) {
             printf("already prepare, can't prepare twice\n");
@@ -677,7 +661,27 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
             printf("buffer mode, file can't open\n");
             return -EINVAL;
         }
+    }
 
+    switch (media->chain[id].type) {
+    case MEDIATOOL_PLAYER:
+        ret = media_player_prepare(media->chain[id].handle, url_mode ? path : NULL, options);
+        break;
+
+    case MEDIATOOL_RECORDER:
+        ret = media_recorder_prepare(media->chain[id].handle, url_mode ? path : NULL, options);
+        break;
+
+    default:
+        printf("Unsupported type!\n");
+        ret = -EINVAL;
+        break;
+    }
+
+    if (ret < 0)
+        goto err;
+
+    if (!url_mode) {
         media->chain[id].direct = direct;
         media->chain[id].size = 512;
         media->chain[id].buf = malloc(media->chain[id].size);
@@ -690,6 +694,13 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
         media->chain[id].thread = thread;
     }
 
+    return ret;
+
+err:
+    if (!url_mode && media->chain[id].fd >= 0) {
+        close(media->chain[id].fd);
+        media->chain[id].fd = -1;
+    }
     return ret;
 }
 
