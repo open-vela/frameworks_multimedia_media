@@ -31,6 +31,10 @@
 #include <stdlib.h>
 #include <system/readline.h>
 #include <unistd.h>
+#ifdef CONFIG_LIBUV_EXTENSION
+#include <uv.h>
+#include <uv_async_queue.h>
+#endif
 
 #include <media_api.h>
 
@@ -45,6 +49,8 @@
 #define MEDIATOOL_CONTROLLER 3
 #define MEDIATOOL_CONTROLLEE 4
 #define MEDIATOOL_FOCUS 5
+#define MEDIATOOL_UVPLAYER 6
+#define MEDIATOOL_UVRECORDER 7
 
 #define GET_ARG_FUNC(out_type, arg)                  \
     static out_type get_##out_type##_arg(char* arg); \
@@ -114,7 +120,7 @@
     static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3, type4 arg4)
 
 /****************************************************************************
- * Public Type Declarations
+ * Type Declarations
  ****************************************************************************/
 
 struct mediatool_chain_s {
@@ -138,10 +144,6 @@ struct mediatool_s {
     struct mediatool_chain_s chain[MEDIATOOL_MAX_CHAIN];
 };
 
-/****************************************************************************
- * Private Type Declarations
- ****************************************************************************/
-
 typedef int (*mediatool_func)(struct mediatool_s* media, int argc, char** argv);
 
 struct mediatool_cmd_s {
@@ -151,6 +153,16 @@ struct mediatool_cmd_s {
 };
 
 typedef char* string_t;
+
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+struct mediatool_s g_mediatool;
+#ifdef CONFIG_LIBUV_EXTENSION
+static uv_loop_t g_mediatool_uvloop;
+static uv_async_queue_t g_mediatool_uvasyncq;
+#endif
 
 /****************************************************************************
  * Private Function
@@ -307,16 +319,79 @@ static void mediatool_focus_callback(int suggestion, void* cookie)
         __func__, chain->id, str, suggestion, __LINE__);
 }
 
+#ifdef CONFIG_LIBUV_EXTENSION
+static void mediatool_uv_common_close_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+    chain->handle = NULL;
+    chain->id = 0;
+}
+
+static void mediatool_uv_common_open_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_common_prepare_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_common_start_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_common_pause_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_common_stop_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_player_get_position_cb(void* cookie, int ret, unsigned position)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d val:%u\n", __func__, chain->id, ret, position);
+}
+
+static void mediatool_uv_player_get_duration_cb(void* cookie, int ret, unsigned duration)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d val:%u\n", __func__, chain->id, ret, duration);
+}
+#endif /* CONFIG_LIBUV_EXTENSION */
+
 static void mediatool_common_stop_thread(struct mediatool_chain_s* chain)
 {
     if (chain->thread) {
-
         pthread_join(chain->thread, NULL);
         free(chain->buf);
         close(chain->fd);
 
         chain->thread = 0;
         chain->buf = NULL;
+    }
+
+    if (chain->fd > 0) {
+        close(chain->fd);
         chain->fd = -1;
     }
 }
@@ -333,6 +408,16 @@ static int mediatool_common_stop_inner(struct mediatool_chain_s* chain)
     case MEDIATOOL_RECORDER:
         ret = media_recorder_stop(chain->handle);
         break;
+
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        ret = media_uv_player_stop(chain->handle, mediatool_uv_common_stop_cb, chain);
+        break;
+
+    case MEDIATOOL_UVRECORDER:
+        ret = media_uv_recorder_stop(chain->handle, mediatool_uv_common_stop_cb, chain);
+        break;
+#endif
     }
 
     usleep(1000);
@@ -500,6 +585,16 @@ CMD2(close, int, id, int, pending_stop)
     case MEDIATOOL_FOCUS:
         ret = media_focus_abandon(media->chain[id].handle);
         break;
+
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        ret = media_uv_player_close(media->chain[id].handle, pending_stop, mediatool_uv_common_close_cb);
+        break;
+
+    case MEDIATOOL_UVRECORDER:
+        ret = media_uv_recorder_close(media->chain[id].handle, mediatool_uv_common_close_cb);
+        break;
+#endif
     }
 
     media->chain[id].handle = NULL;
@@ -632,6 +727,7 @@ out:
 
 CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
 {
+    bool async_mode = false;
     bool url_mode = false;
     bool direct = false;
     pthread_t thread;
@@ -673,6 +769,20 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
         ret = media_recorder_prepare(media->chain[id].handle, url_mode ? path : NULL, options);
         break;
 
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        ret = media_uv_player_prepare(media->chain[id].handle, url_mode ? path : NULL, options,
+            mediatool_uv_common_prepare_cb, &media->chain[id]);
+        async_mode = true;
+        break;
+
+    case MEDIATOOL_UVRECORDER:
+        ret = media_uv_recorder_prepare(media->chain[id].handle, url_mode ? path : NULL, options,
+            mediatool_uv_common_prepare_cb, &media->chain[id]);
+        async_mode = true;
+        break;
+#endif
+
     default:
         printf("Unsupported type!\n");
         ret = -EINVAL;
@@ -682,7 +792,7 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
     if (ret < 0)
         goto err;
 
-    if (!url_mode) {
+    if (!async_mode && !url_mode) {
         media->chain[id].direct = direct;
         media->chain[id].size = 512;
         media->chain[id].buf = malloc(media->chain[id].size);
@@ -724,6 +834,18 @@ CMD1(start, int, id)
     case MEDIATOOL_CONTROLLER:
         ret = media_session_start(media->chain[id].handle);
         break;
+
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        ret = media_uv_player_start(media->chain[id].handle,
+            mediatool_uv_common_start_cb, &media->chain[id]);
+        break;
+
+    case MEDIATOOL_UVRECORDER:
+        ret = media_uv_recorder_start(media->chain[id].handle,
+            mediatool_uv_common_start_cb, &media->chain[id]);
+        break;
+#endif
     }
 
     return ret;
@@ -756,6 +878,18 @@ CMD1(pause, int, id)
     case MEDIATOOL_CONTROLLER:
         ret = media_session_pause(media->chain[id].handle);
         break;
+
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        ret = media_uv_player_pause(media->chain[id].handle,
+            mediatool_uv_common_pause_cb, &media->chain[id]);
+        break;
+
+    case MEDIATOOL_UVRECORDER:
+        ret = media_uv_recorder_pause(media->chain[id].handle,
+            mediatool_uv_common_pause_cb, &media->chain[id]);
+        break;
+#endif
     }
 
     return ret;
@@ -838,7 +972,7 @@ CMD2(seek, int, id, int, msec)
 
 CMD1(position, int, id)
 {
-    unsigned int position;
+    unsigned int position = 0;
     int ret;
 
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
@@ -853,6 +987,11 @@ CMD1(position, int, id)
         ret = media_session_get_position(media->chain[id].handle, &position);
         break;
 
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        return media_uv_player_get_position(media->chain[id].handle,
+            mediatool_uv_player_get_position_cb, &media->chain[id]);
+#endif
     default:
         return 0;
     }
@@ -884,6 +1023,11 @@ CMD1(duration, int, id)
         ret = media_session_get_duration(media->chain[id].handle, &duration);
         break;
 
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        return media_uv_player_get_duration(media->chain[id].handle,
+            mediatool_uv_player_get_duration_cb, &media->chain[id]);
+#endif
     default:
         return 0;
     }
@@ -1149,8 +1293,140 @@ static int mediatool_cmd_help(const struct mediatool_cmd_s cmds[])
     return 0;
 }
 
+#ifdef CONFIG_LIBUV_EXTENSION
+CMD1(uv_player_open, string_t, stream_type)
+{
+    long int i;
+
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!media->chain[i].handle)
+            break;
+    }
+
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
+    media->chain[i].id = i;
+    media->chain[i].handle = media_uv_player_open(&g_mediatool_uvloop, stream_type,
+        mediatool_uv_common_open_cb, &media->chain[i]);
+    if (!media->chain[i].handle)
+        goto err;
+
+    if (media_uv_player_listen(media->chain[i].handle, mediatool_event_callback) < 0)
+        goto err;
+
+    media->chain[i].type = MEDIATOOL_UVPLAYER;
+    return 0;
+
+err:
+    printf("%s error\n", __func__);
+    return -EINVAL;
+}
+
+CMD1(uv_recorder_open, string_t, stream_type)
+{
+    long int i;
+
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!media->chain[i].handle)
+            break;
+    }
+
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
+    media->chain[i].id = i;
+    media->chain[i].handle = media_uv_recorder_open(&g_mediatool_uvloop, stream_type,
+        mediatool_uv_common_open_cb, &media->chain[i]);
+    if (!media->chain[i].handle)
+        goto err;
+
+    if (media_uv_recorder_listen(media->chain[i].handle, mediatool_event_callback) < 0)
+        goto err;
+
+    media->chain[i].type = MEDIATOOL_UVRECORDER;
+    return 0;
+
+err:
+    printf("%s error\n", __func__);
+    return -EINVAL;
+}
+
+static void mediatool_cmd_uv_policy_set_int_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+CMD3(uv_policy_set_int, string_t, name, int, value, int, apply)
+{
+    return media_uv_policy_set_int(&g_mediatool_uvloop, name, value, apply,
+        mediatool_cmd_uv_policy_set_int_cb, strdup(name));
+}
+
+static void mediatool_cmd_uv_policy_get_int_cb(void* cookie, int ret, int val)
+{
+    printf("[%s] name:%s ret:%d val:%d\n", __func__, (char*)cookie, ret, val);
+    free(cookie);
+}
+
+CMD1(uv_policy_get_int, string_t, name)
+{
+    return media_uv_policy_get_int(&g_mediatool_uvloop, name,
+        mediatool_cmd_uv_policy_get_int_cb, strdup(name));
+}
+
+static void mediatool_cmd_uv_policy_set_string_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+CMD3(uv_policy_set_string, string_t, name, string_t, value, int, apply)
+{
+    return media_uv_policy_set_string(&g_mediatool_uvloop, name, value, apply,
+        mediatool_cmd_uv_policy_set_string_cb, strdup(name));
+}
+
+static void mediatool_cmd_uv_policy_get_string_cb(void* cookie, int ret, const char* val)
+{
+    printf("[%s] name:%s ret:%d val:%s\n", __func__, (char*)cookie, ret, val);
+    free(cookie);
+}
+
+CMD1(uv_policy_get_string, string_t, name)
+{
+    return media_uv_policy_get_string(&g_mediatool_uvloop, name,
+        mediatool_cmd_uv_policy_get_string_cb, strdup(name));
+}
+
+static void mediatool_cmd_uv_policy_increase_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+CMD2(uv_policy_increase, string_t, name, int, apply)
+{
+    return media_uv_policy_increase(&g_mediatool_uvloop, name, apply,
+        mediatool_cmd_uv_policy_increase_cb, strdup(name));
+}
+
+static void mediatool_cmd_uv_policy_decrease_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+CMD2(uv_policy_decrease, string_t, name, int, apply)
+{
+    return media_uv_policy_decrease(&g_mediatool_uvloop, name, apply,
+        mediatool_cmd_uv_policy_decrease_cb, strdup(name));
+}
+#endif /* CONFIG_LIBUV_EXTENSION */
+
 /****************************************************************************
- * Private Data
+ * Public Functions
  ****************************************************************************/
 
 static const struct mediatool_cmd_s g_mediatool_cmds[] = {
@@ -1256,6 +1532,32 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "abandon",
         mediatool_cmd_close,
         "Abandon media focus(abandon ID)" },
+#ifdef CONFIG_LIBUV_EXTENSION
+    { "uv_open",
+        mediatool_cmd_uv_player_open,
+        "Create an async player return ID (uv_open [STREAM/FILTER])" },
+    { "uv_copen",
+        mediatool_cmd_uv_recorder_open,
+        "Create an async recorder return ID (uv_copen [STREAM/FILTER])" },
+    { "uv_setint",
+        mediatool_cmd_uv_policy_set_int,
+        "Async set numerical value to criterion (uv_setint NAME VALUE APPLY)" },
+    { "uv_getint",
+        mediatool_cmd_uv_policy_get_int,
+        "Async get numerical value from criterion (uv_getint NAME)" },
+    { "uv_setstr",
+        mediatool_cmd_uv_policy_set_string,
+        "Async set lieteral value to criterion (uv_setstr NAME VALUE APPLY)" },
+    { "uv_getstr",
+        mediatool_cmd_uv_policy_get_string,
+        "Async get lieteral value from criterion (uv_getstr NAME)" },
+    { "uv_increase",
+        mediatool_cmd_uv_policy_increase,
+        "Async increase value of numerical criterion (uv_increase NAME)" },
+    { "uv_decrease",
+        mediatool_cmd_uv_policy_decrease,
+        "Async decrease value of numerical criterion (uv_decrease NAME)" },
+#endif /* CONFIG_LIBUV_EXTENSION */
     { "q",
         mediatool_cmd_quit,
         "Quit (q)" },
@@ -1314,13 +1616,101 @@ static int mediatool_execute(struct mediatool_s* media, char* buffer)
     return ret;
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
+#ifdef CONFIG_LIBUV_EXTENSION
+static void mediatool_uvasyncq_close_cb(uv_handle_t* handle)
+{
+    printf("Bye-Bye!\n");
+    uv_stop(&g_mediatool_uvloop);
+}
+
+static void mediatool_uvasyncq_cb(uv_async_queue_t* asyncq, void* data)
+{
+    int ret;
+
+    ret = mediatool_execute(&g_mediatool, data);
+    free(data);
+    if (ret < 0)
+        uv_close((uv_handle_t*)&g_mediatool_uvasyncq, mediatool_uvasyncq_close_cb);
+}
+
+static void* mediatool_uvloop_thread(void* arg)
+{
+    int ret;
+
+    ret = uv_loop_init(&g_mediatool_uvloop);
+    if (ret < 0)
+        return NULL;
+
+    ret = uv_async_queue_init(&g_mediatool_uvloop, &g_mediatool_uvasyncq,
+        mediatool_uvasyncq_cb);
+    if (ret < 0)
+        goto out;
+
+    printf("[%s][%d] running\n", __func__, __LINE__);
+    while (1) {
+        ret = uv_run(&g_mediatool_uvloop, UV_RUN_DEFAULT);
+        if (ret == 0)
+            break;
+    }
+
+out:
+    ret = uv_loop_close(&g_mediatool_uvloop);
+    printf("[%s][%d] out:%d\n", __func__, __LINE__, ret);
+    return NULL;
+}
 
 int main(int argc, char* argv[])
 {
-    struct mediatool_s mediatool = { 0 };
+    char* buffer = NULL;
+    pthread_t thread;
+    int ret, len;
+
+    ret = pthread_create(&thread, NULL, mediatool_uvloop_thread, NULL);
+    if (ret < 0)
+        goto out;
+
+    usleep(1000); /* let uvloop run. */
+    while (1) {
+        printf("mediatool> ");
+        fflush(stdout);
+
+        if (!buffer) {
+            buffer = malloc(CONFIG_NSH_LINELEN);
+            assert(buffer);
+        }
+
+        len = readline_stream(buffer, CONFIG_NSH_LINELEN, stdin, stdout);
+        if (len <= 0)
+            continue;
+        buffer[len] = '\0';
+
+        if (buffer[0] == '!') {
+#ifdef CONFIG_SYSTEM_SYSTEM
+            system(buffer + 1);
+#endif
+            continue;
+        }
+
+        if (buffer[len - 1] == '\n')
+            buffer[len - 1] = '\0';
+
+        if (buffer[0] == '\0')
+            continue;
+
+        uv_async_queue_send(&g_mediatool_uvasyncq, buffer);
+        if (!strcmp(buffer, "q"))
+            break;
+
+        buffer = NULL;
+    }
+
+out:
+    pthread_join(thread, NULL);
+    return 0;
+}
+#else /* CONFIG_LIBUV_EXTENSION */
+int main(int argc, char* argv[])
+{
     int ret, len;
     char* buffer;
 
@@ -1350,7 +1740,7 @@ int main(int argc, char* argv[])
         if (buffer[0] == '\0')
             continue;
 
-        ret = mediatool_execute(&mediatool, buffer);
+        ret = mediatool_execute(&g_mediatool, buffer);
 
         if (ret < 0) {
             printf("Bye-Bye!\n");
@@ -1361,3 +1751,5 @@ int main(int argc, char* argv[])
     free(buffer);
     return 0;
 }
+
+#endif /* CONFIG_LIBUV_EXTENSION */
