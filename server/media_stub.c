@@ -126,7 +126,7 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
     }
 
     if (out)
-        media_parcel_append_printf(out, "%s%s%s%i%s", target, cmd, arg, ret, response);
+        media_parcel_append_printf(out, "%i%s", ret, response);
 
     free(response);
 }

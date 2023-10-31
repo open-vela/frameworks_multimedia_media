@@ -68,26 +68,26 @@ int media_recorder_close(void* handle);
  * when state changed or something user cares.
  *
  * @code
- *  struct player_state_s
+ *  struct recorder_state_s
  *  {
  *      sem_t sem;
  *      int   last_event;
  *      int   result;
- *      void *player_handle;
+ *      void *recorder_handle;
  *  };
  *  void callback(void* cookie, int event, int ret, const char *data){
- *      struct player_state_s* player_state = (struct player_state_s*) cookie;
- *      player_state->last_event = event;
- *      player_state->result = ret;
- *      sem_post(&player_state->sem);
+ *      struct recorder_state_s* recorder_state = (struct recorder_state_s*) cookie;
+ *      recorder_state->last_event = event;
+ *      recorder_state->result = ret;
+ *      sem_post(&recorder_state->sem);
  *  }
  *
  *  // You can modify or create as you wish.
- *  struct player_state_s* player_state = *state;
+ *  struct recorder_state_s* recorder_state = *state;
  *  void *handle = media_recorder_open("cap");
- *  int ret = media_recorder_set_event_callback(handle, player_state,
+ *  int ret = media_recorder_set_event_callback(handle, recorder_state,
  *                                              callback);
- *  printf("%d", player_state->last_event);
+ *  printf("%d", recorder_state->last_event);
  * @endcode
  *
  * @param[in] handle    The recorder handle
@@ -276,6 +276,82 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
  * @return Zero on success; a negative errno value on failure.
  */
 int media_recorder_take_picture(char* params, char* filename, size_t number, media_event_callback event_cb, void* cookie);
+
+#ifdef CONFIG_LIBUV
+/**
+ * @brief Open an async recorder.
+ *
+ * @param[in] loop          Loop handle of current thread.
+ * @param[in] source        Source type.
+ * @param[in] on_open       Open callback, called after open is done.
+ * @param[in] cookie        Long-term callback context for:
+ *                          on_open, on_event, on_close.
+ * @return void* Handle of recorder.
+ */
+void* media_uv_recorder_open(void* loop, const char* source,
+    media_uv_callback on_open, void* cookie);
+
+/**
+ * @brief Listen to status change event by setting callback.
+ *
+ * @param[in] handle    Async recorder handle.
+ * @param[in] on_event  Event callback, call after receiving notification.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_recorder_listen(void* handle, media_event_callback on_event);
+
+/**
+ * @brief Close the async recorder.
+ *
+ * @param[in] handle    Async recorder handle.
+ * @param[in] on_close  Release callback, called after releasing internal resources.
+ * @return int Zero on success, negative errno on illegal handle.
+ */
+int media_uv_recorder_close(void* handle, media_uv_callback on_close);
+
+/**
+ * @brief Prepare destination file.
+ *
+ * @param[in] handle        Async recorder handle.
+ * @param[in] url           Path of destination.
+ * @param[in] options       Destination options, @see media_recorder_prpare.
+ * @param[in] on_prepare    Call after receiving result.
+ * @param[in] cookie        One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_recorder_prepare(void* handle, const char* url, const char* options,
+    media_uv_callback on_prepare, void* cookie);
+
+/**
+ * @brief Start or resume the capturing.
+ *
+ * @param[in] handle    Async recorder handle.
+ * @param[in] on_start  Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_recorder_start(void* handle, media_uv_callback on_start, void* cookie);
+
+/**
+ * @brief Pause the capturing.
+ *
+ * @param[in] handle    Async recorder handle.
+ * @param[in] on_pause  Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_recorder_pause(void* handle, media_uv_callback on_pause, void* cookie);
+
+/**
+ * @brief Stop the capturing, finish the destination file.
+ *
+ * @param[in] handle    Async recorder handle.
+ * @param[in] on_stop   Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_recorder_stop(void* handle, media_uv_callback on_stop, void* cookie);
+#endif /* CONFIG_LIBUV */
 
 #undef EXTERN
 #ifdef __cplusplus
