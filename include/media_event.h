@@ -104,4 +104,40 @@ typedef void (*media_event_callback)(void* cookie, int event, int ret,
  */
 typedef void (*media_uv_callback)(void* cookie, int ret);
 
+/**
+ * @brief Callback to get int integer.
+ *
+ * @param[out] cookie   Private context.
+ * @param[out] ret      Result of process, zero on success, negative errno on failure.
+ * @param[out] val      Value.
+ */
+typedef void (*media_uv_int_callback)(void* cookie, int ret, int val);
+
+/**
+ * @brief Callback to get unsinged integer.
+ *
+ * @param[out] cookie   Private context.
+ * @param[out] ret      Result of process, zero on success, negative errno on failure.
+ * @param[out] val      Value.
+ */
+typedef void (*media_uv_unsigned_callback)(void* cookie, int ret, unsigned val);
+
+/**
+ * @brief Callback to get float integer.
+ *
+ * @param[out] cookie   Private context.
+ * @param[out] ret      Result of process, zero on success, negative errno on failure.
+ * @param[out] val      Value.
+ */
+typedef void (*media_uv_float_callback)(void* cookie, int ret, float val);
+
+/**
+ * @brief Callback to get string.
+ *
+ * @param[out] cookie   Private context.
+ * @param[out] ret      Result of process, zero on success, negative errno on failure.
+ * @param[out] val      Value.
+ */
+typedef void (*media_uv_string_callback)(void* cookie, int ret, const char* val);
+
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H */

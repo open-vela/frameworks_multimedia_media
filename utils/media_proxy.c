@@ -422,7 +422,7 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
     if (ret < 0)
         goto out;
 
-    ret = media_parcel_read_scanf(&out, "%s%s%s%i%s", NULL, NULL, NULL, &resp, &response);
+    ret = media_parcel_read_scanf(&out, "%i%s", &resp, &response);
     if (ret < 0 || resp < 0)
         goto out;
 
