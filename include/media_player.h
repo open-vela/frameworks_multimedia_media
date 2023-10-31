@@ -447,6 +447,129 @@ int media_player_set_property(void* handle, const char* target, const char* key,
  */
 int media_player_get_property(void* handle, const char* target, const char* key, char* value, int value_len);
 
+#ifdef CONFIG_LIBUV
+/**
+ * @brief Open an async player.
+ *
+ * @param[in] loop          Loop handle of current thread.
+ * @param[in] stream        Stream type, @see MEDIA_STREAM_* .
+ * @param[in] on_open       Open callback, called after open is done.
+ * @param[in] cookie        Long-term callback context for:
+ *                          on_open, on_event, on_close.
+ * @return void* Handle of player.
+ */
+void* media_uv_player_open(void* loop, const char* stream,
+    media_uv_callback on_open, void* cookie);
+
+/**
+ * @brief Listen to status change event by setting callback.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] on_event  Event callback, call after receiving notification.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_listen(void* handle, media_event_callback on_event);
+
+/**
+ * @brief Close the async player.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] pending   Pending close or not.
+ * @param[in] on_close  Release callback, called after releasing internal resources.
+ * @return int Zero on success, negative errno on illegal handle.
+ */
+int media_uv_player_close(void* handle, int pending,
+    media_uv_callback on_close);
+
+/**
+ * @brief Prepare resource file.
+ *
+ * @param[in] handle        Async player handle.
+ * @param[in] url           Path of resources.
+ * @param[in] options       Resource options, @see media_player_prpare.
+ * @param[in] on_prepare    Call after receiving result.
+ * @param[in] cookie        One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_prepare(void* handle, const char* url, const char* options,
+    media_uv_callback on_prepare, void* cookie);
+
+/**
+ * @brief Play or resume the prepared resouce.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] on_start  Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_start(void* handle, media_uv_callback on_start, void* cookie);
+
+/**
+ * @brief Pause the playing.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] on_pause  Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_pause(void* handle, media_uv_callback on_pause, void* cookie);
+
+/**
+ * @brief Stop the playing, clear the prepared resource file.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] on_stop   Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_stop(void* handle, media_uv_callback on_stop, void* cookie);
+
+/**
+ * @brief Set player volume.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] volume    Volume in [0.0, 1.0].
+ * @param[in] on_volume Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_set_volume(void* handle, float volume,
+    media_uv_callback on_volume, void* cookie);
+
+/**
+ * @brief Get current playing status.
+ *
+ * @param handle        Async player handle.
+ * @param on_playing    Call after receiving result.
+ * @param cookie        One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_get_playing(void* handle,
+    media_uv_int_callback on_playing, void* cookie);
+
+/**
+ * @brief Get current playing position.
+ *
+ * @param[in] handle        Async player handle.
+ * @param[in] on_position   Call after receiving result.
+ * @param[in] cookie        One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_get_position(void* handle,
+    media_uv_unsigned_callback on_position, void* cookie);
+
+/**
+ * @brief Get duration of current playing resource.
+ *
+ * @param handle        Async player handle.
+ * @param on_duration   Call after receiving result.
+ * @param cookie        One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_get_duration(void* handle,
+    media_uv_unsigned_callback on_duration, void* cookie);
+#endif /* CONFIG_LIBUV */
+
 #undef EXTERN
 #ifdef __cplusplus
 }
