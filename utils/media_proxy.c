@@ -376,8 +376,8 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
     switch (priv->type) {
     case MEDIA_ID_FOCUS:
         name = "focus";
-        ret = media_parcel_append_printf(&in, "%i%l%s%s%i", priv->type,
-            priv->handle, target, cmd, res_len);
+        ret = media_parcel_append_printf(&in, "%i%s%s%i", priv->type,
+            target, cmd, res_len);
         break;
 
     case MEDIA_ID_GRAPH:
@@ -394,20 +394,20 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
 
     case MEDIA_ID_PLAYER:
         name = "player";
-        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
-            priv->handle, target, cmd, arg, res_len);
+        ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
+            target, cmd, arg, res_len);
         break;
 
     case MEDIA_ID_RECORDER:
         name = "recorder";
-        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
-            priv->handle, target, cmd, arg, res_len);
+        ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
+            target, cmd, arg, res_len);
         break;
 
     case MEDIA_ID_SESSION:
         name = "session";
-        ret = media_parcel_append_printf(&in, "%i%l%s%s%s%i", priv->type,
-            priv->handle, target, cmd, arg, res_len);
+        ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
+            target, cmd, arg, res_len);
         break;
 
     default:
@@ -436,7 +436,7 @@ out:
     media_parcel_deinit(&out);
 
     syslog(LOG_INFO, "%s:%s:%p %s %s %s %s ret:%d resp:%d\n",
-        name, priv->cpu, (void*)(uintptr_t)priv->handle, target ? target : "_",
+        name, priv->cpu, (void*)(uintptr_t)priv, target ? target : "_",
         cmd, arg ? arg : "_", apply ? "apply" : "_", ret, (int)resp);
     return ret < 0 ? ret : resp;
 }

@@ -58,6 +58,7 @@ struct media_server_conn {
     media_parcel parcel;
     uint32_t offset;
     pthread_mutex_t mutex;
+    void* data;
 };
 
 struct media_server_priv {
@@ -195,6 +196,7 @@ static bool media_server_conn_init(struct media_server_conn* conn, int fd)
     if (available) {
         media_parcel_init(&conn->parcel);
         conn->tran_fd = fd;
+        conn->data = NULL;
     }
 
     return available;
@@ -418,4 +420,19 @@ void media_server_finalize(void* handle, void* cookie)
     }
 
     pthread_mutex_unlock(&conn->mutex);
+}
+
+void media_server_set_data(void* cookie, void* data)
+{
+    struct media_server_conn* conn = cookie;
+
+    if (conn != NULL)
+        conn->data = data;
+}
+
+void* media_server_get_data(void* cookie)
+{
+    struct media_server_conn* conn = cookie;
+
+    return conn ? conn->data : NULL;
 }

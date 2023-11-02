@@ -421,20 +421,21 @@ err:
     return NULL;
 }
 
-static int media_common_handler(MediaGraphPriv* priv, void* handle,
+static int media_common_handler(MediaGraphPriv* priv, void* cookie,
     const char* target, const char* cmd, const char* arg,
     char* res, int res_len, bool player)
 {
-    MediaFilterPriv* ctx = handle;
+    MediaFilterPriv* ctx = media_server_get_data(cookie);
     AVFilterContext* filter;
     int pending;
 
     if (!strcmp(cmd, "open")) {
-        ctx = media_common_open(priv, arg, handle, player);
+        ctx = media_common_open(priv, arg, cookie, player);
         if (!ctx)
             return -EINVAL;
 
-        return snprintf(res, res_len, "%" PRIu64 "", (uint64_t)(uintptr_t)ctx);
+        media_server_set_data(cookie, ctx);
+        return 0;
     }
 
     if (!strcmp(cmd, "set_event")) {
@@ -619,14 +620,14 @@ int media_graph_handler(void* graph, const char* target, const char* cmd,
     return 0;
 }
 
-int media_player_handler(void* graph, void* handle, const char* target, const char* cmd,
+int media_player_handler(void* graph, void* cookie, const char* target, const char* cmd,
     const char* arg, char* res, int res_len)
 {
-    return media_common_handler(graph, handle, target, cmd, arg, res, res_len, true);
+    return media_common_handler(graph, cookie, target, cmd, arg, res, res_len, true);
 }
 
-int media_recorder_handler(void* graph, void* handle, const char* target, const char* cmd,
+int media_recorder_handler(void* graph, void* cookie, const char* target, const char* cmd,
     const char* arg, char* res, int res_len)
 {
-    return media_common_handler(graph, handle, target, cmd, arg, res, res_len, false);
+    return media_common_handler(graph, cookie, target, cmd, arg, res, res_len, false);
 }

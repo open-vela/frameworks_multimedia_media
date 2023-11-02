@@ -224,18 +224,22 @@ int media_session_destroy(void* session)
     return 0;
 }
 
-int media_session_handler(void* session, void* handle, const char* target,
+int media_session_handler(void* session, void* cookie, const char* target,
     const char* cmd, const char* arg, char* res, int res_len)
 {
-    MediaControllerPriv* controller = handle;
-    MediaControlleePriv* controllee = handle;
+    MediaControllerPriv* controller = media_server_get_data(cookie);
+    MediaControlleePriv* controllee = media_server_get_data(cookie);
     MediaSessionPriv* priv = session;
     int event, result;
 
     /* Controllee methods. */
     if (!strcmp(cmd, "register")) {
-        controllee = media_session_controllee_register(priv, handle);
-        return snprintf(res, res_len, "%" PRIu64 "", (uint64_t)(uintptr_t)controllee);
+        controllee = media_session_controllee_register(priv, cookie);
+        if (!controllee)
+            return -ENOMEM;
+
+        media_server_set_data(cookie, controllee);
+        return 0;
     }
 
     if (!strcmp(cmd, "unregister")) {
@@ -252,8 +256,12 @@ int media_session_handler(void* session, void* handle, const char* target,
 
     /* Controller methods. */
     if (!strcmp(cmd, "open")) {
-        controller = media_session_controller_open(priv, handle);
-        return snprintf(res, res_len, "%" PRIu64 "", (uint64_t)(uintptr_t)controller);
+        controller = media_session_controller_open(priv, cookie);
+        if (!controller)
+            return -ENOMEM;
+
+        media_server_set_data(cookie, controller);
+        return 0;
     }
 
     if (!strcmp(cmd, "close")) {

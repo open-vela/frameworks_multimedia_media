@@ -608,19 +608,21 @@ int media_focus_debug_stack_return(media_focus_id* p_focus_list, int num)
     return app_focus_stack_return(focus->stack, (app_focus_id*)p_focus_list, num);
 }
 
-int media_focus_handler(void* focus, void* handle, const char* name, const char* cmd,
+int media_focus_handler(void* focus, void* cookie, const char* name, const char* cmd,
     char* res, int res_len)
 {
+    void* handle = media_server_get_data(cookie);
     media_focus* priv = focus;
     int ret, suggestion = 0;
     app_focus_id top;
 
     if (!strcmp(cmd, "request")) {
-        handle = media_focus_request_(priv, &suggestion, name, media_focus_notify, handle);
+        handle = media_focus_request_(priv, &suggestion, name, media_focus_notify, cookie);
         if (!handle)
             return -EPERM;
 
-        return snprintf(res, res_len, "%" PRIu64 ":%d", (uint64_t)(uintptr_t)handle, suggestion);
+        media_server_set_data(cookie, handle);
+        return 0;
     } else if (!strcmp(cmd, "abandon")) {
         return media_focus_abandon_(priv, handle);
     } else if (!strcmp(cmd, "dump")) {

@@ -95,7 +95,6 @@ static int media_get_proper_stream(void* handle, char* stream_type, int len)
 void* media_session_open(const char* params)
 {
     MediaSessionPriv* priv;
-    char tmp[64];
 
     if (!params)
         return NULL;
@@ -104,11 +103,7 @@ void* media_session_open(const char* params)
     if (!priv)
         return NULL;
 
-    if (media_proxy(MEDIA_ID_SESSION, priv, NULL, "open", params, 0, tmp, sizeof(tmp), 0) < 0)
-        goto err;
-
-    sscanf(tmp, "%llu", &priv->handle);
-    if (!priv->handle)
+    if (media_proxy(MEDIA_ID_SESSION, priv, NULL, "open", params, 0, NULL, 0, false) < 0)
         goto err;
 
     priv->stream_type = strdup(params);
@@ -260,17 +255,12 @@ int media_session_prev_song(void* handle)
 void* media_session_register(void* cookie, media_event_callback event_cb)
 {
     MediaSessionPriv* priv;
-    char tmp[64];
 
     priv = zalloc(sizeof(MediaSessionPriv));
     if (!priv)
         return NULL;
 
-    if (media_proxy(MEDIA_ID_SESSION, priv, NULL, "register", NULL, 0, tmp, sizeof(tmp), 0) < 0)
-        goto err;
-
-    sscanf(tmp, "%llu", &priv->handle);
-    if (!priv->handle)
+    if (media_proxy(MEDIA_ID_SESSION, priv, NULL, "register", NULL, 0, NULL, 0, 0) < 0)
         goto err;
 
     if (media_proxy_set_event_cb(priv->proxy, priv->cpu, media_event_cb, priv) < 0)
