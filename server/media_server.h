@@ -68,6 +68,9 @@ int media_server_poll_available(void* handle, struct pollfd* fd, void* conn);
 int media_server_notify(void* handle, void* cookie, media_parcel* parcel);
 void media_server_finalize(void* handle, void* cookie);
 
+void media_server_set_data(void* cookie, void* data);
+void* media_server_get_data(void* cookie);
+
 /****************************************************************************
  * Focus Functions
  ****************************************************************************/
@@ -83,7 +86,7 @@ typedef struct media_focus_id {
 
 void* media_focus_create(void* file);
 int media_focus_destroy(void* focus);
-int media_focus_handler(void* focus, void* handle, const char* name,
+int media_focus_handler(void* focus, void* cookie, const char* name,
     const char* cmd, char* res, int res_len);
 
 void media_focus_debug_stack_display(void);
@@ -102,9 +105,9 @@ int media_graph_run_once(void* graph);
 int media_graph_handler(void* graph, const char* target,
     const char* cmd, const char* arg, char* res, int res_len);
 
-int media_player_handler(void* graph, void* handle, const char* target,
+int media_player_handler(void* graph, void* cookie, const char* target,
     const char* cmd, const char* arg, char* res, int res_len);
-int media_recorder_handler(void* graph, void* handle, const char* target,
+int media_recorder_handler(void* graph, void* cookie, const char* target,
     const char* cmd, const char* arg, char* res, int res_len);
 
 /****************************************************************************
@@ -113,7 +116,7 @@ int media_recorder_handler(void* graph, void* handle, const char* target,
 
 void* media_session_create(void* file);
 int media_session_destroy(void* session);
-int media_session_handler(void* session, void* handle, const char* target,
+int media_session_handler(void* session, void* cookie, const char* target,
     const char* cmd, const char* arg, char* res, int res_len);
 
 /****************************************************************************

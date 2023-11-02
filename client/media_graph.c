@@ -64,21 +64,15 @@ static void media_release_cb(void* handle)
 static void* media_open(int control, const char* params)
 {
     MediaIOPriv* priv;
-    char tmp[32];
 
     priv = zalloc(sizeof(MediaIOPriv));
     if (!priv)
         return NULL;
 
-    if (media_proxy(control, priv, NULL, "open", params, 0, tmp, sizeof(tmp), 0) < 0)
-        goto err;
-
-    sscanf(tmp, "%llu", &priv->handle);
-    if (!priv->handle)
+    if (media_proxy(control, priv, NULL, "open", params, 0, NULL, 0, 0) < 0)
         goto err;
 
     atomic_store(&priv->refs, 1);
-    syslog(LOG_INFO, "%s:%s handle:%p\n", __func__, params, (void*)(uintptr_t)priv->handle);
     media_proxy_set_release_cb(priv->proxy, media_default_release_cb, priv);
     return priv;
 
@@ -124,12 +118,12 @@ static int media_get_sockaddr(void* handle, struct sockaddr_storage* addr_)
         struct sockaddr_un* addr = (struct sockaddr_un*)addr_;
 
         addr->sun_family = AF_UNIX;
-        snprintf(addr->sun_path, UNIX_PATH_MAX, "med%llx", priv->handle);
+        snprintf(addr->sun_path, UNIX_PATH_MAX, "med%p", priv);
     } else {
         struct sockaddr_rpmsg* addr = (struct sockaddr_rpmsg*)addr_;
 
         addr->rp_family = AF_RPMSG;
-        snprintf(addr->rp_name, RPMSG_SOCKET_NAME_SIZE, "med%llx", priv->handle);
+        snprintf(addr->rp_name, RPMSG_SOCKET_NAME_SIZE, "med%p", priv);
         snprintf(addr->rp_cpu, RPMSG_SOCKET_CPU_SIZE, "%s", priv->cpu);
     }
 
@@ -159,9 +153,9 @@ static int media_bind_socket(void* handle, char* url, size_t len)
         goto out;
 
     if (addr.ss_family == AF_UNIX)
-        snprintf(url, len, "unix:med%llx?listen=0", priv->handle);
+        snprintf(url, len, "unix:med%p?listen=0", priv);
     else
-        snprintf(url, len, "rpmsg:med%llx:%s?listen=0", priv->handle,
+        snprintf(url, len, "rpmsg:med%p:%s?listen=0", priv,
             CONFIG_RPTUN_LOCAL_CPUNAME);
 
     return fd;

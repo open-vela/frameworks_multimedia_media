@@ -56,8 +56,6 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
     const char *target = NULL, *cmd = NULL, *arg = NULL;
     int32_t len = 0, flags = 0, id = 0, ret;
     char* response = NULL;
-    uint64_t param_u = 0;
-    void* handle;
 
     media_parcel_read_int32(in, &id);
 
@@ -75,12 +73,11 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
 
 #ifdef CONFIG_MEDIA_FOCUS
     case MEDIA_ID_FOCUS:
-        media_parcel_read_scanf(in, "%l%s%s%i", &param_u, &target, &cmd, &len);
+        media_parcel_read_scanf(in, "%s%s%i", &target, &cmd, &len);
         if (len > 0)
             response = zalloc(len);
 
-        handle = param_u ? (void*)(uintptr_t)param_u : cookie;
-        ret = media_focus_handler(media_get_focus(), handle, target, cmd, response, len);
+        ret = media_focus_handler(media_get_focus(), cookie, target, cmd, response, len);
         media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 #endif
@@ -96,40 +93,35 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         break;
 
     case MEDIA_ID_PLAYER:
-        media_parcel_read_scanf(in, "%l%s%s%s%i", &param_u, &target, &cmd, &arg, &len);
+        media_parcel_read_scanf(in, "%s%s%s%i", &target, &cmd, &arg, &len);
         if (len > 0)
             response = zalloc(len);
 
-        handle = param_u ? (void*)(uintptr_t)param_u : cookie;
-        ret = media_player_handler(media_get_graph(), handle, target, cmd, arg, response, len);
+        ret = media_player_handler(media_get_graph(), cookie, target, cmd, arg, response, len);
         media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 
     case MEDIA_ID_RECORDER:
-        media_parcel_read_scanf(in, "%l%s%s%s%i", &param_u, &target, &cmd, &arg, &len);
+        media_parcel_read_scanf(in, "%s%s%s%i", &target, &cmd, &arg, &len);
         if (len > 0)
             response = zalloc(len);
 
-        handle = param_u ? (void*)(uintptr_t)param_u : cookie;
-        ret = media_recorder_handler(media_get_graph(), handle, target, cmd, arg, response, len);
+        ret = media_recorder_handler(media_get_graph(), cookie, target, cmd, arg, response, len);
         media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 
     case MEDIA_ID_SESSION:
-        media_parcel_read_scanf(in, "%l%s%s%s%i", &param_u, &target, &cmd, &arg, &len);
+        media_parcel_read_scanf(in, "%s%s%s%i", &target, &cmd, &arg, &len);
         if (len > 0)
             response = zalloc(len);
 
-        handle = param_u ? (void*)(uintptr_t)param_u : cookie;
-        ret = media_session_handler(media_get_session(), handle, target, cmd, arg, response, len);
+        ret = media_session_handler(media_get_session(), cookie, target, cmd, arg, response, len);
         media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 
 #endif // CONFIG_LIB_FFMPEG
 
     default:
-        (void)handle;
-        (void)param_u;
         (void)target;
         (void)cmd;
         (void)arg;
