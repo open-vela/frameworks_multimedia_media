@@ -55,8 +55,7 @@ extern "C" {
 #define MEDIA_COMMON_FIELDS \
     int type;               \
     void* proxy;            \
-    char* cpu;              \
-    uint64_t handle;
+    char* cpu;
 
 /****************************************************************************
  * Public Types

@@ -61,7 +61,6 @@ void* media_focus_request(int* suggestion, const char* stream_type,
     media_focus_callback cb, void* cookie)
 {
     MediaFocusPriv* priv;
-    char tmp[64];
 
     if (!suggestion || !stream_type)
         return NULL;
@@ -73,13 +72,7 @@ void* media_focus_request(int* suggestion, const char* stream_type,
     priv->suggest = cb;
     priv->cookie = cookie;
 
-    if (media_proxy(MEDIA_ID_FOCUS,
-            priv, stream_type, "request", NULL, 0, tmp, sizeof(tmp), false)
-        < 0)
-        goto err;
-
-    sscanf(tmp, "%llu:%d", &priv->handle, suggestion);
-    if (!priv->handle)
+    if (media_proxy(MEDIA_ID_FOCUS, priv, stream_type, "request", NULL, 0, NULL, 0, false) < 0)
         goto err;
 
     if (media_proxy_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv) < 0)
