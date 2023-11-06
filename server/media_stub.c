@@ -67,7 +67,6 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         ret = media_policy_handler(media_get_policy(), target, cmd, arg, flags, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 #endif
 
@@ -78,7 +77,6 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         ret = media_focus_handler(media_get_focus(), cookie, target, cmd, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 #endif
 
@@ -89,7 +87,6 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         ret = media_graph_handler(media_get_graph(), target, cmd, arg, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 
     case MEDIA_ID_PLAYER:
@@ -98,7 +95,6 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         ret = media_player_handler(media_get_graph(), cookie, target, cmd, arg, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 
     case MEDIA_ID_RECORDER:
@@ -107,7 +103,6 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         ret = media_recorder_handler(media_get_graph(), cookie, target, cmd, arg, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 
     case MEDIA_ID_SESSION:
@@ -116,7 +111,6 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
             response = zalloc(len);
 
         ret = media_session_handler(media_get_session(), cookie, target, cmd, arg, response, len);
-        media_parcel_append_printf(out, "%i%s", ret, response);
         break;
 
 #endif // CONFIG_LIB_FFMPEG
@@ -127,10 +121,12 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         (void)arg;
         (void)len;
         (void)flags;
-        (void)ret;
-        media_parcel_append_printf(out, "%i", -ENOSYS);
+        ret = -ENOSYS;
         break;
     }
+
+    if (out)
+        media_parcel_append_printf(out, "%s%s%s%i%s", target, cmd, arg, ret, response);
 
     free(response);
 }
