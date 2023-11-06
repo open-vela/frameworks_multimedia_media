@@ -42,7 +42,8 @@ extern "C" {
 
 #define MEDIA_DEVICE_A2DP "a2dp" /*!< bt cellphone */
 #define MEDIA_DEVICE_A2DP_SNK "a2dpsnk"
-#define MEDIA_DEVICE_SCO "sco" /*!< phone */
+#define MEDIA_DEVICE_BLE "ble"
+#define MEDIA_DEVICE_SCO "sco"
 #define MEDIA_DEVICE_MIC "mic"
 #define MEDIA_DEVICE_MODEM "modem"
 
