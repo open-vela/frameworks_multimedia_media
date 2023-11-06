@@ -622,7 +622,7 @@ int media_focus_handler(void* focus, void* cookie, const char* name, const char*
             return -EPERM;
 
         media_server_set_data(cookie, handle);
-        return 0;
+        return suggestion;
     } else if (!strcmp(cmd, "abandon")) {
         return media_focus_abandon_(priv, handle);
     } else if (!strcmp(cmd, "dump")) {
