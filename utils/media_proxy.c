@@ -497,7 +497,7 @@ int media_proxy(int id, void* handle, const char* target, const char* cmd,
             } else
                 media_proxy_disconnect(priv->proxy);
 
-            return 0;
+            return ret;
         }
     }
 

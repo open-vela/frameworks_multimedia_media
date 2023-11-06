@@ -72,10 +72,12 @@ void* media_focus_request(int* suggestion, const char* stream_type,
     priv->suggest = cb;
     priv->cookie = cookie;
 
-    if (media_proxy(MEDIA_ID_FOCUS, priv, stream_type, "request", NULL, 0, NULL, 0, false) < 0)
+    *suggestion = media_proxy(MEDIA_ID_FOCUS, priv, stream_type, "request", NULL, 0, NULL, 0, false);
+    if (*suggestion < 0)
         goto err;
 
-    if (media_proxy_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv) < 0)
+    if (*suggestion != MEDIA_FOCUS_STOP
+        && (media_proxy_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv) < 0))
         goto err;
 
     media_proxy_set_release_cb(priv->proxy, media_default_release_cb, priv);
@@ -93,7 +95,7 @@ int media_focus_abandon(void* handle)
 
     ret = media_proxy(MEDIA_ID_FOCUS,
         priv, NULL, "abandon", NULL, 0, NULL, 0, false);
-    if (ret < 0)
+    if (ret < 0 && ret != -ENOENT)
         return ret;
 
     return media_proxy_disconnect(priv->proxy);
