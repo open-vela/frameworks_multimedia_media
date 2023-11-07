@@ -309,7 +309,7 @@ int media_proxy_set_event_cb(void* handle, const char* cpu, void* event_cb, void
         close(priv->listenfd);
         media_proxy_unref(handle);
     }
-
+    pthread_setname_np(priv->thread, "proxy_listen");
     pthread_attr_destroy(&pattr);
     pthread_mutex_unlock(&priv->mutex);
 
