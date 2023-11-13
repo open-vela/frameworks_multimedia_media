@@ -1327,7 +1327,7 @@ int main(int argc, char* argv[])
         printf("mediatool> ");
         fflush(stdout);
 
-        len = readline(buffer, CONFIG_NSH_LINELEN, stdin, stdout);
+        len = readline_stream(buffer, CONFIG_NSH_LINELEN, stdin, stdout);
         if (len <= 0)
             continue;
         buffer[len] = '\0';
