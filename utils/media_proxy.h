@@ -37,11 +37,13 @@ extern "C" {
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* RPC definitions. */
+#define MEDIA_SOCKADDR_NAME "md:%s"
 #ifndef CONFIG_RPTUN_LOCAL_CPUNAME
 #define CONFIG_RPTUN_LOCAL_CPUNAME CONFIG_MEDIA_SERVER_CPUNAME
 #endif
 
-/* module id. */
+/* Module ID. */
 #define MEDIA_ID_GRAPH 1
 #define MEDIA_ID_POLICY 2
 #define MEDIA_ID_PLAYER 3
@@ -49,9 +51,18 @@ extern "C" {
 #define MEDIA_ID_SESSION 5
 #define MEDIA_ID_FOCUS 6
 
-#define MEDIA_SOCKADDR_NAME "md:%s"
+/* Policy key criterion names. */
+#define MEDIA_POLICY_APPLY 1
+#define MEDIA_POLICY_NOT_APPLY 0
+#define MEDIA_POLICY_AUDIO_MODE "AudioMode"
+#define MEDIA_POLICY_DEVICE_USE "UsingDevices"
+#define MEDIA_POLICY_DEVICE_AVAILABLE "AvailableDevices"
+#define MEDIA_POLICY_HFP_SAMPLERATE "HFPSampleRate"
+#define MEDIA_POLICY_MUTE_MODE "MuteMode"
+#define MEDIA_POLICY_VOLUME "Volume"
+#define MEDIA_POLICY_MIC_MODE "MicMode"
 
-/* common fields of rpc handle. */
+/* Common fields of rpc handle. */
 #define MEDIA_COMMON_FIELDS \
     int type;               \
     void* proxy;            \
