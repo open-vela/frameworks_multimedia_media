@@ -25,6 +25,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <media_event.h>
 #include <media_stream.h>
 
 #ifdef __cplusplus
@@ -255,6 +256,15 @@ int media_policy_increase_stream_volume(const char* stream);
  */
 int media_policy_decrease_stream_volume(const char* stream);
 
+/**
+ * Mute microphone for builtin_mic or bluetooth_mic.
+ * @param[in] mute   mute mode.
+ *                  - 1: mute mode is off.
+ *                  - 0: mute mode is on.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_policy_set_mic_mute(int mute);
+
 /****************************************************************************
  * Public Policy Basic Functions
  ****************************************************************************/
@@ -388,14 +398,143 @@ int media_policy_increase(const char* name, int apply);
  */
 int media_policy_decrease(const char* name, int apply);
 
+#ifdef CONFIG_LIBUV
+/****************************************************************************
+ * Policy Async Basic Functions
+ ****************************************************************************/
+
 /**
- * Mute microphone for builtin_mic or bluetooth_mic.
- * @param[in] mute   mute mode.
- *                  - 1: mute mode is off.
- *                  - 0: mute mode is on.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Set literal value to a criterion.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param name      Criterion name.
+ * @param value     Lieteral value to set.
+ * @param apply     Whether apply new value to policy configurations.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
  */
-int media_policy_set_mic_mute(int mute);
+int media_uv_policy_set_string(void* loop, const char* name,
+    const char* value, int apply, media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Get literal value of a criterion.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param name      Criterion name.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_get_string(void* loop, const char* name,
+    media_uv_string_callback cb, void* cookie);
+
+/**
+ * @brief Set numerical value to a criterion.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param name      Criterion name.
+ * @param value     Numerical value to set.
+ * @param apply     Whether apply new value to policy configurations.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_set_int(void* loop, const char* name,
+    int value, int apply, media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Get numerical value of a criterion.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param name      Criterion name.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_get_int(void* loop, const char* name,
+    media_uv_int_callback cb, void* cookie);
+
+/**
+ * @brief Increase numerical value of a criterion by one.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param name      Criterion name.
+ * @param apply     Whether apply new value to policy configurations.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_increase(void* loop, const char* name, int apply,
+    media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Decrease numerical value of a criterion by one.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param name      Criterion name.
+ * @param apply     Whether apply new value to policy configurations.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_decrease(void* loop, const char* name, int apply,
+    media_uv_callback cb, void* cookie);
+
+/****************************************************************************
+ * Policy Async Wrapper Functions
+ ****************************************************************************/
+
+/**
+ * @brief Set volume of a stream type.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param stream    Stream type, @see MEDIA_STREAM_* .
+ * @param volume    Integer volume to set.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_set_stream_volume(void* loop, const char* stream,
+    int volume, media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Get volume of a stream type.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param stream    Stream type, @see MEDIA_STREAM_* .
+ * @param volume    Integer volume to set.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_get_stream_volume(void* loop, const char* stream,
+    media_uv_int_callback cb, void* cookie);
+
+/**
+ * @brief Increase volume of a stream type.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param stream    Stream type, @see MEDIA_STREAM_* .
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_increase_stream_volume(void* loop, const char* stream,
+    media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Decrease volume of a stream type.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param stream    Stream type, @see MEDIA_STREAM_* .
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_decrease_stream_volume(void* loop, const char* stream,
+    media_uv_callback cb, void* cookie);
+#endif /* CONFIG_LIBUV */
 
 #ifdef __cplusplus
 }
