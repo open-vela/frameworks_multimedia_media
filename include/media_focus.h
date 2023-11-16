@@ -23,6 +23,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <media_event.h>
 #include <media_stream.h>
 #include <stddef.h>
 
@@ -120,5 +121,28 @@ int media_focus_abandon(void* handle);
  * @param[in] options   Dump options(unused so far).
  */
 void media_focus_dump(const char* options);
+
+#ifdef CONFIG_LIBUV
+/**
+ * @brief Request audio focus.
+ *
+ * @param loop          Handle uv_loop_t* of current thread.
+ * @param stream_type   @see MEDIA_STREAM_*.
+ * @param on_suggest    Callback to get focus suggestion.
+ * @param cookie        Callback argument.
+ * @return void*        Handle of focus.
+ */
+void* media_uv_focus_request(void* loop, const char* stream_type,
+    media_focus_callback on_suggest, void* cookie);
+
+/**
+ * @brief Abandon audio focus.
+ *
+ * @param handle        Handle of focus.
+ * @param on_abandon    Callback to release cookie.
+ * @return int          Zero on success, negative errno on failure.
+ */
+int media_uv_focus_abandon(void* handle, media_uv_callback on_abandon);
+#endif
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_FOCUS_H */
