@@ -30,22 +30,6 @@
 #include "media_proxy.h"
 
 /****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-#define MEDIA_POLICY_APPLY 1
-#define MEDIA_POLICY_NOT_APPLY 0
-
-/* Key criterion names. */
-#define MEDIA_POLICY_AUDIO_MODE "AudioMode"
-#define MEDIA_POLICY_DEVICE_USE "UsingDevices"
-#define MEDIA_POLICY_DEVICE_AVAILABLE "AvailableDevices"
-#define MEDIA_POLICY_HFP_SAMPLERATE "HFPSampleRate"
-#define MEDIA_POLICY_MUTE_MODE "MuteMode"
-#define MEDIA_POLICY_VOLUME "Volume"
-#define MEDIA_POLICY_MIC_MODE "MicMode"
-
-/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
