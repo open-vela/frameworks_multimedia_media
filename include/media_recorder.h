@@ -117,7 +117,7 @@ int media_recorder_set_event_callback(void* handle, void* cookie,
  * @param[in] options   Extra configuration
  *                        - format: encapsulation format, 如:opus wav
  *                        - sample_rate: target sampling rate
- *                        - channel_layout: target channel layout
+ *                        - ch_layout: target channel layout
  *                        - bitrate: target code rate，如: "23900"
  *                        - vbr: 0: fixed code rate; 1: variable code rate
  *                        - level: encoding complexity. range：0-10. default:10
