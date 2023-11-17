@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <math.h>
 #include <poll.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -779,8 +780,12 @@ CMD2(volume, int, id, string_t, volume_cmd)
             ret = media_player_get_volume(media->chain[id].handle, &volume_f);
             printf("ID %d, get volume %f\n", id, volume_f);
         } else {
-            ret = media_player_set_volume(media->chain[id].handle, strtof(volume_cmd, NULL));
-            printf("ID %d, set volume %f\n", id, strtof(volume_cmd, NULL));
+            if ((ptr = strcasestr(volume_cmd, "db")))
+                volume_f = pow(10.0, strtof(volume_cmd, NULL) / 20);
+            else
+                volume_f = strtof(volume_cmd, NULL);
+            ret = media_player_set_volume(media->chain[id].handle, volume_f);
+            printf("ID %d, set volume %f\n", id, volume_f);
         }
         break;
 
