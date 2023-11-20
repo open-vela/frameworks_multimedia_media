@@ -76,9 +76,14 @@ void* media_focus_request(int* suggestion, const char* stream_type,
     if (*suggestion < 0)
         goto err;
 
-    if (*suggestion != MEDIA_FOCUS_STOP
-        && (media_proxy_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv) < 0))
-        goto err;
+    /* Create listener only if non-STOP suggestion. */
+    if (*suggestion != MEDIA_FOCUS_STOP) {
+        if (media_proxy_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv) < 0)
+            goto err;
+
+        if (media_proxy(MEDIA_ID_FOCUS, priv, NULL, "set_notify", NULL, 0, NULL, 0, false) < 0)
+            goto err;
+    }
 
     media_proxy_set_release_cb(priv->proxy, media_default_release_cb, priv);
     return priv;
