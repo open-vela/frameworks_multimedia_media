@@ -37,6 +37,7 @@ extern "C" {
 #define MEDIA_STREAM_INFO "Info"
 #define MEDIA_STREAM_MUSIC "Music"
 #define MEDIA_STREAM_EMERGENCY "Emergency"
+#define MEDIA_STREAM_CALLRING "CallRing"
 
 #ifdef __cplusplus
 }
