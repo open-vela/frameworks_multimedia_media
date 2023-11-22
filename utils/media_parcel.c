@@ -99,6 +99,27 @@ void media_parcel_reinit(media_parcel* parcel)
     media_parcel_init(parcel);
 }
 
+int media_parcel_clone(media_parcel* dst, const media_parcel* src)
+{
+    size_t len;
+
+    memcpy(dst, src, sizeof(media_parcel));
+    if (src->chunk == &src->prealloc)
+        dst->chunk = &dst->prealloc;
+    else {
+        len = MEDIA_PARCEL_HEADER_LEN + src->cap;
+        dst->chunk = malloc(len);
+        if (!dst->chunk) {
+            media_parcel_init(dst);
+            return -ENOMEM;
+        }
+
+        memcpy(dst->chunk, src->chunk, len);
+    }
+
+    return 0;
+}
+
 bool media_parcel_completed(media_parcel* parcel, size_t offset)
 {
     return MEDIA_PARCEL_HEADER_LEN + parcel->chunk->len == offset;
