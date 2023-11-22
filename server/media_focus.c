@@ -375,6 +375,12 @@ static void* media_focus_request_(
         return NULL;
     }
 
+    // step 1.1: check if stream type is null or not
+    if (stream_type == NULL) {
+        auderr("wrong stream type input\n");
+        return NULL;
+    }
+
     // step 2: trans stream type to valid num in interaction matrix
     for (i = 0; i < focus->num; i++) {
         if (strcmp((focus->streams + i * STREAM_TYPE_LEN), stream_type) == 0) {
