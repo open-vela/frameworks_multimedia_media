@@ -456,7 +456,14 @@ static void* media_focus_request_(
             auderr("no matched data\n");
             *return_type = MEDIA_FOCUS_STOP;
         }
+        audinfo("%s top stack focus info (client_id:%d, stream type:%s, focus_level:%d)\n", __func__,
+            tmp_id.client_id, focus->streams + tmp_id.focus_level * STREAM_TYPE_LEN, tmp_id.focus_level);
+
+        audinfo("%s request focus info (client_id:%d, stream type:%s, focus_level:%d), reture type %d\n",
+            __func__, new_id.client_id, stream_type, new_id.focus_level, *return_type);
     } else {
+        audinfo("%s request focus info (client_id:%d, stream type:%s, focus_level:%d) direct push stack\n",
+            __func__, new_id.client_id, stream_type, new_id.focus_level);
         // step 7.2: stack top not exist, request directly
         *return_type = MEDIA_FOCUS_PLAY;
         ret = MEDIA_FOCUS_PLAY;
@@ -495,10 +502,13 @@ static int media_focus_abandon_(media_focus* focus, void* handle)
         return -ENOENT;
     }
     if (tmp_id.client_id == app_client_id) {
+        audinfo("%s focus info (client_id:%d, stream type:%s, focus_level:%d) abandon from top stack\n", __func__,
+            app_client_id, focus->streams + tmp_id.focus_level * STREAM_TYPE_LEN, tmp_id.focus_level);
         app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
         app_focus_stack_top_change_broadcast(focus->stack, NONBLOCK_CALLBACK_FLAG);
     } else {
         // step 4: abandon focus id in media focus stack
+        audinfo("%s focus info (client_id:%d) abandon from low stack\n", __func__, app_client_id);
         tmp_id.client_id = app_client_id;
         app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
     }
