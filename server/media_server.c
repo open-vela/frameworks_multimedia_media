@@ -134,13 +134,14 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
     if ((fd->revents & POLLERR) || (fd->revents & POLLHUP)) {
         close(fd->fd);
         conn->tran_fd = -EPERM;
+        conn->offset = 0;
         media_parcel_deinit(&conn->parcel);
         return 0;
     }
 
     ret = media_parcel_recv(&conn->parcel, fd->fd, &conn->offset, MSG_DONTWAIT);
     if (ret < 0)
-        return ret;
+        goto out;
 
     code = media_parcel_get_code(&conn->parcel);
     switch (code) {
@@ -163,6 +164,7 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
         break;
     }
 
+out:
     conn->offset = 0;
     media_parcel_reinit(&conn->parcel);
     return ret;
