@@ -23,11 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/audio/audio.h>
+#include <nuttx/wqueue.h>
 
 #include <errno.h>
 #include <fcntl.h>
 #include <kvdb.h>
 #include <pfw.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
@@ -52,6 +54,13 @@ static void pfw_set_parameter_callback(void* cookie, const char* params);
 /****************************************************************************
  * Private Data
  ****************************************************************************/
+
+typedef struct MediaPolicyPriv {
+    struct work_s work; /* Used for save kvdb */
+    pthread_mutex_t mutex;
+    char key[64];
+    int value;
+} MediaPolicyPriv;
 
 static pfw_plugin_def_t g_media_policy_plugins[] = {
     { "FFmpegCommand", NULL, pfw_ffmpeg_command_callback },
@@ -149,16 +158,48 @@ out:
     free(str);
 }
 
-static void pfw_load_criterion(const char* name, int32_t* state)
+static void pfw_cookie_release_cb(void* cookie)
+{
+    MediaPolicyPriv* priv = cookie;
+
+    if (priv) {
+        pthread_mutex_destroy(&priv->mutex);
+        free(priv);
+    }
+}
+
+static void pfw_load_criterion_cb(void* cookie, const char* name, int32_t* state)
 {
     if (!strncmp(name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
         *state = property_get_int32(name, *state);
 }
 
-static void pfw_save_criterion(const char* name, int32_t state)
+static void pfw_save_criterion_work(void* args)
 {
-    if (!strncmp(name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
-        property_set_int32_oneway(name, state);
+    MediaPolicyPriv* priv = args;
+    char tmp[64];
+    int value;
+
+    pthread_mutex_lock(&priv->mutex);
+    strlcpy(tmp, priv->key, sizeof(tmp));
+    value = priv->value;
+    pthread_mutex_unlock(&priv->mutex);
+
+    property_set_int32(tmp, value);
+}
+
+static void pfw_save_criterion_cb(void* cookie, const char* name, int32_t state)
+{
+    MediaPolicyPriv* priv = cookie;
+
+    if (!strncmp(name, MEDIA_PERSIST, strlen(MEDIA_PERSIST))) {
+        pthread_mutex_lock(&priv->mutex);
+        strlcpy(priv->key, name, sizeof(priv->key));
+        priv->value = state;
+        pthread_mutex_unlock(&priv->mutex);
+
+        work_queue(HPWORK, &priv->work, pfw_save_criterion_work, priv, MSEC2TICK(1000));
+    }
 }
 
 /****************************************************************************
@@ -217,20 +258,27 @@ int media_policy_handler(void* policy, const char* name, const char* cmd,
 
 int media_policy_destroy(void* policy)
 {
-    pfw_destroy(policy);
+    pfw_destroy(policy, pfw_cookie_release_cb);
     return 0;
 }
 
 void* media_policy_create(void* params)
 {
     const char** paths = params;
+    MediaPolicyPriv* priv;
     void* policy;
 
     if (!params)
         return NULL;
 
+    priv = zalloc(sizeof(MediaPolicyPriv));
+    if (!priv)
+        return NULL;
+
+    pthread_mutex_init(&priv->mutex, NULL);
+
     policy = pfw_create(paths[0], paths[1], g_media_policy_plugins,
-        g_media_policy_nb_plugins, pfw_load_criterion, pfw_save_criterion);
+        g_media_policy_nb_plugins, pfw_load_criterion_cb, pfw_save_criterion_cb, (void*)priv);
     if (!policy)
         return NULL;
 
