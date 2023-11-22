@@ -33,7 +33,15 @@
  * Public Type
  ****************************************************************************/
 
-typedef void (*media_uv_parcel_callback)(void* cookie, media_parcel* parcel);
+/**
+ * @brief Callback to receive parcel.
+ *
+ * @param cookie    Long-term context for handle.
+ * @param cookie0   Short-term context for request.
+ * @param cookie1   Extra short-term context.
+ */
+typedef void (*media_uv_parcel_callback)(
+    void* cookie, void* cookie0, void* cookie1, media_parcel* parcel);
 
 /****************************************************************************
  * Public Functions
@@ -47,7 +55,7 @@ typedef void (*media_uv_parcel_callback)(void* cookie, media_parcel* parcel);
  * @param on_connect    Call after connect is done; you must send first
  *                      control message here with ack=true, otherwise further
  *                      control meesages would not be send. @see media_uv_send.
- * @param cookie        Context for all callback.
+ * @param cookie        Long-term context, for on_connect, on_event, on_release.
  * @return void*        Handle.
  */
 void* media_uv_connect(void* loop, const char* cpus,
@@ -80,19 +88,16 @@ int media_uv_reconnect(void* handle);
 int media_uv_listen(void* handle, media_uv_parcel_callback on_event);
 
 /**
- * @brief Async send control message.
+ * @brief Async send parcel control message.
  *
  * @param handle        Handle.
  * @param on_receive    Callback to handle response message.
- * @param cookie        Callback context of on_receive.
- * @param fmt           Format string.
- * @param ...
+ * @param cookie0       Callback context of on_receive.
+ * @param cookie1       Extra callback context of on_receive.
+ * @param parcel
  * @return int          Zero on success, negative errno on failure.
- * @note You must send first control message in `on_connect` method, other control
- * messages would be pending till response of first control message accept in
- * `on_receive` method.
  */
-int media_uv_send(void* handle, media_uv_parcel_callback on_receive, void* cookie,
-    const char* fmt, ...);
+int media_uv_send(void* handle, media_uv_parcel_callback on_receive,
+    void* cookie0, void* cookie1, const media_parcel* parcel);
 
 #endif /* FRAMEWORKS_MEDIA_CLIENT_MEDIA_UV_H */

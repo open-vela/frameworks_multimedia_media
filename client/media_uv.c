@@ -64,7 +64,7 @@ struct MediaWritePriv {
     uv_write_t req;
     media_parcel parcel;
     media_uv_parcel_callback on_receive;
-    void* cookie; /* One-time private context. */
+    void* cookies[2]; /* One-time private context. */
 };
 
 struct MediaProxyPriv {
@@ -88,7 +88,7 @@ struct MediaProxyPriv {
 
 /* Alloc and free. */
 static void media_uv_free_writing(MediaWritePriv* writing);
-static MediaWritePriv* media_uv_alloc_writing(int code);
+static MediaWritePriv* media_uv_alloc_writing(int code, const media_parcel* parcel);
 static void media_uv_free_pipe(MediaPipePriv* pipe);
 static MediaPipePriv* media_uv_alloc_pipe(MediaProxyPriv* proxy);
 
@@ -136,7 +136,7 @@ static void media_uv_free_writing(MediaWritePriv* writing)
     }
 }
 
-static MediaWritePriv* media_uv_alloc_writing(int code)
+static MediaWritePriv* media_uv_alloc_writing(int code, const media_parcel* parcel)
 {
     MediaWritePriv* writing;
 
@@ -146,6 +146,9 @@ static MediaWritePriv* media_uv_alloc_writing(int code)
 
     uv_req_set_data((uv_req_t*)&writing->req, writing);
     media_parcel_init(&writing->parcel);
+    if (parcel)
+        media_parcel_clone(&writing->parcel, parcel);
+
     writing->parcel.chunk->code = code;
     return writing;
 }
@@ -398,7 +401,7 @@ static int media_uv_handle_parcel(MediaPipePriv* pipe)
     MediaWritePriv* writing;
 
     if (pipe == proxy->epipe) {
-        proxy->on_event(pipe->proxy->cookie, &pipe->parcel);
+        proxy->on_event(pipe->proxy->cookie, NULL, NULL, &pipe->parcel);
         return 0;
     }
 
@@ -406,7 +409,8 @@ static int media_uv_handle_parcel(MediaPipePriv* pipe)
     writing = media_uv_dequeue_writing(proxy);
     assert(writing);
     if (writing->on_receive)
-        writing->on_receive(writing->cookie, &pipe->parcel);
+        writing->on_receive(proxy->cookie,
+            writing->cookies[0], writing->cookies[1], &pipe->parcel);
     media_uv_free_writing(writing);
 
     /* Handle flags after first on_receive */
@@ -456,7 +460,8 @@ static void media_uv_write_queued_cb(uv_write_t* req, int status)
         TAILQ_INSERT_TAIL(&proxy->sentq, writing, entry);
     else { /* Should release wiriting because there won't be response. */
         if (writing->on_receive)
-            writing->on_receive(writing->cookie, NULL);
+            writing->on_receive(proxy->cookie,
+                writing->cookies[0], writing->cookies[1], NULL);
 
         media_uv_free_writing(writing);
     }
@@ -521,7 +526,7 @@ static int media_uv_create_notify(MediaProxyPriv* proxy)
     MediaWritePriv* writing;
     char addr[PATH_MAX];
 
-    writing = media_uv_alloc_writing(MEDIA_PARCEL_CREATE_NOTIFY);
+    writing = media_uv_alloc_writing(MEDIA_PARCEL_CREATE_NOTIFY, NULL);
     if (!writing)
         return -ENOMEM;
 
@@ -565,7 +570,7 @@ err2:
 
 err1:
     media_uv_close(server);
-    proxy->on_event(proxy->cookie, NULL);
+    proxy->on_event(proxy->cookie, NULL, NULL, NULL);
 }
 
 /**
@@ -609,7 +614,7 @@ err2:
     media_uv_close(proxy->epipe);
 
 err1:
-    proxy->on_event(proxy->cookie, NULL); /* Notify listening failed. */
+    proxy->on_event(proxy->cookie, NULL, NULL, NULL); /* Notify listening failed. */
     return ret;
 }
 
@@ -707,13 +712,11 @@ int media_uv_listen(void* handle, media_uv_parcel_callback on_event)
     return ret;
 }
 
-int media_uv_send(void* handle, media_uv_parcel_callback on_receive, void* cookie,
-    const char* fmt, ...)
+int media_uv_send(void* handle, media_uv_parcel_callback on_receive,
+    void* cookie0, void* cookie1, const media_parcel* parcel)
 {
     MediaProxyPriv* proxy = handle;
     MediaWritePriv* writing;
-    va_list ap;
-    int ret;
 
     if (!proxy)
         return -EINVAL;
@@ -721,20 +724,12 @@ int media_uv_send(void* handle, media_uv_parcel_callback on_receive, void* cooki
     if (proxy->flags & MEDIA_FLAG_DISCONNECT)
         return -EPERM;
 
-    writing = media_uv_alloc_writing(MEDIA_PARCEL_SEND_ACK);
+    writing = media_uv_alloc_writing(MEDIA_PARCEL_SEND_ACK, parcel);
     if (!writing)
         return -ENOMEM;
 
-    va_start(ap, fmt);
-    ret = media_parcel_append_vprintf(&writing->parcel, fmt, &ap);
-    va_end(ap);
-    if (ret < 0) {
-        media_uv_free_writing(writing);
-        return ret;
-    }
-
     writing->on_receive = on_receive;
-    writing->cookie = cookie;
-
+    writing->cookies[0] = cookie0;
+    writing->cookies[1] = cookie1;
     return media_uv_queue_writing(proxy, writing);
 }
