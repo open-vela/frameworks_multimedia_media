@@ -277,6 +277,33 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
  */
 int media_recorder_take_picture(char* params, char* filename, size_t number, media_event_callback event_cb, void* cookie);
 
+/**
+ * @brief Start taking picture, including open, set_event_callback, prepare, and start operations.
+ *
+ * @attention Camera only.
+ *
+ * @param[in] params    open params
+ * @param[in] filename  The store path for new picture
+ * @param[in] number    The number of taking picture
+ * @param[in] event_cb  The callback to handle state feedback
+ * @param[in] cookie    The private data of user
+ * @return Non-NULL pointer on success; a NULL pointer on failure.
+ */
+void* media_recorder_start_picture(char* params, char* filename, size_t number, media_event_callback event_cb, void* cookie);
+
+/**
+ * @brief Close the recorder when taking picture finished.
+ * This func should be used together with media_recorder_start_picture()
+ * to close the recorder. This func should be called in the event_callback func
+ * of the media_recorder_start_picture() when user want to take pic asynclly.
+ *
+ * @attention Camera only.
+ *
+ * @param[in] handle    The recoder handle returned in media_recorder_start_picture()
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_recorder_finish_picture(void* handle);
+
 #ifdef CONFIG_LIBUV
 /**
  * @brief Open an async recorder.
