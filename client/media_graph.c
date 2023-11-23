@@ -563,16 +563,26 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
 int media_recorder_take_picture(char* params, char* filename, size_t number,
     media_event_callback event_cb, void* cookie)
 {
+    void* handle = media_recorder_start_picture(params, filename, number, event_cb, cookie);
+    if (!handle)
+        return -EINVAL;
+
+    return media_recorder_finish_picture(handle);
+}
+
+void* media_recorder_start_picture(char* params, char* filename, size_t number,
+    media_event_callback event_cb, void* cookie)
+{
     char option[32];
-    void* handle;
+    void* handle = NULL;
     int ret;
 
     if (!number || number > INT_MAX)
-        return -EINVAL;
+        return NULL;
 
     handle = media_recorder_open(params);
     if (!handle)
-        return -EINVAL;
+        return NULL;
 
     ret = media_recorder_set_event_callback(handle, cookie, event_cb);
     if (ret < 0)
@@ -588,9 +598,14 @@ int media_recorder_take_picture(char* params, char* filename, size_t number,
     if (ret < 0)
         goto error;
 
-    return media_close(handle, 1);
+    return handle;
 
 error:
     media_recorder_close(handle);
-    return ret;
+    return NULL;
+}
+
+int media_recorder_finish_picture(void* handle)
+{
+    return media_close(handle, 1);
 }
