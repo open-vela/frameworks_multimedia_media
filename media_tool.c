@@ -51,6 +51,7 @@
 #define MEDIATOOL_FOCUS 5
 #define MEDIATOOL_UVPLAYER 6
 #define MEDIATOOL_UVRECORDER 7
+#define MEDIATOOL_UVFOCUS 8
 
 #define GET_ARG_FUNC(out_type, arg)                  \
     static out_type get_##out_type##_arg(char* arg); \
@@ -593,6 +594,10 @@ CMD2(close, int, id, int, pending_stop)
 
     case MEDIATOOL_UVRECORDER:
         ret = media_uv_recorder_close(media->chain[id].handle, mediatool_uv_common_close_cb);
+        break;
+
+    case MEDIATOOL_UVFOCUS:
+        ret = media_uv_focus_abandon(media->chain[id].handle, mediatool_uv_common_close_cb);
         break;
 #endif
     }
@@ -1352,6 +1357,22 @@ err:
     return -EINVAL;
 }
 
+static void mediatool_uv_player_play_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+CMD1(uv_player_play, int, id)
+{
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+        return -EINVAL;
+
+    return media_uv_player_play(media->chain[id].handle,
+        mediatool_uv_player_play_cb, &media->chain[id]);
+}
+
 static void mediatool_cmd_uv_policy_set_int_cb(void* cookie, int ret)
 {
     printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
@@ -1422,6 +1443,38 @@ CMD2(uv_policy_decrease, string_t, name, int, apply)
 {
     return media_uv_policy_decrease(&g_mediatool_uvloop, name, apply,
         mediatool_cmd_uv_policy_decrease_cb, strdup(name));
+}
+
+static void mediatool_focus_suggest_cb(int suggest, void* cookie)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d suggest:%d\n", __func__, chain->id, suggest);
+}
+
+CMD1(uv_focus_request, string_t, name)
+{
+    long int i;
+
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!media->chain[i].handle)
+            break;
+    }
+
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
+    media->chain[i].id = i;
+    media->chain[i].handle = media_uv_focus_request(&g_mediatool_uvloop,
+        name, mediatool_focus_suggest_cb, &media->chain[i]);
+    if (!media->chain[i].handle) {
+        printf("%s failed\n", __func__);
+        return 0;
+    }
+
+    media->chain[i].type = MEDIATOOL_UVFOCUS;
+    printf("focus ID %ld\n", i);
+    return 0;
 }
 #endif /* CONFIG_LIBUV_EXTENSION */
 
@@ -1539,6 +1592,9 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "uv_copen",
         mediatool_cmd_uv_recorder_open,
         "Create an async recorder return ID (uv_copen [STREAM/FILTER])" },
+    { "uv_play",
+        mediatool_cmd_uv_player_play,
+        "Request focus and start the async player (uv_play ID)" },
     { "uv_setint",
         mediatool_cmd_uv_policy_set_int,
         "Async set numerical value to criterion (uv_setint NAME VALUE APPLY)" },
@@ -1557,6 +1613,9 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "uv_decrease",
         mediatool_cmd_uv_policy_decrease,
         "Async decrease value of numerical criterion (uv_decrease NAME)" },
+    { "uv_request",
+        mediatool_cmd_uv_focus_request,
+        "Async request focus (uv_request STREAM)" },
 #endif /* CONFIG_LIBUV_EXTENSION */
     { "q",
         mediatool_cmd_quit,
