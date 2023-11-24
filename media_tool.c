@@ -1445,6 +1445,42 @@ CMD2(uv_policy_decrease, string_t, name, int, apply)
         mediatool_cmd_uv_policy_decrease_cb, strdup(name));
 }
 
+static void mediatool_cmd_uv_policy_include_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+CMD3(uv_policy_include, string_t, name, string_t, value, int, apply)
+{
+    return media_uv_policy_include(&g_mediatool_uvloop, name, value, apply,
+        mediatool_cmd_uv_policy_include_cb, strdup(name));
+}
+
+static void mediatool_cmd_uv_policy_exclude_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+CMD3(uv_policy_exclude, string_t, name, string_t, value, int, apply)
+{
+    return media_uv_policy_exclude(&g_mediatool_uvloop, name, value, apply,
+        mediatool_cmd_uv_policy_exclude_cb, strdup(name));
+}
+
+static void mediatool_cmd_uv_policy_contain_cb(void* cookie, int ret, int val)
+{
+    printf("[%s] name:%s ret:%d val:%d\n", __func__, (char*)cookie, ret, val);
+    free(cookie);
+}
+
+CMD2(uv_policy_contain, string_t, name, string_t, value)
+{
+    return media_uv_policy_contain(&g_mediatool_uvloop, name, value,
+        mediatool_cmd_uv_policy_contain_cb, strdup(name));
+}
+
 static void mediatool_focus_suggest_cb(int suggest, void* cookie)
 {
     struct mediatool_chain_s* chain = cookie;
@@ -1613,6 +1649,15 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "uv_decrease",
         mediatool_cmd_uv_policy_decrease,
         "Async decrease value of numerical criterion (uv_decrease NAME)" },
+    { "uv_include",
+        mediatool_cmd_uv_policy_include,
+        "Async include inclusive criterion values(uv_include NAME VALUE APPLY)" },
+    { "uv_exclude",
+        mediatool_cmd_uv_policy_exclude,
+        "Async exclude inclusive criterion values(uv_exclude NAME VALUE APPLY)" },
+    { "uv_contain",
+        mediatool_cmd_uv_policy_contain,
+        "Async check wether contain criterion values(uv_contain NAME VALUE)" },
     { "uv_request",
         mediatool_cmd_uv_focus_request,
         "Async request focus (uv_request STREAM)" },
