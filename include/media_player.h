@@ -495,6 +495,16 @@ int media_uv_player_prepare(void* handle, const char* url, const char* options,
     media_uv_callback on_prepare, void* cookie);
 
 /**
+ * @brief  Play or resume the prepared source with auto focus request.
+ *
+ * @param handle    Async player handle.
+ * @param on_play   Call after receiving result or focus request failed.
+ * @param cookie    One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_player_play(void* handle, media_uv_callback on_play, void* cookie);
+
+/**
  * @brief Play or resume the prepared resouce.
  *
  * @param[in] handle    Async player handle.
