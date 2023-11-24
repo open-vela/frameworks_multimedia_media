@@ -298,6 +298,66 @@ int media_uv_policy_decrease(void* loop, const char* name, int apply,
     return 0;
 }
 
+int media_uv_policy_include(void* loop, const char* name,
+    const char* value, int apply, media_uv_callback cb, void* cookie)
+{
+    MediaPolicyPriv* priv;
+
+    priv = media_uv_policy_alloc(name, "include", value, apply, 0,
+        media_uv_policy_receive_cb, cb, cookie);
+    if (!priv)
+        return -ENOMEM;
+
+    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+        media_uv_policy_connect_cb, priv);
+    if (!priv->proxy) {
+        media_uv_policy_free(priv);
+        return -ENOMEM;
+    }
+
+    return 0;
+}
+
+int media_uv_policy_exclude(void* loop, const char* name,
+    const char* value, int apply, media_uv_callback cb, void* cookie)
+{
+    MediaPolicyPriv* priv;
+
+    priv = media_uv_policy_alloc(name, "exclude", value, apply, 0,
+        media_uv_policy_receive_cb, cb, cookie);
+    if (!priv)
+        return -ENOMEM;
+
+    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+        media_uv_policy_connect_cb, priv);
+    if (!priv->proxy) {
+        media_uv_policy_free(priv);
+        return -ENOMEM;
+    }
+
+    return 0;
+}
+
+int media_uv_policy_contain(void* loop, const char* name, const char* value,
+    media_uv_int_callback cb, void* cookie)
+{
+    MediaPolicyPriv* priv;
+
+    priv = media_uv_policy_alloc(name, "contain", value, 0, 128,
+        media_uv_policy_receive_int_cb, cb, cookie);
+    if (!priv)
+        return -ENOMEM;
+
+    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+        media_uv_policy_connect_cb, priv);
+    if (!priv->proxy) {
+        media_uv_policy_free(priv);
+        return -ENOMEM;
+    }
+
+    return 0;
+}
+
 /****************************************************************************
  * Public Wrapper Functions
  ****************************************************************************/
@@ -353,4 +413,85 @@ int media_uv_policy_decrease_stream_volume(void* loop, const char* stream,
         return -ENAMETOOLONG;
 
     return media_uv_policy_decrease(loop, name, MEDIA_POLICY_APPLY, cb, cookie);
+}
+
+int media_uv_policy_set_audio_mode(void* loop, const char* mode,
+    media_uv_callback cb, void* cookie)
+{
+    return media_uv_policy_set_string(loop, MEDIA_POLICY_AUDIO_MODE,
+        mode, MEDIA_POLICY_APPLY, cb, cookie);
+}
+
+int media_uv_policy_get_audio_mode(void* loop,
+    media_uv_string_callback cb, void* cookie)
+{
+    return media_uv_policy_get_string(loop, MEDIA_POLICY_AUDIO_MODE, cb, cookie);
+}
+
+int media_uv_policy_set_devices_use(void* loop, const char* devices, bool use,
+    media_uv_callback cb, void* cookie)
+{
+    if (use)
+        return media_uv_policy_include(loop, MEDIA_POLICY_DEVICE_USE, devices,
+            MEDIA_POLICY_APPLY, cb, cookie);
+    else
+        return media_uv_policy_exclude(loop, MEDIA_POLICY_DEVICE_USE, devices,
+            MEDIA_POLICY_APPLY, cb, cookie);
+}
+
+int media_uv_policy_get_devices_use(void* loop, media_uv_string_callback cb, void* cookie)
+{
+    return media_uv_policy_get_string(loop, MEDIA_POLICY_DEVICE_USE, cb, cookie);
+}
+
+int media_uv_policy_is_devices_use(void* loop, const char* devices,
+    media_uv_int_callback cb, void* cookie)
+{
+    return media_uv_policy_contain(loop, MEDIA_POLICY_DEVICE_USE, devices, cb, cookie);
+}
+
+int media_uv_policy_set_hfp_samplerate(void* loop, const char* rate,
+    media_uv_callback cb, void* cookie)
+{
+    return media_uv_policy_set_string(loop, MEDIA_POLICY_HFP_SAMPLERATE, rate,
+        MEDIA_POLICY_NOT_APPLY, cb, cookie);
+}
+
+int media_uv_policy_set_devices_available(void* loop, const char* devices, bool available,
+    media_uv_callback cb, void* cookie)
+{
+    if (available)
+        return media_uv_policy_include(loop, MEDIA_POLICY_DEVICE_AVAILABLE, devices,
+            MEDIA_POLICY_APPLY, cb, cookie);
+    else
+        return media_uv_policy_exclude(loop, MEDIA_POLICY_DEVICE_AVAILABLE, devices,
+            MEDIA_POLICY_APPLY, cb, cookie);
+}
+
+int media_uv_policy_get_devices_available(void* loop, media_uv_string_callback cb, void* cookie)
+{
+    return media_uv_policy_get_string(loop, MEDIA_POLICY_DEVICE_AVAILABLE, cb, cookie);
+}
+
+int media_uv_policy_is_devices_available(void* loop, const char* devices,
+    media_uv_int_callback cb, void* cookie)
+{
+    return media_uv_policy_contain(loop, MEDIA_POLICY_DEVICE_AVAILABLE, devices, cb, cookie);
+}
+
+int media_uv_policy_set_mute_mode(void* loop, int mute, media_uv_callback cb, void* cookie)
+{
+    return media_uv_policy_set_int(loop, MEDIA_POLICY_MUTE_MODE, mute,
+        MEDIA_POLICY_APPLY, cb, cookie);
+}
+
+int media_uv_policy_get_mute_mode(void* loop, media_uv_int_callback cb, void* cookie)
+{
+    return media_uv_policy_get_int(loop, MEDIA_POLICY_MUTE_MODE, cb, cookie);
+}
+
+int media_uv_policy_set_mic_mute(void* loop, int mute, media_uv_callback cb, void* cookie)
+{
+    return media_uv_policy_set_string(loop, MEDIA_POLICY_MIC_MODE, mute ? "off" : "on",
+        MEDIA_POLICY_APPLY, cb, cookie);
 }

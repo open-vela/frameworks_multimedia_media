@@ -25,6 +25,8 @@
  * Included Files
  ****************************************************************************/
 
+#include <stdbool.h>
+
 #include <media_event.h>
 #include <media_stream.h>
 
@@ -481,6 +483,47 @@ int media_uv_policy_increase(void* loop, const char* name, int apply,
 int media_uv_policy_decrease(void* loop, const char* name, int apply,
     media_uv_callback cb, void* cookie);
 
+/**
+ * @brief Insert string values to InclusiveCriterion.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param name      Criterion name.
+ * @param value     String values.
+ * @param apply     Whether apply new value to policy configurations.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_include(void* loop, const char* name,
+    const char* value, int apply, media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Remove string values from InclusiveCriterion.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param name      Criterion name.
+ * @param value     String values.
+ * @param apply     Whether apply new value to policy configurations.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_exclude(void* loop, const char* name,
+    const char* value, int apply, media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Check whether string values included in InclusiveCriterion.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param name      Criterion name.
+ * @param value     String values.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return int Zero on sucess, negative errno on else.
+ */
+int media_uv_policy_contain(void* loop, const char* name, const char* value,
+    media_uv_int_callback cb, void* cookie);
+
 /****************************************************************************
  * Policy Async Wrapper Functions
  ****************************************************************************/
@@ -534,6 +577,143 @@ int media_uv_policy_increase_stream_volume(void* loop, const char* stream,
  */
 int media_uv_policy_decrease_stream_volume(void* loop, const char* stream,
     media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Set audio mode.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param mode      New audio mode.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_set_audio_mode(void* loop, const char* mode,
+    media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Get current audio mode.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_get_audio_mode(void* loop,
+    media_uv_string_callback cb, void* cookie);
+
+/**
+ * @brief Set devices using or unusing.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param devices   Target devices.
+ * @param use       Whether devices are set using or unusing.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_set_devices_use(void* loop, const char* devices, bool use,
+    media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Get current using devices.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_get_devices_use(void* loop, media_uv_string_callback cb, void* cookie);
+
+/**
+ * @brief Check whether devices are being used.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param devices   Devices to check.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_is_devices_use(void* loop, const char* devices,
+    media_uv_int_callback cb, void* cookie);
+
+/**
+ * @brief Set hfp(hands free protocol) sampling rate.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param rate      Sample rate for SCO.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_set_hfp_samplerate(void* loop, const char* rate,
+    media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Set devices available or unavailable.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param devices   Target devices.
+ * @param available Whether devices are set available or unavailable.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_set_devices_available(void* loop, const char* devices, bool available,
+    media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Get current available devices.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_get_devices_available(void* loop, media_uv_string_callback cb, void* cookie);
+
+/**
+ * @brief Check whether devices are available.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param devices   Devices to check.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_is_devices_available(void* loop, const char* devices,
+    media_uv_int_callback cb, void* cookie);
+
+/**
+ * @brief Set mute mode.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param mute      New mute mode.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_set_mute_mode(void* loop, int mute, media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Get mute mode.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_get_mute_mode(void* loop, media_uv_int_callback cb, void* cookie);
+
+/**
+ * @brief Mute microphone for builtin_mic or bluetooth_mic.
+ *
+ * @param loop      Loop handle of current thread.
+ * @param mute      Mute mode.
+ * @param cb        Call after receiving result.
+ * @param cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_policy_set_mic_mute(void* loop, int mute, media_uv_callback cb, void* cookie);
 #endif /* CONFIG_LIBUV */
 
 #ifdef __cplusplus
