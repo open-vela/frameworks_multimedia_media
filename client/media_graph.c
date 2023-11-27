@@ -28,7 +28,6 @@
 #include <stdatomic.h>
 #include <stdio.h>
 #include <sys/un.h>
-#include <syslog.h>
 
 #include "media_proxy.h"
 
@@ -332,7 +331,6 @@ int media_player_set_event_callback(void* handle, void* cookie,
 
 int media_player_prepare(void* handle, const char* url, const char* options)
 {
-    syslog(LOG_INFO, "%s handle %p. \n", __func__, handle);
     return media_prepare(handle, url, options);
 }
 

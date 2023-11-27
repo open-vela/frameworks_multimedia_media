@@ -9,6 +9,10 @@ config MEDIA
 
 if MEDIA
 
+config MEDIA_DEBUG
+	bool "Enable media debug log"
+	default n
+
 config MEDIA_SERVER
 	bool "Enable media server"
 	default n

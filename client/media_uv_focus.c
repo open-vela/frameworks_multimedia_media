@@ -26,7 +26,6 @@
 #include <media_focus.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 
 #include "media_proxy.h"
 #include "media_uv.h"

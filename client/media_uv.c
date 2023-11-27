@@ -24,7 +24,6 @@
 
 #include <stdlib.h>
 #include <sys/queue.h>
-#include <syslog.h>
 #include <uv.h>
 
 #include "media_proxy.h"
@@ -40,6 +39,13 @@
 #define MEDIA_FLAG_DISCONNECT 8
 
 #define MEDIA_CPU_DELIM " ,;\t\n"
+
+#define MEDIA_TRACE(proxy_)                                           \
+    do {                                                              \
+        MEDIA_LOG(LOG_DEBUG, "[%s][%d] p:%p c:%p e:%p f:%d q:%d/%d",  \
+            __func__, __LINE__, proxy_, proxy_->cpipe, proxy_->epipe, \
+            proxy_->flags, proxy_->nb_pendq, proxy_->nb_sentq);       \
+    } while (0)
 
 /****************************************************************************
  * Private Types
@@ -79,6 +85,8 @@ struct MediaProxyPriv {
     void* cookie; /* Long-term private context. */
     MediaWriteQueue pendq; /* Writings to send. */
     MediaWriteQueue sentq; /* Writings to recv after sending. */
+    int nb_pendq;
+    int nb_sentq;
     int flags;
 };
 
@@ -190,6 +198,7 @@ static void media_uv_free_proxy(MediaProxyPriv* proxy)
 {
     MediaWritePriv* writing;
 
+    MEDIA_TRACE(proxy);
     if (proxy->cpipe || proxy->epipe)
         return; /* Sockets still active. */
 
@@ -211,6 +220,7 @@ static void media_uv_close_cb(uv_handle_t* handle)
     MediaPipePriv* pipe = uv_handle_get_data(handle);
     MediaProxyPriv* proxy = pipe->proxy;
 
+    MEDIA_TRACE(proxy);
     if (pipe == proxy->cpipe)
         proxy->cpipe = NULL;
     else if (pipe == proxy->epipe)
@@ -242,6 +252,7 @@ static void media_uv_shutdown(MediaPipePriv* pipe)
 {
     uv_shutdown_t* req;
 
+    MEDIA_TRACE(pipe->proxy);
     req = zalloc(sizeof(uv_shutdown_t));
     if (!req)
         return;
@@ -253,6 +264,7 @@ static void media_uv_reconnect_one(MediaProxyPriv* proxy)
 {
     int ret = -ENOENT;
 
+    MEDIA_TRACE(proxy);
     if (proxy->cpipe)
         media_uv_close(proxy->cpipe);
 
@@ -275,6 +287,7 @@ static void media_uv_connect_one_cb(uv_connect_t* req, int status)
     MediaProxyPriv* proxy = pipe->proxy;
     int flags;
 
+    MEDIA_TRACE(proxy);
     free(req);
 
     /* Cancel the connect on error and user's cancelation */
@@ -338,10 +351,12 @@ static int media_uv_connect_one(MediaProxyPriv* proxy)
 #endif
     }
 
+    MEDIA_TRACE(proxy);
     return 0;
 
 err:
     free(req);
+    MEDIA_TRACE(proxy);
     proxy->on_connect(proxy->cookie, ret);
     return ret;
 }
@@ -456,9 +471,10 @@ static void media_uv_write_queued_cb(uv_write_t* req, int status)
     MediaWritePriv* writing = uv_req_get_data((uv_req_t*)req);
     MediaProxyPriv* proxy = writing->proxy;
 
-    if (status >= 0)
+    if (status >= 0) {
         TAILQ_INSERT_TAIL(&proxy->sentq, writing, entry);
-    else { /* Should release wiriting because there won't be response. */
+        proxy->nb_sentq++;
+    } else { /* Should release wiriting because there won't be response. */
         if (writing->on_receive)
             writing->on_receive(proxy->cookie,
                 writing->cookies[0], writing->cookies[1], NULL);
@@ -486,8 +502,10 @@ static MediaWritePriv* media_uv_dequeue_writing(MediaProxyPriv* proxy)
     MediaWritePriv* writing;
 
     writing = TAILQ_FIRST(&proxy->sentq);
-    if (writing)
+    if (writing) {
         TAILQ_REMOVE(&proxy->sentq, writing, entry);
+        proxy->nb_sentq--;
+    }
 
     return writing;
 }
@@ -502,6 +520,7 @@ static void media_uv_delivery_writing(MediaProxyPriv* proxy)
     TAILQ_FOREACH_SAFE(writing, &proxy->pendq, entry, tmp)
     {
         TAILQ_REMOVE(&proxy->pendq, writing, entry);
+        proxy->nb_pendq--;
         media_uv_send_writing(proxy, writing, true);
     }
 }
@@ -517,6 +536,7 @@ static int media_uv_queue_writing(MediaProxyPriv* proxy, MediaWritePriv* writing
         return media_uv_send_writing(proxy, writing, true);
     else {
         TAILQ_INSERT_TAIL(&proxy->pendq, writing, entry);
+        proxy->nb_pendq++;
         return 0;
     }
 }
@@ -563,6 +583,7 @@ static void media_uv_listen_one_cb(uv_stream_t* stream, int ret)
     media_uv_close(server);
     media_uv_delivery_writing(proxy);
     uv_read_start((uv_stream_t*)&proxy->epipe->handle, media_uv_alloc_cb, media_uv_read_cb);
+    MEDIA_TRACE(proxy);
     return;
 
 err2:
@@ -570,6 +591,7 @@ err2:
 
 err1:
     media_uv_close(server);
+    MEDIA_TRACE(proxy);
     proxy->on_event(proxy->cookie, NULL, NULL, NULL);
 }
 
@@ -608,12 +630,14 @@ static int media_uv_listen_one(MediaProxyPriv* proxy)
         goto err2;
 
     proxy->flags |= MEDIA_FLAG_LISTENING;
+    MEDIA_TRACE(proxy);
     return ret;
 
 err2:
     media_uv_close(proxy->epipe);
 
 err1:
+    MEDIA_TRACE(proxy);
     proxy->on_event(proxy->cookie, NULL, NULL, NULL); /* Notify listening failed. */
     return ret;
 }

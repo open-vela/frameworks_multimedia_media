@@ -26,7 +26,6 @@
 #include <media_player.h>
 #include <media_recorder.h>
 #include <stdio.h>
-#include <syslog.h>
 
 #include "media_proxy.h"
 #include "media_uv.h"
