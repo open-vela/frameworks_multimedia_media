@@ -140,4 +140,13 @@ typedef void (*media_uv_float_callback)(void* cookie, int ret, float val);
  */
 typedef void (*media_uv_string_callback)(void* cookie, int ret, const char* val);
 
+/**
+ * @brief Callback to get object.
+ *
+ * @param[out] cookie   Private context.
+ * @param[out] ret      Result of process, zero on success, negative errno on failure.
+ * @param[out] obj      Object.
+ */
+typedef void (*media_uv_object_callback)(void* cookie, int ret, void* obj);
+
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H */
