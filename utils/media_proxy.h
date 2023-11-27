@@ -26,6 +26,7 @@
  ****************************************************************************/
 
 #include <stdbool.h>
+#include <syslog.h>
 
 #include "media_parcel.h"
 
@@ -36,6 +37,13 @@ extern "C" {
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* Debug log definition. */
+#ifdef CONFIG_MEDIA_DEBUG
+#define MEDIA_LOG(level, fmt, args...) syslog(level, fmt, args)
+#else
+#define MEDIA_LOG(level, fmt, args...)
+#endif
 
 /* RPC definitions. */
 #define MEDIA_SOCKADDR_NAME "md:%s"
