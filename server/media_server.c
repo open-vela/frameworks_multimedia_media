@@ -121,6 +121,14 @@ static int media_server_create_notify(struct media_server_priv* priv, media_parc
     return fd;
 }
 
+static void media_server_conn_close(struct media_server_conn* conn)
+{
+    close(conn->tran_fd);
+    conn->tran_fd = -EPERM;
+    conn->offset = 0;
+    media_parcel_deinit(&conn->parcel);
+}
+
 static int media_server_receive(void* handle, struct pollfd* fd, struct media_server_conn* conn)
 {
     struct media_server_priv* priv = handle;
@@ -131,42 +139,47 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
     if (priv == NULL || fd->fd <= 0)
         return -EINVAL;
 
-    if ((fd->revents & POLLERR) || (fd->revents & POLLHUP)) {
-        close(fd->fd);
-        conn->tran_fd = -EPERM;
-        conn->offset = 0;
-        media_parcel_deinit(&conn->parcel);
+    if (fd->revents & POLLERR) {
+        MEDIA_LOG(LOG_DEBUG, "[%s][%d] fd:%d revent:%d\n", __func__, __LINE__, fd->fd, (int)fd->revents);
+        media_server_conn_close(conn);
         return 0;
     }
 
-    ret = media_parcel_recv(&conn->parcel, fd->fd, &conn->offset, MSG_DONTWAIT);
-    if (ret < 0)
-        goto out;
+    while (1) {
+        conn->offset = 0;
+        media_parcel_reinit(&conn->parcel);
+        ret = media_parcel_recv(&conn->parcel, fd->fd, &conn->offset, MSG_DONTWAIT);
+        if (ret < 0)
+            break;
 
-    code = media_parcel_get_code(&conn->parcel);
-    switch (code) {
-    case MEDIA_PARCEL_SEND:
-        priv->onreceive(conn, &conn->parcel, NULL);
-        break;
+        code = media_parcel_get_code(&conn->parcel);
+        switch (code) {
+        case MEDIA_PARCEL_SEND:
+            priv->onreceive(conn, &conn->parcel, NULL);
+            break;
 
-    case MEDIA_PARCEL_SEND_ACK:
-        media_parcel_init(&ack);
-        priv->onreceive(conn, &conn->parcel, &ack);
-        ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
-        media_parcel_deinit(&ack);
-        break;
+        case MEDIA_PARCEL_SEND_ACK:
+            media_parcel_init(&ack);
+            priv->onreceive(conn, &conn->parcel, &ack);
+            ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
+            media_parcel_deinit(&ack);
+            break;
 
-    case MEDIA_PARCEL_CREATE_NOTIFY:
-        conn->notify_fd = media_server_create_notify(priv, &conn->parcel);
-        break;
+        case MEDIA_PARCEL_CREATE_NOTIFY:
+            conn->notify_fd = media_server_create_notify(priv, &conn->parcel);
+            break;
 
-    default:
-        break;
+        default:
+            break;
+        }
     }
 
-out:
-    conn->offset = 0;
-    media_parcel_reinit(&conn->parcel);
+    if (fd->revents & POLLHUP) {
+        MEDIA_LOG(LOG_DEBUG, "[%s][%d] fd:%d revent:%d\n", __func__, __LINE__, fd->fd, (int)fd->revents);
+        media_server_conn_close(conn);
+        return 0;
+    }
+
     return ret;
 }
 
