@@ -37,7 +37,6 @@
 #include <sys/eventfd.h>
 #include <sys/queue.h>
 #include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "media_proxy.h"
@@ -438,13 +437,16 @@ static int media_common_handler(MediaGraphPriv* priv, void* cookie,
         return 0;
     }
 
+    if (!ctx)
+        return -EINVAL;
+
     if (!strcmp(cmd, "set_event")) {
         ctx->event = true;
 
         return 0;
     }
 
-    if (!strcmp(cmd, "close")) {
+    if (!strcmp(cmd, "close") && arg) {
         sscanf(arg, "%d", &pending);
         if (!pending)
             media_stub_notify_finalize(&ctx->cookie);
