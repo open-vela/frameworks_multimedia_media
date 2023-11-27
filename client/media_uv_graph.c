@@ -76,6 +76,8 @@ static void media_uv_stream_receive_int_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel);
 static void media_uv_stream_receive_unsigned_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel);
+static void media_uv_stream_prepare_cb(void* cookie,
+    void* cookie0, void* cookie1, media_parcel* parcel);
 static int media_uv_stream_send(void* stream, const char* target,
     const char* cmd, const char* arg, int res_len,
     media_uv_parcel_callback parser, void* cb, void* cookie);
@@ -182,6 +184,19 @@ static void media_uv_stream_receive_unsigned_cb(void* cookie,
     }
 
     cb(cookie1, result, value);
+}
+
+static void media_uv_stream_prepare_cb(void* cookie,
+    void* cookie0, void* cookie1, media_parcel* parcel)
+{
+    media_uv_object_callback cb = cookie0;
+    int32_t result = -ECANCELED;
+
+    if (parcel)
+        media_parcel_read_scanf(parcel, "%i%s", &result, NULL);
+
+    /* TODO: In buffer mode, give uv_pipe_t to user here. */
+    cb(cookie1, result, NULL);
 }
 
 static int media_uv_stream_send(void* stream, const char* target,
@@ -358,7 +373,7 @@ int media_uv_player_listen(void* handle, media_event_callback on_event)
 }
 
 int media_uv_player_prepare(void* handle, const char* url, const char* options,
-    media_uv_callback cb, void* cookie)
+    media_uv_object_callback cb, void* cookie)
 {
     int ret = 0;
 
@@ -373,7 +388,7 @@ int media_uv_player_prepare(void* handle, const char* url, const char* options,
 
     if (ret >= 0)
         ret = media_uv_stream_send(handle, NULL, "prepare", url, 0,
-            media_uv_stream_receive_cb, cb, cookie);
+            media_uv_stream_prepare_cb, cb, cookie);
 
     return ret;
 }
@@ -544,7 +559,7 @@ int media_uv_recorder_listen(void* handle, media_event_callback on_event)
 }
 
 int media_uv_recorder_prepare(void* handle, const char* url, const char* options,
-    media_uv_callback cb, void* cookie)
+    media_uv_object_callback cb, void* cookie)
 {
     int ret = 0;
 
@@ -559,7 +574,7 @@ int media_uv_recorder_prepare(void* handle, const char* url, const char* options
 
     if (ret >= 0)
         ret = media_uv_stream_send(handle, NULL, "prepare", url, 0,
-            media_uv_stream_receive_cb, cb, cookie);
+            media_uv_stream_prepare_cb, cb, cookie);
 
     return ret;
 }
