@@ -29,7 +29,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
-#include <syslog.h>
 
 #include "focus_stack.h"
 #include "media_server.h"
@@ -688,7 +687,7 @@ int media_focus_handler(void* focus, void* cookie, const char* name, const char*
 {
     media_focus_context* ctx = media_server_get_data(cookie);
     media_focus* priv = focus;
-    int ret;
+    int ret = -EINVAL;
 
     if (!strcmp(cmd, "request")) {
         int suggest;
@@ -706,14 +705,18 @@ int media_focus_handler(void* focus, void* cookie, const char* name, const char*
         media_server_set_data(cookie, ctx);
         return suggest;
     } else if (!strcmp(cmd, "abandon")) {
-        if (!ctx)
-            return -EINVAL;
+        if (ctx) {
+            ret = media_focus_abandon_(priv, ctx->handle);
+            media_focus_free_context(ctx);
+        }
 
-        ret = media_focus_abandon_(priv, ctx->handle);
-        media_focus_free_context(ctx);
         return ret;
-    } else if (!strcmp(cmd, "set_notify")) { /* Mark listener created and notify pending suggestions. */
+    } else if (!strcmp(cmd, "set_notify")) {
+        /* XXX: Mark listener created and notify pending suggestions. */
         media_focus_suggest* suggest;
+
+        if (!ctx)
+            return ret;
 
         ctx->ready = true;
         while ((suggest = STAILQ_FIRST(&ctx->suggestq))) {
