@@ -1661,11 +1661,14 @@ out:
 
 int main(int argc, char* argv[])
 {
+    pthread_attr_t attr;
     char* buffer = NULL;
     pthread_t thread;
     int ret, len;
 
-    ret = pthread_create(&thread, NULL, mediatool_uvloop_thread, NULL);
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, CONFIG_MEDIA_TOOL_STACKSIZE);
+    ret = pthread_create(&thread, &attr, mediatool_uvloop_thread, NULL);
     if (ret < 0)
         goto out;
 
