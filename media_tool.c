@@ -337,7 +337,7 @@ static void mediatool_uv_common_open_cb(void* cookie, int ret)
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
-static void mediatool_uv_common_prepare_cb(void* cookie, int ret)
+static void mediatool_uv_common_prepare_cb(void* cookie, int ret, void* obj)
 {
     struct mediatool_chain_s* chain = cookie;
 
