@@ -365,6 +365,13 @@ static void mediatool_uv_common_stop_cb(void* cookie, int ret)
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
+static void mediatool_uv_player_reset_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
 static void mediatool_uv_player_get_position_cb(void* cookie, int ret, unsigned position)
 {
     struct mediatool_chain_s* chain = cookie;
@@ -377,6 +384,41 @@ static void mediatool_uv_player_get_duration_cb(void* cookie, int ret, unsigned 
     struct mediatool_chain_s* chain = cookie;
 
     printf("[%s] id:%d ret:%d val:%u\n", __func__, chain->id, ret, duration);
+}
+
+static void mediatool_uv_player_get_volume_cb(void* cookie, int ret, float volume)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d val:%f\n", __func__, chain->id, ret, volume);
+}
+
+static void mediatool_uv_player_set_volume_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_player_set_looping_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_player_seek_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_recorder_reset_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 #endif /* CONFIG_LIBUV_EXTENSION */
 
@@ -623,6 +665,18 @@ CMD1(reset, int, id)
     case MEDIATOOL_RECORDER:
         ret = media_recorder_reset(media->chain[id].handle);
         break;
+
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        ret = media_uv_player_reset(media->chain[id].handle,
+            mediatool_uv_player_reset_cb, &media->chain[id]);
+        break;
+
+    case MEDIATOOL_UVRECORDER:
+        ret = media_uv_recorder_reset(media->chain[id].handle,
+            mediatool_uv_recorder_reset_cb, &media->chain[id]);
+        break;
+#endif
 
     default:
         return 0;
@@ -946,6 +1000,22 @@ CMD2(volume, int, id, string_t, volume_cmd)
         }
         break;
 
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        if ((ptr = strchr(volume_cmd, '?'))) {
+            ret = media_uv_player_get_volume(media->chain[id].handle,
+                mediatool_uv_player_get_volume_cb, &media->chain[id]);
+        } else {
+            if ((ptr = strcasestr(volume_cmd, "db")))
+                volume_f = pow(10.0, strtof(volume_cmd, NULL) / 20);
+            else
+                volume_f = strtof(volume_cmd, NULL);
+            ret = media_uv_player_set_volume(media->chain[id].handle, volume_f,
+                mediatool_uv_player_set_volume_cb, &media->chain[id]);
+        }
+        break;
+#endif
+
     case MEDIATOOL_RECORDER:
         return 0;
     }
@@ -955,24 +1025,56 @@ CMD2(volume, int, id, string_t, volume_cmd)
 
 CMD2(loop, int, id, int, isloop)
 {
+    int ret = 0;
+
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    if (media->chain[id].type != MEDIATOOL_PLAYER)
-        return 0;
+    switch (media->chain[id].type) {
+    case MEDIATOOL_PLAYER:
+        ret = media_player_set_looping(media->chain[id].handle, isloop);
+        break;
 
-    return media_player_set_looping(media->chain[id].handle, isloop);
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        ret = media_uv_player_set_looping(media->chain[id].handle, isloop,
+            mediatool_uv_player_set_looping_cb, &media->chain[id]);
+        break;
+#endif
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
 }
 
 CMD2(seek, int, id, int, msec)
 {
+    int ret = 0;
+
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
         return -EINVAL;
 
-    if (media->chain[id].type != MEDIATOOL_PLAYER)
-        return 0;
+    switch (media->chain[id].type) {
+    case MEDIATOOL_PLAYER:
+        ret = media_player_seek(media->chain[id].handle, msec);
+        break;
 
-    return media_player_seek(media->chain[id].handle, msec);
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        ret = media_uv_player_seek(media->chain[id].handle, msec,
+            mediatool_uv_player_seek_cb, &media->chain[id]);
+        break;
+#endif
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
 }
 
 CMD1(position, int, id)

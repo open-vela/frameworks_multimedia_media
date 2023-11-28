@@ -496,6 +496,16 @@ int media_uv_player_prepare(void* handle, const char* url, const char* options,
     media_uv_object_callback on_prepare, void* cookie);
 
 /**
+ * @brief Reset media with player type.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] on_reset  Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_player_reset(void* handle, media_uv_callback on_reset, void* cookie);
+
+/**
  * @brief  Play or resume the prepared source with auto focus request.
  *
  * @param handle    Async player handle.
@@ -548,6 +558,18 @@ int media_uv_player_set_volume(void* handle, float volume,
     media_uv_callback on_volume, void* cookie);
 
 /**
+ * @brief Get the player handle volume.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] volume    Volume with range of 0.0 - 1.0
+ * @param[in] on_volume Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_player_get_volume(void* handle,
+    media_uv_float_callback on_volume, void* cookie);
+
+/**
  * @brief Get current playing status.
  *
  * @param handle        Async player handle.
@@ -579,6 +601,57 @@ int media_uv_player_get_position(void* handle,
  */
 int media_uv_player_get_duration(void* handle,
     media_uv_unsigned_callback on_duration, void* cookie);
+
+/**
+ * @brief Set the player path looping play, defult is not looping.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] loop      Loop count (-1: forever, 0: not loop).
+ * @param[in] on_loop   Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_player_set_looping(void* handle, int loop,
+    media_uv_callback on_loop, void* cookie);
+
+/**
+ * @brief Seek to msec position from begining.
+ *
+ * @param[in] handle    Async player handle.
+ * @param[in] mesc      Which postion should seek from begining.
+ * @param[in] on_loop   Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_player_seek(void* handle, unsigned int msec,
+    media_uv_callback on_seek, void* cookie);
+
+/**
+ * @brief Set properties of the player handle.
+ *
+ * @param[in] handle      Async player handle.
+ * @param[in] target      Target filter
+ * @param[in] key         Key
+ * @param[in] value       Value
+ * @param[in] on_setprop  Call after receiving result.
+ * @param[in] cookie      One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_player_set_property(void* handle, const char* target, const char* key,
+    const char* value, media_uv_callback on_setprop, void* cookie);
+
+/**
+ * @brief Get properties of the player handle.
+ *
+ * @param[in] handle      Async player handle.
+ * @param[in] target      Target filter
+ * @param[in] key         Key
+ * @param[in] on_getprop  Call after receiving result.
+ * @param[in] cookie      One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_player_get_property(void* handle, const char* target, const char* key,
+    media_uv_string_callback on_getprop, void* cookie);
 #endif /* CONFIG_LIBUV */
 
 #undef EXTERN

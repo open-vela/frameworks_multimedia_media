@@ -186,6 +186,36 @@ static void media_uv_stream_receive_unsigned_cb(void* cookie,
     cb(cookie1, result, value);
 }
 
+static void media_uv_stream_receive_volume_cb(void* cookie,
+    void* cookie0, void* cookie1, media_parcel* parcel)
+{
+    media_uv_float_callback cb = cookie0;
+    const char* response = NULL;
+    int32_t result = -ECANCELED;
+    float volume = 0;
+
+    if (parcel) {
+        media_parcel_read_scanf(parcel, "%i%s", &result, &response);
+        if (response)
+            sscanf(response, "vol:%f", &volume);
+    }
+
+    cb(cookie1, result, volume);
+}
+
+static void media_uv_stream_receive_string_cb(void* cookie,
+    void* cookie0, void* cookie1, media_parcel* parcel)
+{
+    media_uv_string_callback cb = cookie0;
+    const char* response = NULL;
+    int32_t result = -ECANCELED;
+
+    if (parcel)
+        media_parcel_read_scanf(parcel, "%i%s", &result, &response);
+
+    cb(cookie1, result, response);
+}
+
 static void media_uv_stream_prepare_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel)
 {
@@ -393,6 +423,15 @@ int media_uv_player_prepare(void* handle, const char* url, const char* options,
     return ret;
 }
 
+int media_uv_player_reset(void* handle, media_uv_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_stream_send(handle, NULL, "reset", NULL, 0,
+        media_uv_stream_receive_cb, cb, cookie);
+}
+
 int media_uv_player_play(void* handle, media_uv_callback cb, void* cookie)
 {
     MediaPlayerPriv* priv = handle;
@@ -461,8 +500,16 @@ int media_uv_player_set_volume(void* handle, float volume,
         media_uv_stream_receive_cb, cb, cookie);
 }
 
-int media_uv_player_get_playing(void* handle,
-    media_uv_int_callback cb, void* cookie)
+int media_uv_player_get_volume(void* handle, media_uv_float_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_stream_send(handle, "volume", "dump", NULL, 32,
+        media_uv_stream_receive_volume_cb, cb, cookie);
+}
+
+int media_uv_player_get_playing(void* handle, media_uv_int_callback cb, void* cookie)
 {
     if (!handle)
         return -EINVAL;
@@ -491,6 +538,51 @@ int media_uv_player_get_duration(void* handle,
         media_uv_stream_receive_unsigned_cb, cb, cookie);
 }
 
+int media_uv_player_set_looping(void* handle, int loop,
+    media_uv_callback cb, void* cookie)
+{
+    char tmp[32];
+
+    if (!handle)
+        return -EINVAL;
+
+    snprintf(tmp, sizeof(tmp), "%d", loop);
+    return media_uv_stream_send(handle, NULL, "set_loop", tmp, 0,
+        media_uv_stream_receive_cb, cb, cookie);
+}
+
+int media_uv_player_seek(void* handle, unsigned int msec,
+    media_uv_callback cb, void* cookie)
+{
+    char tmp[32];
+
+    if (!handle)
+        return -EINVAL;
+
+    snprintf(tmp, sizeof(tmp), "%u", msec);
+    return media_uv_stream_send(handle, NULL, "seek", tmp, 0,
+        media_uv_stream_receive_cb, cb, cookie);
+}
+
+int media_uv_player_set_property(void* handle, const char* target, const char* key,
+    const char* value, media_uv_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_stream_send(handle, target, key, value, 0,
+        media_uv_stream_receive_cb, cb, cookie);
+}
+
+int media_uv_player_get_property(void* handle, const char* target, const char* key,
+    media_uv_string_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_stream_send(handle, target, key, NULL, 32,
+        media_uv_stream_receive_string_cb, cb, cookie);
+}
 /****************************************************************************
  * Recorder Functions
  ****************************************************************************/
@@ -603,5 +695,34 @@ int media_uv_recorder_stop(void* handle, media_uv_callback cb, void* cookie)
         return -EINVAL;
 
     return media_uv_stream_send(handle, NULL, "stop", NULL, 0,
+        media_uv_stream_receive_cb, cb, cookie);
+}
+
+int media_uv_recorder_set_property(void* handle, const char* target, const char* key,
+    const char* value, media_uv_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_stream_send(handle, target, key, value, 0,
+        media_uv_stream_receive_cb, cb, cookie);
+}
+
+int media_uv_recorder_get_property(void* handle, const char* target, const char* key,
+    media_uv_string_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_stream_send(handle, target, key, NULL, 32,
+        media_uv_stream_receive_string_cb, cb, cookie);
+}
+
+int media_uv_recorder_reset(void* handle, media_uv_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_stream_send(handle, NULL, "reset", NULL, 0,
         media_uv_stream_receive_cb, cb, cookie);
 }
