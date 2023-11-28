@@ -379,6 +379,43 @@ int media_uv_recorder_pause(void* handle, media_uv_callback on_pause, void* cook
  * @return int Zero on success, negative errno on failure.
  */
 int media_uv_recorder_stop(void* handle, media_uv_callback on_stop, void* cookie);
+
+/**
+ * @brief Set properties of the recorder.
+ *
+ * @param[in] handle    Async recorder handle
+ * @param[in] target    Target filter
+ * @param[in] key       Key
+ * @param[in] value     Value
+ * @param[in] cb        Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negative errno value on failure.
+ */
+int media_uv_recorder_set_property(void* handle, const char* target, const char* key,
+    const char* value, media_uv_callback cb, void* cookie);
+/**
+ * @brief Get properties of the recorder.
+ *
+ * @param[in] handle      Async recorder handle
+ * @param[in] target      Target filter
+ * @param[in] key         Key
+ * @param[in] value       Buffer of value
+ * @param[in] value_len   Buffer length of value
+ * @param[in] cb          Call after receiving result
+ * @param[in] cookie      One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_recorder_get_property(void* handle, const char* target, const char* key,
+    media_uv_string_callback cb, void* cookie);
+/**
+ * @brief Reset the recorder, clear the origin record and record new one.
+ *
+ * @param[in] handle    Async recorder handle.
+ * @param[in] cb        Call after receiving result
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negative errno value on failure.
+ */
+int media_uv_recorder_reset(void* handle, media_uv_callback on_reset, void* cookie);
 #endif /* CONFIG_LIBUV */
 
 #undef EXTERN
