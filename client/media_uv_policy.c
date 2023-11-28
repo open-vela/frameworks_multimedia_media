@@ -122,10 +122,13 @@ static void media_uv_policy_receive_cb(void* cookie,
     media_uv_callback cb = cookie0;
     int32_t result = -ECANCELED;
 
-    if (parcel)
-        media_parcel_read_scanf(parcel, "%i%s", &result, NULL);
+    if (cb) {
+        if (parcel)
+            media_parcel_read_scanf(parcel, "%i%s", &result, NULL);
 
-    cb(cookie1, result);
+        cb(cookie1, result);
+    }
+
     media_uv_disconnect(priv->proxy, media_uv_policy_release_cb);
 }
 
@@ -138,13 +141,16 @@ static void media_uv_policy_receive_int_cb(void* cookie,
     int32_t result = -ECANCELED;
     int value = 0;
 
-    if (parcel) {
-        media_parcel_read_scanf(parcel, "%i%s", &result, &response);
-        if (response)
-            value = strtol(response, NULL, 0);
+    if (cb) {
+        if (parcel) {
+            media_parcel_read_scanf(parcel, "%i%s", &result, &response);
+            if (response)
+                value = strtol(response, NULL, 0);
+        }
+
+        cb(cookie1, result, value);
     }
 
-    cb(cookie1, result, value);
     media_uv_disconnect(priv->proxy, media_uv_policy_release_cb);
 }
 
@@ -156,10 +162,13 @@ static void media_uv_policy_receive_string_cb(void* cookie,
     const char* response = NULL;
     int32_t result = -ECANCELED;
 
-    if (parcel)
-        media_parcel_read_scanf(parcel, "%i%s", &result, &response);
+    if (cb) {
+        if (parcel)
+            media_parcel_read_scanf(parcel, "%i%s", &result, &response);
 
-    cb(cookie1, result, response);
+        cb(cookie1, result, response);
+    }
+
     media_uv_disconnect(priv->proxy, media_uv_policy_release_cb);
 }
 
