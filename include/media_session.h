@@ -88,7 +88,7 @@ int media_session_pause(void* handle);
 /**
  * Seek to msec position from begining
  * @param[in] handle    The player path
- * @param[in] mesc      Which postion should seek from begining
+ * @param[in] msec      Which postion should seek from begining
  * @return Zero on success; a negated errno value on failure.
  */
 int media_session_seek(void* handle, unsigned int msec);
@@ -104,7 +104,7 @@ int media_session_get_state(void* handle, int* state);
 /**
  * Get playback position of the most active player through sessoin path.
  * @param[in] handle    The session path
- * @param[in] mesc      Playback position (from begining)
+ * @param[in] msec      Playback position (from begining)
  * @return Zero on success; a negated errno value on failure.
  */
 int media_session_get_position(void* handle, unsigned int* msec);
@@ -112,7 +112,7 @@ int media_session_get_position(void* handle, unsigned int* msec);
 /**
  * Get playback file duration of the most active player through sessoin path.
  * @param[in] handle    The session path
- * @param[in] mesc      File duration
+ * @param[in] msec      File duration
  * @return Zero on success; a negated errno value on failure.
  */
 int media_session_get_duration(void* handle, unsigned int* msec);
@@ -197,6 +197,173 @@ int media_session_unregister(void* handle);
 int media_session_notify(void* handle, int event,
     int result, const char* extra);
 
+#ifdef CONFIG_LIBUV
+
+/**
+ * Open a session path as controller.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] params    Not used yet.
+ * @param[in] on_open   Open callback, called after open is done.
+ * @param[in] cookie    Long-term callback context for:
+ *         on_open, on_event, on_close.
+ * @return void* Handle of Controller.
+ */
+void* media_uv_session_open(void* loop, char* params,
+    media_uv_callback on_open, void* cookie);
+
+/**
+ * Close the session path.
+ * @param[in] handle    The session path to be destroyed.
+ * @param[in] on_close  Close callback, called after close is done.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_close(void* handle, media_uv_callback on_close);
+
+/**
+ * Set event callback to the session path, the callback will be called
+ * when state of the most active player changed.
+ * @param[in] handle    The session path.
+ * @param[in] on_event  Event callback.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_listen(void* handle, media_event_callback on_event);
+
+/**
+ * Start a player through sessoin path.
+ * @param[in] handle    The session path.
+ * @param[in] on_start  Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_start(void* handle, media_uv_callback on_start,
+    void* cookie);
+
+/**
+ * Stop the most active player through sessoin path.
+ * @param[in] handle    The session path.
+ * @param[in] on_stop   Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_stop(void* handle, media_uv_callback on_stop,
+    void* cookie);
+
+/**
+ * Pause the most active player through sessoin path.
+ * @param[in] handle    The session path.
+ * @param[in] on_pause  Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_pause(void* handle, media_uv_callback on_pause, void* cookie);
+
+/**
+ * Seek to msec position from begining
+ * @param[in] handle    The player path
+ * @param[in] msec      Which postion should seek from begining
+ * @param[in] on_seek   Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_seek(void* handle, unsigned int msec,
+    media_uv_callback on_seek, void* cookie);
+
+/**
+ * Get current player state through sessoin path.
+ * @param[in] handle    The session path.
+ * @param[in] on_state  Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_get_state(void* handle,
+    media_uv_int_callback on_state, void* cookie);
+
+/**
+ * Get playback position of the most active player through sessoin path.
+ * @param[in] handle       The session path
+ * @param[in] on_position  Call after receiving result.
+ * @param[in] cookie       One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_get_position(void* handle,
+    media_uv_int_callback on_position, void* cookie);
+
+/**
+ * Get playback file duration of the most active player through sessoin path.
+ * @param[in] handle        The session path
+ * @param[in] on_duriation  Call after receiving result.
+ * @param[in] cookie        One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_get_duration(void* handle,
+    media_uv_int_callback on_duriation, void* cookie);
+
+/**
+ * Set the most active player path volume through sessoin path.
+ * @param[in] handle        The session path
+ * @param[in] Volume        Volume index of stream type, with range of 1 - 10
+ * @param[in] on_set_volume Call after receiving result.
+ * @param[in] cookie        One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_set_volume(void* handle, unsigned int* volume,
+    media_uv_callback on_set_volume, void* cookie);
+
+/**
+ * Get the most active player path volume through sessoin path.
+ * @param[in] handle        The session path
+ * @param[in] on_get_volume Call after receiving result.
+ * @param[in] cookie        One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_get_volume(void* handle,
+    media_uv_int_callback on_get_volume, void* cookie);
+
+/**
+ * Increase the most active player path volume through sessoin path.
+ * @param[in] handle      The session path
+ * @param[in] on_increase Call after receiving result.
+ * @param[in] cookie      One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_increase_volume(void* handle, media_uv_callback on_increase,
+    void* cookie);
+
+/**
+ * Decrease the most active player path volume through sessoin path.
+ * @param[in] handle      The session path
+ * @param[in] on_decrease Call after receiving result.
+ * @param[in] cookie      One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_uv_session_decrease_volume(void* handle, media_uv_callback on_decrease,
+    void* cookie);
+
+/**
+ * Play previous song in player list through sessoin path.
+ * @param[in] handle      The session path.
+ * @param[in] on_pre_song Call after receiving result.
+ * @param[in] cookie      One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ * @note media framework has no player list, such function shall be
+ * implemented by player.
+ */
+int media_uv_session_prev_song(void* handle,
+    media_uv_callback on_pre_song, void* cookie);
+
+/**
+ * Play next song in player list through sessoin path.
+ * @param[in] handle       The session path.
+ * @param[in] on_next_song Call after receiving result.
+ * @param[in] cookie       One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ * @note media framework has no player list, such function shall be
+ * implemented by player.
+ */
+int media_uv_session_next_song(void* handle,
+    media_uv_callback on_next_song, void* cookie);
+
+#endif /* CONFIG_LIBUV */
 #undef EXTERN
 #ifdef __cplusplus
 }
