@@ -39,6 +39,8 @@ extern "C" {
 #define MEDIA_STREAM_EMERGENCY "Emergency"
 #define MEDIA_STREAM_CALLRING "CallRing"
 #define MEDIA_STREAM_CAPTURE "Capture"
+#define MEDIA_STREAM_MEDIA "Media"
+#define MEDIA_STREAM_A2DP_SNK "A2dpsnk" /* bt music */
 
 #ifdef __cplusplus
 }
