@@ -487,13 +487,14 @@ int media_uv_player_close(void* handle, int pending,
  * @param[in] handle        Async player handle.
  * @param[in] url           Path of resources.
  * @param[in] options       Resource options, @see media_player_prpare.
+ * @param[in] on_connection
  * @param[in] on_prepare    Call after receiving result, will give an uv_pipe_t
  *                          to write data in buffer mode.
  * @param[in] cookie        One-time callback context.
  * @return int Zero on success, negative errno on failure.
  */
 int media_uv_player_prepare(void* handle, const char* url, const char* options,
-    media_uv_object_callback on_prepare, void* cookie);
+    media_uv_object_callback on_connection, media_uv_callback on_prepare, void* cookie);
 
 /**
  * @brief Reset media with player type.

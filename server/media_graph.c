@@ -425,7 +425,8 @@ static int media_common_handler(MediaGraphPriv* priv, void* cookie,
     char* res, int res_len, bool player)
 {
     MediaFilterPriv* ctx = media_server_get_data(cookie);
-    AVFilterContext* filter;
+    AVFilterContext* filter = NULL;
+    char url[PATH_MAX];
     int pending;
 
     if (!strcmp(cmd, "open")) {
@@ -442,24 +443,36 @@ static int media_common_handler(MediaGraphPriv* priv, void* cookie,
 
     if (!strcmp(cmd, "set_event")) {
         ctx->event = true;
-
         return 0;
     }
 
-    if (!strcmp(cmd, "close") && arg) {
-        sscanf(arg, "%d", &pending);
-        if (!pending)
-            media_stub_notify_finalize(&ctx->cookie);
-    }
+    if (!strcmp(cmd, "prepare") && target) {
+        /* Buffer mode, use `target` as cpuname, `arg` as sockname. */
+        if (!strcmp(target, CONFIG_RPTUN_LOCAL_CPUNAME))
+            snprintf(url, sizeof(url), "unix:%s?listen=0", arg);
+        else
+            snprintf(url, sizeof(url), "rpmsg:%s:%s?listen=0", arg, target);
 
-    if (target) {
+        arg = url;
+    } else if (!strcmp(cmd, "close")) {
+        /* Direct end notification if close without pending. */
+        if (arg)
+            sscanf(arg, "%d", &pending);
+
+        if (!arg || !pending)
+            media_stub_notify_finalize(&ctx->cookie);
+    } else if (target) {
+        /* Find other filter if user specified one. */
         filter = avfilter_find_on_link(ctx->filter, target, NULL, player, NULL);
         if (!filter)
             return -EINVAL;
-    } else
+    }
+
+    if (!filter)
         filter = ctx->filter;
 
-    return media_graph_queue_command(priv, filter, cmd, arg, res, res_len, AV_OPT_SEARCH_CHILDREN);
+    return media_graph_queue_command(priv, filter, cmd, arg,
+        res, res_len, AV_OPT_SEARCH_CHILDREN);
 }
 
 /****************************************************************************

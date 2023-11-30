@@ -338,7 +338,7 @@ static void mediatool_uv_common_open_cb(void* cookie, int ret)
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
-static void mediatool_uv_common_prepare_cb(void* cookie, int ret, void* obj)
+static void mediatool_uv_common_prepare_cb(void* cookie, int ret)
 {
     struct mediatool_chain_s* chain = cookie;
 
@@ -855,13 +855,13 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
         ret = media_uv_player_prepare(media->chain[id].handle, url_mode ? path : NULL, options,
-            mediatool_uv_common_prepare_cb, &media->chain[id]);
+            NULL, mediatool_uv_common_prepare_cb, &media->chain[id]);
         async_mode = true;
         break;
 
     case MEDIATOOL_UVRECORDER:
         ret = media_uv_recorder_prepare(media->chain[id].handle, url_mode ? path : NULL, options,
-            mediatool_uv_common_prepare_cb, &media->chain[id]);
+            NULL, mediatool_uv_common_prepare_cb, &media->chain[id]);
         async_mode = true;
         break;
 #endif
