@@ -36,15 +36,19 @@ extern "C" {
 #define EXTERN extern
 #endif
 
+/****************************************************************************
+ * Public Funtions
+ ****************************************************************************/
+
 /**
  * @brief Open one recorder according to the incomming path.
  *
  * @code
  *  // Example
- *  void *handle = media_recorder_open("cap");
+ *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
  * @endcode
  *
- * @param[in] params    open path params, usually "cap".
+ * @param[in] params    open path params, usually MEDIA_SOURCE_MIC.
  * @return Recorder handle on success; NULL on failure.
  */
 void* media_recorder_open(const char* params);
@@ -54,7 +58,7 @@ void* media_recorder_open(const char* params);
  *
  * @code
  *  // Example
- *  void *handle = media_recorder_open("cap");
+ *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
  *  int ret = media_recorder_close(handle);
  * @endcode
  *
@@ -84,7 +88,7 @@ int media_recorder_close(void* handle);
  *
  *  // You can modify or create as you wish.
  *  struct recorder_state_s* recorder_state = *state;
- *  void *handle = media_recorder_open("cap");
+ *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
  *  int ret = media_recorder_set_event_callback(handle, recorder_state,
  *                                              callback);
  *  printf("%d", recorder_state->last_event);
@@ -103,7 +107,7 @@ int media_recorder_set_event_callback(void* handle, void* cookie,
  * @brief Prepare the recorder.
  *
  * @code
- *  void *handle = media_recorder_open("cap");
+ *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
  *  // set event callback here.
  *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
  * @endcode
@@ -134,7 +138,7 @@ int media_recorder_prepare(void* handle, const char* url, const char* options);
  * @brief Reset the recorder, clear the origin record and record new one.
  *
  * @code
- *  void *handle = media_recorder_open("cap");
+ *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
  *  // set event callback here.
  *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
  *  ret = media_recorder_start(handle);
@@ -155,7 +159,7 @@ int media_recorder_reset(void* handle);
  * @code
  *  int buf_len = 10;
  *  void buf[buf_len];
- *  void *handle = media_recorder_open("cap");
+ *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
  *  // set event callback here.
  *  int ret = media_recorder_prepare(handle, NULL, NULL);
  *  ret = media_recorder_start(handle);
@@ -196,7 +200,7 @@ void media_recorder_close_socket(void* handle);
  * @brief Start the recorder.
  *
  * @code
- *  void *handle = media_recorder_open("cap");
+ *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
  *  // set event callback here.
  *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
  *  ret = media_recorder_start(handle);
@@ -211,7 +215,7 @@ int media_recorder_start(void* handle);
  * @brief Pause the recorder.
  *
  * @code
- *  void *handle = media_recorder_open("cap");
+ *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
  *  // set event callback here.
  *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
  *  ret = media_recorder_start(handle);
@@ -227,7 +231,7 @@ int media_recorder_pause(void* handle);
  * @brief Stop the recorder.
  *
  * @code
- *  void *handle = media_recorder_open("cap");
+ *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
  *  // set event callback here.
  *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
  *  ret = media_recorder_start(handle);
@@ -350,6 +354,18 @@ int media_uv_recorder_close(void* handle, media_uv_callback on_close);
  */
 int media_uv_recorder_prepare(void* handle, const char* url, const char* options,
     media_uv_object_callback on_connection, media_uv_callback on_prepare, void* cookie);
+
+/**
+ * @brief Start or resume the capturing with auto focus request.
+ *
+ * @param[in] handle    Async recorder handle.
+ * @param[in] scenario  MEDIA_SCENARIO_* in media_focus.h ..
+ * @param[in] on_play   Call after receiving result.
+ * @param[in] cookie    One-time callback context.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_recorder_start_auto(void* handle, const char* stream,
+    media_uv_callback on_start, void* cookie);
 
 /**
  * @brief Start or resume the capturing.

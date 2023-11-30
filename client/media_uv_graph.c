@@ -37,26 +37,28 @@
  * Private Types
  ****************************************************************************/
 
-#define MEDIA_STREAM_FIELDS        \
-    int id;                        \
-    char* name;                    \
-    void* proxy;                   \
-    void* cookie;                  \
-    media_uv_callback on_open;     \
-    media_uv_callback on_close;    \
-    media_event_callback on_event; \
-    uv_loop_t* loop;               \
-    uv_pipe_t* pipe;               \
-    int nb_listener;               \
-    MediaListenList listeners;     \
-    media_uv_object_callback on_connection;
-
-/****************************************************************************
- * Private Types
- ****************************************************************************/
-
 typedef LIST_ENTRY(MediaListenPriv) MediaListenEntry;
 typedef LIST_HEAD(MediaListenList, MediaListenPriv) MediaListenList;
+
+#define MEDIA_STREAM_FIELDS                       \
+    int id;                                       \
+    char* name; /* Stream type or source type. */ \
+    void* proxy;                                  \
+    void* cookie;                                 \
+    media_uv_callback on_open;                    \
+    media_uv_callback on_close;                   \
+    media_event_callback on_event;                \
+    uv_loop_t* loop;                              \
+    /* Fields for buffer mode. */                 \
+    uv_pipe_t* pipe;                              \
+    int nb_listener;                              \
+    MediaListenList listeners;                    \
+    media_uv_object_callback on_connection;       \
+    /* Fields for auto focus. */                  \
+    void* focus;                                  \
+    bool suggest_active;                          \
+    media_uv_callback on_play;                    \
+    void* on_play_cookie;
 
 typedef struct MediaStreamPriv {
     MEDIA_STREAM_FIELDS
@@ -64,10 +66,6 @@ typedef struct MediaStreamPriv {
 
 typedef struct MediaPlayerPriv {
     MEDIA_STREAM_FIELDS
-    void* focus;
-    bool playable; /* Latest focus suggestion. */
-    media_uv_callback on_play;
-    void* on_play_cookie;
 } MediaPlayerPriv;
 
 typedef struct MediaRecorderPriv {
@@ -119,10 +117,9 @@ static int media_uv_stream_listen_init(MediaStreamPriv* priv, const char* addr);
 
 /* Functions to subscrible focus. */
 
-static void media_uv_player_release(MediaPlayerPriv* priv);
-static void media_uv_player_close_cb(void* cookie, int ret);
-static void media_uv_player_abandon_cb(void* cookie, int ret);
+static void media_uv_stream_abandon_cb(void* cookie, int ret);
 static void media_uv_player_suggest_cb(int suggest, void* cookie);
+static void media_uv_recorder_suggest_cb(int suggest, void* cookie);
 
 /****************************************************************************
  * Common Functions
@@ -130,7 +127,7 @@ static void media_uv_player_suggest_cb(int suggest, void* cookie);
 
 static void media_uv_stream_release(MediaStreamPriv* priv)
 {
-    if (priv && !priv->proxy && !priv->nb_listener) {
+    if (priv && !priv->proxy && !priv->focus && !priv->nb_listener) {
         if (priv->on_close)
             priv->on_close(priv->cookie, 0);
 
@@ -292,10 +289,7 @@ static void media_uv_stream_listen_close_cb(uv_handle_t* handle)
 
     free(listener);
     priv->nb_listener--;
-    if (priv->id == MEDIA_ID_PLAYER)
-        media_uv_player_release((void*)priv);
-    else
-        media_uv_stream_release(priv);
+    media_uv_stream_release(priv);
 }
 
 /**
@@ -459,68 +453,50 @@ err:
     return ret;
 }
 
+static void media_uv_stream_abandon_cb(void* cookie, int ret)
+{
+    MediaStreamPriv* priv = cookie;
+
+    priv->focus = NULL; /* Mark focus is finalized. */
+    media_uv_stream_release(priv);
+}
+
 /****************************************************************************
  * Player Functions
  ****************************************************************************/
-
-static void media_uv_player_release(MediaPlayerPriv* priv)
-{
-    if (priv && !priv->proxy && !priv->focus && !priv->nb_listener) {
-        if (priv->on_close)
-            priv->on_close(priv->cookie, 0);
-
-        free(priv);
-    }
-}
-
-static void media_uv_player_close_cb(void* cookie, int ret)
-{
-    MediaPlayerPriv* priv = cookie;
-
-    priv->proxy = NULL; /* Mark proxy is finalized. */
-    media_uv_player_release(priv);
-}
-
-static void media_uv_player_abandon_cb(void* cookie, int ret)
-{
-    MediaPlayerPriv* priv = cookie;
-
-    priv->focus = NULL; /* Mark focus is finalized. */
-    media_uv_player_release(priv);
-}
 
 static void media_uv_player_suggest_cb(int suggest, void* cookie)
 {
     MediaPlayerPriv* priv = cookie;
 
-    syslog(LOG_INFO, "[%s] player:%p suggest:%d\n", __func__, priv, suggest);
+    syslog(LOG_INFO, "[%s] player:%s:%p suggest:%d\n",
+        __func__, priv->name, priv, suggest);
     switch (suggest) {
     case MEDIA_FOCUS_PLAY:
-        priv->playable = true;
+        priv->suggest_active = true;
         media_uv_player_set_volume(priv, 1.0, NULL, NULL);
         media_uv_player_start(priv, priv->on_play, priv->on_play_cookie);
         break;
 
     case MEDIA_FOCUS_STOP:
-        priv->playable = false;
+        priv->suggest_active = false;
         media_uv_player_stop(priv, NULL, NULL);
-        media_uv_focus_abandon(priv->focus, media_uv_player_abandon_cb);
-        priv->focus = NULL;
+        media_uv_focus_abandon(priv->focus, media_uv_stream_abandon_cb);
         break;
 
     case MEDIA_FOCUS_PAUSE:
-        priv->playable = false;
+        priv->suggest_active = false;
         media_uv_player_pause(priv, NULL, NULL);
         break;
 
     case MEDIA_FOCUS_PLAY_BUT_SILENT:
-        priv->playable = true;
+        priv->suggest_active = true;
         media_uv_player_set_volume(priv, 0.0, NULL, NULL);
         media_uv_player_start(priv, NULL, NULL);
         break;
 
     case MEDIA_FOCUS_PLAY_WITH_DUCK:
-        priv->playable = true;
+        priv->suggest_active = true;
         media_uv_player_set_volume(priv, 0.1, NULL, NULL);
         media_uv_player_start(priv, NULL, NULL);
         break;
@@ -530,7 +506,7 @@ static void media_uv_player_suggest_cb(int suggest, void* cookie)
     }
 
     if (priv->on_play) {
-        if (!priv->playable) /* Notify user if focus request failed. */
+        if (!priv->suggest_active) /* Notify user if focus request failed. */
             priv->on_play(priv->on_play_cookie, -EPERM);
 
         priv->on_play = NULL;
@@ -544,14 +520,14 @@ void* media_uv_player_open(void* loop, const char* stream,
     MediaPlayerPriv* priv;
 
     if (stream && stream[0] != '\0') {
-        priv = zalloc(sizeof(MediaPlayerPriv) + strlen(stream) + 1);
+        priv = zalloc(sizeof(MediaStreamPriv) + strlen(stream) + 1);
         if (!priv)
             return NULL;
 
         priv->name = (char*)(priv + 1);
         strcpy(priv->name, stream);
     } else {
-        priv = zalloc(sizeof(MediaPlayerPriv));
+        priv = zalloc(sizeof(MediaStreamPriv));
         if (!priv)
             return NULL;
     }
@@ -563,7 +539,7 @@ void* media_uv_player_open(void* loop, const char* stream,
     priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
         media_uv_stream_connect_cb, priv);
     if (!priv->proxy) {
-        media_uv_player_close_cb(priv, 0);
+        media_uv_stream_close_cb(priv, 0);
         return NULL;
     }
 
@@ -589,10 +565,10 @@ int media_uv_player_close(void* handle, int pending, media_uv_callback on_close)
     media_uv_stream_listen_clear(handle, NULL);
 
     if (priv->focus)
-        ret = media_uv_focus_abandon(priv->focus, media_uv_player_abandon_cb);
+        ret = media_uv_focus_abandon(priv->focus, media_uv_stream_abandon_cb);
 
     if (ret >= 0)
-        ret = media_uv_disconnect(priv->proxy, media_uv_player_close_cb);
+        ret = media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
 
     return ret;
 }
@@ -660,16 +636,17 @@ int media_uv_player_reset(void* handle, media_uv_callback cb, void* cookie)
         media_uv_stream_receive_cb, cb, cookie);
 }
 
-int media_uv_player_play(void* handle, media_uv_callback cb, void* cookie)
+int media_uv_player_start_auto(void* handle, const char* scenario,
+    media_uv_callback cb, void* cookie)
 {
     MediaPlayerPriv* priv = handle;
 
-    if (!priv || !priv->name)
+    if (!priv || !scenario || !scenario[0])
         return -EINVAL;
 
     /* Follow focus latest suggestion if already requested. */
     if (priv->focus) {
-        if (priv->playable)
+        if (priv->suggest_active)
             return media_uv_player_start(priv, cb, cookie);
         else
             return -EPERM;
@@ -678,7 +655,7 @@ int media_uv_player_play(void* handle, media_uv_callback cb, void* cookie)
     /* Request focus. */
     priv->on_play = cb;
     priv->on_play_cookie = cookie;
-    priv->focus = media_uv_focus_request(priv->loop, priv->name,
+    priv->focus = media_uv_focus_request(priv->loop, scenario,
         media_uv_player_suggest_cb, priv);
     if (!priv->focus) {
         free(priv);
@@ -816,20 +793,58 @@ int media_uv_player_get_property(void* handle, const char* target, const char* k
  * Recorder Functions
  ****************************************************************************/
 
+static void media_uv_recorder_suggest_cb(int suggest, void* cookie)
+{
+    MediaRecorderPriv* priv = cookie;
+
+    syslog(LOG_INFO, "[%s] recorder:%s:%p suggest:%d\n",
+        __func__, priv->name, priv, suggest);
+    switch (suggest) {
+    case MEDIA_FOCUS_PLAY:
+    case MEDIA_FOCUS_PLAY_BUT_SILENT:
+    case MEDIA_FOCUS_PLAY_WITH_DUCK:
+        priv->suggest_active = true;
+        media_uv_recorder_start(priv, priv->on_play, priv->on_play_cookie);
+        break;
+
+    case MEDIA_FOCUS_STOP:
+        priv->suggest_active = false;
+        media_uv_recorder_stop(priv, NULL, NULL);
+        media_uv_focus_abandon(priv->focus, media_uv_stream_abandon_cb);
+        break;
+
+    case MEDIA_FOCUS_PAUSE:
+        priv->suggest_active = false;
+        media_uv_recorder_pause(priv, NULL, NULL);
+        break;
+
+    case MEDIA_FOCUS_PLAY_WITH_KEEP:
+        break;
+    }
+
+    if (priv->on_play) {
+        if (!priv->suggest_active) /* Notify user if focus request failed. */
+            priv->on_play(priv->on_play_cookie, -EPERM);
+
+        priv->on_play = NULL;
+        priv->on_play_cookie = NULL;
+    }
+}
+
 void* media_uv_recorder_open(void* loop, const char* source,
     media_uv_callback on_open, void* cookie)
 {
     MediaRecorderPriv* priv;
 
     if (source && source[0] != '\0') {
-        priv = zalloc(sizeof(MediaRecorderPriv) + strlen(source) + 1);
+        priv = zalloc(sizeof(MediaStreamPriv) + strlen(source) + 1);
         if (!priv)
             return NULL;
 
         priv->name = (char*)(priv + 1);
         strcpy(priv->name, source);
     } else {
-        priv = zalloc(sizeof(MediaRecorderPriv));
+        priv = zalloc(sizeof(MediaStreamPriv));
         if (!priv)
             return NULL;
     }
@@ -863,7 +878,14 @@ int media_uv_recorder_close(void* handle, media_uv_callback on_close)
 
     media_uv_stream_close_pipe(handle);
     media_uv_stream_listen_clear(handle, NULL);
-    return media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
+
+    if (priv->focus)
+        ret = media_uv_focus_abandon(priv->focus, media_uv_stream_abandon_cb);
+
+    if (ret >= 0)
+        ret = media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
+
+    return ret;
 }
 
 int media_uv_recorder_listen(void* handle, media_event_callback on_event)
@@ -918,6 +940,35 @@ int media_uv_recorder_prepare(void* handle, const char* url, const char* options
             media_uv_stream_receive_cb, on_prepare, cookie);
 
     return ret;
+}
+
+int media_uv_recorder_start_auto(void* handle, const char* scenario,
+    media_uv_callback cb, void* cookie)
+{
+    MediaRecorderPriv* priv = handle;
+
+    if (!priv || !scenario || !scenario[0])
+        return -EINVAL;
+
+    /* Follow focus latest suggestion if already requested. */
+    if (priv->focus) {
+        if (priv->suggest_active)
+            return media_uv_recorder_start(priv, cb, cookie);
+        else
+            return -EPERM;
+    }
+
+    /* Request focus. */
+    priv->on_play = cb;
+    priv->on_play_cookie = cookie;
+    priv->focus = media_uv_focus_request(priv->loop, scenario,
+        media_uv_recorder_suggest_cb, priv);
+    if (!priv->focus) {
+        free(priv);
+        return -ENOMEM;
+    }
+
+    return 0;
 }
 
 int media_uv_recorder_start(void* handle, media_uv_callback cb, void* cookie)

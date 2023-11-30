@@ -31,19 +31,40 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-// media focus request play result suggestion,
-#define MEDIA_FOCUS_PLAY 0 // media play
-#define MEDIA_FOCUS_STOP 1 // media stop
-#define MEDIA_FOCUS_PAUSE 2 // media pause
-#define MEDIA_FOCUS_PLAY_BUT_SILENT 3 // media play but silent in background
-#define MEDIA_FOCUS_PLAY_WITH_DUCK 4 // media play in background, duck volumn down
-#define MEDIA_FOCUS_PLAY_WITH_KEEP 5 // media play keep current status in background
+/* Suggestions for users. */
+
+#define MEDIA_FOCUS_PLAY 0
+#define MEDIA_FOCUS_STOP 1
+#define MEDIA_FOCUS_PAUSE 2
+#define MEDIA_FOCUS_PLAY_BUT_SILENT 3
+#define MEDIA_FOCUS_PLAY_WITH_DUCK 4 /* Play with low volume. */
+#define MEDIA_FOCUS_PLAY_WITH_KEEP 5 /* Nothing should be done. */
 
 /****************************************************************************
  * Public Types
  ****************************************************************************/
 
-typedef void (*media_focus_callback)(int return_type, void* callback_argv);
+/**
+ * @brief Callback to receive suggestions.
+ *
+ * @param[in] suggestion    @see MEIDA_FOCUS_* .
+ * @param[in] cookie        Argument set by `media_focus_request`.
+ * @code
+ *  void demo_focu_callback(int suggestion, void* cookie)
+ *  {
+ *      switch(suggestion) {
+ *          case MEDIA_FOCUS_PLAY:
+ *          case MEDIA_FOCUS_STOP:
+ *          case MEDIA_FOCUS_PAUSE:
+ *          case MEDIA_FOCUS_PLAY_BUT_SILENT:
+ *          case MEDIA_FOCUS_PLAY_WITH_DUCK:
+ *          case MEDIA_FOCUS_PLAY_WITH_KEEP:
+ *          default:
+ *      }
+ *  }
+ * @endcode
+ */
+typedef void (*media_focus_callback)(int suggestion, void* cookie);
 
 /****************************************************************************
  * Public Functions
@@ -52,71 +73,42 @@ typedef void (*media_focus_callback)(int return_type, void* callback_argv);
 /**
  * @brief Allow application to request audio focus.
  *
- * @param[out] return_type   Initial suggestion given by focus policy, details
- *                           @see MEIDA_FOCUS_* in media_focus.h
- * @param[in]  stream_type   Represent the type of the incoming stream to get
- *                           the focus. Stream type macro defines detail,
- *                           @see MEDIA_STREAM_* in media_wrapper.h
- * @param[in]  callback_method  Callback method of request app
- * @param[in]  callback_argv    Argument needed by the callback_method
- * @return     NULL when request failed, void* handle(mostly) for request.
- * @note       Value of return_type are announced above.
+ * @param[out] initial_suggestion   @see MEIDA_FOCUS_* .
+ * @param[in]  scenario             @see MEDIA_SCENARIO_* .
+ * @param[in]  on_suggestion        Callback to receive suggestions.
+ * @param[in]  cookie               Argument for callback.
+ * @return Handle, NULL on failure.
  *
- * Here is a example of how to use it:
+ * @note If `initial_suggestion` is `MEDIA_FOCUS_STOP`, `on_suggestion`
+ * won't be called, but this api still return a handle, which means caller
+ * need to call `media_focus_abandon`, or there will be leak.
+ *
  * @code
- *  @note Do this callback after get focus suggestion.
- * void* example_focu_callback(int return_type, void* cookie)
- * {
- *      struct chain_s* chain = cookie;
- *      switch(return_type) {
- *          case MEDIA_FOCUS_PLAY:
- *              chain->name = "MEDIA_FOCUS_PLAY";
- *              break;
- *          case MEDIA_FOCUS_STOP:
- *              chain->name = "MEDIA_FOCUS_STOP";
- *              break;
- *          case MEDIA_FOCUS_PAUSE:
- *              chain->name = "MEDIA_FOCUS_PAUSE";
- *              break;
- *          case MEDIA_FOCUS_PLAY_BUT_SILENT:
- *              chain->name = "MEDIA_FOCUS_PLAY_BUT_SILENT";
- *              break;
- *          case MEDIA_FOCUS_PLAY_WITH_DUCK:
- *              chain->name = "MEDIA_FOCUS_PLAY_WITH_DUCK";
- *              break;
- *          case MEDIA_FOCUS_PLAY_WITH_KEEP:
- *              chain->name = "MEDIA_FOCUS_PLAY_WITH_KEEP";
- *              break;
- *          default:
- *              chain->name = "UNKOWN_SUGGESTION";
- *              break;
- *      }
- *      printf("[%s], suggestion value: %d, suggestion name: %s\n",
- *              __func__, suggestion, chain->name, suggestion);
- * }
+ *  int initial_suggestion;
  *
- *  @note Get focus and store suggestion in address "&suggestion".
- * handle = media_focus_request(&suggestion, MEDIA_STREAM_ALARM,
-                                    example_focu_callback, &context);
+ *  context->handle = media_focus_request(&initial_suggestion,
+ *      MEDIA_STREAM_ALARM, demo_focu_callback, context);
+ *  if (!context->handle)
+ *      ; // handle error
+ *
+ *  if (initial_suggestion == MEDIA_FOCUS_STOP)
+ *      media_focus_abandon(context->handle);
  * @endcode
  *
  */
-void* media_focus_request(int* return_type,
-    const char* stream_type,
-    media_focus_callback callback_method,
-    void* callback_argv);
+void* media_focus_request(int* initial_suggestion, const char* scenario,
+    media_focus_callback on_suggestion, void* cookie);
 
 /**
- * @brief Allow application to abandon its audio focus.
+ * @brief Abandon audio focus.
  *
- * @param[in]  handle    The focus handle to lose focus, @see media_focus_request()
- * @return     Zero when request succeed, negative on failure.
- *
+ * @param[in] handle    Focus handle to abandon.
+ * @return Zero when request succeed, negative on failure.
  */
 int media_focus_abandon(void* handle);
 
 /**
- * @brief Dump focus stack
+ * @brief Dump focus stack.
  *
  * @param[in] options   Dump options(unused so far).
  */
@@ -126,20 +118,20 @@ void media_focus_dump(const char* options);
 /**
  * @brief Request audio focus.
  *
- * @param loop          Handle uv_loop_t* of current thread.
- * @param stream_type   @see MEDIA_STREAM_*.
- * @param on_suggest    Callback to get focus suggestion.
- * @param cookie        Callback argument.
+ * @param[in] loop          Handle uv_loop_t* of current thread.
+ * @param[in] scenario      @see MEDIA_SCENARIO_*.
+ * @param[in] on_suggest    Callback to get focus suggestion.
+ * @param[in] cookie        Callback argument.
  * @return void*        Handle of focus.
  */
-void* media_uv_focus_request(void* loop, const char* stream_type,
+void* media_uv_focus_request(void* loop, const char* scenario,
     media_focus_callback on_suggest, void* cookie);
 
 /**
  * @brief Abandon audio focus.
  *
- * @param handle        Handle of focus.
- * @param on_abandon    Callback to release cookie.
+ * @param[in] handle        Handle of focus.
+ * @param[in] on_abandon    Callback to release cookie.
  * @return int          Zero on success, negative errno on failure.
  */
 int media_uv_focus_abandon(void* handle, media_uv_callback on_abandon);

@@ -25,22 +25,42 @@
 extern "C" {
 #endif
 
-#define MEDIA_STREAM_SCO "SCO" /*!< in call */
+/* Scenario types, for focus. */
+
+#define MEDIA_SCENARIO_INCALL "SCO"
+#define MEDIA_SCENARIO_RING "Ring"
+#define MEDIA_SCENARIO_ALARM "Alarm"
+#define MEDIA_SCENARIO_DRAIN "Enforced"
+#define MEDIA_SCENARIO_NOTIFICATION "Notify" /* message notification */
+#define MEDIA_SCENARIO_RECORD "Record"
+#define MEDIA_SCENARIO_TTS "TTS" /* text-to-speech */
+#define MEDIA_SCENARIO_ACCESSIBILITY "Health" /* health notification */
+#define MEDIA_SCENARIO_SPORT "Sport"
+#define MEDIA_SCENARIO_INFO "Info"
+#define MEDIA_SCENARIO_MUSIC "Music"
+
+/* Stream types, for player and policy. */
+
 #define MEDIA_STREAM_RING "Ring"
 #define MEDIA_STREAM_ALARM "Alarm"
 #define MEDIA_STREAM_SYSTEM_ENFORCED "Enforced"
-#define MEDIA_STREAM_NOTIFICATION "Notify" /*!< message notification */
+#define MEDIA_STREAM_NOTIFICATION "Notify"
 #define MEDIA_STREAM_RECORD "Record"
-#define MEDIA_STREAM_TTS "TTS" /*!< text-to-speech */
-#define MEDIA_STREAM_ACCESSIBILITY "Health" /*!< health notification */
+#define MEDIA_STREAM_TTS "TTS"
+#define MEDIA_STREAM_ACCESSIBILITY "Health"
 #define MEDIA_STREAM_SPORT "Sport"
 #define MEDIA_STREAM_INFO "Info"
 #define MEDIA_STREAM_MUSIC "Music"
 #define MEDIA_STREAM_EMERGENCY "Emergency"
 #define MEDIA_STREAM_CALLRING "CallRing"
-#define MEDIA_STREAM_CAPTURE "Capture"
-#define MEDIA_STREAM_MEDIA "Media"
+#define MEDIA_STREAM_MEDIA "Media" /* video */
 #define MEDIA_STREAM_A2DP_SNK "A2dpsnk" /* bt music */
+#define MEDIA_STREAM_SCO "SCO" /* @deprecated */
+#define MEDIA_STREAM_CAPTURE "Capture" /* @deprecated */
+
+/* Source types, for recorder. */
+
+#define MEDIA_SOURCE_MIC "Capture"
 
 #ifdef __cplusplus
 }

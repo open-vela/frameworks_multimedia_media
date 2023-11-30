@@ -898,7 +898,7 @@ err:
     return ret;
 }
 
-CMD1(start, int, id)
+CMD2(start, int, id, string_t, scenario)
 {
     int ret = -EINVAL;
 
@@ -920,13 +920,21 @@ CMD1(start, int, id)
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
-        ret = media_uv_player_start(media->chain[id].handle,
-            mediatool_uv_common_start_cb, &media->chain[id]);
+        if (scenario)
+            ret = media_uv_player_start_auto(media->chain[id].handle, scenario,
+                mediatool_uv_common_start_cb, &media->chain[id]);
+        else
+            ret = media_uv_player_start(media->chain[id].handle,
+                mediatool_uv_common_start_cb, &media->chain[id]);
         break;
 
     case MEDIATOOL_UVRECORDER:
-        ret = media_uv_recorder_start(media->chain[id].handle,
-            mediatool_uv_common_start_cb, &media->chain[id]);
+        if (scenario)
+            ret = media_uv_recorder_start_auto(media->chain[id].handle, scenario,
+                mediatool_uv_common_start_cb, &media->chain[id]);
+        else
+            ret = media_uv_recorder_start(media->chain[id].handle,
+                mediatool_uv_common_start_cb, &media->chain[id]);
         break;
 
     case MEDIATOOL_UVCONTROLLER:
@@ -1570,22 +1578,6 @@ err:
     return -EINVAL;
 }
 
-static void mediatool_uv_player_play_cb(void* cookie, int ret)
-{
-    struct mediatool_chain_s* chain = cookie;
-
-    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
-}
-
-CMD1(uv_player_play, int, id)
-{
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
-        return -EINVAL;
-
-    return media_uv_player_play(media->chain[id].handle,
-        mediatool_uv_player_play_cb, &media->chain[id]);
-}
-
 static void mediatool_cmd_uv_policy_set_int_cb(void* cookie, int ret)
 {
     printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
@@ -1734,10 +1726,10 @@ CMD1(uv_focus_request, string_t, name)
 static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "open",
         mediatool_cmd_player_open,
-        "Create player channel return ID (open [policy-phrase/filter-name])" },
+        "Create player channel return ID (open [STREAM/FILTER])" },
     { "copen",
         mediatool_cmd_recorder_open,
-        "Create recorder channel return ID (copen [policy-phrase])" },
+        "Create recorder channel return ID (copen [SOURCE/FILTER])" },
     { "sopen",
         mediatool_cmd_session_open,
         "Create session channel return ID (sopen [UNUSED])" },
@@ -1758,7 +1750,7 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
         "Set player/recorder prepare (prepare ID url/buffer/direct url [options])" },
     { "start",
         mediatool_cmd_start,
-        "Set player/recorder/session start (start ID)" },
+        "Set player/recorder/session start (start ID [SCENARIO])" },
     { "stop",
         mediatool_cmd_stop,
         "Set player/recorder/session stop (stop ID)" },
@@ -1830,7 +1822,7 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
         "Decrease criterion value by one(decrease NAME APPLY)" },
     { "request",
         mediatool_cmd_focus_request,
-        "Request media focus(request NAME)" },
+        "Request media focus(request SCENARIO)" },
     { "abandon",
         mediatool_cmd_close,
         "Abandon media focus(abandon ID)" },
@@ -1840,13 +1832,10 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
         "Create an async player return ID (uv_open [STREAM/FILTER])" },
     { "uv_copen",
         mediatool_cmd_uv_recorder_open,
-        "Create an async recorder return ID (uv_copen [STREAM/FILTER])" },
+        "Create an async recorder return ID (uv_copen [SOURCE/FILTER])" },
     { "uv_sopen",
         mediatool_cmd_uv_session_open,
         "Create async session channel return ID (uv_sopen [UNUSED])" },
-    { "uv_play",
-        mediatool_cmd_uv_player_play,
-        "Request focus and start the async player (uv_play ID)" },
     { "uv_setint",
         mediatool_cmd_uv_policy_set_int,
         "Async set numerical value to criterion (uv_setint NAME VALUE APPLY)" },
@@ -1876,7 +1865,7 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
         "Async check wether contain criterion values(uv_contain NAME VALUE)" },
     { "uv_request",
         mediatool_cmd_uv_focus_request,
-        "Async request focus (uv_request STREAM)" },
+        "Async request focus (uv_request SCENARIO)" },
 #endif /* CONFIG_LIBUV_EXTENSION */
     { "q",
         mediatool_cmd_quit,
