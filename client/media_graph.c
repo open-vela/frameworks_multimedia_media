@@ -117,21 +117,20 @@ static int media_get_sockaddr(void* handle, struct sockaddr_storage* addr_)
         struct sockaddr_un* addr = (struct sockaddr_un*)addr_;
 
         addr->sun_family = AF_UNIX;
-        snprintf(addr->sun_path, UNIX_PATH_MAX, "med%p", priv);
+        snprintf(addr->sun_path, UNIX_PATH_MAX, MEDIA_GRAPH_SOCKADDR_NAME, priv);
     } else {
         struct sockaddr_rpmsg* addr = (struct sockaddr_rpmsg*)addr_;
 
         addr->rp_family = AF_RPMSG;
-        snprintf(addr->rp_name, RPMSG_SOCKET_NAME_SIZE, "med%p", priv);
+        snprintf(addr->rp_name, RPMSG_SOCKET_NAME_SIZE, MEDIA_GRAPH_SOCKADDR_NAME, priv);
         snprintf(addr->rp_cpu, RPMSG_SOCKET_CPU_SIZE, "%s", priv->cpu);
     }
 
     return 0;
 }
 
-static int media_bind_socket(void* handle, char* url, size_t len)
+static int media_bind_socket(void* handle)
 {
-    MediaIOPriv* priv = handle;
     struct sockaddr_storage addr;
     int fd, ret;
 
@@ -151,12 +150,6 @@ static int media_bind_socket(void* handle, char* url, size_t len)
     if (ret < 0)
         goto out;
 
-    if (addr.ss_family == AF_UNIX)
-        snprintf(url, len, "unix:med%p?listen=0", priv);
-    else
-        snprintf(url, len, "rpmsg:med%p:%s?listen=0", priv,
-            CONFIG_RPTUN_LOCAL_CPUNAME);
-
     return fd;
 
 out:
@@ -167,19 +160,23 @@ out:
 static int media_prepare(void* handle, const char* url, const char* options)
 {
     MediaIOPriv* priv = handle;
+    const char* cpu = NULL;
     int ret = -EINVAL;
-    char tmp[32];
+    char addr[32];
     int fd = 0;
 
     if (!priv || priv->socket > 0)
         return ret;
 
     if (!url || !url[0]) {
-        fd = media_bind_socket(handle, tmp, sizeof(tmp));
+        /* Buffer mode, create listener and send cpuname and sockname. */
+        fd = media_bind_socket(handle);
         if (fd < 0)
             return fd;
 
-        url = tmp;
+        cpu = CONFIG_RPTUN_LOCAL_CPUNAME;
+        snprintf(addr, sizeof(addr), MEDIA_GRAPH_SOCKADDR_NAME, priv);
+        url = addr;
     }
 
     if (options && options[0] != '\0') {
@@ -188,7 +185,7 @@ static int media_prepare(void* handle, const char* url, const char* options)
             goto out;
     }
 
-    ret = media_proxy_once(priv, NULL, "prepare", url, 0, NULL, 0);
+    ret = media_proxy_once(priv, cpu, "prepare", url, 0, NULL, 0);
     if (ret < 0)
         goto out;
 

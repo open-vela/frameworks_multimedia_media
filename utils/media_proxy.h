@@ -59,6 +59,9 @@ extern "C" {
 #define MEDIA_ID_SESSION 5
 #define MEDIA_ID_FOCUS 6
 
+/* Player/Recorder data socket address. */
+#define MEDIA_GRAPH_SOCKADDR_NAME "med%p"
+
 /* Policy key criterion names. */
 #define MEDIA_POLICY_APPLY 1
 #define MEDIA_POLICY_NOT_APPLY 0
