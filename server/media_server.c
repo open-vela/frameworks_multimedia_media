@@ -147,8 +147,6 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
     }
 
     while (1) {
-        conn->offset = 0;
-        media_parcel_reinit(&conn->parcel);
         ret = media_parcel_recv(&conn->parcel, fd->fd, &conn->offset, MSG_DONTWAIT);
         if (ret < 0)
             break;
@@ -173,6 +171,9 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
         default:
             break;
         }
+
+        media_parcel_reinit(&conn->parcel);
+        conn->offset = 0;
     }
 
     if (fd->revents & POLLHUP) {
@@ -213,6 +214,7 @@ static bool media_server_conn_init(struct media_server_conn* conn, int fd)
         media_parcel_init(&conn->parcel);
         conn->tran_fd = fd;
         conn->data = NULL;
+        conn->offset = 0;
     }
 
     return available;
