@@ -184,7 +184,7 @@ extern "C" {
 
 /**
  * @brief Open media with player type.
- * @param[in] stream    Stream type, @see MEDIA_STREAM_* in media_wrapper.h.)
+ * @param[in] stream    @see MEDIA_STREAM_* in media_stream.h .
  * @return Pointer to created handle on success; NULL on failure.
  */
 void* media_player_open(const char* stream);
@@ -510,11 +510,13 @@ int media_uv_player_reset(void* handle, media_uv_callback on_reset, void* cookie
  * @brief  Play or resume the prepared source with auto focus request.
  *
  * @param handle    Async player handle.
+ * @param scenario  @see MEDIA_SCENARIO_* in media_focus.h .
  * @param on_play   Call after receiving result or focus request failed.
  * @param cookie    One-time callback context.
  * @return int Zero on success, negative errno on failure.
  */
-int media_uv_player_play(void* handle, media_uv_callback on_play, void* cookie);
+int media_uv_player_start_auto(void* handle, const char* scenario,
+    media_uv_callback on_start, void* cookie);
 
 /**
  * @brief Play or resume the prepared resouce.

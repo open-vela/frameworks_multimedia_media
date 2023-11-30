@@ -25,10 +25,9 @@
  * Included Files
  ****************************************************************************/
 
-#include <stdbool.h>
-
 #include <media_event.h>
 #include <media_stream.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -106,7 +105,7 @@ extern "C" {
  *
  * @param[in] mode  New audio mode, in the format of "MEDIA_AUDIO_MODE_XXX".
  *                  There are five macros to define audio mode，details
- *                  @see MEDIA_DEVICE_* in media_wrapper.h
+ *                  @see MEDIA_DEVICE_* above.
  * @return Zero on success; a negated errno value on failure.
  * @note Before changing mode, SCO should be turned off.
  */
