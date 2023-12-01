@@ -75,21 +75,6 @@ typedef struct media_focus {
     media_focus_cell* matrix;
 } media_focus;
 
-typedef STAILQ_HEAD(media_focus_suggest_queue, media_focus_suggest) media_focus_suggest_queue;
-typedef STAILQ_ENTRY(media_focus_suggest) media_focus_suggest_entry;
-
-typedef struct media_focus_suggest {
-    media_focus_suggest_entry entry;
-    int value;
-} media_focus_suggest;
-
-typedef struct media_focus_context {
-    void* handle; /* focus handle. */
-    void* cookie; /* Cookie to notify. */
-    bool ready; /* whether user ready for further suggestions. */
-    media_focus_suggest_queue suggestq;
-} media_focus_context;
-
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -515,53 +500,9 @@ static int media_focus_abandon_(media_focus* focus, void* handle)
     return ret;
 }
 
-static void media_focus_free_context(media_focus_context* ctx)
+void media_focus_notify_cb(int suggestion, void* cookie)
 {
-    media_focus_suggest* suggest;
-
-    if (ctx) {
-        while ((suggest = STAILQ_FIRST(&ctx->suggestq))) {
-            STAILQ_REMOVE_HEAD(&ctx->suggestq, entry);
-            free(suggest);
-        }
-
-        media_stub_notify_finalize(&ctx->cookie);
-        free(ctx);
-    }
-}
-
-static media_focus_context* media_focus_alloc_context(void* cookie)
-{
-    media_focus_context* ctx;
-
-    ctx = zalloc(sizeof(media_focus_context));
-    if (!ctx)
-        return NULL;
-
-    ctx->cookie = cookie;
-    STAILQ_INIT(&ctx->suggestq);
-    return ctx;
-}
-
-static void media_focus_notify_cb(int value, void* cookie)
-{
-    media_focus_context* ctx = cookie;
-    media_focus_suggest* suggest;
-
-    printf("[%s] value:%d\n", __func__, value);
-    /* Direct notify suggestion if listener is ready. */
-    if (ctx->ready) {
-        media_stub_notify_event(ctx->cookie, value, 0, NULL);
-        return;
-    }
-
-    /* Otherwise, queue new suggestion to tail. */
-    suggest = zalloc(sizeof(media_focus_suggest));
-    if (!suggest)
-        return;
-
-    suggest->value = value;
-    STAILQ_INSERT_TAIL(&ctx->suggestq, suggest, entry);
+    media_stub_notify_event(cookie, suggestion, 0, NULL);
 }
 
 /****************************************************************************
@@ -685,47 +626,25 @@ int media_focus_debug_stack_return(media_focus_id* p_focus_list, int num)
 int media_focus_handler(void* focus, void* cookie, const char* name, const char* cmd,
     char* res, int res_len)
 {
-    media_focus_context* ctx = media_server_get_data(cookie);
     media_focus* priv = focus;
-    int ret = -EINVAL;
+    int initial_suggestion;
+    void* focus_handle;
+    int ret;
 
-    if (!strcmp(cmd, "request")) {
-        int suggest;
-
-        ctx = media_focus_alloc_context(cookie);
-        if (!ctx)
-            return -ENOMEM;
-
-        ctx->handle = media_focus_request_(priv, &suggest, name, media_focus_notify_cb, ctx);
-        if (!ctx->handle) {
-            media_focus_free_context(ctx);
-            return -EPERM;
-        }
-
-        media_server_set_data(cookie, ctx);
-        return suggest;
-    } else if (!strcmp(cmd, "abandon")) {
-        if (ctx) {
-            ret = media_focus_abandon_(priv, ctx->handle);
-            media_focus_free_context(ctx);
-        }
-
-        return ret;
-    } else if (!strcmp(cmd, "set_notify")) {
-        /* XXX: Mark listener created and notify pending suggestions. */
-        media_focus_suggest* suggest;
-
-        if (!ctx)
-            return ret;
-
-        ctx->ready = true;
-        while ((suggest = STAILQ_FIRST(&ctx->suggestq))) {
-            media_stub_notify_event(ctx->cookie, suggest->value, 0, NULL);
-            STAILQ_REMOVE_HEAD(&ctx->suggestq, entry);
-            free(suggest);
-        }
-
+    if (!strcmp(cmd, "ping")) { /* To find focus stack. */
         return 0;
+    } else if (!strcmp(cmd, "request")) {
+        focus_handle = media_focus_request_(priv, &initial_suggestion,
+            name, media_focus_notify_cb, cookie);
+        if (!focus_handle)
+            return -EPERM;
+
+        media_server_set_data(cookie, focus_handle);
+        return initial_suggestion;
+    } else if (!strcmp(cmd, "abandon")) {
+        focus_handle = media_server_get_data(cookie);
+        media_stub_notify_finalize(&cookie);
+        return media_focus_abandon_(priv, focus_handle);
     } else if (!strcmp(cmd, "dump")) {
         media_focus_debug_stack_display();
         return 0;
