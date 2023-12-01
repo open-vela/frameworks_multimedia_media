@@ -35,7 +35,7 @@
 typedef struct MediaFocusPriv {
     MEDIA_COMMON_FIELDS
     void* cookie;
-    media_focus_callback suggest;
+    media_focus_callback on_suggestion;
 } MediaFocusPriv;
 
 /****************************************************************************
@@ -50,46 +50,49 @@ static void media_suggest_cb(void* cookie, media_parcel* msg)
     int32_t ret;
 
     media_parcel_read_scanf(msg, "%i%i%s", &event, &ret, &extra);
-    priv->suggest(event, priv->cookie);
+    priv->on_suggestion(event, priv->cookie);
 }
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-void* media_focus_request(int* suggestion, const char* stream_type,
-    media_focus_callback cb, void* cookie)
+void* media_focus_request(int* suggestion, const char* scenario,
+    media_focus_callback on_suggestion, void* cookie)
 {
     MediaFocusPriv* priv;
+    int ret;
 
-    if (!suggestion || !stream_type)
+    if (!suggestion || !scenario)
         return NULL;
 
     priv = zalloc(sizeof(MediaFocusPriv));
     if (!priv)
         return NULL;
 
-    priv->suggest = cb;
-    priv->cookie = cookie;
+    /* Find the focus stack and create listener. */
+    ret = media_proxy(MEDIA_ID_FOCUS, priv, NULL, "ping", NULL, 0, NULL, 0, false);
+    if (ret < 0) {
+        media_default_release_cb(priv);
+        return NULL;
+    }
 
-    *suggestion = media_proxy(MEDIA_ID_FOCUS, priv, stream_type, "request", NULL, 0, NULL, 0, false);
+    priv->cookie = cookie;
+    priv->on_suggestion = on_suggestion;
+    media_proxy_set_release_cb(priv->proxy, media_default_release_cb, priv);
+    ret = media_proxy_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv);
+    if (ret < 0)
+        goto err;
+
+    /* Request only after acknowledge listener, or there might be suggestions missed. */
+    *suggestion = media_proxy(MEDIA_ID_FOCUS, priv, scenario, "request", NULL, 0, NULL, 0, false);
     if (*suggestion < 0)
         goto err;
 
-    /* Create listener only if non-STOP suggestion. */
-    if (*suggestion != MEDIA_FOCUS_STOP) {
-        if (media_proxy_set_event_cb(priv->proxy, priv->cpu, media_suggest_cb, priv) < 0)
-            goto err;
-
-        if (media_proxy(MEDIA_ID_FOCUS, priv, NULL, "set_notify", NULL, 0, NULL, 0, false) < 0)
-            goto err;
-    }
-
-    media_proxy_set_release_cb(priv->proxy, media_default_release_cb, priv);
     return priv;
 
 err:
-    media_default_release_cb(priv);
+    media_focus_abandon(priv);
     return NULL;
 }
 
@@ -98,8 +101,7 @@ int media_focus_abandon(void* handle)
     MediaFocusPriv* priv = handle;
     int ret;
 
-    ret = media_proxy(MEDIA_ID_FOCUS,
-        priv, NULL, "abandon", NULL, 0, NULL, 0, false);
+    ret = media_proxy(MEDIA_ID_FOCUS, priv, NULL, "abandon", NULL, 0, NULL, 0, false);
     if (ret < 0 && ret != -ENOENT)
         return ret;
 

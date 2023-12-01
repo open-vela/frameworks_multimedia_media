@@ -47,11 +47,15 @@ typedef struct MediaFocusPriv {
  ****************************************************************************/
 
 static int media_uv_focus_send(MediaFocusPriv* priv,
-    const char* target, const char* cmd, media_uv_parcel_callback parser);
+    const char* target, const char* cmd, media_uv_callback cb);
 static void media_uv_focus_event_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel);
-static void media_uv_focus_request_cb(void* cookie,
+static void media_uv_focus_receive_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel);
+static void media_uv_focus_ping_cb(void* cookie, int ret);
+static void media_uv_focus_request_cb(void* cookie, int ret);
+
+static void media_uv_focus_listen_cb(void* cookie, int ret);
 static void media_uv_focus_release_cb(void* cookie, int ret);
 static void media_uv_focus_connect_cb(void* cookie, int ret);
 
@@ -60,7 +64,7 @@ static void media_uv_focus_connect_cb(void* cookie, int ret);
  ****************************************************************************/
 
 static int media_uv_focus_send(MediaFocusPriv* priv,
-    const char* target, const char* cmd, media_uv_parcel_callback parser)
+    const char* target, const char* cmd, media_uv_callback cb)
 {
     media_parcel parcel;
     int ret;
@@ -71,7 +75,8 @@ static int media_uv_focus_send(MediaFocusPriv* priv,
     if (ret < 0)
         return ret;
 
-    ret = media_uv_send(priv->proxy, parser, NULL, NULL, &parcel);
+    ret = media_uv_send(priv->proxy, cb ? media_uv_focus_receive_cb : NULL,
+        cb, priv, &parcel);
     media_parcel_deinit(&parcel);
     return ret;
 }
@@ -88,21 +93,58 @@ static void media_uv_focus_event_cb(void* cookie,
     priv->on_suggest(suggest, priv->cookie);
 }
 
-static void media_uv_focus_request_cb(void* cookie,
+static void media_uv_focus_receive_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel)
 {
+    media_uv_callback cb = cookie0;
+    int32_t result = -ECANCELED;
+
+    if (parcel)
+        media_parcel_read_int32(parcel, &result);
+
+    cb(cookie1, result);
+}
+
+static void media_uv_focus_connect_cb(void* cookie, int ret)
+{
     MediaFocusPriv* priv = cookie;
-    int32_t suggest;
 
-    /* Shall not create listener if not enter focus stack. */
-    media_parcel_read_int32(parcel, &suggest);
-    if (suggest != MEDIA_FOCUS_STOP) {
-        media_uv_listen(priv->proxy, NULL, media_uv_focus_event_cb);
-        media_uv_focus_send(priv, NULL, "set_notify", NULL);
-        /* Might be pending suggestions during creating listener. */
-    }
+    if (ret < 0)
+        priv->on_suggest(ret, priv->cookie);
+    else
+        media_uv_focus_send(priv, NULL, "ping", media_uv_focus_ping_cb);
+}
 
-    priv->on_suggest(suggest, priv->cookie);
+static void media_uv_focus_ping_cb(void* cookie, int ret)
+{
+    MediaFocusPriv* priv = cookie;
+
+    if (ret < 0)
+        media_uv_reconnect(priv->proxy);
+    else
+        media_uv_listen(priv->proxy,
+            media_uv_focus_listen_cb, media_uv_focus_event_cb);
+}
+
+static void media_uv_focus_listen_cb(void* cookie, int ret)
+{
+    MediaFocusPriv* priv = cookie;
+
+    /* Should only request after acknowledge listener is ready,
+     * or there might be suggestion missed.
+     */
+    if (ret < 0)
+        priv->on_suggest(ret, priv->cookie);
+    else
+        media_uv_focus_send(priv, priv->name, "request",
+            media_uv_focus_request_cb);
+}
+
+static void media_uv_focus_request_cb(void* cookie, int ret)
+{
+    MediaFocusPriv* priv = cookie;
+
+    priv->on_suggest(ret, priv->cookie);
 }
 
 static void media_uv_focus_release_cb(void* cookie, int ret)
@@ -113,17 +155,6 @@ static void media_uv_focus_release_cb(void* cookie, int ret)
         priv->on_abandon(priv->cookie, ret);
 
     free(priv);
-}
-
-static void media_uv_focus_connect_cb(void* cookie, int ret)
-{
-    MediaFocusPriv* priv = cookie;
-
-    if (ret < 0)
-        priv->on_suggest(ret, priv->cookie);
-    else
-        media_uv_focus_send(priv, priv->name, "request",
-            media_uv_focus_request_cb);
 }
 
 /****************************************************************************
