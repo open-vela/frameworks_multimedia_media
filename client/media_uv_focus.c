@@ -97,7 +97,7 @@ static void media_uv_focus_request_cb(void* cookie,
     /* Shall not create listener if not enter focus stack. */
     media_parcel_read_int32(parcel, &suggest);
     if (suggest != MEDIA_FOCUS_STOP) {
-        media_uv_listen(priv->proxy, media_uv_focus_event_cb);
+        media_uv_listen(priv->proxy, NULL, media_uv_focus_event_cb);
         media_uv_focus_send(priv, NULL, "set_notify", NULL);
         /* Might be pending suggestions during creating listener. */
     }

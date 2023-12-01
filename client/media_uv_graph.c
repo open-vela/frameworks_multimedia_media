@@ -586,7 +586,7 @@ int media_uv_player_listen(void* handle, media_event_callback on_event)
     if (ret < 0)
         return ret;
 
-    return media_uv_listen(priv->proxy, media_uv_stream_event_cb);
+    return media_uv_listen(priv->proxy, NULL, media_uv_stream_event_cb);
 }
 
 int media_uv_player_prepare(void* handle, const char* url, const char* options,
@@ -901,7 +901,7 @@ int media_uv_recorder_listen(void* handle, media_event_callback on_event)
     if (ret < 0)
         return ret;
 
-    return media_uv_listen(priv->proxy, media_uv_stream_event_cb);
+    return media_uv_listen(priv->proxy, NULL, media_uv_stream_event_cb);
 }
 
 int media_uv_recorder_prepare(void* handle, const char* url, const char* options,

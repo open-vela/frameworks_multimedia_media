@@ -197,7 +197,7 @@ int media_uv_session_listen(void* handle, media_event_callback on_event)
     if (ret < 0)
         return ret;
 
-    return media_uv_listen(priv->proxy, media_uv_session_event_cb);
+    return media_uv_listen(priv->proxy, NULL, media_uv_session_event_cb);
 }
 
 int media_uv_session_start(void* handle, media_uv_callback on_start, void* cookie)
