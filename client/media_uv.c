@@ -81,6 +81,7 @@ struct MediaProxyPriv {
     MediaPipePriv* epipe; /* To receive event notification. */
     media_uv_callback on_connect;
     media_uv_callback on_release;
+    media_uv_callback on_listen;
     media_uv_parcel_callback on_event;
     void* cookie; /* Long-term private context. */
     MediaWriteQueue pendq; /* Writings to send. */
@@ -584,6 +585,9 @@ static void media_uv_listen_one_cb(uv_stream_t* stream, int ret)
     media_uv_delivery_writing(proxy);
     uv_read_start((uv_stream_t*)&proxy->epipe->handle, media_uv_alloc_cb, media_uv_read_cb);
     MEDIA_TRACE(proxy);
+    if (proxy->on_listen)
+        proxy->on_listen(proxy->cookie, ret);
+
     return;
 
 err2:
@@ -592,7 +596,8 @@ err2:
 err1:
     media_uv_close(server);
     MEDIA_TRACE(proxy);
-    proxy->on_event(proxy->cookie, NULL, NULL, NULL);
+    if (proxy->on_listen)
+        proxy->on_listen(proxy->cookie, ret);
 }
 
 /**
@@ -638,7 +643,9 @@ err2:
 
 err1:
     MEDIA_TRACE(proxy);
-    proxy->on_event(proxy->cookie, NULL, NULL, NULL); /* Notify listening failed. */
+    if (proxy->on_listen)
+        proxy->on_listen(proxy->cookie, ret);
+
     return ret;
 }
 
@@ -714,7 +721,8 @@ int media_uv_reconnect(void* handle)
     return 0;
 }
 
-int media_uv_listen(void* handle, media_uv_parcel_callback on_event)
+int media_uv_listen(void* handle, media_uv_callback on_listen,
+    media_uv_parcel_callback on_event)
 {
     MediaProxyPriv* proxy = handle;
     int ret = 0;
@@ -725,6 +733,7 @@ int media_uv_listen(void* handle, media_uv_parcel_callback on_event)
     if ((proxy->flags & MEDIA_FLAG_LISTENING) || proxy->epipe)
         return -EPERM; /* Cannot create another listener. */
 
+    proxy->on_listen = on_listen;
     proxy->on_event = on_event;
 
     /* Directly do real work if proxy is working. */
