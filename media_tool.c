@@ -122,6 +122,30 @@
     }                                                                                                                  \
     static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3, type4 arg4)
 
+#define CMD8(func, t1, a1, t2, a2, t3, a3, t4, a4, t5, a5, t6, a6, t7, a7, t8, a8)                                             \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, t1 a1, t2 a2, t3 a3, t4 a4, t5 a5, t6 a6, t7 a7, t8 a8); \
+    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv)                                          \
+    {                                                                                                                          \
+        t1 a1;                                                                                                                 \
+        t2 a2;                                                                                                                 \
+        t3 a3;                                                                                                                 \
+        t4 a4;                                                                                                                 \
+        t5 a5;                                                                                                                 \
+        t6 a6;                                                                                                                 \
+        t7 a7;                                                                                                                 \
+        t8 a8;                                                                                                                 \
+        a1 = (argc > 1) ? GET_ARG(t1, argv[1]) : 0;                                                                            \
+        a2 = (argc > 2) ? GET_ARG(t2, argv[2]) : 0;                                                                            \
+        a3 = (argc > 3) ? GET_ARG(t3, argv[3]) : 0;                                                                            \
+        a4 = (argc > 4) ? GET_ARG(t4, argv[4]) : 0;                                                                            \
+        a5 = (argc > 5) ? GET_ARG(t5, argv[5]) : 0;                                                                            \
+        a6 = (argc > 6) ? GET_ARG(t6, argv[6]) : 0;                                                                            \
+        a7 = (argc > 7) ? GET_ARG(t7, argv[7]) : 0;                                                                            \
+        a8 = (argc > 8) ? GET_ARG(t8, argv[8]) : 0;                                                                            \
+        return mediatool_cmd_##func##_exec(media, a1, a2, a3, a4, a5, a6, a7, a8);                                             \
+    }                                                                                                                          \
+    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, t1 a1, t2 a2, t3 a3, t4 a4, t5 a5, t6 a6, t7 a7, t8 a8)
+
 /****************************************************************************
  * Type Declarations
  ****************************************************************************/
@@ -672,11 +696,101 @@ CMD2(close, int, id, int, pending_stop)
     case MEDIATOOL_UVCONTROLLEE:
         ret = media_uv_session_unregister(media->chain[id].handle, mediatool_uv_common_close_cb);
         break;
-#endif
+#endif /* CONFIG_LIBUV_EXTENSION */
     }
 
     media->chain[id].handle = NULL;
     media->chain[id].extra = NULL;
+
+    return ret;
+}
+
+static void mediatool_display_metadata(int id, const media_metadata_t* data)
+{
+    printf("id:%d f:%d st:%d vol:%d pos:%u dur:%u ttl:%s art:%s\n", id,
+        data->flags, data->state, data->volume, data->position, data->duration,
+        data->title, data->artist);
+}
+
+#ifdef CONFIG_LIBUV_EXTENSION
+static void mediatool_uv_session_query_cb(void* cookie, int ret, void* object)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+    mediatool_display_metadata(chain->id, object);
+}
+
+static void mediatool_uv_session_update_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+#endif /* CONFIG_LIBUV_EXTENSION */
+
+CMD1(query, int, id)
+{
+    const media_metadata_t* data = NULL;
+    int ret = -EINVAL;
+
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+        return -EINVAL;
+
+    switch (media->chain[id].type) {
+    case MEDIATOOL_CONTROLLER:
+        ret = media_session_query(media->chain[id].handle, &data);
+        break;
+
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVCONTROLLER:
+        return media_uv_session_query(media->chain[id].handle,
+            mediatool_uv_session_query_cb, &media->chain[id]);
+#endif
+
+    default:
+        break;
+    }
+
+    if (ret < 0 || !data)
+        return ret;
+
+    mediatool_display_metadata(id, data);
+    return ret;
+}
+
+CMD8(update, int, id, int, flags, int, state, int, volume, int, position, int, duration, string_t, title, string_t, artist)
+{
+    media_metadata_t data = {
+        .flags = flags,
+        .state = state,
+        .volume = volume,
+        .position = position,
+        .duration = duration,
+        .title = title,
+        .artist = artist,
+    };
+    int ret;
+
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+        return -EINVAL;
+
+    switch (media->chain[id].type) {
+    case MEDIATOOL_CONTROLLEE:
+        ret = media_session_update(media->chain[id].handle, &data);
+        break;
+
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVCONTROLLEE:
+        ret = media_uv_session_update(media->chain[id].handle, &data,
+            mediatool_uv_session_update_cb, &media->chain[id]);
+        break;
+#endif
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
 
     return ret;
 }
@@ -1809,6 +1923,12 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "sunregister",
         mediatool_cmd_close,
         "Unregister session channel (sunregister ID)" },
+    { "query",
+        mediatool_cmd_query,
+        "Query metadata through session controller (query ID)" },
+    { "update",
+        mediatool_cmd_update,
+        "Update metadata through session controllee (update ID FLAGS STATE VOLUME POSITION DURATION TITLE ARTIST)" },
     { "reset",
         mediatool_cmd_reset,
         "Reset player/recorder channel (reset ID)" },
