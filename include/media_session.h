@@ -198,6 +198,9 @@ int media_session_notify(void* handle, int event,
     int result, const char* extra);
 
 #ifdef CONFIG_LIBUV
+/****************************************************************************
+ * Public Async Controller Functions
+ ****************************************************************************/
 
 /**
  * Open a session path as controller.
@@ -363,7 +366,44 @@ int media_uv_session_prev_song(void* handle,
 int media_uv_session_next_song(void* handle,
     media_uv_callback on_next_song, void* cookie);
 
+/****************************************************************************
+ * Public Async Controllee Functions
+ ****************************************************************************/
+
+/**
+ * @brief Register as a session controllee to receive control message.
+ *
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] params    Not used yet.
+ * @param[in] on_event  Callback to receive control message.
+ * @param[in] cookie    Callback argument.
+ * @return void*    Handle of session, NULL on error.
+ */
+void* media_uv_session_register(void* loop, const char* params,
+    media_event_callback on_event, void* cookie);
+
+/**
+ * @brief Notify result of control message, or other important events.
+ *
+ * @param[in] handle    Handle.
+ * @param[in] event     Event to notify.
+ * @param[in] result    Result of event, usually zero on success, negative errno on failure.
+ * @param[in] extra     Extra string message of event, NULL if not need.
+ * @return int      Zero on success, negative errno on failure.
+ */
+int media_uv_session_notify(void* handle, int event, int result, const char* extra);
+
+/**
+ * @brief Unregister self.
+ *
+ * @param[in] handle        Handle.
+ * @param[in] on_release    Callabck to release caller's own resources.
+ * @return int          Zero on success, negative errno on failure.
+ */
+int media_uv_session_unregister(void* handle, media_uv_callback on_release);
+
 #endif /* CONFIG_LIBUV */
+
 #undef EXTERN
 #ifdef __cplusplus
 }
