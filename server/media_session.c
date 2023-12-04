@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <sys/queue.h>
 
+#include "media_metadata.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -59,25 +60,45 @@
  *  might need to support register from remote server in the future.
  ****************************************************************************/
 
+typedef LIST_HEAD(MediaControllerList, MediaControllerPriv) MediaControllerList;
+typedef LIST_HEAD(MediaControlleeList, MediaControlleePriv) MediaControlleeList;
+typedef LIST_ENTRY(MediaControllerPriv) MediaControllerEntry;
+typedef LIST_ENTRY(MediaControlleePriv) MediaControlleeEntry;
+
 typedef struct MediaControllerPriv {
+    MediaControllerEntry entry;
     void* cookie;
     bool event;
-    LIST_ENTRY(MediaControllerPriv)
-    entry;
 } MediaControllerPriv;
 
 typedef struct MediaControlleePriv {
+    MediaControlleeEntry entry;
     void* cookie;
-    LIST_ENTRY(MediaControlleePriv)
-    entry;
+    media_metadata_t data;
 } MediaControlleePriv;
 
 typedef struct MediaSessionPriv {
-    LIST_HEAD(MediaControllerList, MediaControllerPriv)
-    controllers;
-    LIST_HEAD(MediaControlleeList, MediaControlleePriv)
-    controllees;
+    MediaControllerList controllers;
+    MediaControlleeList controllees;
 } MediaSessionPriv;
+
+/****************************************************************************
+ * Private Function Prototypes
+ ****************************************************************************/
+
+static int media_session_cmd2event(const char* cmd);
+
+static void* media_session_controller_open(MediaSessionPriv* priv, void* cookie);
+static void media_session_controller_close(MediaControllerPriv* controller);
+static int media_session_controller_transfer(MediaSessionPriv* priv,
+    const char* cmd, const char* arg, char* res, int len);
+
+void* media_session_controllee_register(MediaSessionPriv* priv, void* cookie);
+void media_session_controllee_notify(MediaSessionPriv* priv,
+    MediaControlleePriv* controllee, int event, int result, const char* extra);
+void media_session_controllee_update(MediaSessionPriv* priv,
+    MediaControlleePriv* controllee, const char* arg);
+void media_session_controllee_unregister(MediaControlleePriv* controllee);
 
 /****************************************************************************
  * Private Functions
@@ -113,33 +134,35 @@ static void* media_session_controller_open(MediaSessionPriv* priv, void* cookie)
     return controller;
 }
 
-static void media_session_controller_close(void* handle)
+static void media_session_controller_close(MediaControllerPriv* controller)
 {
-    MediaControllerPriv* controller = handle;
-
     LIST_REMOVE(controller, entry);
     free(controller);
 }
 
 static int media_session_controller_transfer(MediaSessionPriv* priv,
-    const char* cmd, const char* arg)
+    const char* cmd, const char* arg, char* res, int len)
 {
     MediaControlleePriv* controllee = NULL;
-    int event;
+    int ret;
 
     /* Find the most active controllee. */
     controllee = LIST_FIRST(&priv->controllees);
     if (!controllee)
         return -ENOENT;
 
-    /* Transfer control-message to controlllee client. */
-    event = media_session_cmd2event(cmd);
-    if (event > 0) {
-        media_stub_notify_event(controllee->cookie, event, 0, arg);
-        event = 0;
+    /* Directly return metadata if query sth. */
+    if (!strcmp(cmd, "query"))
+        return media_metadata_serialize(&controllee->data, res, len);
+
+    /* Transfer control-message to controllee client. */
+    ret = media_session_cmd2event(cmd);
+    if (ret > 0) {
+        media_stub_notify_event(controllee->cookie, ret, 0, arg);
+        ret = 0;
     }
 
-    return event;
+    return ret;
 }
 
 void* media_session_controllee_register(MediaSessionPriv* priv, void* cookie)
@@ -152,19 +175,15 @@ void* media_session_controllee_register(MediaSessionPriv* priv, void* cookie)
 
     controllee->cookie = cookie;
     LIST_INSERT_HEAD(&priv->controllees, controllee, entry);
-
+    media_metadata_init(&controllee->data);
     return controllee;
 }
 
 void media_session_controllee_notify(MediaSessionPriv* priv,
-    void* handle, int event, int result, const char* extra)
+    MediaControlleePriv* controllee, int event, int result, const char* extra)
 {
-    MediaControlleePriv* controllee = handle;
     MediaControllerPriv* controller;
     bool most_active;
-
-    if (!controllee)
-        return;
 
     /* Only the most active controllee can notify. */
     if (event == MEDIA_EVENT_STARTED && result == 0) {
@@ -187,13 +206,25 @@ void media_session_controllee_notify(MediaSessionPriv* priv,
     }
 }
 
-void media_session_controllee_unregister(void* handle)
+void media_session_controllee_update(MediaSessionPriv* priv,
+    MediaControlleePriv* controllee, const char* arg)
 {
-    MediaControlleePriv* controllee = handle;
+    media_metadata_t diff;
 
-    if (!controllee)
-        return;
+    media_metadata_init(&diff);
+    media_metadata_unserialize(&diff, arg);
 
+    /* Notify state change to controller. */
+    if ((diff.flags & MEDIA_METAFLAG_STATE) && diff.state != controllee->data.state)
+        media_session_controllee_notify(priv, controllee, diff.state, 0, NULL);
+
+    media_metadata_update(&controllee->data, &diff);
+    return;
+}
+
+void media_session_controllee_unregister(MediaControlleePriv* controllee)
+{
+    media_metadata_deinit(&controllee->data);
     LIST_REMOVE(controllee, entry);
     free(controllee);
 }
@@ -245,16 +276,23 @@ int media_session_handler(void* session, void* cookie, const char* target,
         return 0;
     }
 
-    if (!strcmp(cmd, "unregister")) {
-        media_stub_notify_finalize(&controllee->cookie);
-        media_session_controllee_unregister(controllee);
-        return 0;
-    }
+    if (controllee) {
+        if (!strcmp(cmd, "unregister")) {
+            media_stub_notify_finalize(&controllee->cookie);
+            media_session_controllee_unregister(controllee);
+            return 0;
+        }
 
-    if (!strcmp(cmd, "event")) {
-        sscanf(arg, "%d:%d", &event, &result);
-        media_session_controllee_notify(priv, controllee, event, result, target);
-        return 0;
+        if (!strcmp(cmd, "event")) {
+            sscanf(arg, "%d:%d", &event, &result);
+            media_session_controllee_notify(priv, controllee, event, result, target);
+            return 0;
+        }
+
+        if (!strcmp(cmd, "update")) {
+            media_session_controllee_update(priv, controllee, arg);
+            return 0;
+        }
     }
 
     /* Controller methods. */
@@ -267,17 +305,20 @@ int media_session_handler(void* session, void* cookie, const char* target,
         return 0;
     }
 
-    if (!strcmp(cmd, "close")) {
-        media_stub_notify_finalize(&controller->cookie);
-        media_session_controller_close(controller);
-        return 0;
+    if (controller) {
+        if (!strcmp(cmd, "close")) {
+            media_stub_notify_finalize(&controller->cookie);
+            media_session_controller_close(controller);
+            return 0;
+        }
+
+        if (!strcmp(cmd, "set_event")) {
+            controller->event = true;
+            return 0;
+        }
+
+        return media_session_controller_transfer(priv, cmd, arg, res, res_len);
     }
 
-    if (!strcmp(cmd, "set_event")) {
-        controller->event = true;
-        return 0;
-    }
-
-    /* TODO: support query-command by suspending controller and sending ack later. */
-    return media_session_controller_transfer(priv, cmd, arg);
+    return -EINVAL;
 }
