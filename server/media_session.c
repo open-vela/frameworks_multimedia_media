@@ -233,6 +233,9 @@ int media_session_handler(void* session, void* cookie, const char* target,
     int event, result;
 
     /* Controllee methods. */
+    if (!strcmp(cmd, "ping"))
+        return 0;
+
     if (!strcmp(cmd, "register")) {
         controllee = media_session_controllee_register(priv, cookie);
         if (!controllee)
