@@ -42,10 +42,35 @@
 typedef struct MediaSessionPriv {
     void* proxy;
     void* cookie;
-    media_event_callback on_event;
     media_uv_callback on_open;
     media_uv_callback on_close;
+    media_event_callback on_event;
 } MediaSessionPriv;
+
+/****************************************************************************
+ * Private Function Prototypes
+ ****************************************************************************/
+
+static void media_uv_session_close_cb(void* cookie, int ret);
+static void media_uv_session_event_cb(void* cookie, void* cookie0,
+    void* cookie1, media_parcel* parcel);
+static void media_uv_session_receive_cb(void* cookie,
+    void* cookie0, void* cookie1, media_parcel* parcel);
+static int media_uv_session_send(void* handle, const char* target,
+    const char* cmd, const char* arg, int res_len,
+    media_uv_parcel_callback parser, void* cb, void* cookie);
+
+/* Controller functions. */
+
+static void media_uv_controller_open_cb(void* cookie, int ret);
+static void media_uv_controller_connect_cb(void* cookie, int ret);
+
+/* Controllee functions. */
+
+static void media_uv_controllee_register_cb(void* cookie, int ret);
+static void media_uv_controllee_listen_cb(void* cookie, int ret);
+static void media_uv_controllee_ping_cb(void* cookie, int ret);
+static void media_uv_controllee_connect_cb(void* cookie, int ret);
 
 /****************************************************************************
  * Private Functions
@@ -87,21 +112,7 @@ static void media_uv_session_receive_cb(void* cookie,
     cb(cookie1, result);
 }
 
-static void media_uv_session_open_cb(void* cookie, int ret)
-{
-    MediaSessionPriv* priv = cookie;
-
-    if (ret < 0)
-        media_uv_reconnect(priv->proxy);
-    else {
-        syslog(LOG_INFO, "[%s][%d] result:%d handle:%p\n",
-            __func__, __LINE__, ret, priv);
-        if (priv->on_open)
-            priv->on_open(priv->cookie, ret);
-    }
-}
-
-static int media_uv_mession_send(void* handle, const char* target,
+static int media_uv_session_send(void* handle, const char* target,
     const char* cmd, const char* arg, int res_len,
     media_uv_parcel_callback parser, void* cb, void* cookie)
 {
@@ -125,21 +136,35 @@ static int media_uv_mession_send(void* handle, const char* target,
     return ret;
 }
 
-static void media_uv_session_connect_cb(void* cookie, int ret)
+/****************************************************************************
+ * Controller Functions
+ ****************************************************************************/
+
+static void media_uv_controller_open_cb(void* cookie, int ret)
+{
+    MediaSessionPriv* priv = cookie;
+
+    if (ret < 0)
+        media_uv_reconnect(priv->proxy);
+    else {
+        syslog(LOG_INFO, "[%s][%d] result:%d handle:%p\n",
+            __func__, __LINE__, ret, priv);
+        if (priv->on_open)
+            priv->on_open(priv->cookie, ret);
+    }
+}
+
+static void media_uv_controller_connect_cb(void* cookie, int ret)
 {
     MediaSessionPriv* priv = cookie;
 
     if (ret >= 0)
-        ret = media_uv_mession_send(priv, NULL, "open", NULL, 0,
-            media_uv_session_receive_cb, media_uv_session_open_cb,
-            priv->cookie);
+        ret = media_uv_session_send(priv, NULL, "open", NULL, 0,
+            media_uv_session_receive_cb, media_uv_controller_open_cb, priv);
+
     if (ret < 0 && priv->on_open)
         priv->on_open(priv->cookie, ret);
 }
-
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 void* media_uv_session_open(void* loop, char* params,
     media_uv_callback on_open, void* cookie)
@@ -154,7 +179,7 @@ void* media_uv_session_open(void* loop, char* params,
     priv->on_open = on_open;
 
     priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
-        media_uv_session_connect_cb, priv);
+        media_uv_controller_connect_cb, priv);
     if (!priv->proxy) {
         free(priv);
         return NULL;
@@ -172,15 +197,12 @@ int media_uv_session_close(void* handle, media_uv_callback on_close)
         return -EINVAL;
 
     priv->on_close = on_close;
-    ret = media_uv_mession_send(priv, NULL, "close", NULL, 0,
+    ret = media_uv_session_send(priv, NULL, "close", NULL, 0,
         NULL, NULL, NULL);
     if (ret < 0)
         return ret;
 
-    if (ret >= 0)
-        ret = media_uv_disconnect(priv->proxy, media_uv_session_close_cb);
-
-    return ret;
+    return media_uv_disconnect(priv->proxy, media_uv_session_close_cb);
 }
 
 int media_uv_session_listen(void* handle, media_event_callback on_event)
@@ -192,7 +214,7 @@ int media_uv_session_listen(void* handle, media_event_callback on_event)
         return -EINVAL;
 
     priv->on_event = on_event;
-    ret = media_uv_mession_send(priv, NULL, "set_event",
+    ret = media_uv_session_send(priv, NULL, "set_event",
         NULL, 0, NULL, NULL, NULL);
     if (ret < 0)
         return ret;
@@ -205,7 +227,7 @@ int media_uv_session_start(void* handle, media_uv_callback on_start, void* cooki
     if (!handle)
         return -EINVAL;
 
-    return media_uv_mession_send(handle, NULL, "start", NULL, 0,
+    return media_uv_session_send(handle, NULL, "start", NULL, 0,
         media_uv_session_receive_cb, on_start, cookie);
 }
 
@@ -214,7 +236,7 @@ int media_uv_session_pause(void* handle, media_uv_callback on_pause, void* cooki
     if (!handle)
         return -EINVAL;
 
-    return media_uv_mession_send(handle, NULL, "pause", NULL, 0,
+    return media_uv_session_send(handle, NULL, "pause", NULL, 0,
         media_uv_session_receive_cb, on_pause, cookie);
 }
 
@@ -227,7 +249,7 @@ int media_uv_session_seek(void* handle, unsigned int msec,
         return -EINVAL;
 
     snprintf(tmp, sizeof(tmp), "%u", msec);
-    return media_uv_mession_send(handle, NULL, "seek", tmp, 0,
+    return media_uv_session_send(handle, NULL, "seek", tmp, 0,
         media_uv_session_receive_cb, on_seek, cookie);
 }
 
@@ -236,7 +258,7 @@ int media_uv_session_stop(void* handle, media_uv_callback on_stop, void* cookie)
     if (!handle)
         return -EINVAL;
 
-    return media_uv_mession_send(handle, NULL, "stop", NULL, 0,
+    return media_uv_session_send(handle, NULL, "stop", NULL, 0,
         media_uv_session_receive_cb, on_stop, cookie);
 }
 
@@ -288,7 +310,7 @@ int media_uv_session_next_song(void* handle,
     if (!handle)
         return -EINVAL;
 
-    return media_uv_mession_send(handle, NULL, "next", NULL, 0,
+    return media_uv_session_send(handle, NULL, "next", NULL, 0,
         media_uv_session_receive_cb, on_next_song, cookie);
 }
 
@@ -298,6 +320,105 @@ int media_uv_session_prev_song(void* handle,
     if (!handle)
         return -EINVAL;
 
-    return media_uv_mession_send(handle, NULL, "prev", NULL, 0,
+    return media_uv_session_send(handle, NULL, "prev", NULL, 0,
         media_uv_session_receive_cb, on_pre_song, cookie);
+}
+
+/****************************************************************************
+ * Controllee Functions
+ ****************************************************************************/
+
+static void media_uv_controllee_register_cb(void* cookie, int ret)
+{
+    MediaSessionPriv* priv = cookie;
+
+    priv->on_event(priv->cookie, MEDIA_EVENT_NOP, ret, NULL);
+}
+
+static void media_uv_controllee_listen_cb(void* cookie, int ret)
+{
+    MediaSessionPriv* priv = cookie;
+
+    /* Only register after acknowledge listener created. */
+    if (ret >= 0)
+        ret = media_uv_session_send(priv, NULL, "register", NULL, 0,
+            media_uv_session_receive_cb, media_uv_controllee_register_cb, priv);
+
+    if (ret < 0)
+        priv->on_event(priv->cookie, MEDIA_EVENT_NOP, ret, NULL);
+}
+
+static void media_uv_controllee_ping_cb(void* cookie, int ret)
+{
+    MediaSessionPriv* priv = cookie;
+
+    if (ret < 0)
+        media_uv_reconnect(priv->proxy);
+    else
+        media_uv_listen(priv->proxy,
+            media_uv_controllee_listen_cb, media_uv_session_event_cb);
+}
+
+static void media_uv_controllee_connect_cb(void* cookie, int ret)
+{
+    MediaSessionPriv* priv = cookie;
+
+    if (ret >= 0)
+        ret = media_uv_session_send(priv, NULL, "ping", NULL, 0,
+            media_uv_session_receive_cb, media_uv_controllee_ping_cb, priv);
+
+    if (ret < 0)
+        priv->on_event(priv->cookie, MEDIA_EVENT_NOP, ret, NULL);
+}
+
+void* media_uv_session_register(void* loop, const char* params,
+    media_event_callback on_event, void* cookie)
+{
+    MediaSessionPriv* priv;
+
+    if (!on_event)
+        return NULL;
+
+    priv = zalloc(sizeof(MediaSessionPriv));
+    if (!priv)
+        return NULL;
+
+    priv->cookie = cookie;
+    priv->on_event = on_event;
+
+    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+        media_uv_controllee_connect_cb, priv);
+    if (!priv->proxy) {
+        free(priv);
+        return NULL;
+    }
+
+    return priv;
+}
+
+int media_uv_session_notify(void* handle, int event, int result, const char* extra)
+{
+    char tmp[64];
+
+    if (!handle || !MEDIA_IS_STATUS_CHANGE(event))
+        return -EINVAL;
+
+    snprintf(tmp, sizeof(tmp), "%d:%d", event, result);
+    return media_uv_session_send(handle, extra, "event", tmp, 0, NULL, NULL, NULL);
+}
+
+int media_uv_session_unregister(void* handle, media_uv_callback on_release)
+{
+    MediaSessionPriv* priv = handle;
+    int ret;
+
+    if (!handle)
+        return -EINVAL;
+
+    priv->on_close = on_release;
+    ret = media_uv_session_send(handle, NULL, "unregister", NULL, 0, NULL, NULL, NULL);
+    if (ret < 0)
+        return ret;
+
+    return media_uv_disconnect(priv->proxy, media_uv_session_close_cb);
 }

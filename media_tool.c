@@ -53,6 +53,7 @@
 #define MEDIATOOL_UVRECORDER 7
 #define MEDIATOOL_UVFOCUS 8
 #define MEDIATOOL_UVCONTROLLER 9
+#define MEDIATOOL_UVCONTROLLEE 10
 
 #define GET_ARG_FUNC(out_type, arg)                  \
     static out_type get_##out_type##_arg(char* arg); \
@@ -230,6 +231,7 @@ static void mediatool_controllee_callback(void* cookie, int event,
     printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
         __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
 
+    /* Assume we've done real work and notify the result. */
     switch (event) {
     case MEDIA_EVENT_START:
         media_session_notify(chain->handle, MEDIA_EVENT_STARTED, 0, NULL);
@@ -253,7 +255,7 @@ static void mediatool_controllee_callback(void* cookie, int event,
     }
 }
 
-static void mediatool_music_callback(void* cookie, int event,
+static void mediatool_controllee_music_callback(void* cookie, int event,
     int ret, const char* data)
 {
     struct mediatool_chain_s* chain = cookie;
@@ -262,6 +264,7 @@ static void mediatool_music_callback(void* cookie, int event,
         __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
 
     switch (event) {
+    /* Do real work by player api. */
     case MEDIA_EVENT_START:
         media_player_start(chain->handle);
         break;
@@ -274,6 +277,7 @@ static void mediatool_music_callback(void* cookie, int event,
         media_player_stop(chain->handle);
         break;
 
+    /* Assume we've done real work and notify the result. */
     case MEDIA_EVENT_PREV:
         media_session_notify(chain->handle, MEDIA_EVENT_PREVED, 0, NULL);
         break;
@@ -292,6 +296,7 @@ static void mediatool_event_callback(void* cookie, int event,
     printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
         __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
 
+    /* For player with controllee registered, notify event to session. */
     if (chain->extra)
         media_session_notify(chain->extra, event, ret, data);
 }
@@ -516,7 +521,7 @@ CMD1(player_open, string_t, stream_type)
 
     if (stream_type && !strcmp(stream_type, MEDIA_STREAM_MUSIC)) {
         media->chain[i].extra = media_session_register(
-            &media->chain[i], mediatool_music_callback);
+            &media->chain[i], mediatool_controllee_music_callback);
     }
 
     media->chain[i].type = MEDIATOOL_PLAYER;
@@ -583,13 +588,11 @@ CMD1(session_open, string_t, stream_type)
     assert(!ret);
 
     media->chain[i].type = MEDIATOOL_CONTROLLER;
-
     printf("session controller ID %ld\n", i);
-
     return 0;
 }
 
-CMD0(session_register)
+CMD1(session_register, string_t, param)
 {
     long int i;
 
@@ -664,6 +667,10 @@ CMD2(close, int, id, int, pending_stop)
 
     case MEDIATOOL_UVCONTROLLER:
         ret = media_uv_session_close(media->chain[id].handle, mediatool_uv_common_close_cb);
+        break;
+
+    case MEDIATOOL_UVCONTROLLEE:
+        ret = media_uv_session_unregister(media->chain[id].handle, mediatool_uv_common_close_cb);
         break;
 #endif
     }
@@ -1545,7 +1552,7 @@ static void mediatool_uv_session_open_cb(void* cookie, int ret)
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
-CMD1(uv_session_open, string_t, stream_type)
+CMD1(uv_session_open, string_t, param)
 {
     long int i;
 
@@ -1558,19 +1565,79 @@ CMD1(uv_session_open, string_t, stream_type)
         return -ENOMEM;
 
     media->chain[i].id = i;
-    media->chain[i].handle = media_uv_session_open(&g_mediatool_uvloop, stream_type, mediatool_uv_session_open_cb, &media->chain[i]);
+    media->chain[i].handle = media_uv_session_open(&g_mediatool_uvloop, param,
+        mediatool_uv_session_open_cb, &media->chain[i]);
     if (!media->chain[i].handle) {
         printf("media_uv_session_open error\n");
         goto err;
     }
 
-    if (media_uv_session_listen(media->chain[i].handle, mediatool_event_callback) < 0)
+    if (media_uv_session_listen(media->chain[i].handle, mediatool_controller_callback) < 0)
         goto err;
 
     media->chain[i].type = MEDIATOOL_UVCONTROLLER;
+    printf("async session controller ID %ld\n", i);
+    return 0;
 
-    printf("session controller ID %ld\n", i);
+err:
+    printf("%s error\n", __func__);
+    return -EINVAL;
+}
 
+static void mediatool_uv_controllee_callback(void* cookie, int event,
+    int ret, const char* extra)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
+        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
+
+    /* Assume we've done real work and notify the result. */
+    switch (event) {
+    case MEDIA_EVENT_START:
+        media_uv_session_notify(chain->handle, MEDIA_EVENT_STARTED, 0, NULL);
+        break;
+
+    case MEDIA_EVENT_PAUSE:
+        media_uv_session_notify(chain->handle, MEDIA_EVENT_PAUSED, 0, NULL);
+        break;
+
+    case MEDIA_EVENT_STOP:
+        media_uv_session_notify(chain->handle, MEDIA_EVENT_STOPPED, 0, NULL);
+        break;
+
+    case MEDIA_EVENT_PREV:
+        media_uv_session_notify(chain->handle, MEDIA_EVENT_PREVED, 0, NULL);
+        break;
+
+    case MEDIA_EVENT_NEXT:
+        media_uv_session_notify(chain->handle, MEDIA_EVENT_NEXTED, 0, NULL);
+        break;
+    }
+}
+
+CMD1(uv_session_register, string_t, param)
+{
+    long int i;
+
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!media->chain[i].handle)
+            break;
+    }
+
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
+    media->chain[i].id = i;
+    media->chain[i].handle = media_uv_session_register(&g_mediatool_uvloop, param,
+        mediatool_uv_controllee_callback, &media->chain[i]);
+    if (!media->chain[i].handle) {
+        printf("%s error\n", __func__);
+        goto err;
+    }
+
+    media->chain[i].type = MEDIATOOL_UVCONTROLLEE;
+    printf("async session controllee ID %ld\n", i);
     return 0;
 
 err:
@@ -1738,7 +1805,7 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
         "Destroy player/recorder/session channel (close ID [pending_stop(1/0)])" },
     { "sregister",
         mediatool_cmd_session_register,
-        "Register as session channel return ID (sregister policy-phrase)" },
+        "Register as session channel return ID (sregister [UNUSED])" },
     { "sunregister",
         mediatool_cmd_close,
         "Unregister session channel (sunregister ID)" },
@@ -1836,6 +1903,12 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "uv_sopen",
         mediatool_cmd_uv_session_open,
         "Create async session channel return ID (uv_sopen [UNUSED])" },
+    { "uv_sregister",
+        mediatool_cmd_uv_session_register,
+        "Register as async session channel return ID (uv_sregister [UNUSED])" },
+    { "uv_sunregister",
+        mediatool_cmd_close,
+        "Unregister async session channel (sunregister ID)" },
     { "uv_setint",
         mediatool_cmd_uv_policy_set_int,
         "Async set numerical value to criterion (uv_setint NAME VALUE APPLY)" },
