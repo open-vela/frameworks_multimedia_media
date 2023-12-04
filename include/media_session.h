@@ -94,10 +94,29 @@ int media_session_pause(void* handle);
 int media_session_seek(void* handle, unsigned int msec);
 
 /**
+ * @brief Query metadata from most active controllee.
+ *
+ * @param[in] handle    Controller handle.
+ * @param[out] data     Pointer to receive metadata ptr.
+ * @return Zero on success; a negated errno value on failure.
+ *
+ * @note Each controller handle has unique media_metadata_s;
+ * This api only update the content, won't changing address of metadata.
+ *
+ * @code
+ *  const media_metadata_t* data = NULL;
+ *  ret = media_session_query(handle, &data);
+ * @endcode
+ */
+int media_session_query(void* handle, const media_metadata_t** data);
+
+/**
  * Get current player state through sessoin path.
  * @param[in] handle    The session path.
  * @param[out] state    Current state.
  * @return Zero on success; a negated errno value on failure.
+ *
+ * @note use `media_session_query` instead if you want full message.
  */
 int media_session_get_state(void* handle, int* state);
 
@@ -106,6 +125,9 @@ int media_session_get_state(void* handle, int* state);
  * @param[in] handle    The session path
  * @param[in] msec      Playback position (from begining)
  * @return Zero on success; a negated errno value on failure.
+ *
+ * @note use `media_session_query` instead
+ * if you need the whole metadata of controlee.
  */
 int media_session_get_position(void* handle, unsigned int* msec);
 
@@ -114,6 +136,9 @@ int media_session_get_position(void* handle, unsigned int* msec);
  * @param[in] handle    The session path
  * @param[in] msec      File duration
  * @return Zero on success; a negated errno value on failure.
+ *
+ * @note use `media_session_query` instead
+ * if you need the whole metadata of controlee.
  */
 int media_session_get_duration(void* handle, unsigned int* msec);
 
@@ -193,9 +218,20 @@ int media_session_unregister(void* handle);
  * @param[in] result    Exec result.
  * @param[in] extra     Extra message.
  * @return Zero on success; a negated errno value on failure.
+ *
+ * @deprecated Should use `media_session_update` instead.
  */
 int media_session_notify(void* handle, int event,
     int result, const char* extra);
+
+/**
+ * @brief Update metadata to session, would notify controllers in need.
+ *
+ * @param[in] handle    Handle.
+ * @param[in] data      Metadata to update.
+ * @return Zero on success; a negated errno value on failure.
+ */
+int media_session_update(void* handle, const media_metadata_t* data);
 
 #ifdef CONFIG_LIBUV
 /****************************************************************************
@@ -272,6 +308,29 @@ int media_uv_session_seek(void* handle, unsigned int msec,
     media_uv_callback on_seek, void* cookie);
 
 /**
+ * @brief Query metadata from most active controllee.
+ *
+ * @param[in] handle    Async controller handle.
+ * @param[in] on_query  Callback to receive metadata ptr.
+ * @param[in] cookie    Callback argument.
+ * @return Zero on success; a negated errno value on failure.
+ *
+ * @note Each controller handle has unique media_metadata_s;
+ * This api only update the content, won't changing address of metadata.
+ *
+ * @code
+ *  void on_query(void* cookie, int ret, void* object) {
+ *      const media_metadata_t* data = object;
+ *      // ...
+ *  }
+ *
+ *  ret = media_uv_session_query(handle, on_query, cookie);
+ * @endcode
+ */
+int media_uv_session_query(void* handle,
+    media_uv_object_callback on_query, void* cookie);
+
+/**
  * Get current player state through sessoin path.
  * @param[in] handle    The session path.
  * @param[in] on_state  Call after receiving result.
@@ -289,17 +348,17 @@ int media_uv_session_get_state(void* handle,
  * @return Zero on success; a negated errno value on failure.
  */
 int media_uv_session_get_position(void* handle,
-    media_uv_int_callback on_position, void* cookie);
+    media_uv_unsigned_callback on_position, void* cookie);
 
 /**
  * Get playback file duration of the most active player through sessoin path.
  * @param[in] handle        The session path
- * @param[in] on_duriation  Call after receiving result.
+ * @param[in] on_duration   Call after receiving result.
  * @param[in] cookie        One-time callback context.
  * @return Zero on success; a negated errno value on failure.
  */
 int media_uv_session_get_duration(void* handle,
-    media_uv_int_callback on_duriation, void* cookie);
+    media_uv_unsigned_callback on_duration, void* cookie);
 
 /**
  * Set the most active player path volume through sessoin path.
@@ -383,17 +442,6 @@ void* media_uv_session_register(void* loop, const char* params,
     media_event_callback on_event, void* cookie);
 
 /**
- * @brief Notify result of control message, or other important events.
- *
- * @param[in] handle    Handle.
- * @param[in] event     Event to notify.
- * @param[in] result    Result of event, usually zero on success, negative errno on failure.
- * @param[in] extra     Extra string message of event, NULL if not need.
- * @return int      Zero on success, negative errno on failure.
- */
-int media_uv_session_notify(void* handle, int event, int result, const char* extra);
-
-/**
  * @brief Unregister self.
  *
  * @param[in] handle        Handle.
@@ -402,6 +450,30 @@ int media_uv_session_notify(void* handle, int event, int result, const char* ext
  */
 int media_uv_session_unregister(void* handle, media_uv_callback on_release);
 
+/**
+ * @brief Notify result of control message, or other important events.
+ *
+ * @param[in] handle    Handle.
+ * @param[in] event     Event to notify.
+ * @param[in] result    Result of event, usually zero on success, negative errno on failure.
+ * @param[in] extra     Extra string message of event, NULL if not need.
+ * @return int      Zero on success, negative errno on failure.
+ *
+ * @deprecated Should use `media_uv_session_update` instead.
+ */
+int media_uv_session_notify(void* handle, int event, int result, const char* extra);
+
+/**
+ * @brief Update metadata to session, would notify controllers in need.
+ *
+ * @param[in] handle    Async controllee handle.
+ * @param[in] data      Metadata to update.
+ * @param[in] on_update Callback to acknowledge update is done.
+ * @param[in] cookie    Callback argument.
+ * @return int Zero on success, negative errno on failure.
+ */
+int media_uv_session_update(void* handle, const media_metadata_t* data,
+    media_uv_callback on_update, void* cookie);
 #endif /* CONFIG_LIBUV */
 
 #undef EXTERN
