@@ -350,6 +350,13 @@ static void mediatool_focus_callback(int suggestion, void* cookie)
         __func__, chain->id, str, suggestion, __LINE__);
 }
 
+static void mediatool_display_metadata(int id, const media_metadata_t* data)
+{
+    printf("id:%d f:%d st:%d vol:%d pos:%u dur:%u ttl:%s art:%s\n", id,
+        data->flags, data->state, data->volume, data->position, data->duration,
+        data->title, data->artist);
+}
+
 #ifdef CONFIG_LIBUV_EXTENSION
 static void mediatool_uv_common_close_cb(void* cookie, int ret)
 {
@@ -428,6 +435,14 @@ static void mediatool_uv_common_set_volume_cb(void* cookie, int ret)
     struct mediatool_chain_s* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_common_query_cb(void* cookie, int ret, void* object)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+    mediatool_display_metadata(chain->id, object);
 }
 
 static void mediatool_uv_player_set_looping_cb(void* cookie, int ret)
@@ -705,22 +720,7 @@ CMD2(close, int, id, int, pending_stop)
     return ret;
 }
 
-static void mediatool_display_metadata(int id, const media_metadata_t* data)
-{
-    printf("id:%d f:%d st:%d vol:%d pos:%u dur:%u ttl:%s art:%s\n", id,
-        data->flags, data->state, data->volume, data->position, data->duration,
-        data->title, data->artist);
-}
-
 #ifdef CONFIG_LIBUV_EXTENSION
-static void mediatool_uv_session_query_cb(void* cookie, int ret, void* object)
-{
-    struct mediatool_chain_s* chain = cookie;
-
-    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
-    mediatool_display_metadata(chain->id, object);
-}
-
 static void mediatool_uv_session_update_cb(void* cookie, int ret)
 {
     struct mediatool_chain_s* chain = cookie;
@@ -745,7 +745,11 @@ CMD1(query, int, id)
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVCONTROLLER:
         return media_uv_session_query(media->chain[id].handle,
-            mediatool_uv_session_query_cb, &media->chain[id]);
+            mediatool_uv_common_query_cb, &media->chain[id]);
+
+    case MEDIATOOL_UVPLAYER:
+        return media_uv_player_query(media->chain[id].handle,
+            mediatool_uv_common_query_cb, &media->chain[id]);
 #endif
 
     default:
