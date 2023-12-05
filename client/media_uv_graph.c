@@ -30,6 +30,8 @@
 #include <sys/queue.h>
 #include <uv.h>
 
+#include "media_metadata.h"
+#include "media_policy.h"
 #include "media_proxy.h"
 #include "media_uv.h"
 
@@ -66,7 +68,16 @@ typedef struct MediaStreamPriv {
 
 typedef struct MediaPlayerPriv {
     MEDIA_STREAM_FIELDS
+    media_metadata_t data;
 } MediaPlayerPriv;
+
+typedef struct MediaQueryPriv {
+    void* player;
+    int expected;
+    void* cookie;
+    media_uv_object_callback on_query;
+    media_metadata_t diff;
+} MediaQueryPriv;
 
 typedef struct MediaRecorderPriv {
     MEDIA_STREAM_FIELDS
@@ -120,6 +131,14 @@ static int media_uv_stream_listen_init(MediaStreamPriv* priv, const char* addr);
 static void media_uv_stream_abandon_cb(void* cookie, int ret);
 static void media_uv_player_suggest_cb(int suggest, void* cookie);
 static void media_uv_recorder_suggest_cb(int suggest, void* cookie);
+
+/* Functions to query metadata. */
+
+static void media_uv_player_query_complete(void* cookie);
+static void media_uv_player_query_duration_cb(void* cookie, int ret, unsigned value);
+static void media_uv_player_query_position_cb(void* cookie, int ret, unsigned value);
+static void media_uv_player_query_state_cb(void* cookie, int ret, int value);
+static void media_uv_player_query_volume_cb(void* cookie, int ret, int value);
 
 /****************************************************************************
  * Common Functions
@@ -465,6 +484,76 @@ static void media_uv_stream_abandon_cb(void* cookie, int ret)
  * Player Functions
  ****************************************************************************/
 
+static void media_uv_player_query_complete(void* cookie)
+{
+    MediaQueryPriv* ctx = cookie;
+    MediaPlayerPriv* priv = ctx->player;
+    int flags = 0;
+
+    if (!ctx->expected) {
+        flags = ctx->diff.flags;
+        media_metadata_update(&priv->data, &ctx->diff);
+        ctx->on_query(ctx->cookie, flags, &priv->data);
+        free(ctx);
+    }
+}
+
+static void media_uv_player_query_state_cb(void* cookie, int ret, int value)
+{
+    MediaQueryPriv* ctx = cookie;
+
+    ctx->expected &= ~MEDIA_METAFLAG_STATE;
+
+    if (ret >= 0) {
+        ctx->diff.state = value;
+        ctx->diff.flags |= MEDIA_METAFLAG_STATE;
+    }
+
+    media_uv_player_query_complete(ctx);
+}
+
+static void media_uv_player_query_volume_cb(void* cookie, int ret, int value)
+{
+    MediaQueryPriv* ctx = cookie;
+
+    ctx->expected &= ~MEDIA_METAFLAG_VOLUME;
+
+    if (ret >= 0) {
+        ctx->diff.volume = value;
+        ctx->diff.flags |= MEDIA_METAFLAG_VOLUME;
+    }
+
+    media_uv_player_query_complete(ctx);
+}
+
+static void media_uv_player_query_position_cb(void* cookie, int ret, unsigned value)
+{
+    MediaQueryPriv* ctx = cookie;
+
+    ctx->expected &= ~MEDIA_METAFLAG_POSITION;
+
+    if (ret >= 0) {
+        ctx->diff.position = value;
+        ctx->diff.flags |= MEDIA_METAFLAG_POSITION;
+    }
+
+    media_uv_player_query_complete(ctx);
+}
+
+static void media_uv_player_query_duration_cb(void* cookie, int ret, unsigned value)
+{
+    MediaQueryPriv* ctx = cookie;
+
+    ctx->expected &= ~MEDIA_METAFLAG_DURATION;
+
+    if (ret >= 0) {
+        ctx->diff.duration = value;
+        ctx->diff.flags |= MEDIA_METAFLAG_DURATION;
+    }
+
+    media_uv_player_query_complete(ctx);
+}
+
 static void media_uv_player_suggest_cb(int suggest, void* cookie)
 {
     MediaPlayerPriv* priv = cookie;
@@ -520,14 +609,14 @@ void* media_uv_player_open(void* loop, const char* stream,
     MediaPlayerPriv* priv;
 
     if (stream && stream[0] != '\0') {
-        priv = zalloc(sizeof(MediaStreamPriv) + strlen(stream) + 1);
+        priv = zalloc(sizeof(MediaPlayerPriv) + strlen(stream) + 1);
         if (!priv)
             return NULL;
 
         priv->name = (char*)(priv + 1);
         strcpy(priv->name, stream);
     } else {
-        priv = zalloc(sizeof(MediaStreamPriv));
+        priv = zalloc(sizeof(MediaPlayerPriv));
         if (!priv)
             return NULL;
     }
@@ -788,6 +877,44 @@ int media_uv_player_get_property(void* handle, const char* target, const char* k
 
     return media_uv_stream_send(handle, target, key, NULL, 32,
         media_uv_stream_receive_string_cb, cb, cookie);
+}
+
+int media_uv_player_query(void* handle, media_uv_object_callback cb, void* cookie)
+{
+    MediaPlayerPriv* priv = handle;
+    MediaQueryPriv* ctx;
+
+    if (!priv || !cb)
+        return -EINVAL;
+
+    ctx = zalloc(sizeof(MediaQueryPriv));
+    if (!ctx)
+        return -EINVAL;
+
+    ctx->on_query = cb;
+    ctx->player = priv;
+    ctx->cookie = cookie;
+
+    if (media_uv_player_get_playing(handle, media_uv_player_query_state_cb, ctx) >= 0)
+        ctx->expected |= MEDIA_METAFLAG_STATE;
+
+    if (media_uv_policy_get_stream_volume(priv->loop, priv->name,
+            media_uv_player_query_volume_cb, ctx)
+        >= 0)
+        ctx->expected |= MEDIA_METAFLAG_VOLUME;
+
+    if (media_uv_player_get_duration(handle, media_uv_player_query_duration_cb, ctx) >= 0)
+        ctx->expected |= MEDIA_METAFLAG_DURATION;
+
+    if (media_uv_player_get_position(handle, media_uv_player_query_position_cb, ctx) >= 0)
+        ctx->expected |= MEDIA_METAFLAG_POSITION;
+
+    if (!ctx->expected) {
+        free(ctx);
+        return -EINVAL;
+    }
+
+    return 0;
 }
 /****************************************************************************
  * Recorder Functions

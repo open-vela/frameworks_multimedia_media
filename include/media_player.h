@@ -655,6 +655,28 @@ int media_uv_player_set_property(void* handle, const char* target, const char* k
  */
 int media_uv_player_get_property(void* handle, const char* target, const char* key,
     media_uv_string_callback on_getprop, void* cookie);
+
+/**
+ * @brief Query metadata of the player handle.
+ *
+ * @param[in] handle      Async player handle.
+ * @param[in] on_query    Callback to receive metadata ptr.
+ * @param[in] cookie      One-time callback context.
+ * @return Zero on success; a negated errno value on failure.
+ *
+ * @note Each player handle has unique media_metadata_s;
+ * This api only update the content, won't changing address of metadata.
+ *
+ * @code
+ *  void on_query(void* cookie, int ret, void* object) {
+ *      const media_metadata_t* data = object;
+ *      // ...
+ *  }
+ *
+ *  ret = media_uv_player_query(handle, on_query, cookie);
+ * @endcode
+ */
+int media_uv_player_query(void* handle, media_uv_object_callback on_query, void* cookie);
 #endif /* CONFIG_LIBUV */
 
 #undef EXTERN
