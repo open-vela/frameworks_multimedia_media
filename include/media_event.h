@@ -22,7 +22,7 @@
 #define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H
 
 /****************************************************************************
- * Pre-processor Definitions
+ * Event Definitions
  ****************************************************************************/
 
 /* Status change */
@@ -47,10 +47,6 @@
 #define MEDIA_EVENT_STOP 202
 #define MEDIA_EVENT_PREV 203
 #define MEDIA_EVENT_NEXT 204
-
-/****************************************************************************
- * Public Types
- ****************************************************************************/
 
 /**
  * @brief Define a event-callback function pointer when media comes.
@@ -95,6 +91,10 @@
  */
 typedef void (*media_event_callback)(void* cookie, int event, int ret,
     const char* extra);
+
+/****************************************************************************
+ * Async Callback Definitions
+ ****************************************************************************/
 
 /**
  * @brief Common async callback.
@@ -148,5 +148,26 @@ typedef void (*media_uv_string_callback)(void* cookie, int ret, const char* val)
  * @param[out] obj      Object.
  */
 typedef void (*media_uv_object_callback)(void* cookie, int ret, void* obj);
+
+/****************************************************************************
+ * Metadata Definitions
+ ****************************************************************************/
+
+#define MEDIA_METAFLAG_STATE 1
+#define MEDIA_METAFLAG_VOLUME 2
+#define MEDIA_METAFLAG_POSITION 4
+#define MEDIA_METAFLAG_DURATION 8
+#define MEDIA_METAFLAG_TITLE 16
+#define MEDIA_METAFLAG_ARTIST 32
+
+typedef struct media_metadata_s {
+    int flags; /* Indicates available fields. */
+    int state;
+    int volume;
+    unsigned position;
+    unsigned duration;
+    char* title;
+    char* artist;
+} media_metadata_t;
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H */
