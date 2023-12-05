@@ -259,25 +259,24 @@ static void media_uv_shutdown(MediaPipePriv* pipe)
     if (!req)
         return;
 
-    uv_shutdown((uv_shutdown_t*)req, (uv_stream_t*)&pipe->handle, media_uv_shutdown_cb);
+    if (uv_shutdown((uv_shutdown_t*)req, (uv_stream_t*)&pipe->handle, media_uv_shutdown_cb) < 0)
+        free(req);
 }
 
 static void media_uv_reconnect_one(MediaProxyPriv* proxy)
 {
-    int ret = -ENOENT;
-
     MEDIA_DEBUG_PROXY(proxy);
-    if (proxy->cpipe)
-        media_uv_close(proxy->cpipe);
 
     /* Try connect to next cpu. */
     proxy->cpu = strtok_r(NULL, MEDIA_CPU_DELIM, &proxy->cpus);
-    if (proxy->cpu)
-        ret = media_uv_connect_one(proxy);
+    if (!proxy->cpu) {
+        proxy->on_connect(proxy->cookie, -ENOENT);
+        return;
+    }
 
-    /* Notify reconnect error on failure. */
-    if (ret < 0)
-        proxy->on_connect(proxy->cookie, ret);
+    if (proxy->cpipe)
+        media_uv_close(proxy->cpipe);
+    media_uv_connect_one(proxy);
 }
 
 /**
@@ -494,8 +493,13 @@ static int media_uv_send_writing(MediaProxyPriv* proxy, MediaWritePriv* writing,
         .len = MEDIA_PARCEL_HEADER_LEN + writing->parcel.chunk->len
     };
 
-    return uv_write(&writing->req, (uv_stream_t*)&proxy->cpipe->handle, &buf, 1,
+    int ret = uv_write(&writing->req, (uv_stream_t*)&proxy->cpipe->handle, &buf, 1,
         queued ? media_uv_write_queued_cb : media_uv_write_cb);
+
+    if (ret < 0)
+        media_uv_free_writing(writing);
+
+    return ret;
 }
 
 /**
