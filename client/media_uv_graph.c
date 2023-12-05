@@ -90,6 +90,13 @@ typedef struct MediaListenPriv {
     uv_pipe_t pipe;
 } MediaListenPriv;
 
+typedef struct MediaTakePicPriv {
+    MediaRecorderPriv* handle;
+    media_uv_callback on_complete;
+    void* cookie;
+    int err_code;
+} MediaTakePicPriv;
+
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
@@ -181,9 +188,10 @@ static void media_uv_stream_connect_cb(void* cookie, int ret)
     MediaStreamPriv* priv = cookie;
 
     if (ret >= 0)
-        media_uv_stream_send(priv, NULL, "open", priv->name, 0,
+        ret = media_uv_stream_send(priv, NULL, "open", priv->name, 0,
             media_uv_stream_receive_cb, media_uv_stream_open_cb, priv);
-    else if (priv->on_open)
+
+    if (ret < 0 && priv->on_open)
         priv->on_open(priv->cookie, ret);
 }
 
@@ -1150,4 +1158,103 @@ int media_uv_recorder_reset(void* handle, media_uv_callback cb, void* cookie)
 
     return media_uv_stream_send(handle, NULL, "reset", NULL, 0,
         media_uv_stream_receive_cb, cb, cookie);
+}
+
+static void media_uv_recorder_take_picture_close_cb(void* cookie, int ret)
+{
+    MediaTakePicPriv* priv = cookie;
+
+    if (priv->on_complete)
+        priv->on_complete(priv->cookie, priv->err_code);
+
+    free(priv);
+}
+
+static int media_uv_recorder_take_picture_close(void* handle, bool send_close)
+{
+    MediaRecorderPriv* priv = handle;
+    int ret = 0;
+
+    if (!priv)
+        return -EINVAL;
+
+    priv->on_close = media_uv_recorder_take_picture_close_cb;
+
+    if (send_close)
+        ret = media_uv_stream_send(priv, NULL, "close", "1", 0, NULL, NULL, NULL);
+
+    if (ret >= 0)
+        ret = media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
+
+    return ret;
+}
+
+static void media_uv_recorder_take_picture_on_event(void* cookie, int event, int ret,
+    const char* extra)
+{
+    MediaTakePicPriv* priv = cookie;
+
+    MEDIA_INFO("%s, take pic, event %d, ret %d, line %d\n",
+        __func__, event, ret, __LINE__);
+
+    if (ret < 0 || event == MEDIA_EVENT_STOPPED) {
+        if (!priv->err_code) {
+            priv->err_code = ret;
+            media_uv_recorder_take_picture_close(priv->handle, true);
+        }
+    }
+}
+
+static void media_uv_recorder_take_picture_on_open(void* cookie, int ret)
+{
+    MediaTakePicPriv* priv = cookie;
+    if (ret < 0 && !priv->err_code) {
+        priv->err_code = ret;
+        media_uv_recorder_take_picture_close(priv->handle, false);
+    }
+}
+
+int media_uv_recorder_take_picture(void* loop, char* params, char* filename,
+    size_t number, media_uv_callback on_complete, void* cookie)
+{
+    MediaTakePicPriv* priv;
+    char option[32];
+    int ret;
+
+    if (!number || number > INT_MAX)
+        return -EINVAL;
+
+    priv = zalloc(sizeof(MediaTakePicPriv));
+    if (!priv)
+        return -ENOMEM;
+
+    priv->on_complete = on_complete;
+    priv->cookie = cookie;
+
+    priv->handle = media_uv_recorder_open(loop, params,
+        media_uv_recorder_take_picture_on_open, priv);
+    if (!priv->handle) {
+        free(priv);
+        return -EINVAL;
+    }
+
+    ret = media_uv_recorder_listen(priv->handle, media_uv_recorder_take_picture_on_event);
+    if (ret < 0)
+        goto err;
+
+    snprintf(option, sizeof(option), "total_number=%zu", number);
+    ret = media_uv_recorder_prepare(priv->handle, filename, option, NULL, NULL, NULL);
+    if (ret < 0)
+        goto err;
+
+    ret = media_uv_recorder_start(priv->handle, NULL, NULL);
+    if (ret < 0)
+        goto err;
+
+    return ret;
+
+err:
+    priv->err_code = ret;
+    media_uv_recorder_take_picture_close(priv->handle, false);
+    return 0;
 }

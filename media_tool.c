@@ -1861,6 +1861,21 @@ CMD1(uv_focus_request, string_t, name)
     printf("focus ID %ld\n", i);
     return 0;
 }
+
+static void take_picture_complete(void* cookie, int ret)
+{
+    if (ret < 0)
+        printf("take pic failed!\n");
+    else
+        printf("take pic successed!\n");
+}
+
+CMD3(uv_take_picture, string_t, filtername, string_t, filename, int, number)
+{
+    return media_uv_recorder_take_picture(&g_mediatool_uvloop, filtername,
+        filename, number, take_picture_complete, NULL);
+}
+
 #endif /* CONFIG_LIBUV_EXTENSION */
 
 /****************************************************************************
@@ -2022,6 +2037,9 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { "uv_request",
         mediatool_cmd_uv_focus_request,
         "Async request focus (uv_request SCENARIO)" },
+    { "uv_takepic",
+        mediatool_cmd_uv_take_picture,
+        "Async take picture from camera" },
 #endif /* CONFIG_LIBUV_EXTENSION */
     { "q",
         mediatool_cmd_quit,
