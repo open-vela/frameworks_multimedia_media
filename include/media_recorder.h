@@ -433,6 +433,23 @@ int media_uv_recorder_get_property(void* handle, const char* target, const char*
  * @return Zero on success; a negative errno value on failure.
  */
 int media_uv_recorder_reset(void* handle, media_uv_callback on_reset, void* cookie);
+
+/**
+ * @brief Take picture from camera.
+ *
+ * @attention Camera only.
+ *
+ * @param[in] loop        Loop handle of current thread.
+ * @param[in] params      Camera open path params.
+ * @param[in] filename    The store path for new picture.
+ * @param[in] number      The number of pictures taken.
+ * @param[in] on_complete The callback to handle result.
+ * @param[in] cookie      The private data of user.
+ * @return Zero on success; a negative errno value on failure.
+ */
+int media_uv_recorder_take_picture(void* loop, char* params, char* filename,
+    size_t number, media_uv_callback on_complete, void* cookie);
+
 #endif /* CONFIG_LIBUV */
 
 #undef EXTERN
