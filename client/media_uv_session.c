@@ -31,22 +31,17 @@
 #include "media_uv.h"
 
 /****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-#define MEDIA_IS_STATUS_CHANGE(x) ((x) < 200)
-
-/****************************************************************************
  * Private Types
  ****************************************************************************/
 
 typedef struct MediaSessionPriv {
     void* proxy;
     void* cookie;
-    media_metadata_t data;
     media_uv_callback on_open;
     media_uv_callback on_close;
     media_event_callback on_event;
+    media_metadata_t data;
+    bool need_query;
 } MediaSessionPriv;
 
 /****************************************************************************
@@ -101,6 +96,9 @@ static void media_uv_session_event_cb(void* cookie, void* cookie0,
     if (parcel)
         media_parcel_read_scanf(parcel, "%i%i%s", &event,
             &result, &response);
+
+    if (event == MEDIA_EVENT_CHANGED || event == MEDIA_EVENT_UPDATED)
+        priv->need_query = true;
 
     priv->on_event(priv->cookie, event, result, response);
 }
@@ -205,6 +203,7 @@ void* media_uv_session_open(void* loop, char* params,
     priv->cookie = cookie;
     priv->on_open = on_open;
     media_metadata_init(&priv->data);
+    priv->need_query = true;
     priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
         media_uv_controller_connect_cb, priv);
     if (!priv->proxy) {
@@ -292,11 +291,26 @@ int media_uv_session_stop(void* handle, media_uv_callback on_stop, void* cookie)
 int media_uv_session_query(void* handle,
     media_uv_object_callback on_query, void* cookie)
 {
-    if (!handle)
+    MediaSessionPriv* priv = handle;
+    int ret;
+
+    if (!priv || !on_query)
         return -EINVAL;
 
-    return media_uv_session_send(handle, NULL, "query", NULL, 256,
+    if (!priv->need_query) {
+        on_query(priv->cookie, 0, &priv->data);
+        return 0;
+    }
+
+    ret = media_uv_session_send(handle, NULL, "query", NULL, 256,
         media_uv_controller_receive_metadata_cb, on_query, cookie);
+    if (ret < 0)
+        return ret;
+
+    if (priv->on_event)
+        priv->need_query = false;
+
+    return ret;
 }
 
 int media_uv_session_get_state(void* handle,
@@ -336,13 +350,21 @@ int media_uv_session_set_volume(void* handle, unsigned int* volume,
 int media_uv_session_increase_volume(void* handle,
     media_uv_callback on_increase, void* cookie)
 {
-    return -ENOSYS; /* TODO: impl by event. */
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_session_send(handle, NULL, "volumeup", NULL, 0,
+        media_uv_session_receive_cb, on_increase, cookie);
 }
 
 int media_uv_session_decrease_volume(void* handle,
     media_uv_callback on_decrease, void* cookie)
 {
-    return -ENOSYS; /* TODO: impl by event. */
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_session_send(handle, NULL, "volumedown", NULL, 0,
+        media_uv_session_receive_cb, on_decrease, cookie);
 }
 
 int media_uv_session_next_song(void* handle,
@@ -453,15 +475,17 @@ int media_uv_session_unregister(void* handle, media_uv_callback on_release)
     return media_uv_disconnect(priv->proxy, media_uv_session_close_cb);
 }
 
-int media_uv_session_notify(void* handle, int event, int result, const char* extra)
+int media_uv_session_notify(void* handle, int event, int result, const char* extra,
+    media_uv_callback on_notify, void* cookie)
 {
     char tmp[64];
 
-    if (!handle || !MEDIA_IS_STATUS_CHANGE(event))
+    if (!handle)
         return -EINVAL;
 
     snprintf(tmp, sizeof(tmp), "%d:%d", event, result);
-    return media_uv_session_send(handle, extra, "event", tmp, 0, NULL, NULL, NULL);
+    return media_uv_session_send(handle, extra, "event", tmp, 0,
+        media_uv_session_receive_cb, on_notify, cookie);
 }
 
 int media_uv_session_update(void* handle, const media_metadata_t* data,
