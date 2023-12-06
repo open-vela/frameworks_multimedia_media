@@ -19,24 +19,6 @@
  ****************************************************************************/
 
 /****************************************************************************
- * Included Files
- ****************************************************************************/
-
-#include <errno.h>
-#include <inttypes.h>
-#include <pthread.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <sys/queue.h>
-
-#include "media_metadata.h"
-#include "media_server.h"
-
-/****************************************************************************
- * Private Types
- ****************************************************************************/
-
-/****************************************************************************
  * Session Architecture
  *
  * +---------+
@@ -56,19 +38,41 @@
  *            "open from client"        |
  *            "controller -> controllee : forward control message"
  *
- * TODO: so far we only support register controllee from local server,
- *  might need to support register from remote server in the future.
  ****************************************************************************/
 
-typedef LIST_HEAD(MediaControllerList, MediaControllerPriv) MediaControllerList;
-typedef LIST_HEAD(MediaControlleeList, MediaControlleePriv) MediaControlleeList;
-typedef LIST_ENTRY(MediaControllerPriv) MediaControllerEntry;
-typedef LIST_ENTRY(MediaControlleePriv) MediaControlleeEntry;
+/****************************************************************************
+ * Included Files
+ ****************************************************************************/
+
+#include <errno.h>
+#include <inttypes.h>
+#include <pthread.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <sys/queue.h>
+
+#include "media_metadata.h"
+#include "media_server.h"
+
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+#define MEDIA_SESSION_MAX 16 /* Limit of users. */
+
+/****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
+typedef TAILQ_HEAD(MediaControllerList, MediaControllerPriv) MediaControllerList;
+typedef TAILQ_HEAD(MediaControlleeList, MediaControlleePriv) MediaControlleeList;
+typedef TAILQ_ENTRY(MediaControllerPriv) MediaControllerEntry;
+typedef TAILQ_ENTRY(MediaControlleePriv) MediaControlleeEntry;
 
 typedef struct MediaControllerPriv {
     MediaControllerEntry entry;
     void* cookie;
-    bool event;
+    bool event; /* Indicates whether event is needed. */
 } MediaControllerPriv;
 
 typedef struct MediaControlleePriv {
@@ -80,25 +84,30 @@ typedef struct MediaControlleePriv {
 typedef struct MediaSessionPriv {
     MediaControllerList controllers;
     MediaControlleeList controllees;
+    int nb_controllers;
+    int nb_controllees;
 } MediaSessionPriv;
 
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
 
+/* TODO: remove after direct passing event between client&server. */
 static int media_session_cmd2event(const char* cmd);
 
 static void* media_session_controller_open(MediaSessionPriv* priv, void* cookie);
-static void media_session_controller_close(MediaControllerPriv* controller);
 static int media_session_controller_transfer(MediaSessionPriv* priv,
     const char* cmd, const char* arg, char* res, int len);
+static void media_session_controller_close(MediaSessionPriv* priv,
+    MediaControllerPriv* controller);
 
 void* media_session_controllee_register(MediaSessionPriv* priv, void* cookie);
 void media_session_controllee_notify(MediaSessionPriv* priv,
     MediaControlleePriv* controllee, int event, int result, const char* extra);
 void media_session_controllee_update(MediaSessionPriv* priv,
     MediaControlleePriv* controllee, const char* arg);
-void media_session_controllee_unregister(MediaControlleePriv* controllee);
+void media_session_controllee_unregister(MediaSessionPriv* priv,
+    MediaControlleePriv* controllee);
 
 /****************************************************************************
  * Private Functions
@@ -113,9 +122,13 @@ static int media_session_cmd2event(const char* cmd)
     else if (!strcmp(cmd, "stop"))
         return MEDIA_EVENT_STOP;
     else if (!strcmp(cmd, "prev"))
-        return MEDIA_EVENT_PREV;
+        return MEDIA_EVENT_PREV_SONG;
     else if (!strcmp(cmd, "next"))
-        return MEDIA_EVENT_NEXT;
+        return MEDIA_EVENT_NEXT_SONG;
+    else if (!strcmp(cmd, "volumeup"))
+        return MEDIA_EVENT_INCREASE_VOLUME;
+    else if (!strcmp(cmd, "volumedown"))
+        return MEDIA_EVENT_DECREASE_VOLUME;
     else
         return -ENOSYS;
 }
@@ -124,20 +137,17 @@ static void* media_session_controller_open(MediaSessionPriv* priv, void* cookie)
 {
     MediaControllerPriv* controller;
 
+    if (priv->nb_controllers >= MEDIA_SESSION_MAX)
+        return NULL;
+
     controller = zalloc(sizeof(MediaControllerPriv));
     if (!controller)
         return NULL;
 
     controller->cookie = cookie;
-    LIST_INSERT_HEAD(&priv->controllers, controller, entry);
-
+    TAILQ_INSERT_HEAD(&priv->controllers, controller, entry);
+    priv->nb_controllers++;
     return controller;
-}
-
-static void media_session_controller_close(MediaControllerPriv* controller)
-{
-    LIST_REMOVE(controller, entry);
-    free(controller);
 }
 
 static int media_session_controller_transfer(MediaSessionPriv* priv,
@@ -147,7 +157,7 @@ static int media_session_controller_transfer(MediaSessionPriv* priv,
     int ret;
 
     /* Find the most active controllee. */
-    controllee = LIST_FIRST(&priv->controllees);
+    controllee = TAILQ_FIRST(&priv->controllees);
     if (!controllee)
         return -ENOENT;
 
@@ -165,17 +175,32 @@ static int media_session_controller_transfer(MediaSessionPriv* priv,
     return ret;
 }
 
+static void media_session_controller_close(MediaSessionPriv* priv,
+    MediaControllerPriv* controller)
+{
+    TAILQ_REMOVE(&priv->controllers, controller, entry);
+    priv->nb_controllers--;
+    free(controller);
+}
+
 void* media_session_controllee_register(MediaSessionPriv* priv, void* cookie)
 {
     MediaControlleePriv* controllee;
+
+    if (priv->nb_controllees >= MEDIA_SESSION_MAX)
+        return NULL;
 
     controllee = zalloc(sizeof(MediaControlleePriv));
     if (!controllee)
         return NULL;
 
     controllee->cookie = cookie;
-    LIST_INSERT_HEAD(&priv->controllees, controllee, entry);
     media_metadata_init(&controllee->data);
+    TAILQ_INSERT_TAIL(&priv->controllees, controllee, entry);
+    priv->nb_controllees++;
+
+    /* Would notify changed event only if there are no other controllees. */
+    media_session_controllee_notify(priv, controllee, MEDIA_EVENT_CHANGED, 0, NULL);
     return controllee;
 }
 
@@ -183,22 +208,10 @@ void media_session_controllee_notify(MediaSessionPriv* priv,
     MediaControlleePriv* controllee, int event, int result, const char* extra)
 {
     MediaControllerPriv* controller;
-    bool most_active;
 
-    /* Only the most active controllee can notify. */
-    if (event == MEDIA_EVENT_STARTED && result == 0) {
-        most_active = true;
-        LIST_REMOVE(controllee, entry);
-        LIST_INSERT_HEAD(&priv->controllees, controllee, entry);
-    } else if (controllee == LIST_FIRST(&priv->controllees)) {
-        most_active = true;
-    } else {
-        most_active = false;
-    }
-
-    /* Broadcast notification to all controllers that cares. */
-    if (most_active) {
-        LIST_FOREACH(controller, &priv->controllers, entry)
+    /* Only most active controllee can broadcast notification to all controllers. */
+    if (controllee == TAILQ_FIRST(&priv->controllees)) {
+        TAILQ_FOREACH(controller, &priv->controllers, entry)
         {
             if (controller->event)
                 media_stub_notify_event(controller->cookie, event, result, extra);
@@ -210,23 +223,46 @@ void media_session_controllee_update(MediaSessionPriv* priv,
     MediaControlleePriv* controllee, const char* arg)
 {
     media_metadata_t diff;
+    int diff_flags;
 
     media_metadata_init(&diff);
     media_metadata_unserialize(&diff, arg);
-
-    /* Notify state change to controller. */
-    if ((diff.flags & MEDIA_METAFLAG_STATE) && diff.state != controllee->data.state)
-        media_session_controllee_notify(priv, controllee, diff.state, 0, NULL);
-
+    diff_flags = diff.flags;
     media_metadata_update(&controllee->data, &diff);
-    return;
+
+    /* Lastest playing controlee becomes the most active one. */
+    if (controllee == TAILQ_FIRST(&priv->controllees)) {
+        media_session_controllee_notify(priv, controllee,
+            MEDIA_EVENT_UPDATED, diff_flags, NULL);
+    } else if ((controllee->data.flags & MEDIA_METAFLAG_STATE)
+        && controllee->data.state > 0) {
+        TAILQ_REMOVE(&priv->controllees, controllee, entry);
+        TAILQ_INSERT_HEAD(&priv->controllees, controllee, entry);
+        media_session_controllee_notify(priv, controllee,
+            MEDIA_EVENT_CHANGED, diff_flags, NULL);
+    }
 }
 
-void media_session_controllee_unregister(MediaControlleePriv* controllee)
+void media_session_controllee_unregister(MediaSessionPriv* priv,
+    MediaControlleePriv* controllee)
 {
+    bool changed = controllee == TAILQ_FIRST(&priv->controllees);
+    int flags = 0;
+
     media_metadata_deinit(&controllee->data);
-    LIST_REMOVE(controllee, entry);
+    TAILQ_REMOVE(&priv->controllees, controllee, entry);
+    priv->nb_controllees--;
     free(controllee);
+
+    /* Notify changed event if most active controlee was unregistered. */
+    if (changed) {
+        controllee = TAILQ_FIRST(&priv->controllees);
+        if (controllee)
+            flags = controllee->data.flags;
+
+        media_session_controllee_notify(priv, controllee,
+            MEDIA_EVENT_CHANGED, flags, NULL);
+    }
 }
 
 /****************************************************************************
@@ -237,13 +273,12 @@ void* media_session_create(void* param)
 {
     MediaSessionPriv* priv;
 
-    (void)param;
-    priv = malloc(sizeof(MediaSessionPriv));
+    priv = zalloc(sizeof(MediaSessionPriv));
     if (!priv)
         return NULL;
 
-    LIST_INIT(&priv->controllers);
-    LIST_INIT(&priv->controllees);
+    TAILQ_INIT(&priv->controllers);
+    TAILQ_INIT(&priv->controllees);
     return priv;
 }
 
@@ -279,7 +314,7 @@ int media_session_handler(void* session, void* cookie, const char* target,
     if (controllee) {
         if (!strcmp(cmd, "unregister")) {
             media_stub_notify_finalize(&controllee->cookie);
-            media_session_controllee_unregister(controllee);
+            media_session_controllee_unregister(priv, controllee);
             return 0;
         }
 
@@ -308,7 +343,7 @@ int media_session_handler(void* session, void* cookie, const char* target,
     if (controller) {
         if (!strcmp(cmd, "close")) {
             media_stub_notify_finalize(&controller->cookie);
-            media_session_controller_close(controller);
+            media_session_controller_close(priv, controller);
             return 0;
         }
 

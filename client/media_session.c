@@ -31,12 +31,6 @@
 #include "media_proxy.h"
 
 /****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-#define MEDIA_IS_STATUS_CHANGE(x) ((x) < 200)
-
-/****************************************************************************
  * Private Types
  ****************************************************************************/
 
@@ -44,8 +38,8 @@ typedef struct MediaSessionPriv {
     MEDIA_COMMON_FIELDS
     void* cookie;
     media_event_callback event;
-    char* stream_type;
     media_metadata_t data;
+    bool need_query;
 } MediaSessionPriv;
 
 /****************************************************************************
@@ -56,7 +50,6 @@ static void media_release_cb(void* cookie)
 {
     MediaSessionPriv* priv = cookie;
 
-    free(priv->stream_type);
     free(priv->cpu);
     free(priv);
 }
@@ -68,26 +61,12 @@ static void media_event_cb(void* cookie, media_parcel* msg)
     int32_t event;
     int32_t ret;
 
-    if (priv->event) {
-        media_parcel_read_scanf(msg, "%i%i%s", &event, &ret, &extra);
+    media_parcel_read_scanf(msg, "%i%i%s", &event, &ret, &extra);
+    if (event == MEDIA_EVENT_CHANGED || event == MEDIA_EVENT_UPDATED)
+        priv->need_query = true;
+
+    if (priv->event)
         priv->event(priv->cookie, event, ret, extra);
-    }
-}
-
-static int media_get_proper_stream(void* handle, char* stream_type, int len)
-{
-    MediaSessionPriv* priv = handle;
-    int ret;
-
-    if (!handle)
-        return -EINVAL;
-
-    ret = media_proxy(MEDIA_ID_FOCUS,
-        NULL, NULL, "peek", NULL, 0, stream_type, len, false);
-    if (ret <= 0)
-        ret = snprintf(stream_type, len, "%s", priv->stream_type);
-
-    return ret;
 }
 
 /****************************************************************************
@@ -98,9 +77,6 @@ void* media_session_open(const char* params)
 {
     MediaSessionPriv* priv;
 
-    if (!params)
-        return NULL;
-
     priv = zalloc(sizeof(MediaSessionPriv));
     if (!priv)
         return NULL;
@@ -108,12 +84,9 @@ void* media_session_open(const char* params)
     if (media_proxy(MEDIA_ID_SESSION, priv, NULL, "open", params, 0, NULL, 0, false) < 0)
         goto err;
 
-    priv->stream_type = strdup(params);
-    if (!priv->stream_type)
-        goto err;
-
     media_metadata_init(&priv->data);
     media_proxy_set_release_cb(priv->proxy, media_release_cb, priv);
+    priv->need_query = true;
     return priv;
 
 err:
@@ -186,25 +159,28 @@ int media_session_stop(void* handle)
 int media_session_query(void* handle, const media_metadata_t** data)
 {
     MediaSessionPriv* priv = handle;
-    media_metadata_t diff;
     char tmp[256];
     int ret;
 
-    if (!handle)
+    if (!priv)
         return -EINVAL;
 
-    ret = media_proxy_once(handle, NULL, "query", NULL, 0, tmp, sizeof(tmp));
-    if (ret < 0)
-        return ret;
+    if (priv->need_query) {
+        ret = media_proxy_once(handle, NULL, "query", NULL, 0, tmp, sizeof(tmp));
+        if (ret < 0)
+            return ret;
 
-    media_metadata_init(&diff);
-    ret = media_metadata_unserialize(&diff, tmp);
-    if (ret < 0) {
-        media_metadata_deinit(&diff);
-        return ret;
+        media_metadata_reinit(&priv->data);
+        ret = media_metadata_unserialize(&priv->data, tmp);
+        if (ret < 0) {
+            media_metadata_deinit(&priv->data);
+            return ret;
+        }
+
+        if (priv->event)
+            priv->need_query = false;
     }
 
-    media_metadata_update(&priv->data, &diff);
     if (data)
         *data = &priv->data;
 
@@ -289,41 +265,21 @@ int media_session_get_volume(void* handle, int* volume)
 
 int media_session_set_volume(void* handle, int volume)
 {
-    char tmp[32];
-    int ret;
-
-    /* XXX: impl by event. */
-    ret = media_get_proper_stream(handle, tmp, sizeof(tmp));
-    if (ret < 0)
-        return ret;
-
-    return media_policy_set_stream_volume(tmp, volume);
+    /* TODO: to implement this api, we need:
+     * MEDIA_EVENT_SET_VOLUME
+     * MEDIA_METAFLAG_VOLUME_RANGE
+     */
+    return -ENOSYS;
 }
 
 int media_session_increase_volume(void* handle)
 {
-    char tmp[32];
-    int ret;
-
-    /* XXX: impl by event. */
-    ret = media_get_proper_stream(handle, tmp, sizeof(tmp));
-    if (ret < 0)
-        return ret;
-
-    return media_policy_increase_stream_volume(tmp);
+    return media_proxy_once(handle, NULL, "volumeup", NULL, 0, NULL, 0);
 }
 
 int media_session_decrease_volume(void* handle)
 {
-    char tmp[32];
-    int ret;
-
-    /* XXX: impl by event. */
-    ret = media_get_proper_stream(handle, tmp, sizeof(tmp));
-    if (ret < 0)
-        return ret;
-
-    return media_policy_decrease_stream_volume(tmp);
+    return media_proxy_once(handle, NULL, "volumedown", NULL, 0, NULL, 0);
 }
 
 int media_session_next_song(void* handle)
@@ -363,10 +319,6 @@ err:
 int media_session_notify(void* handle, int event, int result, const char* extra)
 {
     char tmp[64];
-
-    /* TODO: split MEDIA_EVENT to player, recorder, controller, controllee events. */
-    if (!MEDIA_IS_STATUS_CHANGE(event))
-        return -EINVAL;
 
     snprintf(tmp, sizeof(tmp), "%d:%d", event, result);
     return media_proxy_once(handle, extra, "event", tmp, 0, NULL, 0);

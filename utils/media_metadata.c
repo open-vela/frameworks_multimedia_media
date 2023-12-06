@@ -40,10 +40,16 @@ void media_metadata_deinit(media_metadata_t* data)
 {
     if (data) {
         free(data->title);
-        free(data->artist);
         data->title = NULL;
+        free(data->artist);
         data->artist = NULL;
     }
+}
+
+void media_metadata_reinit(media_metadata_t* data)
+{
+    media_metadata_deinit(data);
+    media_metadata_init(data);
 }
 
 void media_metadata_update(media_metadata_t* data, media_metadata_t* diff)
