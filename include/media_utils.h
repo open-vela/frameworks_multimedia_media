@@ -92,6 +92,16 @@ int media_dtmf_get_buffer_size(const char* numbers);
  */
 int media_dtmf_generate(const char* numbers, void* buffer);
 
+/**
+ * @brief Get event name.
+ *
+ * For example, media_event_get_name(MEDIA_EVENT_STARTED) returns "STARTED".
+ *
+ * @param event     MEDIA_EVENT_* .
+ * @return const char* Always a printable string.
+ */
+const char* media_event_get_name(int event);
+
 #undef EXTERN
 #ifdef __cplusplus
 }

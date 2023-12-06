@@ -25,72 +25,93 @@
  * Event Definitions
  ****************************************************************************/
 
-/* Status change */
+/****************************************************************************
+ * Stream State Machine
+ *
+ *     open
+ *       |
+ *       V
+ *  +---------+                         +----------+
+ *  |         | ------ prepare -------> |          |
+ *  | STOPPED | <------ stop ---------- | PREPARED |
+ *  |         | <----+                  |          |
+ *  +---------+       \                 +----------+
+ *    ^    ^         stop                       |
+ *    |    \           \                        |
+ *    |     \       +-----------+               |
+ *    |      \      |           |             start
+ *  stop      \     | COMPLETED | ----------+   |
+ *    |        \    |           | <----+    |   |
+ *    |         \   +-----------+       \  seek |
+ *    |          \                       \  |   |
+ *    |           \                       \ V   V
+ *  +---------+    \                    +---------+
+ *  |         |     +--- stop --------- |         |
+ *  | PAUSED  | <------ pause --------- | STARTED |
+ *  |         | ------- start --------> |         |
+ *  +---------+                         +---------+
+ *
+ ****************************************************************************/
 
 #define MEDIA_EVENT_NOP 0
+
+/* Stream status change, used by player&recorder. */
+
 #define MEDIA_EVENT_PREPARED 1
 #define MEDIA_EVENT_STARTED 2
 #define MEDIA_EVENT_PAUSED 3
 #define MEDIA_EVENT_STOPPED 4
-#define MEDIA_EVENT_SEEKED 5
+#define MEDIA_EVENT_SEEKED 5 /* SEEKED is not a state. */
 #define MEDIA_EVENT_COMPLETED 6
 
-/* Status change of client */
+/* Control message and its result, used by session. */
 
-#define MEDIA_EVENT_PREVED 100
-#define MEDIA_EVENT_NEXTED 101
-
-/* Control Message */
-
-#define MEDIA_EVENT_START 200
-#define MEDIA_EVENT_PAUSE 201
-#define MEDIA_EVENT_STOP 202
-#define MEDIA_EVENT_PREV 203
-#define MEDIA_EVENT_NEXT 204
+#define MEDIA_EVENT_CHANGED 101 /* Controllee changed (auto generate). */
+#define MEDIA_EVENT_UPDATED 102 /* Controllee updated (auto generate). */
+#define MEDIA_EVENT_START 103
+#define MEDIA_EVENT_PAUSE 104
+#define MEDIA_EVENT_STOP 105
+#define MEDIA_EVENT_PREV_SONG 106
+#define MEDIA_EVENT_NEXT_SONG 107
+#define MEDIA_EVENT_INCREASE_VOLUME 108
+#define MEDIA_EVENT_DECREASE_VOLUME 109
 
 /**
- * @brief Define a event-callback function pointer when media comes.
+ * @brief Callback to notify event to user.
  *
- * Notify some events back to users, such as MEDIA_EVENT_STARTED, which means
- * the av stream is successfully played.
+ * For player&recorder: events mean stream status change.
+ * For session: events mean control message and its result.
  *
- * @param[in] cookie Usr's private context.
- * @param[in] event  The type of current event, all macro definitions of
- *                   events are listed as following:
- *                   controller's callback can receive status-changed
- *                   notifications as events:
- *                   -   MEDIA_EVENT_NOP
- *                   -   MEDIA_EVENT_PREPARED
- *                   -   MEDIA_EVENT_STARTED
- *                   -   MEDIA_EVENT_PAUSED
- *                   -   MEDIA_EVENT_STOPPED
- *                   -   MEDIA_EVENT_SEEKED
- *                   -   MEDIA_EVENT_COMPLETED
- *                   -   MEDIA_EVENT_PREVED
- *                   -   MEDIA_EVENT_NEXTED
- *                  controllee's callback can receive control message as events:
- *                   -   MEDIA_EVENT_START
- *                   -   MEDIA_EVENT_PAUSE
- *                   -   MEDIA_EVENT_STOP
- *                   -   MEDIA_EVENT_PREV
- *                   -   MEDIA_EVENT_NEXT
- *                  player/recorder's can receive status-changed notifications
- *                  as events:
- *                   -   MEDIA_EVENT_PREPARED
- *                   -   MEDIA_EVENT_STARTED
- *                   -   MEDIA_EVENT_PAUSED
- *                   -   MEDIA_EVENT_STOPPED
- *                   -   MEDIA_EVENT_SEEKED
- *                   -   MEDIA_EVENT_COMPLETED
- * @param[in] ret   The result of this callback function
- * @param[in] extra Extra data needed to complete this callback function.
- * @note There is no playlist in the media framework,so PREVED/NEXTED will not be
- *       notified to player's callback, but the controllee user can actively notify PREVED/NEXTED
- *       to controller user through the media framework.
+ * @param[in] cookie    User's private context.
+ * @param[in] event     MEDIA_EVENT_* .
+ * @param[in] result    Result of the event.
+ * @param[in] extra     Extra message corresponding with event.
  *
+ * @note player, recorder, session use different event set.
  */
-typedef void (*media_event_callback)(void* cookie, int event, int ret,
+typedef void (*media_event_callback)(void* cookie, int event, int result,
     const char* extra);
+
+/****************************************************************************
+ * Metadata Definitions
+ ****************************************************************************/
+
+#define MEDIA_METAFLAG_STATE 1
+#define MEDIA_METAFLAG_VOLUME 2
+#define MEDIA_METAFLAG_POSITION 4
+#define MEDIA_METAFLAG_DURATION 8
+#define MEDIA_METAFLAG_TITLE 16
+#define MEDIA_METAFLAG_ARTIST 32
+
+typedef struct media_metadata_s {
+    int flags; /* Indicates available fields. */
+    int state; /* Positive for active; Zero for inactive; Negative for errno */
+    int volume;
+    unsigned position;
+    unsigned duration;
+    char* title;
+    char* artist;
+} media_metadata_t;
 
 /****************************************************************************
  * Async Callback Definitions
@@ -148,26 +169,5 @@ typedef void (*media_uv_string_callback)(void* cookie, int ret, const char* val)
  * @param[out] obj      Object.
  */
 typedef void (*media_uv_object_callback)(void* cookie, int ret, void* obj);
-
-/****************************************************************************
- * Metadata Definitions
- ****************************************************************************/
-
-#define MEDIA_METAFLAG_STATE 1
-#define MEDIA_METAFLAG_VOLUME 2
-#define MEDIA_METAFLAG_POSITION 4
-#define MEDIA_METAFLAG_DURATION 8
-#define MEDIA_METAFLAG_TITLE 16
-#define MEDIA_METAFLAG_ARTIST 32
-
-typedef struct media_metadata_s {
-    int flags; /* Indicates available fields. */
-    int state;
-    int volume;
-    unsigned position;
-    unsigned duration;
-    char* title;
-    char* artist;
-} media_metadata_t;
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H */

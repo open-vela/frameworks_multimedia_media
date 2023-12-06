@@ -25,6 +25,7 @@
 
 void media_metadata_init(media_metadata_t* data);
 void media_metadata_deinit(media_metadata_t* data);
+void media_metadata_reinit(media_metadata_t* data);
 void media_metadata_update(media_metadata_t* data, media_metadata_t* diff);
 int media_metadata_serialize(const media_metadata_t* data, char* base, int len);
 int media_metadata_unserialize(media_metadata_t* data, const char* str);

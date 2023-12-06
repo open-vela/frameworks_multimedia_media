@@ -207,122 +207,75 @@ GET_ARG_FUNC(string_t, arg)
     return arg;
 }
 
-static const char* mediatool_event2str(int event)
-{
-    if (event == MEDIA_EVENT_STARTED) {
-        return "MEDIA_EVENT_STARTED";
-    } else if (event == MEDIA_EVENT_STOPPED) {
-        return "MEDIA_EVENT_STOPPED";
-    } else if (event == MEDIA_EVENT_COMPLETED) {
-        return "MEDIA_EVENT_COMPLETED";
-    } else if (event == MEDIA_EVENT_PREPARED) {
-        return "MEDIA_EVENT_PREPARED";
-    } else if (event == MEDIA_EVENT_PAUSED) {
-        return "MEDIA_EVENT_PAUSED";
-    } else if (event == MEDIA_EVENT_PREVED) {
-        return "MEDIA_EVENT_PREVED";
-    } else if (event == MEDIA_EVENT_NEXTED) {
-        return "MEDIA_EVENT_NEXTED";
-    } else if (event == MEDIA_EVENT_START) {
-        return "MEDIA_EVENT_START";
-    } else if (event == MEDIA_EVENT_STOP) {
-        return "MEDIA_EVENT_STOP";
-    } else if (event == MEDIA_EVENT_PAUSE) {
-        return "MEDIA_EVENT_PAUSE";
-    } else if (event == MEDIA_EVENT_PREV) {
-        return "MEDIA_EVENT_PREV";
-    } else if (event == MEDIA_EVENT_NEXT) {
-        return "MEDIA_EVENT_NEXT";
-    } else {
-        return "NORMAL EVENT";
-    }
-}
-
 static void mediatool_controller_callback(void* cookie, int event,
-    int ret, const char* data)
+    int ret, const char* extra)
 {
     struct mediatool_chain_s* chain = cookie;
 
-    printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
-        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
+    printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
+        __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
 }
 
 static void mediatool_controllee_callback(void* cookie, int event,
-    int ret, const char* data)
+    int ret, const char* extra)
 {
     struct mediatool_chain_s* chain = cookie;
 
-    printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
-        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
+    printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
+        __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
 
     /* Assume we've done real work and notify the result. */
-    switch (event) {
-    case MEDIA_EVENT_START:
-        media_session_notify(chain->handle, MEDIA_EVENT_STARTED, 0, NULL);
-        break;
-
-    case MEDIA_EVENT_PAUSE:
-        media_session_notify(chain->handle, MEDIA_EVENT_PAUSED, 0, NULL);
-        break;
-
-    case MEDIA_EVENT_STOP:
-        media_session_notify(chain->handle, MEDIA_EVENT_STOPPED, 0, NULL);
-        break;
-
-    case MEDIA_EVENT_PREV:
-        media_session_notify(chain->handle, MEDIA_EVENT_PREVED, 0, NULL);
-        break;
-
-    case MEDIA_EVENT_NEXT:
-        media_session_notify(chain->handle, MEDIA_EVENT_NEXTED, 0, NULL);
-        break;
-    }
+    media_session_notify(chain->handle, event, 0, "fake");
 }
 
 static void mediatool_controllee_music_callback(void* cookie, int event,
-    int ret, const char* data)
+    int ret, const char* extra)
 {
     struct mediatool_chain_s* chain = cookie;
 
-    printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
-        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
+    printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
+        __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
 
+    /* Handle control message by media api. */
     switch (event) {
-    /* Do real work by player api. */
     case MEDIA_EVENT_START:
-        media_player_start(chain->handle);
+        ret = media_player_start(chain->handle);
         break;
 
     case MEDIA_EVENT_PAUSE:
-        media_player_pause(chain->handle);
+        ret = media_player_pause(chain->handle);
         break;
 
     case MEDIA_EVENT_STOP:
-        media_player_stop(chain->handle);
+        ret = media_player_stop(chain->handle);
         break;
 
-    /* Assume we've done real work and notify the result. */
-    case MEDIA_EVENT_PREV:
-        media_session_notify(chain->handle, MEDIA_EVENT_PREVED, 0, NULL);
+    case MEDIA_EVENT_INCREASE_VOLUME:
+        ret = media_policy_decrease_stream_volume(MEDIA_STREAM_MUSIC);
         break;
 
-    case MEDIA_EVENT_NEXT:
-        media_session_notify(chain->handle, MEDIA_EVENT_NEXTED, 0, NULL);
+    case MEDIA_EVENT_DECREASE_VOLUME:
+        ret = media_policy_increase_stream_volume(MEDIA_STREAM_MUSIC);
+        break;
+
+    default:
+        /* There is no song list in this demo. */
+        ret = -ENOSYS;
         break;
     }
+
+    /* XXX: Another implemention for some status control message,
+     * notify after received corresponding event from player's event callback */
+    media_session_notify(chain->handle, event, ret, NULL);
 }
 
 static void mediatool_event_callback(void* cookie, int event,
-    int ret, const char* data)
+    int ret, const char* extra)
 {
     struct mediatool_chain_s* chain = cookie;
 
-    printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
-        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
-
-    /* For player with controllee registered, notify event to session. */
-    if (chain->extra)
-        media_session_notify(chain->extra, event, ret, data);
+    printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
+        __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
 }
 
 static void mediatool_focus_callback(int suggestion, void* cookie)
@@ -428,6 +381,20 @@ static void mediatool_uv_common_get_volume_cb(void* cookie, int ret, float volum
     struct mediatool_chain_s* chain = cookie;
 
     printf("[%s] id:%d ret:%d val:%f\n", __func__, chain->id, ret, volume);
+}
+
+static void mediatool_uv_common_increase_volume_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_common_decrease_volume_cb(void* cookie, int ret)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_set_volume_cb(void* cookie, int ret)
@@ -1181,6 +1148,18 @@ CMD2(volume, int, id, string_t, volume_cmd)
                 mediatool_uv_common_set_volume_cb, &media->chain[id]);
         }
         break;
+
+    case MEDIATOOL_UVCONTROLLER:
+        if ((ptr = strchr(volume_cmd, '?')))
+            ret = -ENOSYS;
+        else if ((ptr = strchr(volume_cmd, '+')))
+            ret = media_uv_session_increase_volume(media->chain[id].handle,
+                mediatool_uv_common_increase_volume_cb, &media->chain[id]);
+        else if ((ptr = strchr(volume_cmd, '-')))
+            ret = media_uv_session_decrease_volume(media->chain[id].handle,
+                mediatool_uv_common_decrease_volume_cb, &media->chain[id]);
+        else
+            ret = -ENOSYS;
 #endif
 
     case MEDIATOOL_RECORDER:
@@ -1707,31 +1686,11 @@ static void mediatool_uv_controllee_callback(void* cookie, int event,
 {
     struct mediatool_chain_s* chain = cookie;
 
-    printf("%s, id %d, event %s, event %d, ret %d, line %d\n",
-        __func__, chain->id, mediatool_event2str(event), event, ret, __LINE__);
+    printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
+        __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
 
     /* Assume we've done real work and notify the result. */
-    switch (event) {
-    case MEDIA_EVENT_START:
-        media_uv_session_notify(chain->handle, MEDIA_EVENT_STARTED, 0, NULL);
-        break;
-
-    case MEDIA_EVENT_PAUSE:
-        media_uv_session_notify(chain->handle, MEDIA_EVENT_PAUSED, 0, NULL);
-        break;
-
-    case MEDIA_EVENT_STOP:
-        media_uv_session_notify(chain->handle, MEDIA_EVENT_STOPPED, 0, NULL);
-        break;
-
-    case MEDIA_EVENT_PREV:
-        media_uv_session_notify(chain->handle, MEDIA_EVENT_PREVED, 0, NULL);
-        break;
-
-    case MEDIA_EVENT_NEXT:
-        media_uv_session_notify(chain->handle, MEDIA_EVENT_NEXTED, 0, NULL);
-        break;
-    }
+    media_uv_session_notify(chain->handle, event, 0, "fake", NULL, NULL);
 }
 
 CMD1(uv_session_register, string_t, param)
