@@ -41,7 +41,7 @@ extern "C" {
 
 /**
  * Open a session path as controller.
- * @param[in] params    Stream type, use MEDIA_STREAM_*.
+ * @param[in] params    Not used yet.
  * @return Pointer to created handle or NULL on failure.
  */
 void* media_session_open(const char* params);
@@ -457,11 +457,12 @@ int media_uv_session_unregister(void* handle, media_uv_callback on_release);
  * @param[in] event     Event to notify.
  * @param[in] result    Result of event, usually zero on success, negative errno on failure.
  * @param[in] extra     Extra string message of event, NULL if not need.
- * @return int      Zero on success, negative errno on failure.
- *
- * @deprecated Should use `media_uv_session_update` instead.
+ * @param[in] on_notify Callback to acknowledge notify is done.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success, negative errno on failure.
  */
-int media_uv_session_notify(void* handle, int event, int result, const char* extra);
+int media_uv_session_notify(void* handle, int event, int result, const char* extra,
+    media_uv_callback on_notify, void* cookie);
 
 /**
  * @brief Update metadata to session, would notify controllers in need.
@@ -470,7 +471,7 @@ int media_uv_session_notify(void* handle, int event, int result, const char* ext
  * @param[in] data      Metadata to update.
  * @param[in] on_update Callback to acknowledge update is done.
  * @param[in] cookie    Callback argument.
- * @return int Zero on success, negative errno on failure.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_session_update(void* handle, const media_metadata_t* data,
     media_uv_callback on_update, void* cookie);
