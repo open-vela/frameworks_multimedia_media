@@ -33,7 +33,23 @@
  * Private Functions
  ****************************************************************************/
 
-static int media_parcel_grow(media_parcel* parcel, size_t cursz, size_t newsz)
+static int media_parcel_copy(media_parcel* parcel, void* val, size_t size)
+{
+    if (parcel->next + size > parcel->chunk->len)
+        return -ENOSPC;
+
+    if (val)
+        memcpy(val, &parcel->chunk->buf[parcel->next], size);
+
+    parcel->next += size;
+    return 0;
+}
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+int media_parcel_grow(media_parcel* parcel, size_t cursz, size_t newsz)
 {
     media_parcel_chunk* newchunk;
 
@@ -61,22 +77,6 @@ static int media_parcel_grow(media_parcel* parcel, size_t cursz, size_t newsz)
     parcel->cap = newsz;
     return 0;
 }
-
-static int media_parcel_copy(media_parcel* parcel, void* val, size_t size)
-{
-    if (parcel->next + size > parcel->chunk->len)
-        return -ENOSPC;
-
-    if (val)
-        memcpy(val, &parcel->chunk->buf[parcel->next], size);
-
-    parcel->next += size;
-    return 0;
-}
-
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 
 void media_parcel_init(media_parcel* parcel)
 {
@@ -118,11 +118,6 @@ int media_parcel_clone(media_parcel* dst, const media_parcel* src)
     }
 
     return 0;
-}
-
-bool media_parcel_completed(media_parcel* parcel, size_t offset)
-{
-    return MEDIA_PARCEL_HEADER_LEN + parcel->chunk->len == offset;
 }
 
 int media_parcel_append(media_parcel* parcel, const void* data, size_t size)

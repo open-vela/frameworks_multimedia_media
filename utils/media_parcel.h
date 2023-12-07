@@ -22,7 +22,6 @@
 #define __FRAMEWORKS_MEDIA_UTILS_MEDIA_PARCEL_H
 
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -56,7 +55,7 @@ void media_parcel_init(media_parcel* parcel);
 void media_parcel_deinit(media_parcel* parcel);
 void media_parcel_reinit(media_parcel* parcel);
 int media_parcel_clone(media_parcel* dst, const media_parcel* src);
-bool media_parcel_completed(media_parcel* parcel, size_t offset);
+int media_parcel_grow(media_parcel* parcel, size_t cursz, size_t newsz);
 
 int media_parcel_append(media_parcel* parcel, const void* data, size_t size);
 int media_parcel_append_uint8(media_parcel* parcel, uint8_t val);
