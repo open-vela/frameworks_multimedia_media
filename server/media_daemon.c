@@ -27,9 +27,9 @@
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
+#include "media_log.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -191,8 +191,7 @@ int main(int argc, char* argv[])
         g_media[i].handle = g_media[i].create(g_media[i].param);
         if (!g_media[i].handle) {
             free(priv);
-            syslog(LOG_ERR, "%s, %s create failed\n",
-                __func__, g_media[i].name);
+            MEDIA_ERR("%s create failed\n", g_media[i].name);
             return -EINVAL;
         }
     }
@@ -205,8 +204,7 @@ int main(int argc, char* argv[])
             ret = g_media[i].get(g_media[i].handle, &priv->fds[n],
                 &priv->ctx[n], MAX_POLLFDS - n);
             if (ret < 0) {
-                syslog(LOG_ERR, "%s, %s get_pollfds failed\n",
-                    __func__, g_media[i].name);
+                MEDIA_ERR("%s get_pollfds failed\n", g_media[i].name);
                 continue;
             }
 
@@ -225,8 +223,8 @@ int main(int argc, char* argv[])
             ret = g_media[priv->idx[i]].available(g_media[priv->idx[i]].handle,
                 &priv->fds[i], priv->ctx[i]);
             if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
-                syslog(LOG_ERR, "%s, %s poll_available failed %d\n",
-                    __func__, g_media[priv->idx[i]].name, ret);
+                MEDIA_ERR("%s poll_available failed %d\n",
+                    g_media[priv->idx[i]].name, ret);
         }
 
         for (i = 0; i < ARRAY_SIZE(g_media); i++) {
@@ -235,7 +233,7 @@ int main(int argc, char* argv[])
 
             ret = g_media[i].run_once(g_media[i].handle);
             if (ret < 0)
-                syslog(LOG_ERR, "%s, %s run_once failed\n", __func__, g_media[i].name);
+                MEDIA_ERR("%s run_once failed\n", g_media[i].name);
         }
     }
 

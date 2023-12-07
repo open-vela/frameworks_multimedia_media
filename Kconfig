@@ -9,15 +9,31 @@ config MEDIA
 
 if MEDIA
 
-config MEDIA_DEBUG
-	bool "Enable media debug log"
-	default n
+choice
+	prompt "MEDIA log level"
+	default MEDIA_LOG_INFO
+
+config MEDIA_LOG_DEBUG
+	bool "MEDIA_LOG_DEBUG"
+
+config MEDIA_LOG_INFO
+	bool "MEDIA_LOG_INFO"
+
+config MEDIA_LOG_WARN
+	bool "MEDIA_LOG_WARN"
+
+config MEDIA_LOG_ERR
+	bool "MEDIA_LOG_ERR"
+
+config MEDIA_LOG_SLIENT
+	bool "MEDIA_LOG_SLIENT"
+
+endchoice
 
 config MEDIA_SERVER
 	bool "Enable media server"
 	default n
 	depends on EVENT_FD
-
 
 if MEDIA_SERVER
 

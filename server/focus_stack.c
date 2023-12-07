@@ -25,9 +25,9 @@
 #include <nuttx/list.h>
 #include <pthread.h>
 #include <stdlib.h>
-#include <syslog.h>
 
 #include "focus_stack.h"
+#include "media_log.h"
 
 /****************************************************************************
  * Private Types
@@ -448,18 +448,18 @@ void app_focus_stack_display(void* x)
     app_focus_stack* s = (app_focus_stack*)x;
     struct app_focus_node* p_tmp_node;
 
-    syslog(LOG_INFO, "current size of stack: %d\n", s->cur_size);
+    MEDIA_INFO("current size of stack: %d\n", s->cur_size);
     list_for_every_entry(&s->head_node,
         p_tmp_node,
         struct app_focus_node,
         node)
     {
-        syslog(LOG_INFO, "Request client id: %d, "
-                         "focus level: %d, "
-                         "thread id: %d, "
-                         "focus state: %d, "
-                         "focus callback: %p, "
-                         "callback arg: %p\n",
+        MEDIA_INFO("Request client id: %d, "
+                   "focus level: %d, "
+                   "thread id: %d, "
+                   "focus state: %d, "
+                   "focus callback: %p, "
+                   "callback arg: %p\n",
             p_tmp_node->focus_id.client_id,
             p_tmp_node->focus_id.focus_level,
             p_tmp_node->focus_id.thread_id,
