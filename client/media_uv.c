@@ -366,39 +366,42 @@ err:
 static void media_uv_alloc_cb(uv_handle_t* handle,
     size_t suggested_size, uv_buf_t* buf)
 {
-    buf->base = malloc(suggested_size);
-    buf->len = suggested_size;
+    MediaPipePriv* pipe = uv_handle_get_data(handle);
+
+    buf->base = (char*)pipe->parcel.chunk + pipe->offset;
+    if (pipe->offset < MEDIA_PARCEL_HEADER_LEN)
+        buf->len = MEDIA_PARCEL_HEADER_LEN - pipe->offset;
+    else
+        buf->len = MEDIA_PARCEL_HEADER_LEN + pipe->parcel.chunk->len - pipe->offset;
 }
 
 static void media_uv_read_cb(uv_stream_t* stream, ssize_t ret,
     const uv_buf_t* buf)
 {
     MediaPipePriv* pipe = uv_handle_get_data((uv_handle_t*)stream);
-    char* pos = buf->base;
-    size_t len = ret;
+
+    if (ret == 0)
+        return;
 
     if (ret < 0)
         goto err;
 
-    do {
-        ret = media_parcel_recvfrom(&pipe->parcel, &pipe->offset, pos, len);
+    pipe->offset += ret;
+    if (pipe->offset == MEDIA_PARCEL_HEADER_LEN) {
+        ret = media_parcel_grow(&pipe->parcel, 0, pipe->parcel.chunk->len);
+        if (ret < 0)
+            goto err;
+    }
+
+    if (MEDIA_PARCEL_HEADER_LEN + pipe->parcel.chunk->len == pipe->offset) {
+        ret = media_uv_handle_parcel(pipe);
         if (ret < 0)
             goto err;
 
-        pos += ret;
-        len -= ret;
+        media_parcel_reinit(&pipe->parcel);
+        pipe->offset = 0;
+    }
 
-        if (media_parcel_completed(&pipe->parcel, pipe->offset)) {
-            ret = media_uv_handle_parcel(pipe);
-            if (ret < 0)
-                goto err;
-
-            media_parcel_reinit(&pipe->parcel);
-            pipe->offset = 0;
-        }
-    } while (len > 0);
-
-    free(buf->base);
     return;
 
 err:
@@ -406,7 +409,6 @@ err:
         MEDIA_ERR("ret:%d\n", ret);
 
     media_uv_close(pipe);
-    free(buf->base);
 }
 
 /**
