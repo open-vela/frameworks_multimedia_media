@@ -32,6 +32,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#include "media_log.h"
 #include "media_proxy.h"
 #include "media_server.h"
 
@@ -140,7 +141,7 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
         return -EINVAL;
 
     if (fd->revents & POLLERR) {
-        MEDIA_LOG(LOG_DEBUG, "[%s][%d] fd:%d revent:%d\n", __func__, __LINE__, fd->fd, (int)fd->revents);
+        MEDIA_DEBUG("fd:%d revent:%d\n", fd->fd, (int)fd->revents);
         media_server_conn_close(conn);
         return 0;
     }
@@ -175,7 +176,7 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
     }
 
     if (fd->revents & POLLHUP) {
-        MEDIA_LOG(LOG_DEBUG, "[%s][%d] fd:%d revent:%d\n", __func__, __LINE__, fd->fd, (int)fd->revents);
+        MEDIA_DEBUG("fd:%d revent:%d\n", fd->fd, (int)fd->revents);
         media_server_conn_close(conn);
         return 0;
     }

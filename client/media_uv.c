@@ -26,6 +26,7 @@
 #include <sys/queue.h>
 #include <uv.h>
 
+#include "media_log.h"
 #include "media_proxy.h"
 #include "media_uv.h"
 
@@ -40,11 +41,11 @@
 
 #define MEDIA_CPU_DELIM " ,;\t\n"
 
-#define MEDIA_TRACE(proxy_)                                           \
-    do {                                                              \
-        MEDIA_LOG(LOG_DEBUG, "[%s][%d] p:%p c:%p e:%p f:%d q:%d/%d",  \
-            __func__, __LINE__, proxy_, proxy_->cpipe, proxy_->epipe, \
-            proxy_->flags, proxy_->nb_pendq, proxy_->nb_sentq);       \
+#define MEDIA_DEBUG_PROXY(proxy_)                               \
+    do {                                                        \
+        MEDIA_DEBUG("p:%p c:%p e:%p f:%d q:%d/%d",              \
+            proxy_, proxy_->cpipe, proxy_->epipe,               \
+            proxy_->flags, proxy_->nb_pendq, proxy_->nb_sentq); \
     } while (0)
 
 /****************************************************************************
@@ -199,7 +200,7 @@ static void media_uv_free_proxy(MediaProxyPriv* proxy)
 {
     MediaWritePriv* writing;
 
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     if (proxy->cpipe || proxy->epipe)
         return; /* Sockets still active. */
 
@@ -221,7 +222,7 @@ static void media_uv_close_cb(uv_handle_t* handle)
     MediaPipePriv* pipe = uv_handle_get_data(handle);
     MediaProxyPriv* proxy = pipe->proxy;
 
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     if (pipe == proxy->cpipe)
         proxy->cpipe = NULL;
     else if (pipe == proxy->epipe)
@@ -253,7 +254,7 @@ static void media_uv_shutdown(MediaPipePriv* pipe)
 {
     uv_shutdown_t* req;
 
-    MEDIA_TRACE(pipe->proxy);
+    MEDIA_DEBUG_PROXY(pipe->proxy);
     req = zalloc(sizeof(uv_shutdown_t));
     if (!req)
         return;
@@ -265,7 +266,7 @@ static void media_uv_reconnect_one(MediaProxyPriv* proxy)
 {
     int ret = -ENOENT;
 
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     if (proxy->cpipe)
         media_uv_close(proxy->cpipe);
 
@@ -288,7 +289,7 @@ static void media_uv_connect_one_cb(uv_connect_t* req, int status)
     MediaProxyPriv* proxy = pipe->proxy;
     int flags;
 
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     free(req);
 
     /* Cancel the connect on error and user's cancelation */
@@ -352,12 +353,12 @@ static int media_uv_connect_one(MediaProxyPriv* proxy)
 #endif
     }
 
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     return 0;
 
 err:
     free(req);
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     proxy->on_connect(proxy->cookie, ret);
     return ret;
 }
@@ -402,7 +403,7 @@ static void media_uv_read_cb(uv_stream_t* stream, ssize_t ret,
 
 err:
     if (ret != UV_EOF)
-        syslog(LOG_ERR, "[%s][%d] ret:%d\n", __func__, __LINE__, ret);
+        MEDIA_ERR("ret:%d\n", ret);
 
     media_uv_close(pipe);
     free(buf->base);
@@ -584,7 +585,7 @@ static void media_uv_listen_one_cb(uv_stream_t* stream, int ret)
     media_uv_close(server);
     media_uv_delivery_writing(proxy);
     uv_read_start((uv_stream_t*)&proxy->epipe->handle, media_uv_alloc_cb, media_uv_read_cb);
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     if (proxy->on_listen)
         proxy->on_listen(proxy->cookie, ret);
 
@@ -595,7 +596,7 @@ err2:
 
 err1:
     media_uv_close(server);
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     if (proxy->on_listen)
         proxy->on_listen(proxy->cookie, ret);
 }
@@ -635,14 +636,14 @@ static int media_uv_listen_one(MediaProxyPriv* proxy)
         goto err2;
 
     proxy->flags |= MEDIA_FLAG_LISTENING;
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     return ret;
 
 err2:
     media_uv_close(proxy->epipe);
 
 err1:
-    MEDIA_TRACE(proxy);
+    MEDIA_DEBUG_PROXY(proxy);
     if (proxy->on_listen)
         proxy->on_listen(proxy->cookie, ret);
 

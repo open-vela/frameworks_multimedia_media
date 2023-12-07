@@ -33,8 +33,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
-#include <syslog.h>
 
+#include "media_log.h"
 #include "media_proxy.h"
 #include "media_server.h"
 
@@ -242,7 +242,7 @@ int media_policy_handler(void* policy, const char* name, const char* cmd,
             return 0;
     } else if (!strcmp(cmd, "dump")) {
         dump = pfw_dump(policy);
-        syslog(LOG_INFO, "\n%s", dump);
+        MEDIA_INFO("\n%s", dump);
         free(dump);
         return 0;
     }

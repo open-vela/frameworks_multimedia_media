@@ -39,6 +39,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "media_log.h"
 #include "media_proxy.h"
 #include "media_server.h"
 
@@ -604,7 +605,7 @@ int media_graph_handler(void* graph, const char* target, const char* cmd,
     if (!target && !strcmp(cmd, "dump")) {
         dump = avfilter_graph_dump_ext(priv->graph, arg);
         if (dump)
-            syslog(LOG_INFO, "\n%s\n", dump);
+            MEDIA_INFO("\n%s\n", dump);
 
         free(dump);
         return 0;

@@ -30,6 +30,7 @@
 #include <sys/queue.h>
 #include <uv.h>
 
+#include "media_log.h"
 #include "media_metadata.h"
 #include "media_policy.h"
 #include "media_proxy.h"
@@ -169,7 +170,7 @@ static void media_uv_stream_open_cb(void* cookie, int ret)
     if (ret < 0)
         media_uv_reconnect(priv->proxy);
     else {
-        syslog(LOG_INFO, "open:%s result:%d handle:%p\n", priv->name, ret, priv);
+        MEDIA_INFO("open:%s result:%d handle:%p\n", priv->name, ret, priv);
         if (priv->on_open)
             priv->on_open(priv->cookie, ret);
     }
@@ -316,7 +317,7 @@ static void media_uv_stream_listen_close_cb(uv_handle_t* handle)
  */
 static void media_uv_stream_listen_remove(MediaListenPriv* listener)
 {
-    MEDIA_LOG(LOG_DEBUG, "[%s] listener:%p\n", __func__, listener);
+    MEDIA_DEBUG("listener:%p\n", listener);
     LIST_REMOVE(listener, entry);
     uv_close((uv_handle_t*)&listener->pipe, media_uv_stream_listen_close_cb);
 }
@@ -337,7 +338,7 @@ static MediaListenPriv* media_uv_stream_listen_add(MediaStreamPriv* priv)
         return NULL;
     }
 
-    MEDIA_LOG(LOG_DEBUG, "[%s] stream:%p listener:%p\n", __func__, priv, listener);
+    MEDIA_DEBUG("stream:%p listener:%p\n", priv, listener);
     LIST_INSERT_HEAD(&priv->listeners, listener, entry);
     priv->nb_listener++;
     listener->priv = priv;
@@ -412,7 +413,7 @@ static void media_uv_stream_listen_connection_cb(uv_stream_t* stream, int ret)
         return;
     }
 
-    MEDIA_LOG(LOG_DEBUG, "[%s] listener:%p accept:%p\n", __func__, listener, priv->pipe);
+    MEDIA_DEBUG("listener:%p accept:%p\n", listener, priv->pipe);
     media_uv_stream_listen_clear(priv, listener); /* Clear redundant listeners. */
     if (!priv->on_connection) {
         media_uv_stream_close_pipe(priv);
@@ -558,8 +559,7 @@ static void media_uv_player_suggest_cb(int suggest, void* cookie)
 {
     MediaPlayerPriv* priv = cookie;
 
-    syslog(LOG_INFO, "[%s] player:%s:%p suggest:%d\n",
-        __func__, priv->name, priv, suggest);
+    MEDIA_INFO("player:%s:%p suggest:%d\n", priv->name, priv, suggest);
     switch (suggest) {
     case MEDIA_FOCUS_PLAY:
         priv->suggest_active = true;
@@ -924,8 +924,7 @@ static void media_uv_recorder_suggest_cb(int suggest, void* cookie)
 {
     MediaRecorderPriv* priv = cookie;
 
-    syslog(LOG_INFO, "[%s] recorder:%s:%p suggest:%d\n",
-        __func__, priv->name, priv, suggest);
+    MEDIA_INFO("recorder:%s:%p suggest:%d\n", priv->name, priv, suggest);
     switch (suggest) {
     case MEDIA_FOCUS_PLAY:
     case MEDIA_FOCUS_PLAY_BUT_SILENT:

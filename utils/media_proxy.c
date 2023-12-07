@@ -31,6 +31,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#include "media_log.h"
 #include "media_proxy.h"
 
 /****************************************************************************
@@ -364,7 +365,6 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
     const char* response;
     int ret = -EINVAL;
     int32_t resp = 0;
-    const char* name;
 
     if (!priv || !priv->proxy)
         return ret;
@@ -374,43 +374,36 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
 
     switch (priv->type) {
     case MEDIA_ID_FOCUS:
-        name = "focus";
         ret = media_parcel_append_printf(&in, "%i%s%s%i", priv->type,
             target, cmd, res_len);
         break;
 
     case MEDIA_ID_GRAPH:
-        name = "graph";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
             target, cmd, arg, res_len);
         break;
 
     case MEDIA_ID_POLICY:
-        name = "policy";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i%i", priv->type,
             target, cmd, arg, apply, res_len);
         break;
 
     case MEDIA_ID_PLAYER:
-        name = "player";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
             target, cmd, arg, res_len);
         break;
 
     case MEDIA_ID_RECORDER:
-        name = "recorder";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
             target, cmd, arg, res_len);
         break;
 
     case MEDIA_ID_SESSION:
-        name = "session";
         ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
             target, cmd, arg, res_len);
         break;
 
     default:
-        name = "none";
         goto out;
     }
 
@@ -428,14 +421,14 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
     if (res_len > 0)
         strlcpy(res, response, res_len);
     else if (response && strlen(response) > 0)
-        syslog(LOG_INFO, "\n%s\n", response);
+        MEDIA_INFO("\n%s\n", response);
 
 out:
     media_parcel_deinit(&in);
     media_parcel_deinit(&out);
 
-    syslog(LOG_INFO, "%s:%s:%p %s %s %s %s ret:%d resp:%d\n",
-        name, priv->cpu, (void*)(uintptr_t)priv, target ? target : "_",
+    MEDIA_INFO("%s:%s:%p %s %s %s %s ret:%d resp:%d\n",
+        media_id_get_name(priv->type), priv->cpu, (void*)(uintptr_t)priv, target ? target : "_",
         cmd, arg ? arg : "_", apply ? "apply" : "_", ret, (int)resp);
     return ret < 0 ? ret : resp;
 }

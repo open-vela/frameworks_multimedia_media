@@ -26,7 +26,6 @@
  ****************************************************************************/
 
 #include <stdbool.h>
-#include <syslog.h>
 
 #include "media_parcel.h"
 
@@ -37,13 +36,6 @@ extern "C" {
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-/* Debug log definition. */
-#ifdef CONFIG_MEDIA_DEBUG
-#define MEDIA_LOG(level, fmt, args...) syslog(level, fmt, args)
-#else
-#define MEDIA_LOG(level, fmt, args...)
-#endif
 
 /* RPC definitions. */
 #define MEDIA_SOCKADDR_NAME "md:%s"
@@ -137,6 +129,16 @@ int media_proxy(int id, void* handle, const char* target, const char* cmd,
     const char* arg, int apply, char* res, int res_len, bool remote);
 
 void media_default_release_cb(void* handle);
+
+/**
+ * @brief Get id name.
+ *
+ * For example, media_id_get_name(MEDIA_ID_GRAPH) returns "graph".
+ *
+ * @param id     MEDIA_ID_* .
+ * @return const char* Always a printable string.
+ */
+const char* media_id_get_name(int id);
 
 #ifdef __cplusplus
 }

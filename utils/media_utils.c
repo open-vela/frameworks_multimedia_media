@@ -25,6 +25,8 @@
 #include <media_event.h>
 #include <media_utils.h>
 
+#include "media_proxy.h"
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -66,5 +68,25 @@ const char* media_event_get_name(int event)
         return "DECREASE_VOLUME";
     default:
         return "UNKOWN";
+    }
+}
+
+const char* media_id_get_name(int id)
+{
+    switch (id) {
+    case MEDIA_ID_GRAPH:
+        return "graph";
+    case MEDIA_ID_POLICY:
+        return "policy";
+    case MEDIA_ID_PLAYER:
+        return "player";
+    case MEDIA_ID_RECORDER:
+        return "recorder";
+    case MEDIA_ID_SESSION:
+        return "session";
+    case MEDIA_ID_FOCUS:
+        return "focus";
+    default:
+        return "none";
     }
 }

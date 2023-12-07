@@ -26,6 +26,7 @@
 #include <media_session.h>
 #include <stdio.h>
 
+#include "media_log.h"
 #include "media_metadata.h"
 #include "media_proxy.h"
 #include "media_uv.h"
@@ -172,8 +173,7 @@ static void media_uv_controller_open_cb(void* cookie, int ret)
     if (ret < 0)
         media_uv_reconnect(priv->proxy);
     else {
-        syslog(LOG_INFO, "[%s][%d] result:%d handle:%p\n",
-            __func__, __LINE__, ret, priv);
+        MEDIA_INFO("result:%d handle:%p\n", ret, priv);
         if (priv->on_open)
             priv->on_open(priv->cookie, ret);
     }
