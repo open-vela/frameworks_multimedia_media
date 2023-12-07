@@ -96,12 +96,12 @@ typedef void (*media_event_callback)(void* cookie, int event, int result,
  * Metadata Definitions
  ****************************************************************************/
 
-#define MEDIA_METAFLAG_STATE 1
-#define MEDIA_METAFLAG_VOLUME 2
-#define MEDIA_METAFLAG_POSITION 4
-#define MEDIA_METAFLAG_DURATION 8
-#define MEDIA_METAFLAG_TITLE 16
-#define MEDIA_METAFLAG_ARTIST 32
+#define MEDIA_METAFLAG_STATE 0x1
+#define MEDIA_METAFLAG_VOLUME 0x2
+#define MEDIA_METAFLAG_POSITION 0x4
+#define MEDIA_METAFLAG_DURATION 0x8
+#define MEDIA_METAFLAG_TITLE 0x10
+#define MEDIA_METAFLAG_ARTIST 0x20
 
 typedef struct media_metadata_s {
     int flags; /* Indicates available fields. */
