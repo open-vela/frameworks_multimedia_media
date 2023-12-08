@@ -341,7 +341,7 @@ int media_uv_session_get_volume(void* handle,
     return -ENOSYS;
 }
 
-int media_uv_session_set_volume(void* handle, unsigned int* volume,
+int media_uv_session_set_volume(void* handle, int volume,
     media_uv_callback on_volume, void* cookie)
 {
     return -ENOSYS; /* TODO: impl by event. */

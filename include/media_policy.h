@@ -49,6 +49,7 @@ extern "C" {
 #define MEDIA_DEVICE_MIC "mic"
 #define MEDIA_DEVICE_MODEM "modem"
 
+/* @deprecated */
 #define MEDIA_SAMPLERATE_8000 "8000"
 #define MEDIA_SAMPLERATE_16000 "16000"
 #define MEDIA_SAMPLERATE_22050 "22050"
@@ -58,139 +59,137 @@ extern "C" {
 #define MEDIA_SAMPLERATE_96000 "96000"
 #define MEDIA_SAMPLERATE_192000 "192000"
 
-/*
- * @code HFP telephony app example.
- *  // 1. On init, you should request audio focus as telephone APP.
- *  focus_handle = media_focus_request(&first_suggest, MEDIA_STREAM_SCO, cb, cookie);
- *
- *  // 2. Then you should set audio mode to RINGTONE or PHONE,
- *  //    and you should always set mode before setting devices.
- *  ret = media_policy_set_audio_mode(MEDIA_MODE_RINGTONE);
- *
- *  // 3. Then you should choose the devices to use,
- *  //    Under different audio mode, same devices has different meaning,
- *  //    here under PHONE mode, SCO is for hfp.
- *  ret = media_policy_set_devices_use(MEDIA_DEVICE_SCO);
- *
- *  // 4. Do your work.
- *
- *  // 5. On exit, you should restore the devices status,
- *  //    and set audio mode back to NORMAL.
- *  ret = media_policy_set_devices_unuse(MEDIA_DEVICE_SCO);
- *  ret = media_policy_set_audio_mode(MEDIA_MODE_NORMAL);
- * @endcode
- *
- * @code btsco monitor example.
- *  // update media policy when status of btsco changed;
- *  // this usually happened in poll_callback.
- *  if (msbc) {
- *      ret = media_policy_set_hfp_samplerate(MEDIA_SAMPLERATE_8000);
- *      ret = media_policy_set_devices_available(MEDIA_DEVICE_SCO);
- *  } else if (cvsd) {
- *      ret = media_policy_set_hfp_samplerate(MEDIA_SAMPLERATE_16000);
- *      ret = media_policy_set_devices_available(MEDIA_DEVICE_SCO);
- *  } else {
- *      // disconnected.
- *      ret = media_policy_set_devices_unavailable(MEDIA_DEVICE_SCO);
- *  }
- * @endcode
- */
-
 /****************************************************************************
- * Public Functions for Mode Control
+ * Public Funtions
  ****************************************************************************/
 
 /**
  * @brief Set audio mode.
  *
- * @param[in] mode  New audio mode, in the format of "MEDIA_AUDIO_MODE_XXX".
- *                  There are five macros to define audio mode，details
- *                  @see MEDIA_DEVICE_* above.
- * @return Zero on success; a negated errno value on failure.
- * @note Before changing mode, SCO should be turned off.
+ * @param[in] mode  MEDIA_MODE_*
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note your application should follow these steps.
+ *  1. choose audio mode;
+ *  2. Force use devices (protocol) you need;
+ *  3. then do your work.
+ *  4. Revert the force use.
+ *  5. set audio mode to MEDIA_MODE_NORMAL.
+ *
+ * @code hfp example
+ *  // 1. enter the incall mode.
+ *  ret = media_policy_set_audio_mode(MEDIA_MODE_PHONE);
+ *
+ *  // 2. use btsco protocol.
+ *  ret = media_policy_set_devices_use(MEDIA_DEVICE_SCO);
+ *
+ *  // 3. in call.
+ *
+ *  // 4. revert choose.
+ *  ret = media_policy_set_devices_unuse(MEDIA_DEVICE_SCO);
+ *
+ *  // 5. back to normal mode.
+ *  ret = media_policy_set_audio_mode(MEDIA_MODE_NORMAL);
+ * @endcode
  */
 int media_policy_set_audio_mode(const char* mode);
 
 /**
- * @brief Get audio mode.
+ * @brief Get current audio mode.
  *
- * @param[in] mode  A pointer to save current audio mode.
- * @param[out] len  Size of current mode.
- * @return Zero on success; a negated errno value on failure.
+ * @param[out] mode Buffer address.
+ * @param[in] len   Buffer length.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_get_audio_mode(char* mode, int len);
 
-/****************************************************************************
- * Public Functions for Devices Control
- ****************************************************************************/
-
 /**
- * @brief Set devices using.
- * @param[in] devices   new using devices, MEDIA_DEVICE_XXX.
- * @return Zero on success; a negated errno value on failure.
- * @note This api is for applications to declare
- *       whether it needs to use the device.
+ * @brief Force Use devices (or protocol).
+ *
+ * @param[in] devices   MEDIA_DEVICE_*,
+ *                      support multi-devices with "|" delimiter.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_set_devices_use(const char* devices);
 
 /**
- * @brief Set devices not using.
- * @param[in] devices   new unavailable devices, MEDIA_DEVICE_XXX.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Revert the force use.
+ *
+ * @param[in] devices   MEDIA_DEVICE_*,
+ *                      support multi-devices with "|" delimiter.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_set_devices_unuse(const char* devices);
 
 /**
- * @brief Get current using devices.
- * @param[out] devices   current using devices.
- *                       device names are separated by "|".
- * @param[in] len        sizeof devices.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Get current force use devices.
+ *
+ * @param[out] devices   Buffer address, device names has "|" delimiter
+ *                       (e.g. "sco", "sco|mic", "<none>").
+ * @param[in] len        Buffer length.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_get_devices_use(char* devices, int len);
 
 /**
- * @brief Check whether devices are being used.
- * @param[in] devices   devices to check, use MEDIA_DEVICE_XXX.
-                        device names are separated by "|".
+ * @brief Check whether devices are under force-use.
+ *
+ * @param[in] devices   MEDIA_DEVICE_*,
+ *                      support multi-devices with "|" delimiter.
  * @param[out] use  status of devices.
  *                  - 0: all given devices not used.
  *                  - 1: at least one of devices is being used.
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_is_devices_use(const char* devices, int* use);
 
 /**
- * @brief Set hfp(hands free protocol) sampling rate.
- * @param[in] rate  sample rate for SCO, MEDIA_SAMPLING_RATE_XXX.
- * @return Zero on success; a negated errno value on failure.
- * @note Sample rate is a negotiated result, which is sent from BT,
- *       should be set before set sco available.
+ * @brief Set HFP sample rate.
+ *
+ * HFP (Hand Free Profile) is based on bt-sco, the samplerate
+ * is uncertain before negotiation is done.
+ *
+ * @param[in] rate  8000 for cvsd, 16000 for msbc.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @warning This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
+ *
+ * @deprecated This api would soon use `int rate`.
  */
 int media_policy_set_hfp_samplerate(const char* rate);
 
 /**
- * @brief Set devices available.
- * @param[in] devices   new available devices, MEDIA_DEVICE_XXX.
- * @return Zero on success; a negated errno value on failure.
- * @note This api is for device monitors to declare
- *       whether the device is available or not.
+ * @brief Report devices (or protocol) available.
+ *
+ * @param[in] devices   MEDIA_DEVICE_*,
+ *                      support multi-devices with "|" delimiter.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @warning This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_set_devices_available(const char* devices);
 
 /**
- * @brief Set devices unavailable.
- * @param[in] devices   new unavailable devices, MEDIA_DEVICE_XXX.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Report devices (or protocol) unavailable.
+ *
+ * @param[in] devices   MEDIA_DEVICE_*,
+ *                      support multi-devices with "|" delimiter.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @warning This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_set_devices_unavailable(const char* devices);
 
 /**
  * @brief Get current available devices.
- * @param[out] devices   current available devices.
- *                       device names are separated by "|".
- * @param[in] len        sizeof devices.
- * @return Zero on success; a negated errno value on failure.
+ *
+ * @param[out] devices  MEDIA_DEVICE_*, device names has "|" delimiter
+ *                       (e.g. "sco", "sco|mic", "<none>").
+ * @param[in] len       Buffer len.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_get_devices_available(char* devices, int len);
 
@@ -201,245 +200,205 @@ int media_policy_get_devices_available(char* devices, int len);
  * @param[out] available  status of devices.
  *                        - 0: all given devices are unavailable.
  *                        - 1: at least one of devices is available.
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_is_devices_available(const char* devices, int* available);
 
-/****************************************************************************
- * Public Functions for Volume Control
- ****************************************************************************/
-
 /**
  * @brief Set mute mode.
+ *
  * @param[in] mute  New mute mode.
  *                  - 0: mute mode is off.
  *                  - 1: mute mode is on.
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_set_mute_mode(int mute);
 
 /**
  * @brief Get mute mode.
+ *
  * @param[out] mute Current mute mode.
  *                  - 0: mute mode is off.
  *                  - 1: mute mode is on.
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_get_mute_mode(int* mute);
 
 /**
  * @brief Set stream type volume index.
- * @param[in] stream    stream type, MEDIA_STREAM_XXX.
+ *
+ * @param[in] stream    MEDIA_STREAM_XXX.
  * @param[in] volume    new volume index.
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_set_stream_volume(const char* stream, int volume);
 
 /**
  * @brief Get stream type volume index.
- * @param[in] stream    stream type, MEDIA_STREAM_XXX.
+ *
+ * @param[in] stream    MEDIA_STREAM_XXX.
  * @param[out] volume   current volume index.
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_get_stream_volume(const char* stream, int* volume);
 
 /**
  * @brief Increase stream type volume index by 1.
- * @param[in] stream    stream type, MEDIA_STREAM_XXX.
- * @return Zero on success; a negated errno value on failure.
+ *
+ * @param[in] stream    MEDIA_STREAM_XXX.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_increase_stream_volume(const char* stream);
 
 /**
  * @brief Decrease stream type volume index by 1.
- * @param[in] stream    stream type, MEDIA_STREAM_XXX.
- * @return Zero on success; a negated errno value on failure.
+ *
+ * @param[in] stream    MEDIA_STREAM_XXX.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_decrease_stream_volume(const char* stream);
 
 /**
- * Mute microphone for builtin_mic or bluetooth_mic.
- * @param[in] mute   mute mode.
+ * @brief Mute the mic.
+ *
+ * @param[in] mute  mute mode.
  *                  - 1: mute mode is off.
  *                  - 0: mute mode is on.
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_policy_set_mic_mute(int mute);
 
-/****************************************************************************
- * Public Policy Basic Functions
- ****************************************************************************/
-
 /**
- * @brief Set criterion with interger value.
- * This function is used to set the value of an integer-type policy
- * criterion. You should use this function when you need to update or
- * configure an integer-based policy criterion.
- * @param[in] name      criterion name
- * @param[in] value     new integer value
- * @param[in] apply     Indicates whether to apply the configurations.
- * Set to non-zero to apply configurations, zero to not apply
- * @return Zero on success; a negated errno value on failure.
- * @note Should use wrapper functions rather than using this directly.
+ * @brief Set numerical value to criterion.
+ *
+ * @param[in] name  Criterion name.
+ * @param[in] value Numerical value.
+ * @param[in] apply Whether apply change to policy.
+ *
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @warning This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_set_int(const char* name, int value, int apply);
 
 /**
- * @brief Get criterion in interger value.
- * This function is used to retrieve the value of an integer-type policy
- * criterion. You should use this function when you need to access the
- * current value of an integer-based policy criterion.
- * @param[in] name      criterion name
- * @param[out] value    A pointer to store the current integer value
- * @return Zero on success; a negated errno value on failure.
- * @note Should use wrapper functions rather than using this directly.
+ * @brief Get numerical value of criterion.
+ *
+ * @param[in] name      Criterion name
+ * @param[out] value    Numerical value.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_get_int(const char* name, int* value);
 
 /**
- * @brief Set criterion with string value.
- * This function is used to set the value of a string-type policy
- * criterion. You should use this function when you need to update
- * or configure a string-based policy criterion.
- * @param[in] name      criterion name
- * @param[in] value     new string value
- * @param[in] apply     Indicates whether to apply the configurations.
- * Set to non-zero to apply configurations, zero to not apply.
- * @return Zero on success; a negated errno value on failure.
- * @note Should use wrapper functions rather than using this directly.
+ * @brief Set literal value to criterion.
+ *
+ * @param[in] name  Criterion name.
+ * @param[in] value Literal value.
+ * @param[in] apply Whether apply change to policy.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_set_string(const char* name, const char* value, int apply);
 
 /**
- * @brief Get criterion in string value.
- * This function is used to retrieve the value of a string-type
- * policy criterion. You should use this function when you need
- * to access the current value of a string-based policy criterion.
- * @param[in] name      criterion name
- * @param[out] value    A buffer to store the current string value
- * @param[in] len       The size of the 'value' buffer
- * @return Zero on success; a negated errno value on failure.
- * @note Should use wrapper functions rather than using this directly.
+ * @brief Get literal value from criterion.
+ *
+ * @param[in] name      Criterion name.
+ * @param[out] value    Buffer address.
+ * @param[in] len       Buffer length.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_get_string(const char* name, char* value, int len);
 
 /**
- * @brief Insert string values to InclusiveCriterion.
- * This function is used to insert string values into the
- * InclusiveCriterion of a policy. You should use this function
- * when you need to add string values to an InclusiveCriterion policy.
- * @param[in] name      criterion name
- * @param[in] values    string values
- * @param[in] apply     Indicates whether to apply the configurations.
- * Set to non-zero to apply configurations, zero to not apply.
- * @return Zero on success; a negated errno value on failure.
- * @note Should use wrapper functions rather than using this directly.
- * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
+ * @brief Insert literal values to InclusiveCriterion.
+ *
+ * @param[in] name      Criterion name
+ * @param[in] values    Literal value.
+ * @param[in] apply     Whether apply change to policy.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_include(const char* name, const char* values, int apply);
 
 /**
- * @brief Remove string values from InclusiveCriterion.
- * This function is used to remove string values from the
- * InclusiveCriterion of a policy. You should use this function
- * when you need to remove specific string values from an
- * InclusiveCriterion policy.
- * @param[in] name      criterion name
- * @param[in] values    string values
- * @param[in] apply     Indicates whether to apply the configurations.
- * Set to non-zero to apply configurations, zero to not apply.
- * @return Zero on success; a negated errno value on failure.
- * @note Should use wrapper functions rather than using this directly.
- * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
+ * @brief Remove literal values from InclusiveCriterion.
+ *
+ * @param[in] name      Criterion name
+ * @param[in] values    Literal value.
+ * @param[in] apply     Whether apply change to policy.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_exclude(const char* name, const char* values, int apply);
 
 /**
- * @brief Check whether string values included in InclusiveCriterion.
- * This function is used to check whether a set of string values is
- * included in an InclusiveCriterion policy. You should use this
- * function when you need to determine if specific string values
- * are part of an InclusiveCriterion policy.
- * @param[in] name      criterion name
- * @param[in] values    string values
- * @param[out] result   whether the values are included or not
- * @return Zero on success; a negated errno value on failure.
- * @note Should use wrapper functions rather than using this directly.
- * @warning only for InclusiveCriterion, never call on ExclusiveCriterion.
+ * @brief Check whether literal values included in InclusiveCriterion.
+ *
+ * @param[in] name      Criterion name
+ * @param[in] values    Literal values
+ * @param[out] result   whether the values are included.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_contain(const char* name, const char* values, int* result);
 
 /**
- * @brief Increase interger value of criterion by 1.
- * This function is used to increment the integer value of an
- * ExclusiveCriterion policy by 1. You should use this function
- * when you need to increment the integer value of an
- * ExclusiveCriterion policy.
- * @param[in] name      criterion name
- * @param[in] apply     Indicates whether to apply the configurations.
- * Set to non-zero to apply configurations, zero to not apply.
- * @return Zero on success; a negated errno value on failure.
- * @note Should use wrapper functions rather than using this directly.
- * @warning only for ExclusiveCriterion, never call on InclusiveCriterion.
+ * @brief Increase value of NumericalCriterion by 1.
+ *
+ * @param[in] name      Criterion name
+ * @param[in] apply     Whether apply change to policy.
+ *
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_increase(const char* name, int apply);
 
 /**
- * @brief Decrease criterion interger value by 1.
- * This function is used to decrement the integer value of an
- * ExclusiveCriterion policy by 1. You should use this function
- * when you need to decrement the integer value of an
- * ExclusiveCriterion policy.
- * @param[in] name      criterion name
- * @param[in] apply     Indicates whether to apply the configurations.
- * Set to non-zero to apply configurations, zero to not apply.
- * @return Zero on success; a negated errno value on failure.
- * @note Should use wrapper functions rather than using this directly.
- * @warning only for ExclusiveCriterion, never call on InclusiveCriterion.
+ * @brief Decrease value of NumericalCriterion by 1.
+ *
+ * @param[in] name      Criterion name
+ * @param[in] apply     Whether apply change to policy.
+ *
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_policy_decrease(const char* name, int apply);
 
 #ifdef CONFIG_LIBUV
-/****************************************************************************
- * Policy Async Basic Functions
- ****************************************************************************/
-
-/**
- * @brief Set literal value to a criterion.
- *
- * @param loop      Loop handle of current thread.
- * @param name      Criterion name.
- * @param value     Lieteral value to set.
- * @param apply     Whether apply new value to policy configurations.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
- */
-int media_uv_policy_set_string(void* loop, const char* name,
-    const char* value, int apply, media_uv_callback cb, void* cookie);
-
-/**
- * @brief Get literal value of a criterion.
- *
- * @param loop      Loop handle of current thread.
- * @param name      Criterion name.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
- */
-int media_uv_policy_get_string(void* loop, const char* name,
-    media_uv_string_callback cb, void* cookie);
-
 /**
  * @brief Set numerical value to a criterion.
  *
- * @param loop      Loop handle of current thread.
- * @param name      Criterion name.
- * @param value     Numerical value to set.
- * @param apply     Whether apply new value to policy configurations.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] name      Criterion name.
+ * @param[in] value     Numerical value to set.
+ * @param[in] apply     Whether apply new value to policy configurations.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_uv_policy_set_int(void* loop, const char* name,
     int value, int apply, media_uv_callback cb, void* cookie);
@@ -447,11 +406,14 @@ int media_uv_policy_set_int(void* loop, const char* name,
 /**
  * @brief Get numerical value of a criterion.
  *
- * @param loop      Loop handle of current thread.
- * @param name      Criterion name.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] name      Criterion name.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_uv_policy_get_int(void* loop, const char* name,
     media_uv_int_callback cb, void* cookie);
@@ -459,132 +421,175 @@ int media_uv_policy_get_int(void* loop, const char* name,
 /**
  * @brief Increase numerical value of a criterion by one.
  *
- * @param loop      Loop handle of current thread.
- * @param name      Criterion name.
- * @param apply     Whether apply new value to policy configurations.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] name      Criterion name.
+ * @param[in] apply     Whether apply new value to policy configurations.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_uv_policy_increase(void* loop, const char* name, int apply,
     media_uv_callback cb, void* cookie);
 
 /**
+ * @brief Set literal value to a criterion.
+ *
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] name      Criterion name.
+ * @param[in] value     Lieteral value to set.
+ * @param[in] apply     Whether apply new value to policy configurations.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
+ */
+int media_uv_policy_set_string(void* loop, const char* name,
+    const char* value, int apply, media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Get literal value of a criterion.
+ *
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] name      Criterion name.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
+ */
+int media_uv_policy_get_string(void* loop, const char* name,
+    media_uv_string_callback cb, void* cookie);
+
+/**
  * @brief Decrease numerical value of a criterion by one.
  *
- * @param loop      Loop handle of current thread.
- * @param name      Criterion name.
- * @param apply     Whether apply new value to policy configurations.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] name      Criterion name.
+ * @param[in] apply     Whether apply new value to policy configurations.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_uv_policy_decrease(void* loop, const char* name, int apply,
     media_uv_callback cb, void* cookie);
 
 /**
- * @brief Insert string values to InclusiveCriterion.
+ * @brief Insert literal values to InclusiveCriterion.
  *
- * @param loop      Loop handle of current thread.
- * @param name      Criterion name.
- * @param value     String values.
- * @param apply     Whether apply new value to policy configurations.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] name      Criterion name.
+ * @param[in] value     Literal values.
+ * @param[in] apply     Whether apply new value to policy configurations.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_uv_policy_include(void* loop, const char* name,
     const char* value, int apply, media_uv_callback cb, void* cookie);
 
 /**
- * @brief Remove string values from InclusiveCriterion.
+ * @brief Remove literal values from InclusiveCriterion.
  *
- * @param loop      Loop handle of current thread.
- * @param name      Criterion name.
- * @param value     String values.
- * @param apply     Whether apply new value to policy configurations.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] name      Criterion name.
+ * @param[in] value     Literal values.
+ * @param[in] apply     Whether apply new value to policy configurations.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
 int media_uv_policy_exclude(void* loop, const char* name,
     const char* value, int apply, media_uv_callback cb, void* cookie);
 
 /**
- * @brief Check whether string values included in InclusiveCriterion.
+ * @brief Check whether literal values included in InclusiveCriterion.
  *
- * @param loop      Loop handle of current thread.
- * @param name      Criterion name.
- * @param value     String values.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] name      Criterion name.
+ * @param[in] value     Literal values.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
-int media_uv_policy_contain(void* loop, const char* name, const char* value,
-    media_uv_int_callback cb, void* cookie);
-
-/****************************************************************************
- * Policy Async Wrapper Functions
- ****************************************************************************/
+int media_uv_policy_contain(void* loop, const char* name,
+    const char* value, media_uv_int_callback cb, void* cookie);
 
 /**
  * @brief Set volume of a stream type.
  *
- * @param loop      Loop handle of current thread.
- * @param stream    Stream type, @see MEDIA_STREAM_* .
- * @param volume    Integer volume to set.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] stream    Stream type, @see MEDIA_STREAM_* .
+ * @param[in] volume    Integer volume to set.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
  */
-int media_uv_policy_set_stream_volume(void* loop, const char* stream,
-    int volume, media_uv_callback cb, void* cookie);
+int media_uv_policy_set_stream_volume(void* loop,
+    const char* stream, int volume, media_uv_callback cb, void* cookie);
 
 /**
  * @brief Get volume of a stream type.
  *
- * @param loop      Loop handle of current thread.
- * @param stream    Stream type, @see MEDIA_STREAM_* .
- * @param volume    Integer volume to set.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] stream    Stream type, @see MEDIA_STREAM_* .
+ * @param[in] volume    Integer volume to set.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
  */
-int media_uv_policy_get_stream_volume(void* loop, const char* stream,
-    media_uv_int_callback cb, void* cookie);
+int media_uv_policy_get_stream_volume(void* loop,
+    const char* stream, media_uv_int_callback cb, void* cookie);
 
 /**
  * @brief Increase volume of a stream type.
  *
- * @param loop      Loop handle of current thread.
- * @param stream    Stream type, @see MEDIA_STREAM_* .
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] stream    Stream type, @see MEDIA_STREAM_* .
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
  */
-int media_uv_policy_increase_stream_volume(void* loop, const char* stream,
-    media_uv_callback cb, void* cookie);
+int media_uv_policy_increase_stream_volume(void* loop,
+    const char* stream, media_uv_callback cb, void* cookie);
 
 /**
  * @brief Decrease volume of a stream type.
  *
- * @param loop      Loop handle of current thread.
- * @param stream    Stream type, @see MEDIA_STREAM_* .
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return int Zero on sucess, negative errno on else.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] stream    Stream type, @see MEDIA_STREAM_* .
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on sucess, negative errno on else.
  */
-int media_uv_policy_decrease_stream_volume(void* loop, const char* stream,
-    media_uv_callback cb, void* cookie);
+int media_uv_policy_decrease_stream_volume(void* loop,
+    const char* stream, media_uv_callback cb, void* cookie);
 
 /**
  * @brief Set audio mode.
  *
- * @param loop      Loop handle of current thread.
- * @param mode      New audio mode.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] mode      New audio mode.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_uv_policy_set_audio_mode(void* loop, const char* mode,
     media_uv_callback cb, void* cookie);
@@ -592,92 +597,102 @@ int media_uv_policy_set_audio_mode(void* loop, const char* mode,
 /**
  * @brief Get current audio mode.
  *
- * @param loop      Loop handle of current thread.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_uv_policy_get_audio_mode(void* loop,
     media_uv_string_callback cb, void* cookie);
 
 /**
- * @brief Set devices using or unusing.
+ * @brief Force use/unuse devices (or protocols).
  *
- * @param loop      Loop handle of current thread.
- * @param devices   Target devices.
- * @param use       Whether devices are set using or unusing.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] devices   Target devices.
+ * @param[in] use       Whether devices are set using or unusing.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
-int media_uv_policy_set_devices_use(void* loop, const char* devices, bool use,
-    media_uv_callback cb, void* cookie);
+int media_uv_policy_set_devices_use(void* loop,
+    const char* devices, bool use, media_uv_callback cb, void* cookie);
 
 /**
- * @brief Get current using devices.
+ * @brief Get current force-use devices.
  *
- * @param loop      Loop handle of current thread.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
-int media_uv_policy_get_devices_use(void* loop, media_uv_string_callback cb, void* cookie);
+int media_uv_policy_get_devices_use(void* loop,
+    media_uv_string_callback cb, void* cookie);
 
 /**
  * @brief Check whether devices are being used.
  *
- * @param loop      Loop handle of current thread.
- * @param devices   Devices to check.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] devices   Devices to check.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
-int media_uv_policy_is_devices_use(void* loop, const char* devices,
-    media_uv_int_callback cb, void* cookie);
+int media_uv_policy_is_devices_use(void* loop,
+    const char* devices, media_uv_int_callback cb, void* cookie);
 
 /**
  * @brief Set hfp(hands free protocol) sampling rate.
  *
- * @param loop      Loop handle of current thread.
- * @param rate      Sample rate for SCO.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] rate      Sample rate for SCO.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @warning This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
+ *
+ * @deprecated This api would soon use `int rate`.
  */
-int media_uv_policy_set_hfp_samplerate(void* loop, const char* rate,
-    media_uv_callback cb, void* cookie);
+int media_uv_policy_set_hfp_samplerate(void* loop,
+    const char* rate, media_uv_callback cb, void* cookie);
 
 /**
  * @brief Set devices available or unavailable.
  *
- * @param loop      Loop handle of current thread.
- * @param devices   Target devices.
- * @param available Whether devices are set available or unavailable.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] devices   Target devices.
+ * @param[in] available Whether devices are set available or unavailable.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @warning This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
  */
-int media_uv_policy_set_devices_available(void* loop, const char* devices, bool available,
-    media_uv_callback cb, void* cookie);
+int media_uv_policy_set_devices_available(void* loop,
+    const char* devices, bool available, media_uv_callback cb, void* cookie);
 
 /**
  * @brief Get current available devices.
  *
- * @param loop      Loop handle of current thread.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
-int media_uv_policy_get_devices_available(void* loop, media_uv_string_callback cb, void* cookie);
+int media_uv_policy_get_devices_available(void* loop,
+    media_uv_string_callback cb, void* cookie);
 
 /**
  * @brief Check whether devices are available.
  *
- * @param loop      Loop handle of current thread.
- * @param devices   Devices to check.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] devices   Devices to check.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_uv_policy_is_devices_available(void* loop, const char* devices,
     media_uv_int_callback cb, void* cookie);
@@ -685,34 +700,37 @@ int media_uv_policy_is_devices_available(void* loop, const char* devices,
 /**
  * @brief Set mute mode.
  *
- * @param loop      Loop handle of current thread.
- * @param mute      New mute mode.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] mute      New mute mode.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
-int media_uv_policy_set_mute_mode(void* loop, int mute, media_uv_callback cb, void* cookie);
+int media_uv_policy_set_mute_mode(void* loop, int mute,
+    media_uv_callback cb, void* cookie);
 
 /**
  * @brief Get mute mode.
  *
- * @param loop      Loop handle of current thread.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
-int media_uv_policy_get_mute_mode(void* loop, media_uv_int_callback cb, void* cookie);
+int media_uv_policy_get_mute_mode(void* loop,
+    media_uv_int_callback cb, void* cookie);
 
 /**
  * @brief Mute microphone for builtin_mic or bluetooth_mic.
  *
- * @param loop      Loop handle of current thread.
- * @param mute      Mute mode.
- * @param cb        Call after receiving result.
- * @param cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] loop      Loop handle of current thread.
+ * @param[in] mute      Mute mode.
+ * @param[out] cb       Call after receiving result.
+ * @param[in] cookie    Callback argument.
+ * @return int  Zero on success; a negative errno value on failure.
  */
-int media_uv_policy_set_mic_mute(void* loop, int mute, media_uv_callback cb, void* cookie);
+int media_uv_policy_set_mic_mute(void* loop, int mute,
+    media_uv_callback cb, void* cookie);
 #endif /* CONFIG_LIBUV */
 
 #ifdef __cplusplus

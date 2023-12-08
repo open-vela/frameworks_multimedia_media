@@ -18,147 +18,6 @@
  *
  ****************************************************************************/
 
-/**
- * @brief Media Player Interface
- *
- * This interface provides functions for media playback.
- * here is an example for using these functions
- * @code
-    #include <media_api.h>
-    #include <stdio.h>
-    #include <stdlib.h>
-    #include <syslog.h>
-
-    #define PLAYER_IDLE      0
-    #define PLAYER_PREPARED  1
-    #define PLAYER_STARTED   2
-    #define PLAYER_COMPLETED 3
-    #define PLAYER_STOPPED   4
-
-    static struct player_priv_s
-    {
-    sem_t sem;
-    int   state;
-    } g_priv;
-
-    static void music_event_callback(void* cookie, int event,
-                                     int ret, const char *data)
-    {
-        char *str;
-        if (event == MEDIA_EVENT_STARTED) {
-            g_priv.state = PLAYER_STARTED;
-            str = "MEDIA_EVENT_STARTED";
-            sem_post(&g_priv.sem);
-        } else if (event == MEDIA_EVENT_STOPPED) {
-            str = "MEDIA_EVENT_STOPPED";
-        } else if (event == MEDIA_EVENT_COMPLETED) {
-            g_priv.state = PLAYER_COMPLETED;
-            str = "MEDIA_EVENT_COMPLETED";
-        } else if (event == MEDIA_EVENT_PREPARED) {
-            g_priv.state = PLAYER_PREPARED;
-            str = "MEDIA_EVENT_PREPARED";
-            sem_post(&g_priv.sem);
-        } else if (event == MEDIA_EVENT_PAUSED) {
-            str = "MEDIA_EVENT_PAUSED";
-        } else if (event == MEDIA_EVENT_SEEKED) {
-            str = "MEDIA_EVENT_SEEKED";
-        } else {
-            str = "UNKNOW EVENT";
-        }
-
-        syslog(LOG_INFO, "%s, music event %s, event %d, ret %d,
-               info %s line %d\n", __func__, str, event, ret,
-               data ? data : "NULL", __LINE__);
-    }
-
-    int main(int argc, char *argv[])
-    {
-        unsigned int duration, position;
-        float volume;
-        void *player;
-        int ret;
-
-        sem_init(&g_priv.sem, 0, 0);
-        g_priv.state = PLAYER_IDLE;
-
-        player = media_player_open("Music");
-        if (!player) {
-            syslog(LOG_ERR, "Player: open failed.\n");
-            return -1;
-        }
-
-        ret = media_player_set_event_callback(player, player,
-                                              music_event_callback);
-        if (ret < 0) {
-            syslog(LOG_ERR, "Player: set callback failed.\n");
-            goto out;
-        }
-
-        ret = media_player_set_volume(player, 0.2);
-        if (ret < 0) {
-            syslog(LOG_ERR, "Player: set_volume failed.\n");
-            goto out;
-        }
-
-        ret = media_player_prepare(player, argv[1], NULL);
-        if (ret < 0) {
-            syslog(LOG_ERR, "Player: prepare failed.\n");
-            goto out;
-        }
-
-        sem_wait(&g_priv.sem);
-
-        if (g_priv.state != PLAYER_PREPARED) {
-            syslog(LOG_INFO, "Player: prepare event return failed.\n");
-            goto out;
-        }
-
-        ret = media_player_start(player);
-        if (ret < 0) {
-            syslog(LOG_ERR, "Player: start failed.\n");
-            goto out;
-        }
-
-        sem_wait(&g_priv.sem);
-        if (g_priv.state != PLAYER_STARTED) {
-            syslog(LOG_ERR, "Player: start event return failed.\n");
-            goto out;
-        }
-
-        syslog(LOG_INFO, "Player: playing %d.\n",
-               media_player_is_playing(player));
-        media_player_get_duration(player, &duration);
-        syslog(LOG_INFO, "Player: get_duration ret %d %d.\n",
-               ret, duration);
-
-        media_player_get_volume(player, &volume);
-        syslog(LOG_INFO, "Player: get_volume %f.\n", volume);
-
-        while (g_priv.state == PLAYER_STARTED) {
-            media_player_get_position(player, &position);
-            syslog(LOG_ERR, "Player: get_position %d.\n", position);
-            usleep(300 * 1000);
-        }
-
-        ret = media_player_stop(player);
-        if (ret < 0) {
-            syslog(LOG_ERR, "Player: stop failed.\n");
-            goto out;
-        }
-
-    out:
-        media_player_close(player, 0);
-        sem_destroy(&g_priv.sem);
-        syslog(LOG_INFO, "Player: closed.\n");
-
-        return 0;
-    }
- * @endcond
- *
- * @file media_player.h
- *
- */
-
 #ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_PLAYER_H
 #define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_PLAYER_H
 
@@ -183,52 +42,85 @@ extern "C" {
  ****************************************************************************/
 
 /**
- * @brief Open media with player type.
- * @param[in] stream    @see MEDIA_STREAM_* in media_stream.h .
- * @return Pointer to created handle on success; NULL on failure.
+ * @brief Open a player path with given stream type.
+ *
+ * @param[in] stream    MEDIA_STREAM_*.
+ *                      Different stream types have different route logic.
+ * @return void*    Player handle, NULL on failure.
+ *
+ * @code To simply play a song you should:
+ *  // 1. create a instance.
+ *  handle = media_player_open(MEDIA_STREAM_MUSIC);
+ *
+ *  // 2. prepare the resource you want to play.
+ *  ret = media_player_prepare(handle, "/data/1.mp3", NULL);
+ *
+ *  // 3. start playing.
+ *  ret = media_player_start(handle);
+ *
+ *  // 4. stop playing and clear the prepared song,
+ *  //  should goto step2 if you still need this player instance.
+ *  ret = media_player_stop(handle);
+ *
+ *  // 5. don't forget to destroy the instance.
+ *  ret = media_player_close(handle, 0);
+ * @endcode
  */
 void* media_player_open(const char* stream);
 
 /**
- * @brief Close the player with handle.
- * @param[in] handle       The player path to be destroyed, return value of
- * media_player_open function.
- * @param[in] pending_stop whether pending command.
- *                         - 0: close immediately
- *                         - 1: pending command,
- *                              close automatically after playback complete
- * @return Zero on success; a negated errno value on failure.
+ * @brief Close the player path.
+ *
+ * @param[in] handle        Player handle.
+ * @param[in] pending_stop  Whether pending stop before close:
+ *                          - 0: stop immediately for closing;
+ *                          - 1: stop till complete current playing track.
+ * @return int  Zero on success; a negated errno value on failure.
  */
 int media_player_close(void* handle, int pending_stop);
 
 /**
- * @brief  Set event callback to the player path, the callback will be
- * called when state changed.
- * @param[in] handle    The player path, return value of media_player_open
- * function.
- * @param[in] cookie    User cookie, will be brought back to user when do
- * event_cb
- * @param[in] event_cb  The function pointer of event callback
- * @return Zero on success; a negated errno value on failure.
+ * @brief Set a event callback to listen to stream status change.
+ *
+ * @param[in] handle        Player handle.
+ * @param[in] event_cookie  Callback argument.
+ * @param[out] on_event     Callback to receive events about stream status change.
+ * @return int  Zero on success; a negated errno value on failure.
+ *
+ * @code
+ *  void user_on_event(void* cookie, int event, int result, const char* extra) {
+ *      switch () {
+ *      case MEDIA_EVENT_PREPARED:
+ *      case MEDIA_EVENT_STARTED:
+ *      case MEDIA_EVENT_PAUSED:
+ *      case MEDIA_EVENT_STOPPED:
+ *      case MEDIA_EVENT_SEEKED:
+ *      case MEDIA_EVENT_COMPLETED:
+ *      }
+ *  }
+ * @endcode
  */
-int media_player_set_event_callback(void* handle, void* cookie,
-    media_event_callback event_cb);
+int media_player_set_event_callback(void* handle, void* event_cookie,
+    media_event_callback on_event);
 
 /**
- * @brief Prepare resource file to be played by media.
- * @param[in] handle    The player path, return value of media_player_open
- * function.
- * @param[in] url       the path of resource file to be played by media, can
- * be a local path(e.g. /music/1.mp3) or an online path(e.g.
- * http://10.221.110.236/1.mp3) or NULL(buffer mode).
- * @param[in] options   Extra options configure
- *   - If url is not NULL: options is the url addtional description
- *   - If url is NULL: options descript "buffer" mode, exmaple:
- *     - "format=s16le,sample_rate=44100,channels=2"
- *     - "format=unknown"
- *   then use media_player_write_data() or fd returned by
- *   media_player_get_socket() to write data
- * @return Zero on success; a negated errno value on failure.
+ * @brief Prepare resource to play.
+ *
+ * @param[in] handle    Player handle.
+ * @param[in] url       Path of resource, there is 2 mode:
+ *                      1. URL: `url` is Local file path or Network address;
+ *                          media framework would read the resource and play.
+ *                      2. BUFFER: `url` is NULL, so caller should continuously
+ *                          provide buffers to media framework for playing;
+ *                          there are 2 ways to provide buffers,
+ *                              1. Use `media_player_write_data()`.
+ *                              2. Use `media_player_get_socket()` and `write()`
+ * @param[in] options   Extra options about the resource, usually it's key-value pairs
+ *                      to describe format of resource.
+ *                      (e.g. "format=s16le,sample_rate=44100,channels=2")
+ * @return int  Zero on success; a negated errno value on failure.
+ *
+ * @note The api mentioned for buffer mode are all thread-safe.
  */
 int media_player_prepare(void* handle, const char* url, const char* options);
 
@@ -238,225 +130,228 @@ int media_player_prepare(void* handle, const char* url, const char* options);
  * function.
  * @return Zero on success; a negated errno value on failure.
  */
+
+/**
+ * @brief Reset the player path.
+ *
+ * @param[in] handle    Player handle.
+ * @return int  Zero on success; a negated errno value on failure.
+ *
+ * @note This api is similar to `media_player_stop`.
+ */
 int media_player_reset(void* handle);
 
 /**
- * @brief Write data to media with player type.
- * Used only in buffer mode, need media_player_prepare() url set to NULL.
- * Only need to choose either this function or the media_player_get_socket()
- * to transfer data for the media.
- * @note: this function is blocked
- * @param[in] handle    The player path, return value of media_player_open
- * function.
- * @param[in] data      Buffer will be played
- * @param[in] len       Buffer len
- * @return Actly sent len on succeed; a negated errno value on failure.
+ * @brief Write data to media for playing.
+ *
+ * @param[in] handle    Player handle.
+ * @param[in] data      Buffer address.
+ * @param[in] len       Buffer length to write.
+ * @return ssize_t  Sent length on success; a negated errno value on failure.
+ *
+ * @note This api is thread-safe, in buffer mode, you might need this
+ * in your worker thread.
  */
 ssize_t media_player_write_data(void* handle, const void* data, size_t len);
 
 /**
- * @brief Get sockaddr for unblock mode write data.
- * @deprecated This function is deprecated now, please use the new function
- * media_player_get_socket() instead.
- * @param[in] handle    The player path, return value of media_player_open
- * function.
- * @param[in] addr      The sockaddr pointer
- * @return Actly sent len on succeed; a negated errno value on failure.
+ * @brief Get socket address info for buffer mode.
+ *
+ * @param[in] handle    Player handle
+ * @param[out] addr     Socket address info
+ * @return int  Zero on success; a negated errno value on failure.
  */
 int media_player_get_sockaddr(void* handle, struct sockaddr_storage* addr);
 
 /**
- * @brief Get socket fd for unblock mode write data.
+ * @brief Get socket fd for writing.
  *
- * @code
- *  int  ret;
- *  void *handle;
- *  handle = media_player_open(MEDIA_STREAM_MUSIC);
- *  // set event callback
- *  // set prepare mode buffer
- *  ret = media_player_prepare(handle, NULL, NULL);
- *  int socketfd = media_player_get_socket(handle);
- * @endcode
+ * @param[in] handle    Player handle.
+ * @return int  Socket fd, negative errno on failure.
  *
- * @param[in] handle    The player handle.
- * @return fd; a negated errno value on failure.
+ * @note This api is thread-safe, in buffer mode, you can get socket fd
+ * for data transaction in your worker thread.
  */
 int media_player_get_socket(void* handle);
 
 /**
- * @brief Close socket fd when player finish read data.
+ * @brief Close socket fd.
  *
- * @param[in] handle    The player handle.
+ * @param[in] handle    Player handle.
+ *
+ * @note This api is thread-safe, in buffer mode, you can finalize data
+ * transaction by this api in your worker thread.
  */
 void media_player_close_socket(void* handle);
 
 /**
- * Start the player path to play
- * @param[in] handle    The player path
- * @return Zero on success; a negated errno value on failure.
+ * @brief Start/resume playing the resource.
+ *
+ * @param[in] handle    Player handle.
+ * @return int  Zero on success; a negated errno value on failure.
+ *
+ * @note This api would generates MEDIA_EVENT_STARTED event.
  */
 int media_player_start(void* handle);
 
 /**
- * Stop the player path
- * @param[in] handle    The player path
- * @return Zero on success; a negated errno value on failure.
+ * @brief Stop and clear the resource.
+ *
+ * @param[in] handle    Player handle.
+ * @return int  Zero on success; a negated errno value on failure.
+ *
+ * @note This api would generates MEDIA_EVENT_STOPPED event.
  */
 int media_player_stop(void* handle);
 
 /**
- * Pause the player path
- * @param[in] handle    The player path
- * @return Zero on success; a negated errno value on failure.
+ * @brief Pause.
+ *
+ * @param[in] handle    Player handle.
+ * @return int  Zero on success; a negated errno value on failure.
+ *
+ * @note This api would generates MEDIA_EVENT_PAUSED event.
  */
 int media_player_pause(void* handle);
 
 /**
- * Seek to msec position from begining
- * @param[in] handle    The player path
- * @param[in] mesc      Which postion should seek from begining
- * @return Zero on success; a negated errno value on failure.
+ * @brief Seek to msec position from begining.
+ *
+ * @param[in] handle    Player handle.
+ * @param[in] position  Position with msec unit.
+ * @return int  Zero on success; a negated errno value on failure.
+ *
+ * @note This api would generates MEDIA_EVENT_SEEKED event.
  */
-int media_player_seek(void* handle, unsigned int msec);
+int media_player_seek(void* handle, unsigned int position);
 
 /**
- * Set the player path looping play, defult is not looping
- * @param[in] handle    The player path
- * @param[in] loop      Loop count (-1: forever, 0: not loop)
- * @return Zero on success; a negated errno value on failure.
+ * @brief Set loop times.
+ *
+ * @param[in] handle    Player handle.
+ * @param[in] loop      Loop times, -1 for infinite loop.
+ * @return int  Zero on success; a negated errno value on failure.
  */
 int media_player_set_looping(void* handle, int loop);
 
 /**
- * @brief Check if the media player is currently playing.
+ * @brief Check playing status.
  *
- * @code
- *  // Example
- *  void *handle;
- *  int ret;
- *  handle = media_player_open("Music");
- *  // set event callback
- *  ret = media_player_prepare(handle, "/music/1.mp3", NULL);
- *  ret = media_player_start(handle);
- *  ret = media_player_is_playing(handle);
- *  syslog(LOG_INFO, "Player: playing %d.\n", ret);
- * @endcode
+ * @param[in] handle    Player handle.
+ * @return int  Positive on playing, zero on inactive, negative on error.
  *
- * @param[in] handle    The player handle.
- * @return 1 on playing, 0 on not-playing, else on error.
+ * @note If you monitor the MEDIA_EVENT_STARTED event and result from
+ * event callback, this api is not needed.
  */
 int media_player_is_playing(void* handle);
 
 /**
- * @brief Get the playing duration after the music starts playing.
+ * @brief Gert current msec position of resource.
  *
- * @code
- *  void *handle;
- *  int ret;
- *  unsigned int position;
- *  handle = media_player_open(MEDIA_STREAM_MUSIC);
- *  // set event callback
- *  ret = media_player_prepare(handle, "/music/1.mp3", NULL);
- *  ret = media_player_start(handle);
- *  ret = media_player_get_position(handle, &position);
- * @endcode
- *
- * @param[in] handle    The player handle.
- * @param[in] mesc      Playback postion (from begining)
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] handle    Player handle.
+ * @param[in] position  Msec position.
+ * @return int  Zero on success; a negated errno value on failure.
  */
-int media_player_get_position(void* handle, unsigned int* msec);
+int media_player_get_position(void* handle, unsigned int* position);
 
 /**
- * @brief Get playback file duration (Total play time).
+ * @brief Gert msec duration of current resource.
  *
- * @code
- *  void *handle;
- *  int ret;
- *  unsigned int duration;
- *  handle = media_player_open(MEDIA_STREAM_MUSIC);
- *  // set event callback
- *  ret = media_player_prepare(handle, "/music/1.mp3", NULL);
- *  ret = media_player_start(handle);
- *  ret = media_player_get_duration(handle, &duration);
- * @endcode
- *
- * @param[in] handle    The player handle.
- * @param[in] mesc      Store playing time of the media.
- * @param[in] mesc      File duration
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] handle    Player handle.
+ * @param[in] duration  Position in msec.
+ * @return int  Zero on success; a negated errno value on failure.
  */
-int media_player_get_duration(void* handle, unsigned int* msec);
+int media_player_get_duration(void* handle, unsigned int* duration);
 
 /**
- * @brief Set the player path volume.
+ * @brief Set volume.
  *
- * @code
- *  void *handle;
- *  int ret;
- *  handle = media_player_open(MEDIA_STREAM_MUSIC);
- *  ret = media_player_set_volume(handle, 0.2);
- * @endcode
+ * @param[in] handle    Player handle.
+ * @param[in] volume    Volume in range [0.0, 1.0].
+ * @return int  Zero on success; a negated errno value on failure.
  *
- * @param[in] handle    The player handle.
- * @param[in] volume    Volume with range of 0.0 - 1.0
- * @return Zero on success; a negated errno value on failure.
+ * @warning You should always use `meida_policy_set_stream_volume`
+ * if possible; if you use this api to adjust your volume, you
+ * can not align with stream volume policy configuration.
  */
 int media_player_set_volume(void* handle, float volume);
 
 /**
- * @brief Get the player handle volume.
+ * @brief Get volume.
  *
- * @code
- *  void *handle;
- *  int ret;
- *  float volume;
- *  handle = media_player_open(MEDIA_STREAM_MUSIC);
- *  // set event callback
- *  ret = media_player_prepare(handle, "/music/1.mp3", NULL);
- *  ret = media_player_start(handle);
- *  ret = media_player_get_volume(player, &volume);
- * @endcode
- *
- * @param[in] handle    The player path
- * @param[in] volume    Volume with range of 0.0 - 1.0
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] handle    Player handle.
+ * @param[out] volume   Volume in range [0.0, 1.0].
+ * @return int  Zero on success; a negated errno value on failure.
  */
 int media_player_get_volume(void* handle, float* volume);
 
 /**
- * @brief Set properties of the player path.
+ * @brief Set properties.
  *
  * @param[in] handle      Current player path
  * @param[in] target      Target filter
  * @param[in] key         Key
  * @param[in] value       Value
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negated errno value on failure.
  */
-int media_player_set_property(void* handle, const char* target, const char* key, const char* value);
+int media_player_set_property(void* handle, const char* target,
+    const char* key, const char* value);
 
 /**
- * @brief Get properties of the player path.
+ * @brief Get properties.
  *
  * @param[in] handle      Current player path
  * @param[in] target      Target filter
  * @param[in] key         Key
- * @param[in] value       Buffer of value
+ * @param[out] value      Buffer of value
  * @param[in] value_len   Buffer length of value
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negated errno value on failure.
  */
-int media_player_get_property(void* handle, const char* target, const char* key, char* value, int value_len);
+int media_player_get_property(void* handle, const char* target,
+    const char* key, char* value, int value_len);
 
 #ifdef CONFIG_LIBUV
 /**
- * @brief Open an async player.
+ * @brief Open an async player with given stream type.
  *
  * @param[in] loop          Loop handle of current thread.
- * @param[in] stream        Stream type, @see MEDIA_STREAM_* .
- * @param[in] on_open       Open callback, called after open is done.
+ * @param[in] stream        MEDIA_STREAM_* .
+ *                          Different stream types have different route logic.
+ * @param[out] on_open      Open callback, called after open is done.
  * @param[in] cookie        Long-term callback context for:
- *                          on_open, on_event, on_close.
- * @return void* Handle of player.
+ *                          on_open, on_event, on_connection, on_close.
+ * @return void*    Handle of player, NULL on error.
+ *
+ * @note Even if `on_open` has not been called, you can call other
+ * handle-based async APIs, and they will be queued inside the
+ * player handle as requests, and processed in order after
+ * `open` is completed.
+ *
+ * @code example1.
+ *  // 1. open a player instance.
+ *  ctx->handle = media_uv_player_open(loop, MEDIA_STREAM_MUSIC, NULL, ctx);
+ *
+ *  // 2. prepare a song (delay till open is done).
+ *  media_uv_player_prepare(ctx->handle, "/data/1.mp3", NULL, NULL);
+ *
+ *  // 3. start playing (delay till prepare is done).
+ *  media_uv_player_start(ctx->handle, NULL, NULL);
+ * @endcode example1.
+ *
+ * @code example2.
+ *  void user_on_open(void* cookie, int ret) {
+ *      UserContext* ctx = cookie;
+ *
+ *      if (ret < 0)
+ *          media_uv_player_close(ctx->handle, user_on_close);
+ *      else
+ *          media_uv_player_prepare(ctx->handle, "/data/1.mp3",
+ *              user_on_prepare, ctx);
+ *  }
+ *
+ *  ctx->handle = media_uv_player_open(loop, MEDIA_STREAM_MUSIC,
+ *      user_on_open, ctx);
+ * @endcode example2.
  */
 void* media_uv_player_open(void* loop, const char* stream,
     media_uv_callback on_open, void* cookie);
@@ -465,8 +360,8 @@ void* media_uv_player_open(void* loop, const char* stream,
  * @brief Listen to status change event by setting callback.
  *
  * @param[in] handle    Async player handle.
- * @param[in] on_event  Event callback, call after receiving notification.
- * @return int Zero on success, negative errno on failure.
+ * @param[out] on_event Event callback, call after receiving notification.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_player_listen(void* handle, media_event_callback on_event);
 
@@ -475,56 +370,62 @@ int media_uv_player_listen(void* handle, media_event_callback on_event);
  *
  * @param[in] handle    Async player handle.
  * @param[in] pending   Pending close or not.
- * @param[in] on_close  Release callback, called after releasing internal resources.
- * @return int Zero on success, negative errno on illegal handle.
+ * @param[out] on_close Release callback, called after releasing internal resources.
+ * @return int  Zero on success, negative errno on illegal handle.
+ *
+ * @note It's safe to call this api before `on_open` of `media_uv_player_open`
+ * is called, but other api calls would be canceled, there `on_xxx` callback
+ * would be called with ret == -ECANCELD.
  */
 int media_uv_player_close(void* handle, int pending,
     media_uv_callback on_close);
 
 /**
- * @brief Prepare resource file.
+ * @brief Prepare resource for playing.
  *
- * @param[in] handle        Async player handle.
- * @param[in] url           Path of resources.
- * @param[in] options       Resource options, @see media_player_prpare.
- * @param[in] on_connection
- * @param[in] on_prepare    Call after receiving result, will give an uv_pipe_t
- *                          to write data in buffer mode.
- * @param[in] cookie        One-time callback context.
+ * @param[in] handle            Async player handle.
+ * @param[in] url               Path of resources, details @see media_player_prpare.
+ * @param[in] options           Resource options, @see media_player_prpare.
+ * @param[out] on_connection    Callback to receive uv_pipe_t in buffer mode.
+ * @param[out] on_prepare       Callback to receive result.
+ * @param[in] cookie            Callback argument for `on_prepare`.
  * @return int Zero on success, negative errno on failure.
+ *
+ * @note For buffer mode, see `media_player_prepare` for more informations.
  */
 int media_uv_player_prepare(void* handle, const char* url, const char* options,
     media_uv_object_callback on_connection, media_uv_callback on_prepare, void* cookie);
 
 /**
- * @brief Reset media with player type.
+ * @brief Reset player.
  *
  * @param[in] handle    Async player handle.
- * @param[in] on_reset  Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @param[out] on_reset Call after receiving result.
+ * @param[in] cookie    Callback argument for `on_reset`.
+ * @return int  Zero on success; a negated errno value on failure.
  */
 int media_uv_player_reset(void* handle, media_uv_callback on_reset, void* cookie);
 
 /**
  * @brief  Play or resume the prepared source with auto focus request.
  *
- * @param handle    Async player handle.
- * @param scenario  @see MEDIA_SCENARIO_* in media_focus.h .
- * @param on_play   Call after receiving result or focus request failed.
- * @param cookie    One-time callback context.
- * @return int Zero on success, negative errno on failure.
+ * @param[in] handle    Async player handle.
+ * @param[in] scenario  MEDIA_SCENARIO_* .
+ *                      Different scenario have different focus priority.
+ * @param[out] on_play  Callback to acknowledge result of request/start.
+ * @param[in] cookie    Callback argument for `on_play`.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_player_start_auto(void* handle, const char* scenario,
     media_uv_callback on_start, void* cookie);
 
 /**
- * @brief Play or resume the prepared resouce.
+ * @brief Play/resume the prepared resouce.
  *
  * @param[in] handle    Async player handle.
- * @param[in] on_start  Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return int Zero on success, negative errno on failure.
+ * @param[out] on_start Call after receiving result.
+ * @param[in] cookie    Callback argument for `on_start`.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_player_start(void* handle, media_uv_callback on_start, void* cookie);
 
@@ -532,9 +433,9 @@ int media_uv_player_start(void* handle, media_uv_callback on_start, void* cookie
  * @brief Pause the playing.
  *
  * @param[in] handle    Async player handle.
- * @param[in] on_pause  Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return int Zero on success, negative errno on failure.
+ * @param[out] on_pause Call after receiving result.
+ * @param[in] cookie    Callback argument for `on_pause`.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_player_pause(void* handle, media_uv_callback on_pause, void* cookie);
 
@@ -542,20 +443,24 @@ int media_uv_player_pause(void* handle, media_uv_callback on_pause, void* cookie
  * @brief Stop the playing, clear the prepared resource file.
  *
  * @param[in] handle    Async player handle.
- * @param[in] on_stop   Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return int Zero on success, negative errno on failure.
+ * @param[out] on_stop  Call after receiving result.
+ * @param[in] cookie    Callback argument for `on_stop`.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_player_stop(void* handle, media_uv_callback on_stop, void* cookie);
 
 /**
  * @brief Set player volume.
  *
- * @param[in] handle    Async player handle.
- * @param[in] volume    Volume in [0.0, 1.0].
- * @param[in] on_volume Call after receiving result.
- * @param[in] cookie    One-time callback context.
+ * @param[in] handle        Async player handle.
+ * @param[in] volume        Volume in [0.0, 1.0].
+ * @param[out] on_volume    Call after receiving result.
+ * @param[in] cookie        Callback argument for `on_volume`.
  * @return int Zero on success, negative errno on failure.
+ *
+ * @warning You should always use `meida_policy_set_stream_volume`
+ * if possible; if you use this api to adjust your volume, you
+ * can not align with stream volume policy configuration.
  */
 int media_uv_player_set_volume(void* handle, float volume,
     media_uv_callback on_volume, void* cookie);
@@ -563,11 +468,11 @@ int media_uv_player_set_volume(void* handle, float volume,
 /**
  * @brief Get the player handle volume.
  *
- * @param[in] handle    Async player handle.
- * @param[in] volume    Volume with range of 0.0 - 1.0
- * @param[in] on_volume Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] handle        Async player handle.
+ * @param[in] volume        Volume with range of 0.0 - 1.0
+ * @param[out] on_volume    Call after receiving result.
+ * @param[in] cookie        Callback argument for `on_volume`.
+ * @return int  Zero on success; a negated errno value on failure.
  */
 int media_uv_player_get_volume(void* handle,
     media_uv_float_callback on_volume, void* cookie);
@@ -575,10 +480,10 @@ int media_uv_player_get_volume(void* handle,
 /**
  * @brief Get current playing status.
  *
- * @param handle        Async player handle.
- * @param on_playing    Call after receiving result.
- * @param cookie        One-time callback context.
- * @return int Zero on success, negative errno on failure.
+ * @param[in] handle        Async player handle.
+ * @param[out] on_playing   Call after receiving result.
+ * @param[in] cookie        Callback argument for `on_playing`.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_player_get_playing(void* handle,
     media_uv_int_callback on_playing, void* cookie);
@@ -587,9 +492,9 @@ int media_uv_player_get_playing(void* handle,
  * @brief Get current playing position.
  *
  * @param[in] handle        Async player handle.
- * @param[in] on_position   Call after receiving result.
- * @param[in] cookie        One-time callback context.
- * @return int Zero on success, negative errno on failure.
+ * @param[out] on_position  Call after receiving result.
+ * @param[in] cookie        Callback argument for `on_position`.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_player_get_position(void* handle,
     media_uv_unsigned_callback on_position, void* cookie);
@@ -597,48 +502,48 @@ int media_uv_player_get_position(void* handle,
 /**
  * @brief Get duration of current playing resource.
  *
- * @param handle        Async player handle.
- * @param on_duration   Call after receiving result.
- * @param cookie        One-time callback context.
- * @return int Zero on success, negative errno on failure.
+ * @param[in] handle        Async player handle.
+ * @param[out] on_duration  Call after receiving result.
+ * @param[in] cookie        Callback argument for `on_duration`.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_player_get_duration(void* handle,
     media_uv_unsigned_callback on_duration, void* cookie);
 
 /**
- * @brief Set the player path looping play, defult is not looping.
+ * @brief Set the loop times.
  *
- * @param[in] handle    Async player handle.
- * @param[in] loop      Loop count (-1: forever, 0: not loop).
- * @param[in] on_loop   Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] handle        Async player handle.
+ * @param[in] loop          Loop times, -1 for infinite loop.
+ * @param[out] on_looping   Call after receiving result.
+ * @param[in] cookie        Callback argument for `on_looping`.
+ * @return int  Zero on success; a negated errno value on failure.
  */
 int media_uv_player_set_looping(void* handle, int loop,
-    media_uv_callback on_loop, void* cookie);
+    media_uv_callback on_looping, void* cookie);
 
 /**
  * @brief Seek to msec position from begining.
  *
  * @param[in] handle    Async player handle.
- * @param[in] mesc      Which postion should seek from begining.
- * @param[in] on_loop   Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] position  Position in msec from begining.
+ * @param[out] on_seek  Call after receiving result.
+ * @param[in] cookie    Callback argument for `on_seek`.
+ * @return int  Zero on success; a negated errno value on failure.
  */
-int media_uv_player_seek(void* handle, unsigned int msec,
+int media_uv_player_seek(void* handle, unsigned int position,
     media_uv_callback on_seek, void* cookie);
 
 /**
  * @brief Set properties of the player handle.
  *
- * @param[in] handle      Async player handle.
- * @param[in] target      Target filter
- * @param[in] key         Key
- * @param[in] value       Value
- * @param[in] on_setprop  Call after receiving result.
- * @param[in] cookie      One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] handle        Async player handle.
+ * @param[in] target        Target filter
+ * @param[in] key           Key
+ * @param[in] value         Value
+ * @param[out] on_setprop   Call after receiving result.
+ * @param[in] cookie        Callback argument for `on_setprop`.
+ * @return int  Zero on success; a negated errno value on failure.
  */
 int media_uv_player_set_property(void* handle, const char* target, const char* key,
     const char* value, media_uv_callback on_setprop, void* cookie);
@@ -646,11 +551,11 @@ int media_uv_player_set_property(void* handle, const char* target, const char* k
 /**
  * @brief Get properties of the player handle.
  *
- * @param[in] handle      Async player handle.
- * @param[in] target      Target filter
- * @param[in] key         Key
- * @param[in] on_getprop  Call after receiving result.
- * @param[in] cookie      One-time callback context.
+ * @param[in] handle        Async player handle.
+ * @param[in] target        Target filter
+ * @param[in] key           Key
+ * @param[out] on_getprop   Call after receiving result.
+ * @param[in] cookie        Callback argument for `on_getprop`.
  * @return Zero on success; a negated errno value on failure.
  */
 int media_uv_player_get_property(void* handle, const char* target, const char* key,
@@ -659,9 +564,9 @@ int media_uv_player_get_property(void* handle, const char* target, const char* k
 /**
  * @brief Query metadata of the player handle.
  *
- * @param[in] handle      Async player handle.
- * @param[in] on_query    Callback to receive metadata ptr.
- * @param[in] cookie      One-time callback context.
+ * @param[in] handle    Async player handle.
+ * @param[out] on_query Callback to receive metadata ptr.
+ * @param[in] cookie    Callback argument for `on_query`.
  * @return Zero on success; a negated errno value on failure.
  *
  * @note Each player handle has unique media_metadata_s;

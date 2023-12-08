@@ -36,69 +36,162 @@ extern "C" {
 #endif
 
 /****************************************************************************
- * Public Controller Functions
+ * Public Functions
  ****************************************************************************/
 
 /**
- * Open a session path as controller.
- * @param[in] params    Not used yet.
- * @return Pointer to created handle or NULL on failure.
+ * @brief Open a session controller.
+ *
+ * @param[in] params    NULL, Not used yet.
+ * @return void*    Controller handle, NULL on error.
+ *
+ * @note The control messages sent from controller is always passed to
+ * the most active controlee.
+ *                                                +---------------+
+ * +------------+                                 | Media Session |
+ * |            | start, pause, stop -------------+---+           |
+ * | Controller |                                 |   |           |
+ * |            | on_event() <----- MEDIA_EVENT_* +-+ |           |
+ * +------------+                                 | | |           |
+ *                                                | | |           |
+ * +------------+                                 | | |           |
+ * |            | --------------------------------+-+ |           |
+ * | Controllee |                                 |   |           |
+ * |            | <-------------------------------+---+           |
+ * +------------+                                 +---------------+
  */
 void* media_session_open(const char* params);
 
 /**
- * Close the session path.
- * @param[in] handle    The session path to be destroyed.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Close the session controller.
+ *
+ * @param[in] handle    Controller handle
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_session_close(void* handle);
 
 /**
- * Set event callback to the session path, the callback will be called
- * when state of the most active player changed.
- * @param[in] handle    The session path.
- * @param[in] cookie    User cookie, will bring back to user when do event_cb.
- * @param[in] event_cb  Event callback.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Set event callback to receive message from controllee.
+ *
+ * @param[in] handle    Controller handle
+ * @param[in] cookie    Callback argument for `on_event`.
+ * @param[out] on_event Callback to receive events.
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @code
+ *  void user_on_event(void* cookie, int event, int result, cosnt char* extra) {
+ *      switch (event) {
+ *      case MEDIA_EVENT_CHANGED:
+ *          // The most active controllee changed, you should clear
+ *          // the metadata you queried, and query again (if you cares).
+ *          break;
+ *
+ *      case MEDIA_EVENT_UPDATED:
+ *          // The most active controllee updated its metadata, also
+ *          // you should query again (if you cares).
+ *          break;
+ *
+ *      case MEDIA_EVENT_START:
+ *      case MEDIA_EVENT_PAUSE:
+ *      case MEDIA_EVENT_STOP:
+ *      case MEDIA_EVENT_PREV_SONG:
+ *      case MEDIA_EVENT_NEXT_SONG:
+ *      case MEDIA_EVENT_INCREASE_VOLUME:
+ *      case MEDIA_EVENT_DECREASE_VOLUME:
+ *          // These are the process result of your control message,
+ *          // sent by controllee.
+ *          break;
+ *      }
+ *  }
+ * @endcode
  */
 int media_session_set_event_callback(void* handle, void* cookie,
-    media_event_callback event_cb);
+    media_event_callback on_event);
 
 /**
- * Start a player through sessoin path.
- * @param[in] handle    The session path.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Request start.
+ *
+ * @param[in] handle    Controller handle.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_session_start(void* handle);
 
 /**
- * Stop the most active player through sessoin path.
- * @param[in] handle    The session path.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Request stop.
+ *
+ * @param[in] handle    Controller handle.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_session_stop(void* handle);
 
 /**
- * Pause the most active player through sessoin path.
- * @param[in] handle    The session path.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Request pause.
+ *
+ * @param[in] handle    Controller handle.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_session_pause(void* handle);
 
 /**
- * Seek to msec position from begining
- * @param[in] handle    The player path
- * @param[in] msec      Which postion should seek from begining
- * @return Zero on success; a negated errno value on failure.
+ * @brief Request seek.
+ *
+ * @param[in] handle    Controller handle.
+ * @param[in] position  The msec position from beginning.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @warning not implement yet.
  */
-int media_session_seek(void* handle, unsigned int msec);
+int media_session_seek(void* handle, unsigned position);
+
+/**
+ * @brief Request play previous song.
+ *
+ * @param[in] handle    Controller handle.
+ * @return Zero on success; a negative errno value on failure.
+ */
+int media_session_prev_song(void* handle);
+
+/**
+ * @brief Request play next song.
+ *
+ * @param[in] handle    Controller handle.
+ * @return Zero on success; a negative errno value on failure.
+ */
+int media_session_next_song(void* handle);
+
+/**
+ * @brief Request increase volume.
+ *
+ * @param[in] handle    Controller handle.
+ * @return int  Zero on success; a negative errno value on failure.
+ */
+int media_session_increase_volume(void* handle);
+
+/**
+ * @brief Request decrease volume.
+ *
+ * @param[in] handle    Controller handle.
+ * @return int  Zero on success; a negative errno value on failure.
+ */
+int media_session_decrease_volume(void* handle);
+
+/**
+ * @brief Rquest set volume.
+ *
+ * @param[in] handle    Controller handle.
+ * @param[in] volume    Volume index.
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @warning not implement yet.
+ */
+int media_session_set_volume(void* handle, int volume);
 
 /**
  * @brief Query metadata from most active controllee.
  *
  * @param[in] handle    Controller handle.
  * @param[out] data     Pointer to receive metadata ptr.
- * @return Zero on success; a negated errno value on failure.
+ * @return Zero on success; a negative errno value on failure.
  *
  * @note Each controller handle has unique media_metadata_s;
  * This api only update the content, won't changing address of metadata.
@@ -111,209 +204,286 @@ int media_session_seek(void* handle, unsigned int msec);
 int media_session_query(void* handle, const media_metadata_t** data);
 
 /**
- * Get current player state through sessoin path.
- * @param[in] handle    The session path.
+ * @brief Get all status.
+ *
+ * @param[in] handle    Controller handle.
  * @param[out] state    Current state.
- * @return Zero on success; a negated errno value on failure.
+ * @return Zero on success; a negative errno value on failure.
  *
  * @note use `media_session_query` instead if you want full message.
  */
 int media_session_get_state(void* handle, int* state);
 
 /**
- * Get playback position of the most active player through sessoin path.
- * @param[in] handle    The session path
- * @param[in] msec      Playback position (from begining)
- * @return Zero on success; a negated errno value on failure.
+ * @brief Get msec position.
  *
- * @note use `media_session_query` instead
- * if you need the whole metadata of controlee.
- */
-int media_session_get_position(void* handle, unsigned int* msec);
-
-/**
- * Get playback file duration of the most active player through sessoin path.
- * @param[in] handle    The session path
- * @param[in] msec      File duration
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] handle    Controller handle.
+ * @param[out] position Current msec position.
+ * @return Zero on success; a negative errno value on failure.
  *
- * @note use `media_session_query` instead
- * if you need the whole metadata of controlee.
+ * @note use `media_session_query` instead if you want full message.
  */
-int media_session_get_duration(void* handle, unsigned int* msec);
+int media_session_get_position(void* handle, unsigned* position);
 
 /**
- * Set the most active player path volume through sessoin path.
- * @param[in] handle    The session path
- * @param[in] volume    Volume index of stream type, with range of 1 - 10
- * @return Zero on success; a negated errno value on failure.
+ * @brief Get msec duration.
+ *
+ * @param[in] handle    Controller handle.
+ * @param[out] duration Current msec duration.
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @note use `media_session_query` instead if you want full message.
  */
-int media_session_set_volume(void* handle, int volume);
+int media_session_get_duration(void* handle, unsigned* duration);
 
 /**
- * Get the most active player path volume through sessoin path.
- * @param[in] handle    The session path
- * @param[in] volume    Volume index of stream type, with range of 1 - 10
- * @return Zero on success; a negated errno value on failure.
+ * @brief Get current volume index.
+ *
+ * @param[in] handle    Controller handle.
+ * @param[out] volume   Volume index.
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @note use `media_session_query` instead if you want full message.
  */
 int media_session_get_volume(void* handle, int* volume);
 
 /**
- * Increase the most active player path volume through sessoin path.
- * @param[in] handle    The session path
- * @return Zero on success; a negated errno value on failure.
+ * @brief Register as a session controllee.
+ *
+ * @param[in] cookie    Callback arguemnt of `on_event`.
+ * @param[out] on_event Event callback.
+ * @return void*    Controllee handle, NULL on failure.
+ *
+ * @note Only the most active controllee would receive control message
+ * and notify result from&to controllers;
+ * If there are many controllees and you want to become the most active one,
+ * just call update your metadata and set state > 0.
+ *
+ *                                                +---------------+
+ * +------------+                                 | Media Session |
+ * |            | --------------------------------+---+           |
+ * | Controller |                                 |   |           |
+ * |            | <-------------------------------+-+ |           |
+ * +------------+                                 | | |           |
+ *                                                | | |           |
+ * +------------+                                 | | |           |
+ * |            | notify, update -----------------+-+ |           |
+ * | Controllee |                                 |   |           |
+ * |            | on_event() <----- MEDIA_EVENT_* +---+           |
+ * +------------+                                 +---------------+
  */
-int media_session_increase_volume(void* handle);
+void* media_session_register(void* cookie, media_event_callback on_event);
 
 /**
- * Decrease the most active player path volume through sessoin path.
- * @param[in] handle    The session path
- * @return Zero on success; a negated errno value on failure.
- */
-int media_session_decrease_volume(void* handle);
-
-/**
- * Play previous song in player list through sessoin path.
- * @param[in] handle    The session path.
- * @return Zero on success; a negated errno value on failure.
- * @note media framework has no player list, such function shall be
- * implemented by player.
- */
-int media_session_prev_song(void* handle);
-
-/**
- * Play next song in player list through sessoin path.
- * @param[in] handle    The session path.
- * @return Zero on success; a negated errno value on failure.
- * @note media framework has no player list, such function shall be
- * implemented by player.
- */
-int media_session_next_song(void* handle);
-
-/****************************************************************************
- * Public Controllee Functions
- ****************************************************************************/
-
-/**
- * Register a session path as player(controllee).
- * @param[in] cookie    User cookie, will bring back to user when do event_cb.
- * @param[in] event_cb  Event callback.
- * @return Pointer to created handle or NULL on failure.
- */
-void* media_session_register(void* cookie, media_event_callback event_cb);
-
-/**
- * Unregister the session path.
- * @param[in] handle    The session path to be destroyed.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Unregister the session controllee.
+ *
+ * @param[in] handle    Controllee handle.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_session_unregister(void* handle);
 
 /**
- * Report event to media sessions as player(controllee).
- * @note Should only report event that media framework cannot know,
- * such as MEDIA_EVENT_DONENEXT.
- * @param[in] handle    The session path.
- * @param[in] event     Event, use MEDIA_EVENT_*.
- * @param[in] result    Exec result.
- * @param[in] extra     Extra message.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Notify the result of control message.
  *
- * @deprecated Should use `media_session_update` instead.
+ * After receive MEDIA_EVENT_* from `on_event`, as controllee you should
+ * do something to handle the control message, after you acknowledge the
+ * control message, you should call this api to send response to the controller.
+ *
+ * @param[in] handle    Controllee handle.
+ * @param[in] event     MEDIA_EVENT_*
+ * @param[in] result    Result, 0 on succes, negative errno on error.
+ * @param[in] extra     Extra message.
+ * @return int  Zero on success; a negative errno value on failure.
  */
-int media_session_notify(void* handle, int event,
-    int result, const char* extra);
+int media_session_notify(void* handle, int event, int result, const char* extra);
 
 /**
- * @brief Update metadata to session, would notify controllers in need.
+ * @brief Update metadata to session.
  *
- * @param[in] handle    Handle.
+ * @param[in] handle    Controllee handle.
  * @param[in] data      Metadata to update.
- * @return Zero on success; a negated errno value on failure.
+ * @return int  Zero on success; a negative errno value on failure.
  */
 int media_session_update(void* handle, const media_metadata_t* data);
 
 #ifdef CONFIG_LIBUV
-/****************************************************************************
- * Public Async Controller Functions
- ****************************************************************************/
-
 /**
- * Open a session path as controller.
+ * @brief Open an async session controller.
+ *
  * @param[in] loop      Loop handle of current thread.
  * @param[in] params    Not used yet.
- * @param[in] on_open   Open callback, called after open is done.
+ * @param[out] on_open  Open callback, called after open is done.
  * @param[in] cookie    Long-term callback context for:
- *         on_open, on_event, on_close.
- * @return void* Handle of Controller.
+ *                      on_open, on_event, on_close.
+ * @return void*    Async controller handle.
+ *
+ * @note This is async version of `media_session_open`, see this
+ * API for more information about media session mechanism.
+ *
+ * @note Even if `on_open` has not been called, you can call other
+ * handle-based async APIs, and they will be queued inside the
+ * player handle as requests, and processed in order after
+ * `open` is completed.
+ *
+ * @code example1.
+ *  // 1. open a session controller instance.
+ *  ctx->handle = media_uv_session_open(loop, NULL, NULL, ctx);
+ *
+ *  // 2. request playing (delay till open is done).
+ *  media_uv_session_start(ctx->handle, NULL, NULL);
+ * @endcode example1.
+ *
+ * @code example2.
+ *  void user_on_open(void* cookie, int ret) {
+ *      UserContext* ctx = cookie;
+ *
+ *      if (ret < 0)
+ *          media_uv_player_close(ctx->handle, user_on_close);
+ *      else
+ *          media_uv_session_start(ctx->handle, user_on_start, ctx);
+ *  }
+ *
+ *  ctx->handle = media_uv_session_open(loop, MEDIA_STREAM_MUSIC,
+ *      user_on_open, ctx);
+ * @endcode example2.
  */
 void* media_uv_session_open(void* loop, char* params,
     media_uv_callback on_open, void* cookie);
 
 /**
- * Close the session path.
- * @param[in] handle    The session path to be destroyed.
- * @param[in] on_close  Close callback, called after close is done.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Close the async controller handle.
+ *
+ * @param[in] handle    Async controller handle. to be destroyed.
+ * @param[out] on_close Close callback, called after close is done.
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @note It's safe to call this api before `on_open` of `media_uv_session_open`
+ * is called, but other api calls would be canceled, there `on_xxx` callback
+ * would be called with ret == -ECANCELD.
  */
 int media_uv_session_close(void* handle, media_uv_callback on_close);
 
 /**
- * Set event callback to the session path, the callback will be called
- * when state of the most active player changed.
- * @param[in] handle    The session path.
- * @param[in] on_event  Event callback.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Listen to the events from controllee.
+ *
+ * @param[in] handle    Async Controller handle.
+ * @param[out] on_event Event callback.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This is async version of `media_session_set_event_callback`,
+ * see this API for more information about media session mechanism.
  */
 int media_uv_session_listen(void* handle, media_event_callback on_event);
 
 /**
- * Start a player through sessoin path.
- * @param[in] handle    The session path.
- * @param[in] on_start  Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Request start.
+ *
+ * @param[in] handle    Async Controller handle.
+ * @param[out] on_start Call after receiving result.
+ * @param[in] cookie    Callback argument of `on_start`
+ * @return Zero on success; a negative errno value on failure.
  */
 int media_uv_session_start(void* handle, media_uv_callback on_start,
     void* cookie);
 
 /**
- * Stop the most active player through sessoin path.
- * @param[in] handle    The session path.
- * @param[in] on_stop   Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Request stop.
+ *
+ * @param[in] handle    Async Controller handle.
+ * @param[out] on_stop  Call after receiving result.
+ * @param[in] cookie    Callback argument of `on_stop`
+ * @return Zero on success; a negative errno value on failure.
  */
 int media_uv_session_stop(void* handle, media_uv_callback on_stop,
     void* cookie);
 
 /**
- * Pause the most active player through sessoin path.
- * @param[in] handle    The session path.
- * @param[in] on_pause  Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Request pause.
+ *
+ * @param[in] handle    Async Controller handle.
+ * @param[out] on_pause Call after receiving result.
+ * @param[in] cookie    Callback argument of `on_pause`
+ * @return Zero on success; a negative errno value on failure.
  */
 int media_uv_session_pause(void* handle, media_uv_callback on_pause, void* cookie);
 
 /**
- * Seek to msec position from begining
+ * @brief Request seek.
+ *
  * @param[in] handle    The player path
- * @param[in] msec      Which postion should seek from begining
- * @param[in] on_seek   Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] position  The msec position from beginning.
+ * @param[out] on_seek  Call after receiving result.
+ * @param[in] cookie    Callback argument of `on_seek`
+ * @return Zero on success; a negative errno value on failure.
  */
-int media_uv_session_seek(void* handle, unsigned int msec,
+int media_uv_session_seek(void* handle, unsigned position,
     media_uv_callback on_seek, void* cookie);
 
 /**
- * @brief Query metadata from most active controllee.
+ * @brief Request play previous song.
+ *
+ * @param[in] handle    Async Controller handle.
+ * @param[out] on_prev  Call after receiving result.
+ * @param[in] cookie    Callback argument of `on_prev`
+ * @return Zero on success; a negative errno value on failure.
+ */
+int media_uv_session_prev_song(void* handle,
+    media_uv_callback on_pre_song, void* cookie);
+
+/**
+ * @brief Request play next song.
+ *
+ * @param[in] handle    Async Controller handle.
+ * @param[out] on_next  Call after receiving result.
+ * @param[in] cookie    Callback argument of `on_next`
+ * @return Zero on success; a negative errno value on failure.
+ */
+int media_uv_session_next_song(void* handle,
+    media_uv_callback on_next, void* cookie);
+
+/**
+ * @brief Request increase volume.
+ *
+ * @param[in] handle        Async controller handle.
+ * @param[out] on_increase  Call after receiving result.
+ * @param[in] cookie        Callback argument of `on_increase`
+ * @return Zero on success; a negative errno value on failure.
+ */
+int media_uv_session_increase_volume(void* handle,
+    media_uv_callback on_increase, void* cookie);
+
+/**
+ * @brief Request decrease volume.
+ *
+ * @param[in] handle        Async controller handle.
+ * @param[out] on_decrease  Call after receiving result.
+ * @param[in] cookie        Callback argument of `on_decrease`
+ * @return Zero on success; a negative errno value on failure.
+ */
+int media_uv_session_decrease_volume(void* handle,
+    media_uv_callback on_decrease, void* cookie);
+
+/**
+ * @brief Request set volume.
+ *
+ * @param[in] handle        Async controller handle.
+ * @param[in] Volume        Volume index.
+ * @param[out] on_volume    Call after receiving result.
+ * @param[in] cookie        Callback argument of `on_volume`
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @warning Not impletement yet.
+ */
+int media_uv_session_set_volume(void* handle, int volume,
+    media_uv_callback on_set_volume, void* cookie);
+
+/**
+ * @brief Query full status.
  *
  * @param[in] handle    Async controller handle.
- * @param[in] on_query  Callback to receive metadata ptr.
+ * @param[out] on_query Callback to receive metadata ptr.
  * @param[in] cookie    Callback argument.
- * @return Zero on success; a negated errno value on failure.
+ * @return Zero on success; a negative errno value on failure.
  *
  * @note Each controller handle has unique media_metadata_s;
  * This api only update the content, won't changing address of metadata.
@@ -331,112 +501,68 @@ int media_uv_session_query(void* handle,
     media_uv_object_callback on_query, void* cookie);
 
 /**
- * Get current player state through sessoin path.
- * @param[in] handle    The session path.
- * @param[in] on_state  Call after receiving result.
- * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Get current state.
+ *
+ * @param[in] handle    Async Controller handle.
+ * @param[out] on_state Call after receiving result.
+ * @param[in] cookie    Callback argument of `on_state`
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @warning not implemented yet, use `media_uv_session_query` instead.
  */
 int media_uv_session_get_state(void* handle,
     media_uv_int_callback on_state, void* cookie);
 
 /**
- * Get playback position of the most active player through sessoin path.
- * @param[in] handle       The session path
- * @param[in] on_position  Call after receiving result.
- * @param[in] cookie       One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Get current position.
+ *
+ * @param[in] handle        Async controller handle.
+ * @param[out] on_position  Call after receiving result.
+ * @param[in] cookie        Callback argument of `on_position`
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @warning not implemented yet, use `media_uv_session_query` instead.
  */
 int media_uv_session_get_position(void* handle,
     media_uv_unsigned_callback on_position, void* cookie);
 
 /**
- * Get playback file duration of the most active player through sessoin path.
- * @param[in] handle        The session path
- * @param[in] on_duration   Call after receiving result.
- * @param[in] cookie        One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Get current duration.
+ *
+ * @param[in] handle        Async controller handle.
+ * @param[out] on_duration  Call after receiving result.
+ * @param[in] cookie        Callback argument of `on_duration`
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @warning not implemented yet, use `media_uv_session_query` instead.
  */
 int media_uv_session_get_duration(void* handle,
     media_uv_unsigned_callback on_duration, void* cookie);
 
 /**
- * Set the most active player path volume through sessoin path.
- * @param[in] handle        The session path
- * @param[in] Volume        Volume index of stream type, with range of 1 - 10
- * @param[in] on_set_volume Call after receiving result.
- * @param[in] cookie        One-time callback context.
- * @return Zero on success; a negated errno value on failure.
- */
-int media_uv_session_set_volume(void* handle, unsigned int* volume,
-    media_uv_callback on_set_volume, void* cookie);
-
-/**
- * Get the most active player path volume through sessoin path.
- * @param[in] handle        The session path
- * @param[in] on_get_volume Call after receiving result.
- * @param[in] cookie        One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @brief Get current volume.
+ *
+ * @param[in] handle        Async controller handle.
+ * @param[out] on_volume    Call after receiving result.
+ * @param[in] cookie        Callback argument of `on_volume`
+ * @return Zero on success; a negative errno value on failure.
+ *
+ * @warning not implemented yet, use `media_uv_session_query` instead.
  */
 int media_uv_session_get_volume(void* handle,
     media_uv_int_callback on_get_volume, void* cookie);
 
 /**
- * Increase the most active player path volume through sessoin path.
- * @param[in] handle      The session path
- * @param[in] on_increase Call after receiving result.
- * @param[in] cookie      One-time callback context.
- * @return Zero on success; a negated errno value on failure.
- */
-int media_uv_session_increase_volume(void* handle, media_uv_callback on_increase,
-    void* cookie);
-
-/**
- * Decrease the most active player path volume through sessoin path.
- * @param[in] handle      The session path
- * @param[in] on_decrease Call after receiving result.
- * @param[in] cookie      One-time callback context.
- * @return Zero on success; a negated errno value on failure.
- */
-int media_uv_session_decrease_volume(void* handle, media_uv_callback on_decrease,
-    void* cookie);
-
-/**
- * Play previous song in player list through sessoin path.
- * @param[in] handle      The session path.
- * @param[in] on_pre_song Call after receiving result.
- * @param[in] cookie      One-time callback context.
- * @return Zero on success; a negated errno value on failure.
- * @note media framework has no player list, such function shall be
- * implemented by player.
- */
-int media_uv_session_prev_song(void* handle,
-    media_uv_callback on_pre_song, void* cookie);
-
-/**
- * Play next song in player list through sessoin path.
- * @param[in] handle       The session path.
- * @param[in] on_next_song Call after receiving result.
- * @param[in] cookie       One-time callback context.
- * @return Zero on success; a negated errno value on failure.
- * @note media framework has no player list, such function shall be
- * implemented by player.
- */
-int media_uv_session_next_song(void* handle,
-    media_uv_callback on_next_song, void* cookie);
-
-/****************************************************************************
- * Public Async Controllee Functions
- ****************************************************************************/
-
-/**
  * @brief Register as a session controllee to receive control message.
  *
  * @param[in] loop      Loop handle of current thread.
- * @param[in] params    Not used yet.
- * @param[in] on_event  Callback to receive control message.
+ * @param[in] params    NULL, not used yet.
+ * @param[out] on_event Callback to receive control message.
  * @param[in] cookie    Callback argument.
- * @return void*    Handle of session, NULL on error.
+ * @return void*    Async controlee handle, NULL on error.
+ *
+ * @note This is async version of `media_session_register`, see this
+ * API for more information about media session mechanism.
  */
 void* media_uv_session_register(void* loop, const char* params,
     media_event_callback on_event, void* cookie);
@@ -444,20 +570,24 @@ void* media_uv_session_register(void* loop, const char* params,
 /**
  * @brief Unregister self.
  *
- * @param[in] handle        Handle.
- * @param[in] on_release    Callabck to release caller's own resources.
- * @return int          Zero on success, negative errno on failure.
+ * @param[in] handle        Async controllee handle..
+ * @param[out] on_release   Callabck to release caller's own resources.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_session_unregister(void* handle, media_uv_callback on_release);
 
 /**
- * @brief Notify result of control message, or other important events.
+ * @brief  Notify the result of control message.
  *
- * @param[in] handle    Handle.
+ * After receive MEDIA_EVENT_* from `on_event`, as controllee you should
+ * do something to handle the control message, after you acknowledge the
+ * control message, you should call this api to send response to the controller.
+ *
+ * @param[in] handle    Async controllee handle.
  * @param[in] event     Event to notify.
  * @param[in] result    Result of event, usually zero on success, negative errno on failure.
  * @param[in] extra     Extra string message of event, NULL if not need.
- * @param[in] on_notify Callback to acknowledge notify is done.
+ * @param[out] on_notify Callback to acknowledge notify is done.
  * @param[in] cookie    Callback argument.
  * @return int  Zero on success, negative errno on failure.
  */
@@ -465,12 +595,12 @@ int media_uv_session_notify(void* handle, int event, int result, const char* ext
     media_uv_callback on_notify, void* cookie);
 
 /**
- * @brief Update metadata to session, would notify controllers in need.
+ * @brief Update metadata to session.
  *
- * @param[in] handle    Async controllee handle.
- * @param[in] data      Metadata to update.
- * @param[in] on_update Callback to acknowledge update is done.
- * @param[in] cookie    Callback argument.
+ * @param[in] handle        Async controllee handle.
+ * @param[in] data          Metadata to update.
+ * @param[out] on_update    Callback to acknowledge update is done.
+ * @param[in] cookie        Callback argument.
  * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_session_update(void* handle, const media_metadata_t* data,
