@@ -47,19 +47,20 @@
 /**
  * @brief Callback to receive suggestions.
  *
- * @param[in] suggestion    @see MEIDA_FOCUS_* .
- * @param[in] cookie        Argument set by `media_focus_request`.
+ * @param[in] suggestion    MEIDA_FOCUS_* .
+ * @param[in] cookie        Argument set by focus request.
+ *
  * @code
- *  void demo_focu_callback(int suggestion, void* cookie)
+ *  void user_focu_callback(int suggestion, void* cookie)
  *  {
  *      switch(suggestion) {
- *          case MEDIA_FOCUS_PLAY:
- *          case MEDIA_FOCUS_STOP:
- *          case MEDIA_FOCUS_PAUSE:
- *          case MEDIA_FOCUS_PLAY_BUT_SILENT:
- *          case MEDIA_FOCUS_PLAY_WITH_DUCK:
- *          case MEDIA_FOCUS_PLAY_WITH_KEEP:
- *          default:
+ *      case MEDIA_FOCUS_PLAY:
+ *      case MEDIA_FOCUS_STOP:
+ *      case MEDIA_FOCUS_PAUSE:
+ *      case MEDIA_FOCUS_PLAY_BUT_SILENT:
+ *      case MEDIA_FOCUS_PLAY_WITH_DUCK:
+ *      case MEDIA_FOCUS_PLAY_WITH_KEEP:
+ *      default:
  *      }
  *  }
  * @endcode
@@ -71,12 +72,12 @@ typedef void (*media_focus_callback)(int suggestion, void* cookie);
  ****************************************************************************/
 
 /**
- * @brief Allow application to request audio focus.
+ * @brief Request Audio Focus.
  *
- * @param[out] initial_suggestion   @see MEIDA_FOCUS_* .
- * @param[in]  scenario             @see MEDIA_SCENARIO_* .
- * @param[in]  on_suggestion        Callback to receive suggestions.
- * @param[in]  cookie               Argument for callback.
+ * @param[out] initial_suggestion   MEIDA_FOCUS_* .
+ * @param[in] scenario              MEDIA_SCENARIO_* .
+ * @param[out] on_suggestion        Callback to receive suggestions.
+ * @param[in] cookie                Callback argument.
  * @return Handle, NULL on failure.
  *
  * @note If `initial_suggestion` is `MEDIA_FOCUS_STOP`, `on_suggestion`
@@ -87,7 +88,7 @@ typedef void (*media_focus_callback)(int suggestion, void* cookie);
  *  int initial_suggestion;
  *
  *  context->handle = media_focus_request(&initial_suggestion,
- *      MEDIA_STREAM_ALARM, demo_focu_callback, context);
+ *      MEDIA_SCENARIO_MUSIC, demo_focu_callback, context);
  *  if (!context->handle)
  *      ; // handle error
  *
@@ -111,6 +112,8 @@ int media_focus_abandon(void* handle);
  * @brief Dump focus stack.
  *
  * @param[in] options   Dump options(unused so far).
+ *
+ * @deprecated would merge into `media_dump()`.
  */
 void media_focus_dump(const char* options);
 
@@ -118,21 +121,38 @@ void media_focus_dump(const char* options);
 /**
  * @brief Request audio focus.
  *
- * @param[in] loop          Handle uv_loop_t* of current thread.
- * @param[in] scenario      @see MEDIA_SCENARIO_*.
- * @param[in] on_suggest    Callback to get focus suggestion.
- * @param[in] cookie        Callback argument.
- * @return void*        Handle of focus.
+ * @param[in] loop              Handle uv_loop_t* of current thread.
+ * @param[in] scenario          MEDIA_SCENARIO_*.
+ * @param[out] on_suggestion    Callback to get focus suggestion.
+ * @param[in] cookie            Callback argument.
+ * @return void*    Async focus handle.
+ *
+ * @note After `on_suggestion` give `MEDIA_FOCUS_STOP`, you should
+ * abandon the handle by `media_uv_focus_abandon`.
+ *
+ * @code
+ *  void user_on_suggestion(int, suggestion, void* cookie) {
+ *      UserContext* ctx = cookie;
+ *
+ *      switch (suggestion) {
+ *      case MEDIA_FOCUS_STOP:
+ *          media_uv_focus_abandon();
+ *      }
+ *  }
+ *
+ *  ctx->handle = media_uv_focus_request(loop, MEDIA_SCENARIO_MUSIC,
+ *      user_on_suggestion, ctx);
+ * @endcode
  */
 void* media_uv_focus_request(void* loop, const char* scenario,
-    media_focus_callback on_suggest, void* cookie);
+    media_focus_callback on_suggestion, void* cookie);
 
 /**
  * @brief Abandon audio focus.
  *
- * @param[in] handle        Handle of focus.
+ * @param[in] handle        Async focus handle..
  * @param[in] on_abandon    Callback to release cookie.
- * @return int          Zero on success, negative errno on failure.
+ * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_focus_abandon(void* handle, media_uv_callback on_abandon);
 #endif
