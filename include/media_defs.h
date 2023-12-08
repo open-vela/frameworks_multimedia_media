@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/include/media_event.h
+ * frameworks/media/include/media_defs.h
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,8 +18,12 @@
  *
  ****************************************************************************/
 
-#ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H
-#define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H
+#ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_DEFS_H
+#define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_DEFS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /****************************************************************************
  * Event Definitions
@@ -91,6 +95,90 @@
  */
 typedef void (*media_event_callback)(void* cookie, int event, int result,
     const char* extra);
+
+/****************************************************************************
+ * Focus Definitions
+ ****************************************************************************/
+
+/* Suggestions for users. */
+
+#define MEDIA_FOCUS_PLAY 0
+#define MEDIA_FOCUS_STOP 1
+#define MEDIA_FOCUS_PAUSE 2
+#define MEDIA_FOCUS_PLAY_BUT_SILENT 3
+#define MEDIA_FOCUS_PLAY_WITH_DUCK 4 /* Play with low volume. */
+#define MEDIA_FOCUS_PLAY_WITH_KEEP 5 /* Nothing should be done. */
+
+/**
+ * @brief Callback to receive suggestions.
+ *
+ * @param[in] suggestion    MEIDA_FOCUS_* .
+ * @param[in] cookie        Argument set by focus request.
+ *
+ * @code
+ *  void user_focu_callback(int suggestion, void* cookie)
+ *  {
+ *      switch(suggestion) {
+ *      case MEDIA_FOCUS_PLAY:
+ *      case MEDIA_FOCUS_STOP:
+ *      case MEDIA_FOCUS_PAUSE:
+ *      case MEDIA_FOCUS_PLAY_BUT_SILENT:
+ *      case MEDIA_FOCUS_PLAY_WITH_DUCK:
+ *      case MEDIA_FOCUS_PLAY_WITH_KEEP:
+ *      default:
+ *      }
+ *  }
+ * @endcode
+ */
+typedef void (*media_focus_callback)(int suggestion, void* cookie);
+
+/****************************************************************************
+ * Scenario Definitions
+ ****************************************************************************/
+
+/* Scenario types, for focus. */
+
+#define MEDIA_SCENARIO_INCALL "SCO"
+#define MEDIA_SCENARIO_RING "Ring"
+#define MEDIA_SCENARIO_ALARM "Alarm"
+#define MEDIA_SCENARIO_DRAIN "Enforced"
+#define MEDIA_SCENARIO_NOTIFICATION "Notify" /* message notification */
+#define MEDIA_SCENARIO_RECORD "Record"
+#define MEDIA_SCENARIO_TTS "TTS" /* text-to-speech */
+#define MEDIA_SCENARIO_ACCESSIBILITY "Health" /* health notification */
+#define MEDIA_SCENARIO_SPORT "Sport"
+#define MEDIA_SCENARIO_INFO "Info"
+#define MEDIA_SCENARIO_MUSIC "Music"
+
+/****************************************************************************
+ * Stream Definitions
+ ****************************************************************************/
+
+/* Stream types, for player and policy. */
+
+#define MEDIA_STREAM_RING "Ring"
+#define MEDIA_STREAM_ALARM "Alarm"
+#define MEDIA_STREAM_SYSTEM_ENFORCED "Enforced"
+#define MEDIA_STREAM_NOTIFICATION "Notify"
+#define MEDIA_STREAM_RECORD "Record"
+#define MEDIA_STREAM_TTS "TTS"
+#define MEDIA_STREAM_ACCESSIBILITY "Health"
+#define MEDIA_STREAM_SPORT "Sport"
+#define MEDIA_STREAM_INFO "Info"
+#define MEDIA_STREAM_MUSIC "Music"
+#define MEDIA_STREAM_EMERGENCY "Emergency"
+#define MEDIA_STREAM_CALLRING "CallRing"
+#define MEDIA_STREAM_MEDIA "Media" /* video */
+#define MEDIA_STREAM_A2DP_SNK "A2dpsnk" /* bt music */
+#define MEDIA_STREAM_INCALL "SCO" /* @deprecated */
+
+/****************************************************************************
+ * Source Definitions
+ ****************************************************************************/
+
+/* Source types, for recorder. */
+
+#define MEDIA_SOURCE_MIC "Capture"
 
 /****************************************************************************
  * Metadata Definitions
@@ -170,4 +258,8 @@ typedef void (*media_uv_string_callback)(void* cookie, int ret, const char* val)
  */
 typedef void (*media_uv_object_callback)(void* cookie, int ret, void* obj);
 
-#endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_EVENT_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_DEFS_H */

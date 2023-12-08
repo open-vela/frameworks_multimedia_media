@@ -25,8 +25,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <media_event.h>
-#include <media_stream.h>
+#include <media_defs.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus

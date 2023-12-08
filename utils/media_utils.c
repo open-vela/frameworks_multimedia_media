@@ -22,7 +22,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <media_event.h>
+#include <media_defs.h>
 #include <media_utils.h>
 
 #include "media_proxy.h"

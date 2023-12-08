@@ -25,13 +25,12 @@
  * Included Files
  ****************************************************************************/
 
-#include <media_event.h>
+#include <media_defs.h>
 #include <media_focus.h>
 #include <media_player.h>
 #include <media_policy.h>
 #include <media_recorder.h>
 #include <media_session.h>
-#include <media_stream.h>
 #include <media_utils.h>
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_API_H */

@@ -21,7 +21,7 @@
 #ifndef __FRAMEWORKS_MEDIA_MEDIA_SERVER_H__
 #define __FRAMEWORKS_MEDIA_MEDIA_SERVER_H__
 
-#include <media_event.h>
+#include <media_defs.h>
 #include <media_focus.h>
 #include <poll.h>
 

@@ -23,49 +23,8 @@
  * Included Files
  ****************************************************************************/
 
-#include <media_event.h>
-#include <media_stream.h>
+#include <media_defs.h>
 #include <stddef.h>
-
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-/* Suggestions for users. */
-
-#define MEDIA_FOCUS_PLAY 0
-#define MEDIA_FOCUS_STOP 1
-#define MEDIA_FOCUS_PAUSE 2
-#define MEDIA_FOCUS_PLAY_BUT_SILENT 3
-#define MEDIA_FOCUS_PLAY_WITH_DUCK 4 /* Play with low volume. */
-#define MEDIA_FOCUS_PLAY_WITH_KEEP 5 /* Nothing should be done. */
-
-/****************************************************************************
- * Public Types
- ****************************************************************************/
-
-/**
- * @brief Callback to receive suggestions.
- *
- * @param[in] suggestion    MEIDA_FOCUS_* .
- * @param[in] cookie        Argument set by focus request.
- *
- * @code
- *  void user_focu_callback(int suggestion, void* cookie)
- *  {
- *      switch(suggestion) {
- *      case MEDIA_FOCUS_PLAY:
- *      case MEDIA_FOCUS_STOP:
- *      case MEDIA_FOCUS_PAUSE:
- *      case MEDIA_FOCUS_PLAY_BUT_SILENT:
- *      case MEDIA_FOCUS_PLAY_WITH_DUCK:
- *      case MEDIA_FOCUS_PLAY_WITH_KEEP:
- *      default:
- *      }
- *  }
- * @endcode
- */
-typedef void (*media_focus_callback)(int suggestion, void* cookie);
 
 /****************************************************************************
  * Public Functions
