@@ -44,6 +44,7 @@
 
 #define MEDIATOOL_MAX_CHAIN 16
 #define MEDIATOOL_MAX_ARGC 16
+#define MEDIATOOL_MAX_SIZE 1024
 #define MEDIATOOL_PLAYER 1
 #define MEDIATOOL_RECORDER 2
 #define MEDIATOOL_CONTROLLER 3
@@ -62,95 +63,95 @@
 #define GET_ARG(out_type, arg) \
     get_##out_type##_arg(arg)
 
-#define CMD0(func)                                                                    \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media);                \
-    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv) \
-    {                                                                                 \
-        return mediatool_cmd_##func##_exec(media);                                    \
-    }                                                                                 \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media)
+#define CMD0(func)                                                                 \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool);                \
+    static int mediatool_cmd_##func(mediatool_t* mediatool, int argc, char** argv) \
+    {                                                                              \
+        return mediatool_cmd_##func##_exec(mediatool);                             \
+    }                                                                              \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool)
 
-#define CMD1(func, type1, arg1)                                                       \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1);    \
-    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv) \
-    {                                                                                 \
-        type1 arg1;                                                                   \
-        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                              \
-        return mediatool_cmd_##func##_exec(media, arg1);                              \
-    }                                                                                 \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1)
+#define CMD1(func, type1, arg1)                                                    \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, type1 arg1);    \
+    static int mediatool_cmd_##func(mediatool_t* mediatool, int argc, char** argv) \
+    {                                                                              \
+        type1 arg1;                                                                \
+        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                           \
+        return mediatool_cmd_##func##_exec(mediatool, arg1);                       \
+    }                                                                              \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, type1 arg1)
 
-#define CMD2(func, type1, arg1, type2, arg2)                                                   \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2); \
-    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv)          \
-    {                                                                                          \
-        type1 arg1;                                                                            \
-        type2 arg2;                                                                            \
-        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                                       \
-        arg2 = (argc > 2) ? GET_ARG(type2, argv[2]) : 0;                                       \
-        return mediatool_cmd_##func##_exec(media, arg1, arg2);                                 \
-    }                                                                                          \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2)
+#define CMD2(func, type1, arg1, type2, arg2)                                                \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, type1 arg1, type2 arg2); \
+    static int mediatool_cmd_##func(mediatool_t* mediatool, int argc, char** argv)          \
+    {                                                                                       \
+        type1 arg1;                                                                         \
+        type2 arg2;                                                                         \
+        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                                    \
+        arg2 = (argc > 2) ? GET_ARG(type2, argv[2]) : 0;                                    \
+        return mediatool_cmd_##func##_exec(mediatool, arg1, arg2);                          \
+    }                                                                                       \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, type1 arg1, type2 arg2)
 
-#define CMD3(func, type1, arg1, type2, arg2, type3, arg3)                                                  \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3); \
-    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv)                      \
-    {                                                                                                      \
-        type1 arg1;                                                                                        \
-        type2 arg2;                                                                                        \
-        type3 arg3;                                                                                        \
-        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                                                   \
-        arg2 = (argc > 2) ? GET_ARG(type2, argv[2]) : 0;                                                   \
-        arg3 = (argc > 3) ? GET_ARG(type3, argv[3]) : 0;                                                   \
-        return mediatool_cmd_##func##_exec(media, arg1, arg2, arg3);                                       \
-    }                                                                                                      \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3)
+#define CMD3(func, type1, arg1, type2, arg2, type3, arg3)                                               \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, type1 arg1, type2 arg2, type3 arg3); \
+    static int mediatool_cmd_##func(mediatool_t* mediatool, int argc, char** argv)                      \
+    {                                                                                                   \
+        type1 arg1;                                                                                     \
+        type2 arg2;                                                                                     \
+        type3 arg3;                                                                                     \
+        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                                                \
+        arg2 = (argc > 2) ? GET_ARG(type2, argv[2]) : 0;                                                \
+        arg3 = (argc > 3) ? GET_ARG(type3, argv[3]) : 0;                                                \
+        return mediatool_cmd_##func##_exec(mediatool, arg1, arg2, arg3);                                \
+    }                                                                                                   \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, type1 arg1, type2 arg2, type3 arg3)
 
-#define CMD4(func, type1, arg1, type2, arg2, type3, arg3, type4, arg4)                                                 \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3, type4 arg4); \
-    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv)                                  \
-    {                                                                                                                  \
-        type1 arg1;                                                                                                    \
-        type2 arg2;                                                                                                    \
-        type3 arg3;                                                                                                    \
-        type4 arg4;                                                                                                    \
-        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                                                               \
-        arg2 = (argc > 2) ? GET_ARG(type2, argv[2]) : 0;                                                               \
-        arg3 = (argc > 3) ? GET_ARG(type3, argv[3]) : 0;                                                               \
-        arg4 = (argc > 4) ? GET_ARG(type4, argv[4]) : 0;                                                               \
-        return mediatool_cmd_##func##_exec(media, arg1, arg2, arg3, arg4);                                             \
-    }                                                                                                                  \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, type1 arg1, type2 arg2, type3 arg3, type4 arg4)
+#define CMD4(func, type1, arg1, type2, arg2, type3, arg3, type4, arg4)                                              \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, type1 arg1, type2 arg2, type3 arg3, type4 arg4); \
+    static int mediatool_cmd_##func(mediatool_t* mediatool, int argc, char** argv)                                  \
+    {                                                                                                               \
+        type1 arg1;                                                                                                 \
+        type2 arg2;                                                                                                 \
+        type3 arg3;                                                                                                 \
+        type4 arg4;                                                                                                 \
+        arg1 = (argc > 1) ? GET_ARG(type1, argv[1]) : 0;                                                            \
+        arg2 = (argc > 2) ? GET_ARG(type2, argv[2]) : 0;                                                            \
+        arg3 = (argc > 3) ? GET_ARG(type3, argv[3]) : 0;                                                            \
+        arg4 = (argc > 4) ? GET_ARG(type4, argv[4]) : 0;                                                            \
+        return mediatool_cmd_##func##_exec(mediatool, arg1, arg2, arg3, arg4);                                      \
+    }                                                                                                               \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, type1 arg1, type2 arg2, type3 arg3, type4 arg4)
 
-#define CMD8(func, t1, a1, t2, a2, t3, a3, t4, a4, t5, a5, t6, a6, t7, a7, t8, a8)                                             \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, t1 a1, t2 a2, t3 a3, t4 a4, t5 a5, t6 a6, t7 a7, t8 a8); \
-    static int mediatool_cmd_##func(struct mediatool_s* media, int argc, char** argv)                                          \
-    {                                                                                                                          \
-        t1 a1;                                                                                                                 \
-        t2 a2;                                                                                                                 \
-        t3 a3;                                                                                                                 \
-        t4 a4;                                                                                                                 \
-        t5 a5;                                                                                                                 \
-        t6 a6;                                                                                                                 \
-        t7 a7;                                                                                                                 \
-        t8 a8;                                                                                                                 \
-        a1 = (argc > 1) ? GET_ARG(t1, argv[1]) : 0;                                                                            \
-        a2 = (argc > 2) ? GET_ARG(t2, argv[2]) : 0;                                                                            \
-        a3 = (argc > 3) ? GET_ARG(t3, argv[3]) : 0;                                                                            \
-        a4 = (argc > 4) ? GET_ARG(t4, argv[4]) : 0;                                                                            \
-        a5 = (argc > 5) ? GET_ARG(t5, argv[5]) : 0;                                                                            \
-        a6 = (argc > 6) ? GET_ARG(t6, argv[6]) : 0;                                                                            \
-        a7 = (argc > 7) ? GET_ARG(t7, argv[7]) : 0;                                                                            \
-        a8 = (argc > 8) ? GET_ARG(t8, argv[8]) : 0;                                                                            \
-        return mediatool_cmd_##func##_exec(media, a1, a2, a3, a4, a5, a6, a7, a8);                                             \
-    }                                                                                                                          \
-    static int mediatool_cmd_##func##_exec(struct mediatool_s* media, t1 a1, t2 a2, t3 a3, t4 a4, t5 a5, t6 a6, t7 a7, t8 a8)
+#define CMD8(func, t1, a1, t2, a2, t3, a3, t4, a4, t5, a5, t6, a6, t7, a7, t8, a8)                                          \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, t1 a1, t2 a2, t3 a3, t4 a4, t5 a5, t6 a6, t7 a7, t8 a8); \
+    static int mediatool_cmd_##func(mediatool_t* mediatool, int argc, char** argv)                                          \
+    {                                                                                                                       \
+        t1 a1;                                                                                                              \
+        t2 a2;                                                                                                              \
+        t3 a3;                                                                                                              \
+        t4 a4;                                                                                                              \
+        t5 a5;                                                                                                              \
+        t6 a6;                                                                                                              \
+        t7 a7;                                                                                                              \
+        t8 a8;                                                                                                              \
+        a1 = (argc > 1) ? GET_ARG(t1, argv[1]) : 0;                                                                         \
+        a2 = (argc > 2) ? GET_ARG(t2, argv[2]) : 0;                                                                         \
+        a3 = (argc > 3) ? GET_ARG(t3, argv[3]) : 0;                                                                         \
+        a4 = (argc > 4) ? GET_ARG(t4, argv[4]) : 0;                                                                         \
+        a5 = (argc > 5) ? GET_ARG(t5, argv[5]) : 0;                                                                         \
+        a6 = (argc > 6) ? GET_ARG(t6, argv[6]) : 0;                                                                         \
+        a7 = (argc > 7) ? GET_ARG(t7, argv[7]) : 0;                                                                         \
+        a8 = (argc > 8) ? GET_ARG(t8, argv[8]) : 0;                                                                         \
+        return mediatool_cmd_##func##_exec(mediatool, a1, a2, a3, a4, a5, a6, a7, a8);                                      \
+    }                                                                                                                       \
+    static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, t1 a1, t2 a2, t3 a3, t4 a4, t5 a5, t6 a6, t7 a7, t8 a8)
 
 /****************************************************************************
  * Type Declarations
  ****************************************************************************/
 
-struct mediatool_chain_s {
+typedef struct mediatool_chain_s {
     int id;
     int type;
     void* handle;
@@ -165,30 +166,50 @@ struct mediatool_chain_s {
     bool direct;
     char* buf;
     int size;
-};
 
-struct mediatool_s {
-    struct mediatool_chain_s chain[MEDIATOOL_MAX_CHAIN];
-};
+#ifdef CONFIG_LIBUV_EXTENSION
+    void* data;
+    uv_pipe_t* pipe; /* pipe handle object */
+    uv_fs_t fs_req;
+    uv_write_t write_req;
+#endif
+} mediatool_chain_t;
 
-typedef int (*mediatool_func)(struct mediatool_s* media, int argc, char** argv);
+typedef struct mediatool_s {
+    mediatool_chain_t chain[MEDIATOOL_MAX_CHAIN];
+#ifdef CONFIG_LIBUV_EXTENSION
+    uv_loop_t loop;
+    uv_async_queue_t asyncq;
+#endif
+} mediatool_t;
 
-struct mediatool_cmd_s {
+typedef int (*mediatool_func)(mediatool_t* mediatool, int argc, char** argv);
+
+typedef struct mediatool_cmd_s {
     const char* cmd; /* The command text */
     mediatool_func pfunc; /* Pointer to command handler */
     const char* help; /* The help text */
-};
+} mediatool_cmd_t;
 
 typedef char* string_t;
 
 /****************************************************************************
- * Private Data
+ * Private Function Prototypes
  ****************************************************************************/
 
-struct mediatool_s g_mediatool;
 #ifdef CONFIG_LIBUV_EXTENSION
-static uv_loop_t g_mediatool_uvloop;
-static uv_async_queue_t g_mediatool_uvasyncq;
+/* uv recorder buffer mode functions declaration */
+static void mediatool_uv_recorder_alloc_cb(uv_handle_t* handle,
+    unsigned suggested_size, uv_buf_t* buf);
+static void mediatool_uv_recorder_write_cb(uv_fs_t* req);
+static void mediatool_uv_recorder_read_cb(uv_stream_t* stream,
+    ssize_t nread, const uv_buf_t* buf);
+static void mediatool_uv_recorder_connection_cb(void* cookie, int ret, void* obj);
+
+/* uv player buffer mode functions declaration */
+static void mediatool_uv_player_write_cb(uv_write_t* req, int status);
+static void mediatool_uv_player_read_cb(uv_fs_t* req);
+static void mediatool_uv_player_connection_cb(void* cookie, int ret, void* obj);
 #endif
 
 /****************************************************************************
@@ -210,7 +231,7 @@ GET_ARG_FUNC(string_t, arg)
 static void mediatool_controller_callback(void* cookie, int event,
     int ret, const char* extra)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
         __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
@@ -219,7 +240,7 @@ static void mediatool_controller_callback(void* cookie, int event,
 static void mediatool_controllee_callback(void* cookie, int event,
     int ret, const char* extra)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
         __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
@@ -231,12 +252,12 @@ static void mediatool_controllee_callback(void* cookie, int event,
 static void mediatool_controllee_music_callback(void* cookie, int event,
     int ret, const char* extra)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
         __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
 
-    /* Handle control message by media api. */
+    /* Handle control message by mediatool api. */
     switch (event) {
     case MEDIA_EVENT_START:
         ret = media_player_start(chain->handle);
@@ -272,7 +293,7 @@ static void mediatool_controllee_music_callback(void* cookie, int event,
 static void mediatool_event_callback(void* cookie, int event,
     int ret, const char* extra)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
         __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
@@ -280,7 +301,7 @@ static void mediatool_event_callback(void* cookie, int event,
 
 static void mediatool_focus_callback(int suggestion, void* cookie)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
     char* str;
 
     if (suggestion == MEDIA_FOCUS_PLAY) {
@@ -313,7 +334,7 @@ static void mediatool_display_metadata(int id, const media_metadata_t* data)
 #ifdef CONFIG_LIBUV_EXTENSION
 static void mediatool_uv_common_close_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
     chain->handle = NULL;
@@ -322,91 +343,93 @@ static void mediatool_uv_common_close_cb(void* cookie, int ret)
 
 static void mediatool_uv_common_open_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_prepare_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_start_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_pause_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_stop_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+    free(chain->buf);
+    chain->buf = NULL;
 }
 
 static void mediatool_uv_player_reset_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_get_position_cb(void* cookie, int ret, unsigned position)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d val:%u\n", __func__, chain->id, ret, position);
 }
 
 static void mediatool_uv_common_get_duration_cb(void* cookie, int ret, unsigned duration)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d val:%u\n", __func__, chain->id, ret, duration);
 }
 
 static void mediatool_uv_common_get_volume_cb(void* cookie, int ret, float volume)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d val:%f\n", __func__, chain->id, ret, volume);
 }
 
 static void mediatool_uv_common_increase_volume_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_decrease_volume_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_set_volume_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_query_cb(void* cookie, int ret, void* object)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
     mediatool_display_metadata(chain->id, object);
@@ -414,42 +437,256 @@ static void mediatool_uv_common_query_cb(void* cookie, int ret, void* object)
 
 static void mediatool_uv_player_set_looping_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_common_seek_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void mediatool_uv_recorder_reset_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void media_uv_session_prev_song_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
 static void media_uv_session_next_song_cb(void* cookie, int ret)
 {
-    struct mediatool_chain_s* chain = cookie;
+    mediatool_chain_t* chain = cookie;
 
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
+static void mediatool_uv_controllee_callback(void* cookie, int event,
+    int ret, const char* extra)
+{
+    mediatool_chain_t* chain = cookie;
+
+    printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
+        __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
+
+    /* Assume we've done real work and notify the result. */
+    media_uv_session_notify(chain->handle, event, 0, "fake", NULL, NULL);
+}
+
+static void mediatool_cmd_uv_policy_set_string_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+static void mediatool_cmd_uv_policy_include_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+static void mediatool_cmd_uv_policy_set_int_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+static void mediatool_cmd_uv_policy_contain_cb(void* cookie, int ret, int val)
+{
+    printf("[%s] name:%s ret:%d val:%d\n", __func__, (char*)cookie, ret, val);
+    free(cookie);
+}
+
+static void mediatool_cmd_uv_policy_get_string_cb(void* cookie, int ret, const char* val)
+{
+    printf("[%s] name:%s ret:%d val:%s\n", __func__, (char*)cookie, ret, val);
+    free(cookie);
+}
+
+static void mediatool_cmd_uv_policy_get_int_cb(void* cookie, int ret, int val)
+{
+    printf("[%s] name:%s ret:%d val:%d\n", __func__, (char*)cookie, ret, val);
+    free(cookie);
+}
+
+static void mediatool_focus_suggest_cb(int suggest, void* cookie)
+{
+    mediatool_chain_t* chain = cookie;
+
+    printf("[%s] id:%d suggest:%d\n", __func__, chain->id, suggest);
+}
+
+static void mediatool_cmd_uv_policy_increase_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+static void mediatool_cmd_uv_policy_exclude_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+static void mediatool_cmd_uv_policy_decrease_cb(void* cookie, int ret)
+{
+    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
+    free(cookie);
+}
+
+static void mediatool_uv_session_open_cb(void* cookie, int ret)
+{
+    mediatool_chain_t* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_session_update_cb(void* cookie, int ret)
+{
+    mediatool_chain_t* chain = cookie;
+
+    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
+}
+
+static void mediatool_uv_take_picture_complete_cb(void* cookie, int ret)
+{
+    if (ret < 0)
+        printf("take pic failed!\n");
+    else
+        printf("take pic successed!\n");
+}
+
+static void mediatool_uv_recorder_alloc_cb(uv_handle_t* handle,
+    unsigned suggested_size, uv_buf_t* buf)
+{
+    buf->base = malloc(MEDIATOOL_MAX_SIZE);
+    assert(buf->base);
+    buf->len = MEDIATOOL_MAX_SIZE;
+}
+
+static void mediatool_uv_recorder_write_cb(uv_fs_t* req)
+{
+    mediatool_chain_t* chain = uv_req_get_data((uv_req_t*)req);
+
+    if (req->result < 0) {
+        printf("[%s][%d] Recorder write to file Failed: %s\n", __func__,
+            __LINE__, uv_strerror(req->result));
+        free(chain->buf);
+        return;
+    } else
+        printf("[%s][%d] Recorder Data written to file successfully.\n", __func__, __LINE__);
+
+    free(chain->buf);
+    chain->buf = NULL;
+    uv_fs_req_cleanup(req);
+}
+
+static void mediatool_uv_recorder_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
+{
+    mediatool_chain_t* chain = uv_handle_get_data((uv_handle_t*)stream);
+    mediatool_t* mediatool = chain->data;
+    uv_fs_t close_req;
+    uv_buf_t iov;
+
+    chain->buf = buf->base;
+    uv_req_set_data((uv_req_t*)&chain->fs_req, chain);
+    if (nread < 0) {
+        if (nread != UV_EOF)
+            printf("[%s][%d] Recorder read error %s\n", __func__, __LINE__, uv_err_name(nread));
+        uv_fs_close(&mediatool->loop, &close_req, chain->fd, NULL);
+        free(chain->buf);
+        chain->buf = NULL;
+        return;
+    }
+
+    iov = uv_buf_init(buf->base, nread);
+    uv_fs_write(&mediatool->loop, &chain->fs_req, chain->fd,
+        &iov, 1, -1, mediatool_uv_recorder_write_cb);
+}
+
+static void mediatool_uv_recorder_connection_cb(void* cookie, int ret, void* obj)
+{
+    mediatool_chain_t* chain = cookie;
+
+    printf("[%s][%d] id:%d ret:%d obj:%p\n", __func__, __LINE__, chain->id, ret, obj);
+    if (!obj)
+        return;
+
+    uv_handle_set_data(obj, cookie);
+    uv_read_start(obj, mediatool_uv_recorder_alloc_cb, mediatool_uv_recorder_read_cb);
+}
+
+static void mediatool_uv_player_write_cb(uv_write_t* req, int status)
+{
+    mediatool_chain_t* chain = uv_req_get_data((uv_req_t*)req);
+    mediatool_t* mediatool = chain->data;
+    uv_buf_t iov;
+
+    if (status < 0) {
+        printf("[%s][%d] Player write error: %s\n", __func__, __LINE__, uv_strerror(status));
+        free(chain->buf);
+        chain->buf = NULL;
+        return;
+    } else {
+        iov = uv_buf_init(chain->buf, chain->size);
+        uv_fs_read(&mediatool->loop, &chain->fs_req, chain->fd,
+            &iov, 1, -1, mediatool_uv_player_read_cb);
+    }
+}
+
+static void mediatool_uv_player_read_cb(uv_fs_t* req)
+{
+    mediatool_chain_t* chain = uv_req_get_data((uv_req_t*)req);
+    mediatool_t* mediatool = chain->data;
+    uv_fs_t close_req;
+    uv_buf_t iov;
+
+    if (req->result < 0) {
+        printf("[%s][%d] Player Read error: %s\n", __func__, __LINE__,
+            uv_strerror(req->result));
+        free(chain->buf);
+        chain->buf = NULL;
+        return;
+    } else if (req->result == 0) {
+        printf("[%s][%d] Player read to end of file\n", __func__, __LINE__);
+        uv_fs_close(&mediatool->loop, &close_req, chain->fd, NULL);
+    } else {
+        iov = uv_buf_init(chain->buf, req->result);
+        uv_req_set_data((uv_req_t*)&chain->write_req, chain);
+        uv_write((uv_write_t*)&chain->write_req, (uv_stream_t*)chain->pipe,
+            &iov, 1, mediatool_uv_player_write_cb);
+    }
+}
+
+static void mediatool_uv_player_connection_cb(void* cookie, int ret, void* obj)
+{
+    mediatool_chain_t* chain = cookie;
+    mediatool_t* mediatool = chain->data;
+    uv_buf_t iov;
+
+    printf("[%s][%d] id:%d ret:%d obj:%p\n", __func__, __LINE__, chain->id, ret, obj);
+    chain->size = MEDIATOOL_MAX_SIZE;
+    chain->buf = malloc(MEDIATOOL_MAX_SIZE);
+    assert(chain->buf);
+    chain->pipe = obj;
+
+    iov = uv_buf_init(chain->buf, chain->size);
+    uv_req_set_data((uv_req_t*)&chain->fs_req, chain);
+    uv_fs_read(&mediatool->loop, &chain->fs_req, chain->fd,
+        &iov, 1, -1, mediatool_uv_player_read_cb);
+}
 #endif /* CONFIG_LIBUV_EXTENSION */
 
-static void mediatool_common_stop_thread(struct mediatool_chain_s* chain)
+static void mediatool_common_stop_thread(mediatool_chain_t* chain)
 {
     if (chain->thread) {
         pthread_join(chain->thread, NULL);
@@ -466,7 +703,7 @@ static void mediatool_common_stop_thread(struct mediatool_chain_s* chain)
     }
 }
 
-static int mediatool_common_stop_inner(struct mediatool_chain_s* chain)
+static int mediatool_common_stop_inner(mediatool_chain_t* chain)
 {
     int ret = 0;
 
@@ -507,30 +744,30 @@ CMD1(player_open, string_t, stream_type)
     int ret;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_player_open(stream_type);
-    if (!media->chain[i].handle) {
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_player_open(stream_type);
+    if (!mediatool->chain[i].handle) {
         printf("media_player_open error\n");
         return -EINVAL;
     }
 
-    ret = media_player_set_event_callback(media->chain[i].handle,
-        &media->chain[i], mediatool_event_callback);
+    ret = media_player_set_event_callback(mediatool->chain[i].handle,
+        &mediatool->chain[i], mediatool_event_callback);
     assert(!ret);
 
     if (stream_type && !strcmp(stream_type, MEDIA_STREAM_MUSIC)) {
-        media->chain[i].extra = media_session_register(
-            &media->chain[i], mediatool_controllee_music_callback);
+        mediatool->chain[i].extra = media_session_register(
+            &mediatool->chain[i], mediatool_controllee_music_callback);
     }
 
-    media->chain[i].type = MEDIATOOL_PLAYER;
+    mediatool->chain[i].type = MEDIATOOL_PLAYER;
 
     printf("player ID %ld\n", i);
 
@@ -543,26 +780,26 @@ CMD1(recorder_open, string_t, stream_type)
     int ret;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_recorder_open(stream_type);
-    if (!media->chain[i].handle) {
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_recorder_open(stream_type);
+    if (!mediatool->chain[i].handle) {
         printf("media_recorder_open error\n");
         return -EINVAL;
     }
 
-    ret = media_recorder_set_event_callback(media->chain[i].handle,
-        &media->chain[i],
+    ret = media_recorder_set_event_callback(mediatool->chain[i].handle,
+        &mediatool->chain[i],
         mediatool_event_callback);
     assert(!ret);
 
-    media->chain[i].type = MEDIATOOL_RECORDER;
+    mediatool->chain[i].type = MEDIATOOL_RECORDER;
 
     printf("recorder ID %ld\n", i);
 
@@ -575,25 +812,25 @@ CMD1(session_open, string_t, stream_type)
     int ret;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_session_open(stream_type);
-    if (!media->chain[i].handle) {
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_session_open(stream_type);
+    if (!mediatool->chain[i].handle) {
         printf("media_session_open error\n");
         return -EINVAL;
     }
 
-    ret = media_session_set_event_callback(media->chain[i].handle,
-        &media->chain[i], mediatool_controller_callback);
+    ret = media_session_set_event_callback(mediatool->chain[i].handle,
+        &mediatool->chain[i], mediatool_controller_callback);
     assert(!ret);
 
-    media->chain[i].type = MEDIATOOL_CONTROLLER;
+    mediatool->chain[i].type = MEDIATOOL_CONTROLLER;
     printf("session controller ID %ld\n", i);
     return 0;
 }
@@ -603,22 +840,22 @@ CMD1(session_register, string_t, param)
     long int i;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_session_register(
-        &media->chain[i], mediatool_controllee_callback);
-    if (!media->chain[i].handle) {
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_session_register(
+        &mediatool->chain[i], mediatool_controllee_callback);
+    if (!mediatool->chain[i].handle) {
         printf("media_session_register error\n");
         return -EINVAL;
     }
 
-    media->chain[i].type = MEDIATOOL_CONTROLLEE;
+    mediatool->chain[i].type = MEDIATOOL_CONTROLLEE;
 
     printf("session controllee ID %ld\n", i);
 
@@ -629,94 +866,85 @@ CMD2(close, int, id, int, pending_stop)
 {
     int ret = -EINVAL;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
         if (!pending_stop)
-            mediatool_common_stop_inner(&media->chain[id]);
-        ret = media_player_close(media->chain[id].handle, pending_stop);
-        if (ret >= 0 && media->chain[id].extra)
-            ret = media_session_unregister(media->chain[id].extra);
+            mediatool_common_stop_inner(&mediatool->chain[id]);
+        ret = media_player_close(mediatool->chain[id].handle, pending_stop);
+        if (ret >= 0 && mediatool->chain[id].extra)
+            ret = media_session_unregister(mediatool->chain[id].extra);
         break;
 
     case MEDIATOOL_RECORDER:
-        mediatool_common_stop_inner(&media->chain[id]);
-        ret = media_recorder_close(media->chain[id].handle);
+        mediatool_common_stop_inner(&mediatool->chain[id]);
+        ret = media_recorder_close(mediatool->chain[id].handle);
         break;
 
     case MEDIATOOL_CONTROLLER:
-        ret = media_session_close(media->chain[id].handle);
+        ret = media_session_close(mediatool->chain[id].handle);
         break;
 
     case MEDIATOOL_CONTROLLEE:
-        ret = media_session_unregister(media->chain[id].handle);
+        ret = media_session_unregister(mediatool->chain[id].handle);
         break;
 
     case MEDIATOOL_FOCUS:
-        ret = media_focus_abandon(media->chain[id].handle);
+        ret = media_focus_abandon(mediatool->chain[id].handle);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
-        ret = media_uv_player_close(media->chain[id].handle, pending_stop, mediatool_uv_common_close_cb);
+        ret = media_uv_player_close(mediatool->chain[id].handle, pending_stop, mediatool_uv_common_close_cb);
         break;
 
     case MEDIATOOL_UVRECORDER:
-        ret = media_uv_recorder_close(media->chain[id].handle, mediatool_uv_common_close_cb);
+        ret = media_uv_recorder_close(mediatool->chain[id].handle, mediatool_uv_common_close_cb);
         break;
 
     case MEDIATOOL_UVFOCUS:
-        ret = media_uv_focus_abandon(media->chain[id].handle, mediatool_uv_common_close_cb);
+        ret = media_uv_focus_abandon(mediatool->chain[id].handle, mediatool_uv_common_close_cb);
         break;
 
     case MEDIATOOL_UVCONTROLLER:
-        ret = media_uv_session_close(media->chain[id].handle, mediatool_uv_common_close_cb);
+        ret = media_uv_session_close(mediatool->chain[id].handle, mediatool_uv_common_close_cb);
         break;
 
     case MEDIATOOL_UVCONTROLLEE:
-        ret = media_uv_session_unregister(media->chain[id].handle, mediatool_uv_common_close_cb);
+        ret = media_uv_session_unregister(mediatool->chain[id].handle, mediatool_uv_common_close_cb);
         break;
 #endif /* CONFIG_LIBUV_EXTENSION */
     }
 
-    media->chain[id].handle = NULL;
-    media->chain[id].extra = NULL;
+    mediatool->chain[id].handle = NULL;
+    mediatool->chain[id].extra = NULL;
 
     return ret;
 }
-
-#ifdef CONFIG_LIBUV_EXTENSION
-static void mediatool_uv_session_update_cb(void* cookie, int ret)
-{
-    struct mediatool_chain_s* chain = cookie;
-
-    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
-}
-#endif /* CONFIG_LIBUV_EXTENSION */
 
 CMD1(query, int, id)
 {
     const media_metadata_t* data = NULL;
     int ret = -EINVAL;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_CONTROLLER:
-        ret = media_session_query(media->chain[id].handle, &data);
+        ret = media_session_query(mediatool->chain[id].handle, &data);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVCONTROLLER:
-        return media_uv_session_query(media->chain[id].handle,
-            mediatool_uv_common_query_cb, &media->chain[id]);
+        return media_uv_session_query(mediatool->chain[id].handle,
+            mediatool_uv_common_query_cb, &mediatool->chain[id]);
 
     case MEDIATOOL_UVPLAYER:
-        return media_uv_player_query(media->chain[id].handle,
-            mediatool_uv_common_query_cb, &media->chain[id]);
+        return media_uv_player_query(mediatool->chain[id].handle,
+            mediatool_uv_common_query_cb, &mediatool->chain[id]);
 #endif
 
     default:
@@ -743,18 +971,18 @@ CMD8(update, int, id, int, flags, int, state, int, volume, int, position, int, d
     };
     int ret;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_CONTROLLEE:
-        ret = media_session_update(media->chain[id].handle, &data);
+        ret = media_session_update(mediatool->chain[id].handle, &data);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVCONTROLLEE:
-        ret = media_uv_session_update(media->chain[id].handle, &data,
-            mediatool_uv_session_update_cb, &media->chain[id]);
+        ret = media_uv_session_update(mediatool->chain[id].handle, &data,
+            mediatool_uv_session_update_cb, &mediatool->chain[id]);
         break;
 #endif
 
@@ -770,27 +998,27 @@ CMD1(reset, int, id)
 {
     int ret;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        ret = media_player_reset(media->chain[id].handle);
+        ret = media_player_reset(mediatool->chain[id].handle);
         break;
 
     case MEDIATOOL_RECORDER:
-        ret = media_recorder_reset(media->chain[id].handle);
+        ret = media_recorder_reset(mediatool->chain[id].handle);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
-        ret = media_uv_player_reset(media->chain[id].handle,
-            mediatool_uv_player_reset_cb, &media->chain[id]);
+        ret = media_uv_player_reset(mediatool->chain[id].handle,
+            mediatool_uv_player_reset_cb, &mediatool->chain[id]);
         break;
 
     case MEDIATOOL_UVRECORDER:
-        ret = media_uv_recorder_reset(media->chain[id].handle,
-            mediatool_uv_recorder_reset_cb, &media->chain[id]);
+        ret = media_uv_recorder_reset(mediatool->chain[id].handle,
+            mediatool_uv_recorder_reset_cb, &mediatool->chain[id]);
         break;
 #endif
 
@@ -798,7 +1026,7 @@ CMD1(reset, int, id)
         return 0;
     }
 
-    mediatool_common_stop_thread(&media->chain[id]);
+    mediatool_common_stop_thread(&mediatool->chain[id]);
 
     return ret;
 }
@@ -825,7 +1053,7 @@ static ssize_t mediatool_process_data(int fd, bool player,
 
 static void* mediatool_buffer_thread(void* arg)
 {
-    struct mediatool_chain_s* chain = arg;
+    mediatool_chain_t* chain = arg;
     int act, ret, fd = 0;
     char* tmp;
 
@@ -908,7 +1136,7 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
     pthread_t thread;
     int ret = 0;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
     if (!mode || !path)
@@ -920,40 +1148,42 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
         direct = true;
 
     if (!url_mode) {
-        if (media->chain[id].thread) {
+        if (mediatool->chain[id].thread) {
             printf("already prepare, can't prepare twice\n");
             return -EPERM;
         }
 
-        if (media->chain[id].type == MEDIATOOL_RECORDER)
+        if (mediatool->chain[id].type == MEDIATOOL_RECORDER)
             unlink(path);
 
-        media->chain[id].fd = open(path, media->chain[id].type == MEDIATOOL_PLAYER ? O_RDONLY | O_CLOEXEC : O_CREAT | O_RDWR | O_CLOEXEC, 0666);
-        if (media->chain[id].fd < 0) {
+        mediatool->chain[id].fd = open(path, mediatool->chain[id].type == MEDIATOOL_PLAYER ? O_RDONLY | O_CLOEXEC : O_CREAT | O_RDWR | O_CLOEXEC, 0666);
+        if (mediatool->chain[id].fd < 0) {
             printf("buffer mode, file can't open\n");
             return -EINVAL;
         }
     }
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        ret = media_player_prepare(media->chain[id].handle, url_mode ? path : NULL, options);
+        ret = media_player_prepare(mediatool->chain[id].handle, url_mode ? path : NULL, options);
         break;
 
     case MEDIATOOL_RECORDER:
-        ret = media_recorder_prepare(media->chain[id].handle, url_mode ? path : NULL, options);
+        ret = media_recorder_prepare(mediatool->chain[id].handle, url_mode ? path : NULL, options);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
-        ret = media_uv_player_prepare(media->chain[id].handle, url_mode ? path : NULL, options,
-            NULL, mediatool_uv_common_prepare_cb, &media->chain[id]);
+        mediatool->chain[id].data = mediatool;
+        ret = media_uv_player_prepare(mediatool->chain[id].handle, url_mode ? path : NULL, options,
+            mediatool_uv_player_connection_cb, mediatool_uv_common_prepare_cb, &mediatool->chain[id]);
         async_mode = true;
         break;
 
     case MEDIATOOL_UVRECORDER:
-        ret = media_uv_recorder_prepare(media->chain[id].handle, url_mode ? path : NULL, options,
-            NULL, mediatool_uv_common_prepare_cb, &media->chain[id]);
+        mediatool->chain[id].data = mediatool;
+        ret = media_uv_recorder_prepare(mediatool->chain[id].handle, url_mode ? path : NULL, options,
+            mediatool_uv_recorder_connection_cb, mediatool_uv_common_prepare_cb, &mediatool->chain[id]);
         async_mode = true;
         break;
 #endif
@@ -968,24 +1198,24 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
         goto err;
 
     if (!async_mode && !url_mode) {
-        media->chain[id].direct = direct;
-        media->chain[id].size = 512;
-        media->chain[id].buf = malloc(media->chain[id].size);
-        assert(media->chain[id].buf);
+        mediatool->chain[id].direct = direct;
+        mediatool->chain[id].size = 512;
+        mediatool->chain[id].buf = malloc(mediatool->chain[id].size);
+        assert(mediatool->chain[id].buf);
 
-        ret = pthread_create(&thread, NULL, mediatool_buffer_thread, &media->chain[id]);
+        ret = pthread_create(&thread, NULL, mediatool_buffer_thread, &mediatool->chain[id]);
         assert(!ret);
 
         pthread_setname_np(thread, "mediatool_file");
-        media->chain[id].thread = thread;
+        mediatool->chain[id].thread = thread;
     }
 
     return ret;
 
 err:
-    if (!url_mode && media->chain[id].fd >= 0) {
-        close(media->chain[id].fd);
-        media->chain[id].fd = -1;
+    if (!url_mode && mediatool->chain[id].fd >= 0) {
+        close(mediatool->chain[id].fd);
+        mediatool->chain[id].fd = -1;
     }
     return ret;
 }
@@ -994,44 +1224,44 @@ CMD2(start, int, id, string_t, scenario)
 {
     int ret = -EINVAL;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        ret = media_player_start(media->chain[id].handle);
+        ret = media_player_start(mediatool->chain[id].handle);
         break;
 
     case MEDIATOOL_RECORDER:
-        ret = media_recorder_start(media->chain[id].handle);
+        ret = media_recorder_start(mediatool->chain[id].handle);
         break;
 
     case MEDIATOOL_CONTROLLER:
-        ret = media_session_start(media->chain[id].handle);
+        ret = media_session_start(mediatool->chain[id].handle);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
         if (scenario)
-            ret = media_uv_player_start_auto(media->chain[id].handle, scenario,
-                mediatool_uv_common_start_cb, &media->chain[id]);
+            ret = media_uv_player_start_auto(mediatool->chain[id].handle, scenario,
+                mediatool_uv_common_start_cb, &mediatool->chain[id]);
         else
-            ret = media_uv_player_start(media->chain[id].handle,
-                mediatool_uv_common_start_cb, &media->chain[id]);
+            ret = media_uv_player_start(mediatool->chain[id].handle,
+                mediatool_uv_common_start_cb, &mediatool->chain[id]);
         break;
 
     case MEDIATOOL_UVRECORDER:
         if (scenario)
-            ret = media_uv_recorder_start_auto(media->chain[id].handle, scenario,
-                mediatool_uv_common_start_cb, &media->chain[id]);
+            ret = media_uv_recorder_start_auto(mediatool->chain[id].handle, scenario,
+                mediatool_uv_common_start_cb, &mediatool->chain[id]);
         else
-            ret = media_uv_recorder_start(media->chain[id].handle,
-                mediatool_uv_common_start_cb, &media->chain[id]);
+            ret = media_uv_recorder_start(mediatool->chain[id].handle,
+                mediatool_uv_common_start_cb, &mediatool->chain[id]);
         break;
 
     case MEDIATOOL_UVCONTROLLER:
-        ret = media_uv_session_start(media->chain[id].handle,
-            mediatool_uv_common_start_cb, &media->chain[id]);
+        ret = media_uv_session_start(mediatool->chain[id].handle,
+            mediatool_uv_common_start_cb, &mediatool->chain[id]);
         break;
 #endif
     }
@@ -1041,46 +1271,46 @@ CMD2(start, int, id, string_t, scenario)
 
 CMD1(stop, int, id)
 {
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    return mediatool_common_stop_inner(&media->chain[id]);
+    return mediatool_common_stop_inner(&mediatool->chain[id]);
 }
 
 CMD1(pause, int, id)
 {
     int ret = 0;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        ret = media_player_pause(media->chain[id].handle);
+        ret = media_player_pause(mediatool->chain[id].handle);
         break;
 
     case MEDIATOOL_RECORDER:
-        ret = media_recorder_pause(media->chain[id].handle);
+        ret = media_recorder_pause(mediatool->chain[id].handle);
         break;
 
     case MEDIATOOL_CONTROLLER:
-        ret = media_session_pause(media->chain[id].handle);
+        ret = media_session_pause(mediatool->chain[id].handle);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
-        ret = media_uv_player_pause(media->chain[id].handle,
-            mediatool_uv_common_pause_cb, &media->chain[id]);
+        ret = media_uv_player_pause(mediatool->chain[id].handle,
+            mediatool_uv_common_pause_cb, &mediatool->chain[id]);
         break;
 
     case MEDIATOOL_UVRECORDER:
-        ret = media_uv_recorder_pause(media->chain[id].handle,
-            mediatool_uv_common_pause_cb, &media->chain[id]);
+        ret = media_uv_recorder_pause(mediatool->chain[id].handle,
+            mediatool_uv_common_pause_cb, &mediatool->chain[id]);
         break;
 
     case MEDIATOOL_UVCONTROLLER:
-        ret = media_uv_session_pause(media->chain[id].handle,
-            mediatool_uv_common_pause_cb, &media->chain[id]);
+        ret = media_uv_session_pause(mediatool->chain[id].handle,
+            mediatool_uv_common_pause_cb, &mediatool->chain[id]);
         break;
 #endif
     }
@@ -1095,41 +1325,41 @@ CMD2(volume, int, id, string_t, volume_cmd)
     int ret = 0;
     char* ptr;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
     if (!volume_cmd)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
         if ((ptr = strchr(volume_cmd, '?'))) {
-            ret = media_player_get_volume(media->chain[id].handle, &volume_f);
+            ret = media_player_get_volume(mediatool->chain[id].handle, &volume_f);
             printf("ID %d, get volume %f\n", id, volume_f);
         } else {
             if ((ptr = strcasestr(volume_cmd, "db")))
                 volume_f = pow(10.0, strtof(volume_cmd, NULL) / 20);
             else
                 volume_f = strtof(volume_cmd, NULL);
-            ret = media_player_set_volume(media->chain[id].handle, volume_f);
+            ret = media_player_set_volume(mediatool->chain[id].handle, volume_f);
             printf("ID %d, set volume %f\n", id, volume_f);
         }
         break;
 
     case MEDIATOOL_CONTROLLER:
         if ((ptr = strchr(volume_cmd, '?'))) {
-            ret = media_session_get_volume(media->chain[id].handle, &volume_i);
+            ret = media_session_get_volume(mediatool->chain[id].handle, &volume_i);
             printf("ID %d, get volume %d\n", id, volume_i);
         } else if ((ptr = strchr(volume_cmd, '+'))) {
-            ret = media_session_get_volume(media->chain[id].handle, &volume_i);
-            ret = media_session_increase_volume(media->chain[id].handle);
+            ret = media_session_get_volume(mediatool->chain[id].handle, &volume_i);
+            ret = media_session_increase_volume(mediatool->chain[id].handle);
             printf("ID %d, increase volume %d++\n", id, volume_i);
         } else if ((ptr = strchr(volume_cmd, '-'))) {
-            ret = media_session_get_volume(media->chain[id].handle, &volume_i);
-            ret = media_session_decrease_volume(media->chain[id].handle);
+            ret = media_session_get_volume(mediatool->chain[id].handle, &volume_i);
+            ret = media_session_decrease_volume(mediatool->chain[id].handle);
             printf("ID %d, decrease volume %d--\n", id, volume_i);
         } else {
-            ret = media_session_set_volume(media->chain[id].handle, strtol(volume_cmd, NULL, 10));
+            ret = media_session_set_volume(mediatool->chain[id].handle, strtol(volume_cmd, NULL, 10));
             printf("ID %d, set volume %d\n", id, (int)strtol(volume_cmd, NULL, 10));
         }
         break;
@@ -1137,15 +1367,15 @@ CMD2(volume, int, id, string_t, volume_cmd)
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
         if ((ptr = strchr(volume_cmd, '?'))) {
-            ret = media_uv_player_get_volume(media->chain[id].handle,
-                mediatool_uv_common_get_volume_cb, &media->chain[id]);
+            ret = media_uv_player_get_volume(mediatool->chain[id].handle,
+                mediatool_uv_common_get_volume_cb, &mediatool->chain[id]);
         } else {
             if ((ptr = strcasestr(volume_cmd, "db")))
                 volume_f = pow(10.0, strtof(volume_cmd, NULL) / 20);
             else
                 volume_f = strtof(volume_cmd, NULL);
-            ret = media_uv_player_set_volume(media->chain[id].handle, volume_f,
-                mediatool_uv_common_set_volume_cb, &media->chain[id]);
+            ret = media_uv_player_set_volume(mediatool->chain[id].handle, volume_f,
+                mediatool_uv_common_set_volume_cb, &mediatool->chain[id]);
         }
         break;
 
@@ -1153,11 +1383,11 @@ CMD2(volume, int, id, string_t, volume_cmd)
         if ((ptr = strchr(volume_cmd, '?')))
             ret = -ENOSYS;
         else if ((ptr = strchr(volume_cmd, '+')))
-            ret = media_uv_session_increase_volume(media->chain[id].handle,
-                mediatool_uv_common_increase_volume_cb, &media->chain[id]);
+            ret = media_uv_session_increase_volume(mediatool->chain[id].handle,
+                mediatool_uv_common_increase_volume_cb, &mediatool->chain[id]);
         else if ((ptr = strchr(volume_cmd, '-')))
-            ret = media_uv_session_decrease_volume(media->chain[id].handle,
-                mediatool_uv_common_decrease_volume_cb, &media->chain[id]);
+            ret = media_uv_session_decrease_volume(mediatool->chain[id].handle,
+                mediatool_uv_common_decrease_volume_cb, &mediatool->chain[id]);
         else
             ret = -ENOSYS;
 #endif
@@ -1173,18 +1403,18 @@ CMD2(loop, int, id, int, isloop)
 {
     int ret = 0;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        ret = media_player_set_looping(media->chain[id].handle, isloop);
+        ret = media_player_set_looping(mediatool->chain[id].handle, isloop);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
-        ret = media_uv_player_set_looping(media->chain[id].handle, isloop,
-            mediatool_uv_player_set_looping_cb, &media->chain[id]);
+        ret = media_uv_player_set_looping(mediatool->chain[id].handle, isloop,
+            mediatool_uv_player_set_looping_cb, &mediatool->chain[id]);
         break;
 #endif
 
@@ -1200,23 +1430,23 @@ CMD2(seek, int, id, int, msec)
 {
     int ret = 0;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        ret = media_player_seek(media->chain[id].handle, msec);
+        ret = media_player_seek(mediatool->chain[id].handle, msec);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
-        ret = media_uv_player_seek(media->chain[id].handle, msec,
-            mediatool_uv_common_seek_cb, &media->chain[id]);
+        ret = media_uv_player_seek(mediatool->chain[id].handle, msec,
+            mediatool_uv_common_seek_cb, &mediatool->chain[id]);
         break;
 
     case MEDIATOOL_UVCONTROLLER:
-        ret = media_uv_session_seek(media->chain[id].handle, msec,
-            mediatool_uv_common_seek_cb, &media->chain[id]);
+        ret = media_uv_session_seek(mediatool->chain[id].handle, msec,
+            mediatool_uv_common_seek_cb, &mediatool->chain[id]);
         break;
 #endif
 
@@ -1233,22 +1463,22 @@ CMD1(position, int, id)
     unsigned int position = 0;
     int ret;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        ret = media_player_get_position(media->chain[id].handle, &position);
+        ret = media_player_get_position(mediatool->chain[id].handle, &position);
         break;
 
     case MEDIATOOL_CONTROLLER:
-        ret = media_session_get_position(media->chain[id].handle, &position);
+        ret = media_session_get_position(mediatool->chain[id].handle, &position);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
-        return media_uv_player_get_position(media->chain[id].handle,
-            mediatool_uv_common_get_position_cb, &media->chain[id]);
+        return media_uv_player_get_position(mediatool->chain[id].handle,
+            mediatool_uv_common_get_position_cb, &mediatool->chain[id]);
 #endif
     default:
         return 0;
@@ -1269,22 +1499,22 @@ CMD1(duration, int, id)
     unsigned int duration;
     int ret;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
-        ret = media_player_get_duration(media->chain[id].handle, &duration);
+        ret = media_player_get_duration(mediatool->chain[id].handle, &duration);
         break;
 
     case MEDIATOOL_CONTROLLER:
-        ret = media_session_get_duration(media->chain[id].handle, &duration);
+        ret = media_session_get_duration(mediatool->chain[id].handle, &duration);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
-        return media_uv_player_get_duration(media->chain[id].handle,
-            mediatool_uv_common_get_duration_cb, &media->chain[id]);
+        return media_uv_player_get_duration(mediatool->chain[id].handle,
+            mediatool_uv_common_get_duration_cb, &mediatool->chain[id]);
 #endif
     default:
         return 0;
@@ -1304,13 +1534,13 @@ CMD1(isplaying, int, id)
 {
     int ret;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    if (media->chain[id].type != MEDIATOOL_PLAYER)
+    if (mediatool->chain[id].type != MEDIATOOL_PLAYER)
         return 0;
 
-    ret = media_player_is_playing(media->chain[id].handle);
+    ret = media_player_is_playing(mediatool->chain[id].handle);
     if (ret < 0) {
         printf("is_playing ret %d\n", ret);
         return ret;
@@ -1329,7 +1559,7 @@ CMD3(playdtmf, int, id, string_t, mode, string_t, dial_number)
     int ret;
     int fd;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
     if (!mode || mode[0] == '\0' || !dial_number || dial_number[0] == '\0')
@@ -1348,12 +1578,12 @@ CMD3(playdtmf, int, id, string_t, mode, string_t, dial_number)
     if (ret < 0)
         goto out;
 
-    ret = media_player_prepare(media->chain[id].handle, NULL, MEDIA_TONE_DTMF_FORMAT);
+    ret = media_player_prepare(mediatool->chain[id].handle, NULL, MEDIA_TONE_DTMF_FORMAT);
     if (ret < 0)
         goto out;
 
     if (direct) {
-        fd = media_player_get_socket(media->chain[id].handle);
+        fd = media_player_get_socket(mediatool->chain[id].handle);
         if (fd < 0)
             goto out;
 
@@ -1362,10 +1592,10 @@ CMD3(playdtmf, int, id, string_t, mode, string_t, dial_number)
 
         ret = mediatool_process_data(fd, true, buffer, buffer_size);
     } else
-        ret = media_player_write_data(media->chain[id].handle, buffer, buffer_size);
+        ret = media_player_write_data(mediatool->chain[id].handle, buffer, buffer_size);
 
     if (ret == buffer_size) {
-        media_player_close_socket(media->chain[id].handle);
+        media_player_close_socket(mediatool->chain[id].handle);
         ret = 0;
     } else {
         printf("Failed to play DTMF tone.");
@@ -1383,18 +1613,18 @@ CMD1(prevsong, int, id)
 {
     int ret = 0;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_CONTROLLER:
-        ret = media_session_prev_song(media->chain[id].handle);
+        ret = media_session_prev_song(mediatool->chain[id].handle);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVCONTROLLER:
-        ret = media_uv_session_prev_song(media->chain[id].handle,
-            media_uv_session_prev_song_cb, &media->chain[id]);
+        ret = media_uv_session_prev_song(mediatool->chain[id].handle,
+            media_uv_session_prev_song_cb, &mediatool->chain[id]);
         break;
 #endif
 
@@ -1410,18 +1640,18 @@ CMD1(nextsong, int, id)
 {
     int ret = 0;
 
-    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !media->chain[id].handle)
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    switch (media->chain[id].type) {
+    switch (mediatool->chain[id].type) {
     case MEDIATOOL_CONTROLLER:
-        ret = media_session_next_song(media->chain[id].handle);
+        ret = media_session_next_song(mediatool->chain[id].handle);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVCONTROLLER:
-        ret = media_uv_session_next_song(media->chain[id].handle,
-            media_uv_session_next_song_cb, &media->chain[id]);
+        ret = media_uv_session_next_song(mediatool->chain[id].handle,
+            media_uv_session_next_song_cb, &mediatool->chain[id]);
         break;
 #endif
 
@@ -1435,10 +1665,10 @@ CMD1(nextsong, int, id)
 
 CMD3(take_picture, string_t, filtername, string_t, filename, int, number)
 {
-    return media_recorder_take_picture(filtername, filename, number, mediatool_event_callback, media->chain);
+    return media_recorder_take_picture(filtername, filename, number, mediatool_event_callback, mediatool->chain);
 }
 
-static int mediatool_cmd_send(struct mediatool_s* media, int argc, char** argv)
+static int mediatool_cmd_send(mediatool_t* mediatool, int argc, char** argv)
 {
     char arg[64] = {};
 
@@ -1541,22 +1771,22 @@ CMD1(focus_request, string_t, name)
     long int i;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_focus_request(&suggestion, name,
-        mediatool_focus_callback, &media->chain[i]);
-    if (!media->chain[i].handle) {
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_focus_request(&suggestion, name,
+        mediatool_focus_callback, &mediatool->chain[i]);
+    if (!mediatool->chain[i].handle) {
         printf("media_player_request failed\n");
         return 0;
     }
 
-    media->chain[i].type = MEDIATOOL_FOCUS;
+    mediatool->chain[i].type = MEDIATOOL_FOCUS;
     printf("focus ID %ld, first suggestion %d\n", i, suggestion);
     return 0;
 }
@@ -1566,14 +1796,14 @@ CMD0(quit)
     int i;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (media->chain[i].handle)
-            mediatool_cmd_close_exec(media, i, 0);
+        if (mediatool->chain[i].handle)
+            mediatool_cmd_close_exec(mediatool, i, 0);
     }
 
     return 0;
 }
 
-static int mediatool_cmd_help(const struct mediatool_cmd_s cmds[])
+static int mediatool_cmd_help(const mediatool_cmd_t cmds[])
 {
     int i;
 
@@ -1589,23 +1819,23 @@ CMD1(uv_player_open, string_t, stream_type)
     long int i;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_uv_player_open(&g_mediatool_uvloop, stream_type,
-        mediatool_uv_common_open_cb, &media->chain[i]);
-    if (!media->chain[i].handle)
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_uv_player_open(&mediatool->loop, stream_type,
+        mediatool_uv_common_open_cb, &mediatool->chain[i]);
+    if (!mediatool->chain[i].handle)
         goto err;
 
-    if (media_uv_player_listen(media->chain[i].handle, mediatool_event_callback) < 0)
+    if (media_uv_player_listen(mediatool->chain[i].handle, mediatool_event_callback) < 0)
         goto err;
 
-    media->chain[i].type = MEDIATOOL_UVPLAYER;
+    mediatool->chain[i].type = MEDIATOOL_UVPLAYER;
     return 0;
 
 err:
@@ -1618,23 +1848,23 @@ CMD1(uv_recorder_open, string_t, stream_type)
     long int i;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_uv_recorder_open(&g_mediatool_uvloop, stream_type,
-        mediatool_uv_common_open_cb, &media->chain[i]);
-    if (!media->chain[i].handle)
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_uv_recorder_open(&mediatool->loop, stream_type,
+        mediatool_uv_common_open_cb, &mediatool->chain[i]);
+    if (!mediatool->chain[i].handle)
         goto err;
 
-    if (media_uv_recorder_listen(media->chain[i].handle, mediatool_event_callback) < 0)
+    if (media_uv_recorder_listen(mediatool->chain[i].handle, mediatool_event_callback) < 0)
         goto err;
 
-    media->chain[i].type = MEDIATOOL_UVRECORDER;
+    mediatool->chain[i].type = MEDIATOOL_UVRECORDER;
     return 0;
 
 err:
@@ -1642,37 +1872,30 @@ err:
     return -EINVAL;
 }
 
-static void mediatool_uv_session_open_cb(void* cookie, int ret)
-{
-    struct mediatool_chain_s* chain = cookie;
-
-    printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
-}
-
 CMD1(uv_session_open, string_t, param)
 {
     long int i;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_uv_session_open(&g_mediatool_uvloop, param,
-        mediatool_uv_session_open_cb, &media->chain[i]);
-    if (!media->chain[i].handle) {
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_uv_session_open(&mediatool->loop, param,
+        mediatool_uv_session_open_cb, &mediatool->chain[i]);
+    if (!mediatool->chain[i].handle) {
         printf("media_uv_session_open error\n");
         goto err;
     }
 
-    if (media_uv_session_listen(media->chain[i].handle, mediatool_controller_callback) < 0)
+    if (media_uv_session_listen(mediatool->chain[i].handle, mediatool_controller_callback) < 0)
         goto err;
 
-    media->chain[i].type = MEDIATOOL_UVCONTROLLER;
+    mediatool->chain[i].type = MEDIATOOL_UVCONTROLLER;
     printf("async session controller ID %ld\n", i);
     return 0;
 
@@ -1681,39 +1904,27 @@ err:
     return -EINVAL;
 }
 
-static void mediatool_uv_controllee_callback(void* cookie, int event,
-    int ret, const char* extra)
-{
-    struct mediatool_chain_s* chain = cookie;
-
-    printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
-        __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
-
-    /* Assume we've done real work and notify the result. */
-    media_uv_session_notify(chain->handle, event, 0, "fake", NULL, NULL);
-}
-
 CMD1(uv_session_register, string_t, param)
 {
     long int i;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_uv_session_register(&g_mediatool_uvloop, param,
-        mediatool_uv_controllee_callback, &media->chain[i]);
-    if (!media->chain[i].handle) {
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_uv_session_register(&mediatool->loop, param,
+        mediatool_uv_controllee_callback, &mediatool->chain[i]);
+    if (!mediatool->chain[i].handle) {
         printf("%s error\n", __func__);
         goto err;
     }
 
-    media->chain[i].type = MEDIATOOL_UVCONTROLLEE;
+    mediatool->chain[i].type = MEDIATOOL_UVCONTROLLEE;
     printf("async session controllee ID %ld\n", i);
     return 0;
 
@@ -1722,119 +1933,58 @@ err:
     return -EINVAL;
 }
 
-static void mediatool_cmd_uv_policy_set_int_cb(void* cookie, int ret)
-{
-    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
-    free(cookie);
-}
-
 CMD3(uv_policy_set_int, string_t, name, int, value, int, apply)
 {
-    return media_uv_policy_set_int(&g_mediatool_uvloop, name, value, apply,
+    return media_uv_policy_set_int(&mediatool->loop, name, value, apply,
         mediatool_cmd_uv_policy_set_int_cb, strdup(name));
-}
-
-static void mediatool_cmd_uv_policy_get_int_cb(void* cookie, int ret, int val)
-{
-    printf("[%s] name:%s ret:%d val:%d\n", __func__, (char*)cookie, ret, val);
-    free(cookie);
 }
 
 CMD1(uv_policy_get_int, string_t, name)
 {
-    return media_uv_policy_get_int(&g_mediatool_uvloop, name,
+    return media_uv_policy_get_int(&mediatool->loop, name,
         mediatool_cmd_uv_policy_get_int_cb, strdup(name));
-}
-
-static void mediatool_cmd_uv_policy_set_string_cb(void* cookie, int ret)
-{
-    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
-    free(cookie);
 }
 
 CMD3(uv_policy_set_string, string_t, name, string_t, value, int, apply)
 {
-    return media_uv_policy_set_string(&g_mediatool_uvloop, name, value, apply,
+    return media_uv_policy_set_string(&mediatool->loop, name, value, apply,
         mediatool_cmd_uv_policy_set_string_cb, strdup(name));
-}
-
-static void mediatool_cmd_uv_policy_get_string_cb(void* cookie, int ret, const char* val)
-{
-    printf("[%s] name:%s ret:%d val:%s\n", __func__, (char*)cookie, ret, val);
-    free(cookie);
 }
 
 CMD1(uv_policy_get_string, string_t, name)
 {
-    return media_uv_policy_get_string(&g_mediatool_uvloop, name,
+    return media_uv_policy_get_string(&mediatool->loop, name,
         mediatool_cmd_uv_policy_get_string_cb, strdup(name));
-}
-
-static void mediatool_cmd_uv_policy_increase_cb(void* cookie, int ret)
-{
-    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
-    free(cookie);
 }
 
 CMD2(uv_policy_increase, string_t, name, int, apply)
 {
-    return media_uv_policy_increase(&g_mediatool_uvloop, name, apply,
+    return media_uv_policy_increase(&mediatool->loop, name, apply,
         mediatool_cmd_uv_policy_increase_cb, strdup(name));
-}
-
-static void mediatool_cmd_uv_policy_decrease_cb(void* cookie, int ret)
-{
-    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
-    free(cookie);
 }
 
 CMD2(uv_policy_decrease, string_t, name, int, apply)
 {
-    return media_uv_policy_decrease(&g_mediatool_uvloop, name, apply,
+    return media_uv_policy_decrease(&mediatool->loop, name, apply,
         mediatool_cmd_uv_policy_decrease_cb, strdup(name));
-}
-
-static void mediatool_cmd_uv_policy_include_cb(void* cookie, int ret)
-{
-    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
-    free(cookie);
 }
 
 CMD3(uv_policy_include, string_t, name, string_t, value, int, apply)
 {
-    return media_uv_policy_include(&g_mediatool_uvloop, name, value, apply,
+    return media_uv_policy_include(&mediatool->loop, name, value, apply,
         mediatool_cmd_uv_policy_include_cb, strdup(name));
-}
-
-static void mediatool_cmd_uv_policy_exclude_cb(void* cookie, int ret)
-{
-    printf("[%s] name:%s ret:%d\n", __func__, (char*)cookie, ret);
-    free(cookie);
 }
 
 CMD3(uv_policy_exclude, string_t, name, string_t, value, int, apply)
 {
-    return media_uv_policy_exclude(&g_mediatool_uvloop, name, value, apply,
+    return media_uv_policy_exclude(&mediatool->loop, name, value, apply,
         mediatool_cmd_uv_policy_exclude_cb, strdup(name));
-}
-
-static void mediatool_cmd_uv_policy_contain_cb(void* cookie, int ret, int val)
-{
-    printf("[%s] name:%s ret:%d val:%d\n", __func__, (char*)cookie, ret, val);
-    free(cookie);
 }
 
 CMD2(uv_policy_contain, string_t, name, string_t, value)
 {
-    return media_uv_policy_contain(&g_mediatool_uvloop, name, value,
+    return media_uv_policy_contain(&mediatool->loop, name, value,
         mediatool_cmd_uv_policy_contain_cb, strdup(name));
-}
-
-static void mediatool_focus_suggest_cb(int suggest, void* cookie)
-{
-    struct mediatool_chain_s* chain = cookie;
-
-    printf("[%s] id:%d suggest:%d\n", __func__, chain->id, suggest);
 }
 
 CMD1(uv_focus_request, string_t, name)
@@ -1842,38 +1992,30 @@ CMD1(uv_focus_request, string_t, name)
     long int i;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
-        if (!media->chain[i].handle)
+        if (!mediatool->chain[i].handle)
             break;
     }
 
     if (i == MEDIATOOL_MAX_CHAIN)
         return -ENOMEM;
 
-    media->chain[i].id = i;
-    media->chain[i].handle = media_uv_focus_request(&g_mediatool_uvloop,
-        name, mediatool_focus_suggest_cb, &media->chain[i]);
-    if (!media->chain[i].handle) {
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_uv_focus_request(&mediatool->loop,
+        name, mediatool_focus_suggest_cb, &mediatool->chain[i]);
+    if (!mediatool->chain[i].handle) {
         printf("%s failed\n", __func__);
         return 0;
     }
 
-    media->chain[i].type = MEDIATOOL_UVFOCUS;
+    mediatool->chain[i].type = MEDIATOOL_UVFOCUS;
     printf("focus ID %ld\n", i);
     return 0;
 }
 
-static void take_picture_complete(void* cookie, int ret)
-{
-    if (ret < 0)
-        printf("take pic failed!\n");
-    else
-        printf("take pic successed!\n");
-}
-
 CMD3(uv_take_picture, string_t, filtername, string_t, filename, int, number)
 {
-    return media_uv_recorder_take_picture(&g_mediatool_uvloop, filtername,
-        filename, number, take_picture_complete, NULL);
+    return media_uv_recorder_take_picture(&mediatool->loop, filtername,
+        filename, number, mediatool_uv_take_picture_complete_cb, NULL);
 }
 
 #endif /* CONFIG_LIBUV_EXTENSION */
@@ -1882,7 +2024,7 @@ CMD3(uv_take_picture, string_t, filtername, string_t, filename, int, number)
  * Public Functions
  ****************************************************************************/
 
-static const struct mediatool_cmd_s g_mediatool_cmds[] = {
+static const mediatool_cmd_t g_mediatool_cmds[] = {
     { "open",
         mediatool_cmd_player_open,
         "Create player channel return ID (open [STREAM/FILTER])" },
@@ -2051,7 +2193,7 @@ static const struct mediatool_cmd_s g_mediatool_cmds[] = {
     { 0 },
 };
 
-static int mediatool_execute(struct mediatool_s* media, char* buffer)
+static int mediatool_execute(mediatool_t* mediatool, char* buffer)
 {
     char* argv[MEDIATOOL_MAX_ARGC] = { NULL };
     char* saveptr = NULL;
@@ -2078,7 +2220,7 @@ static int mediatool_execute(struct mediatool_s* media, char* buffer)
         }
 
         if (!strcmp(argv[0], g_mediatool_cmds[x].cmd)) {
-            ret = g_mediatool_cmds[x].pfunc(media, argc, argv);
+            ret = g_mediatool_cmds[x].pfunc(mediatool, argc, argv);
             if (ret < 0) {
                 printf("cmd %s error %d\n", argv[0], ret);
                 ret = 0;
@@ -2103,55 +2245,62 @@ static int mediatool_execute(struct mediatool_s* media, char* buffer)
 static void mediatool_uvasyncq_close_cb(uv_handle_t* handle)
 {
     printf("Bye-Bye!\n");
-    uv_stop(&g_mediatool_uvloop);
+    uv_stop(uv_req_get_data((const uv_req_t*)handle));
 }
 
 static void mediatool_uvasyncq_cb(uv_async_queue_t* asyncq, void* data)
 {
+    mediatool_t* mediatool = asyncq->data;
     int ret;
 
-    ret = mediatool_execute(&g_mediatool, data);
+    ret = mediatool_execute(mediatool, data);
     free(data);
-    if (ret < 0)
-        uv_close((uv_handle_t*)&g_mediatool_uvasyncq, mediatool_uvasyncq_close_cb);
+    if (ret < 0) {
+        uv_req_set_data((uv_req_t*)&mediatool->asyncq, &mediatool->loop);
+        uv_close((uv_handle_t*)&mediatool->asyncq, mediatool_uvasyncq_close_cb);
+    }
 }
 
 static void* mediatool_uvloop_thread(void* arg)
 {
+    mediatool_t* mediatool = arg;
     int ret;
 
-    ret = uv_loop_init(&g_mediatool_uvloop);
+    ret = uv_loop_init(&mediatool->loop);
     if (ret < 0)
         return NULL;
 
-    ret = uv_async_queue_init(&g_mediatool_uvloop, &g_mediatool_uvasyncq,
+    mediatool->asyncq.data = arg;
+    ret = uv_async_queue_init(&mediatool->loop, &mediatool->asyncq,
         mediatool_uvasyncq_cb);
     if (ret < 0)
         goto out;
 
     printf("[%s][%d] running\n", __func__, __LINE__);
     while (1) {
-        ret = uv_run(&g_mediatool_uvloop, UV_RUN_DEFAULT);
+        ret = uv_run(&mediatool->loop, UV_RUN_DEFAULT);
         if (ret == 0)
             break;
     }
 
 out:
-    ret = uv_loop_close(&g_mediatool_uvloop);
+    ret = uv_loop_close(&mediatool->loop);
     printf("[%s][%d] out:%d\n", __func__, __LINE__, ret);
     return NULL;
 }
 
 int main(int argc, char* argv[])
 {
+    mediatool_t mediatool;
     pthread_attr_t attr;
     char* buffer = NULL;
     pthread_t thread;
     int ret, len;
 
+    memset(&mediatool, 0, sizeof(mediatool));
     pthread_attr_init(&attr);
     pthread_attr_setstacksize(&attr, CONFIG_MEDIA_TOOL_STACKSIZE);
-    ret = pthread_create(&thread, &attr, mediatool_uvloop_thread, NULL);
+    ret = pthread_create(&thread, &attr, mediatool_uvloop_thread, &mediatool);
     if (ret < 0)
         goto out;
 
@@ -2183,7 +2332,7 @@ int main(int argc, char* argv[])
         if (buffer[0] == '\0')
             continue;
 
-        uv_async_queue_send(&g_mediatool_uvasyncq, buffer);
+        uv_async_queue_send(&mediatool.asyncq, buffer);
         if (!strcmp(buffer, "q"))
             break;
 
@@ -2197,9 +2346,11 @@ out:
 #else /* CONFIG_LIBUV_EXTENSION */
 int main(int argc, char* argv[])
 {
+    mediatool_t mediatool;
     int ret, len;
     char* buffer;
 
+    memset(&mediatool, 0, sizeof(mediatool));
     buffer = malloc(CONFIG_NSH_LINELEN);
     if (!buffer)
         return -ENOMEM;
@@ -2226,7 +2377,7 @@ int main(int argc, char* argv[])
         if (buffer[0] == '\0')
             continue;
 
-        ret = mediatool_execute(&g_mediatool, buffer);
+        ret = mediatool_execute(&mediatool, buffer);
 
         if (ret < 0) {
             printf("Bye-Bye!\n");
