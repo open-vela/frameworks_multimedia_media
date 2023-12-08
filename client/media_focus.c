@@ -23,6 +23,7 @@
  ****************************************************************************/
 
 #include <errno.h>
+#include <media_defs.h>
 #include <media_focus.h>
 #include <stdio.h>
 
