@@ -25,7 +25,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <media_event.h>
+#include <media_defs.h>
 #include <stddef.h>
 #include <sys/socket.h>
 
@@ -359,7 +359,7 @@ int media_uv_recorder_prepare(void* handle, const char* url, const char* options
  * @brief Start or resume the capturing with auto focus request.
  *
  * @param[in] handle    Async recorder handle.
- * @param[in] scenario  MEDIA_SCENARIO_* in media_focus.h ..
+ * @param[in] scenario  MEDIA_SCENARIO_* in media_defs.h ..
  * @param[in] on_play   Call after receiving result.
  * @param[in] cookie    One-time callback context.
  * @return int Zero on success, negative errno on failure.

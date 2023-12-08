@@ -21,7 +21,7 @@
 #ifndef __FRAMEWORKS_MEDIA_UTILS_MEDIA_METADATA_H
 #define __FRAMEWORKS_MEDIA_UTILS_MEDIA_METADATA_H
 
-#include <media_event.h>
+#include <media_defs.h>
 
 void media_metadata_init(media_metadata_t* data);
 void media_metadata_deinit(media_metadata_t* data);
