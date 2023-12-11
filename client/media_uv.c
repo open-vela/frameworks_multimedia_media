@@ -26,8 +26,7 @@
 #include <sys/queue.h>
 #include <uv.h>
 
-#include "media_log.h"
-#include "media_proxy.h"
+#include "media_common.h"
 #include "media_uv.h"
 
 /****************************************************************************

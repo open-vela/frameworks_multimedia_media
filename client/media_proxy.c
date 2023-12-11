@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/utils/media_proxy.c
+ * frameworks/media/client/media_proxy.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -31,7 +31,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "media_log.h"
+#include "media_common.h"
 #include "media_proxy.h"
 
 /****************************************************************************
@@ -434,7 +434,7 @@ out:
 }
 
 int media_proxy(int id, void* handle, const char* target, const char* cmd,
-    const char* arg, int apply, char* res, int res_len, bool remote)
+    const char* arg, int apply, char* res, int res_len)
 {
     MediaProxyPriv *priv, priv_ = { 0 };
     char *saveptr, *cpu;
@@ -450,9 +450,6 @@ int media_proxy(int id, void* handle, const char* target, const char* cmd,
     strlcpy(tmp, CONFIG_MEDIA_SERVER_CPUNAME, sizeof(tmp));
     for (cpu = strtok_r(tmp, " ,;|", &saveptr); cpu;
          cpu = strtok_r(NULL, " ,;|", &saveptr)) {
-        if (remote && !strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME))
-            continue;
-
         priv->proxy = media_proxy_connect(cpu);
         if (!priv->proxy)
             continue;
