@@ -27,6 +27,7 @@
 #include <media_session.h>
 #include <stdio.h>
 
+#include "media_common.h"
 #include "media_metadata.h"
 #include "media_proxy.h"
 
@@ -81,7 +82,7 @@ void* media_session_open(const char* params)
     if (!priv)
         return NULL;
 
-    if (media_proxy(MEDIA_ID_SESSION, priv, NULL, "open", params, 0, NULL, 0, false) < 0)
+    if (media_proxy(MEDIA_ID_SESSION, priv, NULL, "open", params, 0, NULL, 0) < 0)
         goto err;
 
     media_metadata_init(&priv->data);
@@ -300,7 +301,7 @@ void* media_session_register(void* cookie, media_event_callback event_cb)
     if (!priv)
         return NULL;
 
-    if (media_proxy(MEDIA_ID_SESSION, priv, NULL, "register", NULL, 0, NULL, 0, 0) < 0)
+    if (media_proxy(MEDIA_ID_SESSION, priv, NULL, "register", NULL, 0, NULL, 0) < 0)
         goto err;
 
     if (media_proxy_set_event_cb(priv->proxy, priv->cpu, media_event_cb, priv) < 0)
