@@ -49,16 +49,6 @@ extern "C" {
 #define MEDIA_DEVICE_MIC "mic"
 #define MEDIA_DEVICE_MODEM "modem"
 
-/* @deprecated */
-#define MEDIA_SAMPLERATE_8000 "8000"
-#define MEDIA_SAMPLERATE_16000 "16000"
-#define MEDIA_SAMPLERATE_22050 "22050"
-#define MEDIA_SAMPLERATE_32000 "32000"
-#define MEDIA_SAMPLERATE_44100 "44100"
-#define MEDIA_SAMPLERATE_48000 "48000"
-#define MEDIA_SAMPLERATE_96000 "96000"
-#define MEDIA_SAMPLERATE_192000 "192000"
-
 /****************************************************************************
  * Public Funtions
  ****************************************************************************/
@@ -154,10 +144,8 @@ int media_policy_is_devices_use(const char* devices, int* use);
  *
  * @warning This api is only for certain service, if you are not sure
  * whether you need this API, then you definitely don't need.
- *
- * @deprecated This api would soon use `int rate`.
  */
-int media_policy_set_hfp_samplerate(const char* rate);
+int media_policy_set_hfp_samplerate(int rate);
 
 /**
  * @brief Report devices (or protocol) available.
@@ -645,7 +633,7 @@ int media_uv_policy_is_devices_use(void* loop,
  * @brief Set hfp(hands free protocol) sampling rate.
  *
  * @param[in] loop      Loop handle of current thread.
- * @param[in] rate      Sample rate for SCO.
+ * @param[in] rate      8000 for cvsd, 16000 for msbc.
  * @param[out] cb       Call after receiving result.
  * @param[in] cookie    Callback argument.
  * @return int  Zero on success; a negative errno value on failure.
@@ -655,8 +643,8 @@ int media_uv_policy_is_devices_use(void* loop,
  *
  * @deprecated This api would soon use `int rate`.
  */
-int media_uv_policy_set_hfp_samplerate(void* loop,
-    const char* rate, media_uv_callback cb, void* cookie);
+int media_uv_policy_set_hfp_samplerate(void* loop, int rate,
+    media_uv_callback cb, void* cookie);
 
 /**
  * @brief Set devices available or unavailable.
