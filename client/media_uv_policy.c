@@ -450,10 +450,10 @@ int media_uv_policy_is_devices_use(void* loop, const char* devices,
     return media_uv_policy_contain(loop, MEDIA_POLICY_DEVICE_USE, devices, cb, cookie);
 }
 
-int media_uv_policy_set_hfp_samplerate(void* loop, const char* rate,
+int media_uv_policy_set_hfp_samplerate(void* loop, int rate,
     media_uv_callback cb, void* cookie)
 {
-    return media_uv_policy_set_string(loop, MEDIA_POLICY_HFP_SAMPLERATE, rate,
+    return media_uv_policy_set_int(loop, MEDIA_POLICY_HFP_SAMPLERATE, rate,
         MEDIA_POLICY_NOT_APPLY, cb, cookie);
 }
 
