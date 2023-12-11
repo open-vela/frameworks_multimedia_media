@@ -55,12 +55,6 @@
 #include "media_server.h"
 
 /****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-#define MEDIA_SESSION_MAX 16 /* Limit of users. */
-
-/****************************************************************************
  * Private Types
  ****************************************************************************/
 
@@ -84,8 +78,6 @@ typedef struct MediaControlleePriv {
 typedef struct MediaSessionPriv {
     MediaControllerList controllers;
     MediaControlleeList controllees;
-    int nb_controllers;
-    int nb_controllees;
 } MediaSessionPriv;
 
 /****************************************************************************
@@ -137,16 +129,12 @@ static void* media_session_controller_open(MediaSessionPriv* priv, void* cookie)
 {
     MediaControllerPriv* controller;
 
-    if (priv->nb_controllers >= MEDIA_SESSION_MAX)
-        return NULL;
-
     controller = zalloc(sizeof(MediaControllerPriv));
     if (!controller)
         return NULL;
 
     controller->cookie = cookie;
     TAILQ_INSERT_HEAD(&priv->controllers, controller, entry);
-    priv->nb_controllers++;
     return controller;
 }
 
@@ -179,16 +167,12 @@ static void media_session_controller_close(MediaSessionPriv* priv,
     MediaControllerPriv* controller)
 {
     TAILQ_REMOVE(&priv->controllers, controller, entry);
-    priv->nb_controllers--;
     free(controller);
 }
 
 void* media_session_controllee_register(MediaSessionPriv* priv, void* cookie)
 {
     MediaControlleePriv* controllee;
-
-    if (priv->nb_controllees >= MEDIA_SESSION_MAX)
-        return NULL;
 
     controllee = zalloc(sizeof(MediaControlleePriv));
     if (!controllee)
@@ -197,7 +181,6 @@ void* media_session_controllee_register(MediaSessionPriv* priv, void* cookie)
     controllee->cookie = cookie;
     media_metadata_init(&controllee->data);
     TAILQ_INSERT_TAIL(&priv->controllees, controllee, entry);
-    priv->nb_controllees++;
 
     /* Would notify changed event only if there are no other controllees. */
     media_session_controllee_notify(priv, controllee, MEDIA_EVENT_CHANGED, 0, NULL);
@@ -251,7 +234,6 @@ void media_session_controllee_unregister(MediaSessionPriv* priv,
 
     media_metadata_deinit(&controllee->data);
     TAILQ_REMOVE(&priv->controllees, controllee, entry);
-    priv->nb_controllees--;
     free(controllee);
 
     /* Notify changed event if most active controlee was unregistered. */
