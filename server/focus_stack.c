@@ -27,7 +27,7 @@
 #include <stdlib.h>
 
 #include "focus_stack.h"
-#include "media_log.h"
+#include "media_common.h"
 
 /****************************************************************************
  * Private Types
