@@ -54,7 +54,6 @@ typedef LIST_HEAD(MediaListenList, MediaListenPriv) MediaListenList;
     uv_loop_t* loop;                              \
     /* Fields for buffer mode. */                 \
     uv_pipe_t* pipe;                              \
-    int nb_listener;                              \
     MediaListenList listeners;                    \
     media_uv_object_callback on_connection;       \
     /* Fields for auto focus. */                  \
@@ -147,7 +146,7 @@ static void media_uv_player_query_volume_cb(void* cookie, int ret, int value);
 
 static void media_uv_stream_release(MediaStreamPriv* priv)
 {
-    if (priv && !priv->proxy && !priv->focus && !priv->nb_listener) {
+    if (priv && !priv->proxy && !priv->focus && LIST_EMPTY(&priv->listeners)) {
         if (priv->on_close)
             priv->on_close(priv->cookie, 0);
 
@@ -308,7 +307,6 @@ static void media_uv_stream_listen_close_cb(uv_handle_t* handle)
     MediaStreamPriv* priv = listener->priv;
 
     free(listener);
-    priv->nb_listener--;
     media_uv_stream_release(priv);
 }
 
@@ -340,7 +338,6 @@ static MediaListenPriv* media_uv_stream_listen_add(MediaStreamPriv* priv)
 
     MEDIA_DEBUG("stream:%p listener:%p\n", priv, listener);
     LIST_INSERT_HEAD(&priv->listeners, listener, entry);
-    priv->nb_listener++;
     listener->priv = priv;
     uv_handle_set_data((uv_handle_t*)&listener->pipe, listener);
     return listener;
@@ -434,7 +431,7 @@ static int media_uv_stream_listen_init(MediaStreamPriv* priv, const char* addr)
     int ret = -ENOENT;
     char tmp[128];
 
-    if (priv->nb_listener > 0)
+    if (!LIST_EMPTY(&priv->listeners))
         return 0; /* Only create listeners once. */
 
     LIST_INIT(&priv->listeners);
@@ -466,7 +463,7 @@ static int media_uv_stream_listen_init(MediaStreamPriv* priv, const char* addr)
             goto err;
     }
 
-    return priv->nb_listener > 0 ? 0 : ret;
+    return LIST_EMPTY(&priv->listeners) ? ret : 0;
 
 err:
     media_uv_stream_listen_clear(priv, NULL);
