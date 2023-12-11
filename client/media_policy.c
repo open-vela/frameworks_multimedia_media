@@ -66,9 +66,9 @@ int media_policy_get_devices_use(char* devices, int len)
     return media_policy_get_string(MEDIA_POLICY_DEVICE_USE, devices, len);
 }
 
-int media_policy_set_hfp_samplerate(const char* rate)
+int media_policy_set_hfp_samplerate(int rate)
 {
-    return media_policy_set_string(MEDIA_POLICY_HFP_SAMPLERATE, rate,
+    return media_policy_set_int(MEDIA_POLICY_HFP_SAMPLERATE, rate,
         MEDIA_POLICY_NOT_APPLY);
 }
 
