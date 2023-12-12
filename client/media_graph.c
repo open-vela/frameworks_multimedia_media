@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <media_api.h>
 #include <netpacket/rpmsg.h>
+#include <semaphore.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <sys/un.h>
@@ -40,12 +41,23 @@ typedef struct MediaIOPriv {
     void* cookie;
     media_event_callback event;
     atomic_int refs;
+    sem_t sem;
     int socket;
 } MediaIOPriv;
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+static void media_recorder_take_picture_cb(void* cookie, int event, int result,
+    const char* extra)
+{
+    MediaIOPriv* priv = cookie;
+    if (event == MEDIA_EVENT_COMPLETED) {
+        media_recorder_finish_picture(priv->cookie);
+        sem_post(&priv->sem);
+    }
+}
 
 /**
  * @brief Player/Recorder release method.
@@ -555,14 +567,29 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
     return media_proxy_once(handle, target, key, NULL, 0, value, value_len);
 }
 
-int media_recorder_take_picture(char* params, char* filename, size_t number,
-    media_event_callback event_cb, void* cookie)
+int media_recorder_take_picture(char* params, char* filename, size_t number)
 {
-    void* handle = media_recorder_start_picture(params, filename, number, event_cb, cookie);
-    if (!handle)
+    MediaIOPriv* priv;
+
+    if (!number || number > INT_MAX)
         return -EINVAL;
 
-    return media_recorder_finish_picture(handle);
+    priv = zalloc(sizeof(MediaIOPriv));
+    if (!priv)
+        return -ENOMEM;
+
+    sem_init(&priv->sem, 0, 0);
+    priv->cookie = media_recorder_start_picture(params, filename, number, media_recorder_take_picture_cb, priv);
+    if (!priv->cookie) {
+        free(priv);
+        return -EINVAL;
+    }
+
+    sem_wait(&priv->sem);
+    sem_destroy(&priv->sem);
+    free(priv);
+
+    return 0;
 }
 
 void* media_recorder_start_picture(char* params, char* filename, size_t number,
@@ -602,5 +629,5 @@ error:
 
 int media_recorder_finish_picture(void* handle)
 {
-    return media_close(handle, 1);
+    return media_recorder_close(handle);
 }
