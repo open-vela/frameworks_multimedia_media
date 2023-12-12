@@ -229,11 +229,9 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
  * @param[in] params    Camera open path params.
  * @param[in] filename  The store path for new picture.
  * @param[in] number    The number of pictures taken.
- * @param[in] event_cb  The callback to handle state feedback.
- * @param[in] cookie    The private data of user.
  * @return int Zero on success; a negative errno value on failure.
  */
-int media_recorder_take_picture(char* params, char* filename, size_t number, media_event_callback event_cb, void* cookie);
+int media_recorder_take_picture(char* params, char* filename, size_t number);
 
 /**
  * @brief Start taking picture, including open, set_event_callback, prepare, and start operations.
