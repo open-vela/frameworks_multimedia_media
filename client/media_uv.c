@@ -277,6 +277,7 @@ static void media_uv_shutdown(MediaPipePriv* pipe)
 
 static void media_uv_reconnect_one(MediaProxyPriv* proxy)
 {
+    int ret;
     MEDIA_DEBUG_PROXY(proxy);
 
     /* Try connect to next cpu. */
@@ -288,7 +289,10 @@ static void media_uv_reconnect_one(MediaProxyPriv* proxy)
 
     if (proxy->cpipe)
         media_uv_close(proxy->cpipe);
-    media_uv_connect_one(proxy);
+
+    ret = media_uv_connect_one(proxy);
+    if (ret < 0)
+        proxy->on_connect(proxy->cookie, ret);
 }
 
 /**
@@ -370,7 +374,6 @@ static int media_uv_connect_one(MediaProxyPriv* proxy)
 err:
     free(req);
     MEDIA_DEBUG_PROXY(proxy);
-    proxy->on_connect(proxy->cookie, ret);
     return ret;
 }
 
