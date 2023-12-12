@@ -299,6 +299,21 @@ static void mediatool_event_callback(void* cookie, int event,
         __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
 }
 
+static void mediatool_takepic_callback(void* cookie, int event,
+    int ret, const char* extra)
+{
+    struct mediatool_chain_s* chain = cookie;
+
+    if (event == MEDIA_EVENT_COMPLETED) {
+        media_recorder_finish_picture(chain->handle);
+        chain->handle = NULL;
+        chain->extra = NULL;
+    }
+
+    printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
+        __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
+}
+
 static void mediatool_focus_callback(int suggestion, void* cookie)
 {
     mediatool_chain_t* chain = cookie;
@@ -1665,7 +1680,36 @@ CMD1(nextsong, int, id)
 
 CMD3(take_picture, string_t, filtername, string_t, filename, int, number)
 {
-    return media_recorder_take_picture(filtername, filename, number, mediatool_event_callback, mediatool->chain);
+    int ret = 0;
+
+    ret = media_recorder_take_picture(filtername, filename, number);
+    if (ret < 0) {
+        printf("Failed to take_picture.");
+    }
+
+    return 0;
+}
+
+CMD3(take_picture_async, string_t, filtername, string_t, filename, int, number)
+{
+    long int i;
+
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!mediatool->chain[i].handle)
+            break;
+    }
+
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_recorder_start_picture(filtername, filename, number, mediatool_takepic_callback, mediatool->chain);
+    if (!mediatool->chain[i].handle) {
+        printf("media_recorder_start_picture error\n");
+        return -EINVAL;
+    }
+
+    return 0;
 }
 
 static int mediatool_cmd_send(mediatool_t* mediatool, int argc, char** argv)
@@ -2093,7 +2137,10 @@ static const mediatool_cmd_t g_mediatool_cmds[] = {
         "To play next song in player list(next ID)" },
     { "takepic",
         mediatool_cmd_take_picture,
-        "Take picture from camera" },
+        "Sync take picture from camera" },
+    { "takepic_async",
+        mediatool_cmd_take_picture_async,
+        "Async take picture from camera" },
     { "send",
         mediatool_cmd_send,
         "Send cmd to graph. PS:loglevel INFO:32 VERBOSE:40 DEBUG:48 TRACE:56" },
