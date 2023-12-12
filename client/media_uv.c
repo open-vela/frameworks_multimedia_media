@@ -127,7 +127,6 @@ static int media_uv_handle_parcel(MediaPipePriv* pipe);
 
 /* Write control message. */
 static void media_uv_write_cb(uv_write_t* req, int status);
-static void media_uv_write_queued_cb(uv_write_t* req, int status);
 static int media_uv_send_writing(MediaProxyPriv* proxy, MediaWritePriv* writing);
 static MediaWritePriv* media_uv_dequeue_writing(MediaProxyPriv* proxy);
 static void media_uv_delivery_writing(MediaProxyPriv* proxy);
@@ -220,7 +219,7 @@ static void media_uv_free_proxy(MediaProxyPriv* proxy)
         /* Concat 2 queue and clear all. */
         TAILQ_CONCAT(&proxy->sentq, &proxy->pendq, entry);
         while ((writing = TAILQ_FIRST(&proxy->sentq)))
-            media_uv_write_queued_cb(&writing->req, -ECANCELED);
+            media_uv_write_cb(&writing->req, -ECANCELED);
 
         if (proxy->on_release)
             proxy->on_release(proxy->cookie, 0);
@@ -441,9 +440,8 @@ static int media_uv_handle_parcel(MediaPipePriv* pipe)
     /* dequeue writing context and notify user. */
     writing = media_uv_dequeue_writing(proxy);
     assert(writing);
-    if (writing->on_receive)
-        writing->on_receive(proxy->cookie,
-            writing->cookies[0], writing->cookies[1], &pipe->parcel);
+    writing->on_receive(proxy->cookie,
+        writing->cookies[0], writing->cookies[1], &pipe->parcel);
     writing->flags |= MEDIA_MSGFLAG_RESPONSED;
     media_uv_free_writing(writing);
 
@@ -473,33 +471,22 @@ static int media_uv_handle_parcel(MediaPipePriv* pipe)
 }
 
 /**
- * @brief Callback for writing not in queue.
- */
-static void media_uv_write_cb(uv_write_t* req, int status)
-{
-    MediaWritePriv* writing = uv_req_get_data((uv_req_t*)req);
-
-    writing->flags |= MEDIA_MSGFLAG_WRITTEN;
-    media_uv_free_writing(writing);
-}
-
-/**
  * @brief Would add writing to sentq on success.
  */
-static void media_uv_write_queued_cb(uv_write_t* req, int status)
+static void media_uv_write_cb(uv_write_t* req, int status)
 {
     MediaWritePriv* writing = uv_req_get_data((uv_req_t*)req);
     MediaProxyPriv* proxy = writing->proxy;
 
     /* Should remove from queue because there won't be response. */
-    if (status < 0) {
+    if (status < 0 && writing->parcel.chunk->code == MEDIA_PARCEL_SEND_ACK) {
         writing->flags |= MEDIA_MSGFLAG_RESPONSED;
         TAILQ_REMOVE(&proxy->sentq, writing, entry);
-        if (writing->on_receive)
-            writing->on_receive(proxy->cookie,
-                writing->cookies[0], writing->cookies[1], NULL);
+        writing->on_receive(proxy->cookie,
+            writing->cookies[0], writing->cookies[1], NULL);
     }
 
+    /* Should release wiriting because there won't be response. */
     writing->flags |= MEDIA_MSGFLAG_WRITTEN;
     media_uv_free_writing(writing);
 }
@@ -512,26 +499,17 @@ static int media_uv_send_writing(MediaProxyPriv* proxy, MediaWritePriv* writing)
         .len = MEDIA_PARCEL_HEADER_LEN + writing->parcel.chunk->len
     };
 
-    if (writing->parcel.chunk->code == MEDIA_PARCEL_CREATE_NOTIFY) {
+    if (writing->parcel.chunk->code == MEDIA_PARCEL_SEND_ACK) {
+        /* Move to sentq, and wait for response. */
+        TAILQ_INSERT_TAIL(&proxy->sentq, writing, entry);
+        proxy->nb_sentq++;
+    } else
         writing->flags |= MEDIA_MSGFLAG_RESPONSED; /* won't be response. */
-        ret = uv_write(&writing->req, (uv_stream_t*)&proxy->cpipe->handle, &buf, 1,
-            media_uv_write_cb);
-        if (ret < 0)
-            media_uv_write_cb(&writing->req, ret);
-
-        return ret;
-    }
-
-    /* Move to sentq, and wait for response. */
-    TAILQ_INSERT_TAIL(&proxy->sentq, writing, entry);
-    proxy->nb_sentq++;
 
     ret = uv_write(&writing->req, (uv_stream_t*)&proxy->cpipe->handle, &buf, 1,
-        media_uv_write_queued_cb);
-    if (ret < 0) {
-        media_uv_write_queued_cb(&writing->req, ret);
-        return ret;
-    }
+        media_uv_write_cb);
+    if (ret < 0)
+        media_uv_write_cb(&writing->req, ret);
 
     return ret;
 }
@@ -797,7 +775,10 @@ int media_uv_send(void* handle, media_uv_parcel_callback on_receive,
     if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT)
         return -EPERM;
 
-    writing = media_uv_alloc_writing(MEDIA_PARCEL_SEND_ACK, parcel);
+    if (!on_receive || !cookie0)
+        writing = media_uv_alloc_writing(MEDIA_PARCEL_SEND, parcel);
+    else
+        writing = media_uv_alloc_writing(MEDIA_PARCEL_SEND_ACK, parcel);
     if (!writing)
         return -ENOMEM;
 

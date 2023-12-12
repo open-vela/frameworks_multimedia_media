@@ -132,8 +132,8 @@ int media_uv_listen(void* handle, media_uv_callback on_listen,
  *
  * @param handle        Handle.
  * @param on_receive    Callback to handle response message.
- * @param cookie0       Callback context of on_receive.
- * @param cookie1       Extra callback context of on_receive.
+ * @param cookie0       Callback argument for user's callback.
+ * @param cookie1       Callback argument for user's callback argument.
  * @param parcel
  * @return int          Zero on success, negative errno on failure.
  *
