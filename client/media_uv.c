@@ -34,10 +34,13 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_FLAG_CONNECTING 1
-#define MEDIA_FLAG_LISTENING 2
-#define MEDIA_FLAG_RECONNECT 4
-#define MEDIA_FLAG_DISCONNECT 8
+#define MEDIA_PROXYFLAG_CONNECTING 1
+#define MEDIA_PROXYFLAG_LISTENING 2
+#define MEDIA_PROXYFLAG_RECONNECT 4
+#define MEDIA_PROXYFLAG_DISCONNECT 8
+
+#define MEDIA_MSGFLAG_WRITTEN 1
+#define MEDIA_MSGFLAG_RESPONSED 2
 
 #define MEDIA_CPU_DELIM " ,;\t\n"
 
@@ -72,6 +75,7 @@ struct MediaWritePriv {
     media_parcel parcel;
     media_uv_parcel_callback on_receive;
     void* cookies[2]; /* One-time private context. */
+    int flags;
 };
 
 struct MediaProxyPriv {
@@ -124,7 +128,7 @@ static int media_uv_handle_parcel(MediaPipePriv* pipe);
 /* Write control message. */
 static void media_uv_write_cb(uv_write_t* req, int status);
 static void media_uv_write_queued_cb(uv_write_t* req, int status);
-static int media_uv_send_writing(MediaProxyPriv* proxy, MediaWritePriv* writing, bool queued);
+static int media_uv_send_writing(MediaProxyPriv* proxy, MediaWritePriv* writing);
 static MediaWritePriv* media_uv_dequeue_writing(MediaProxyPriv* proxy);
 static void media_uv_delivery_writing(MediaProxyPriv* proxy);
 static int media_uv_queue_writing(MediaProxyPriv* proxy, MediaWritePriv* writing);
@@ -138,9 +142,17 @@ static int media_uv_listen_one(MediaProxyPriv* proxy);
  * Private Functions
  ****************************************************************************/
 
+/**
+ * @brief free writing.
+ *
+ * Will release only after 2 case are all statisfied:
+ * 1. uv_write_cb is called, which means write is done.
+ * 2. received response; or uv_write failed, which means there won't be response.
+ */
 static void media_uv_free_writing(MediaWritePriv* writing)
 {
-    if (writing) {
+    if (writing && (writing->flags & MEDIA_MSGFLAG_WRITTEN)
+        && (writing->flags & MEDIA_MSGFLAG_RESPONSED)) {
         media_parcel_deinit(&writing->parcel);
         free(writing);
     }
@@ -204,10 +216,10 @@ static void media_uv_free_proxy(MediaProxyPriv* proxy)
     if (proxy->cpipe || proxy->epipe)
         return; /* Sockets still active. */
 
-    if (proxy->flags & MEDIA_FLAG_DISCONNECT) {
+    if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT) {
         /* Concat 2 queue and clear all. */
         TAILQ_CONCAT(&proxy->sentq, &proxy->pendq, entry);
-        while ((writing = media_uv_dequeue_writing(proxy)))
+        while ((writing = TAILQ_FIRST(&proxy->sentq)))
             media_uv_write_queued_cb(&writing->req, -ECANCELED);
 
         if (proxy->on_release)
@@ -292,7 +304,7 @@ static void media_uv_connect_one_cb(uv_connect_t* req, int status)
     free(req);
 
     /* Cancel the connect on error and user's cancelation */
-    if (status >= 0 && (proxy->flags & MEDIA_FLAG_DISCONNECT))
+    if (status >= 0 && (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT))
         status = -ECANCELED;
 
     if (status < 0) {
@@ -338,7 +350,7 @@ static int media_uv_connect_one(MediaProxyPriv* proxy)
 
     /* Connect to media server. */
     snprintf(addr, sizeof(addr), MEDIA_SOCKADDR_NAME, proxy->cpu);
-    proxy->flags |= MEDIA_FLAG_CONNECTING;
+    proxy->flags |= MEDIA_PROXYFLAG_CONNECTING;
     if (!strcmp(proxy->cpu, CONFIG_RPTUN_LOCAL_CPUNAME))
         uv_pipe_connect(req, &proxy->cpipe->handle, addr,
             media_uv_connect_one_cb);
@@ -429,25 +441,26 @@ static int media_uv_handle_parcel(MediaPipePriv* pipe)
     if (writing->on_receive)
         writing->on_receive(proxy->cookie,
             writing->cookies[0], writing->cookies[1], &pipe->parcel);
+    writing->flags |= MEDIA_MSGFLAG_RESPONSED;
     media_uv_free_writing(writing);
 
     /* Handle flags after first on_receive */
-    if (proxy->flags & MEDIA_FLAG_CONNECTING) {
-        proxy->flags &= ~MEDIA_FLAG_CONNECTING;
+    if (proxy->flags & MEDIA_PROXYFLAG_CONNECTING) {
+        proxy->flags &= ~MEDIA_PROXYFLAG_CONNECTING;
 
-        if (proxy->flags == MEDIA_FLAG_LISTENING)
+        if (proxy->flags == MEDIA_PROXYFLAG_LISTENING)
             media_uv_listen_one(proxy); /* Might be new flags. */
 
         /* Apply writings if user recognize current proxy */
-        if (!(proxy->flags & MEDIA_FLAG_LISTENING)
-            && !(proxy->flags & MEDIA_FLAG_RECONNECT))
+        if (!(proxy->flags & MEDIA_PROXYFLAG_LISTENING)
+            && !(proxy->flags & MEDIA_PROXYFLAG_RECONNECT))
             media_uv_delivery_writing(proxy);
 
-        if (proxy->flags & MEDIA_FLAG_DISCONNECT)
+        if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT)
             return UV_EOF;
 
-        if (proxy->flags & MEDIA_FLAG_RECONNECT) {
-            proxy->flags &= ~MEDIA_FLAG_RECONNECT;
+        if (proxy->flags & MEDIA_PROXYFLAG_RECONNECT) {
+            proxy->flags &= ~MEDIA_PROXYFLAG_RECONNECT;
             media_uv_reconnect_one(proxy);
             return UV_EOF;
         }
@@ -463,6 +476,7 @@ static void media_uv_write_cb(uv_write_t* req, int status)
 {
     MediaWritePriv* writing = uv_req_get_data((uv_req_t*)req);
 
+    writing->flags |= MEDIA_MSGFLAG_WRITTEN;
     media_uv_free_writing(writing);
 }
 
@@ -474,30 +488,47 @@ static void media_uv_write_queued_cb(uv_write_t* req, int status)
     MediaWritePriv* writing = uv_req_get_data((uv_req_t*)req);
     MediaProxyPriv* proxy = writing->proxy;
 
-    if (status >= 0) {
-        TAILQ_INSERT_TAIL(&proxy->sentq, writing, entry);
-        proxy->nb_sentq++;
-    } else { /* Should release wiriting because there won't be response. */
+    /* Should remove from queue because there won't be response. */
+    if (status < 0) {
+        writing->flags |= MEDIA_MSGFLAG_RESPONSED;
+        TAILQ_REMOVE(&proxy->sentq, writing, entry);
         if (writing->on_receive)
             writing->on_receive(proxy->cookie,
                 writing->cookies[0], writing->cookies[1], NULL);
-
-        media_uv_free_writing(writing);
     }
+
+    writing->flags |= MEDIA_MSGFLAG_WRITTEN;
+    media_uv_free_writing(writing);
 }
 
-static int media_uv_send_writing(MediaProxyPriv* proxy, MediaWritePriv* writing, bool queued)
+static int media_uv_send_writing(MediaProxyPriv* proxy, MediaWritePriv* writing)
 {
+    int ret;
     uv_buf_t buf = {
         .base = (void*)writing->parcel.chunk,
         .len = MEDIA_PARCEL_HEADER_LEN + writing->parcel.chunk->len
     };
 
-    int ret = uv_write(&writing->req, (uv_stream_t*)&proxy->cpipe->handle, &buf, 1,
-        queued ? media_uv_write_queued_cb : media_uv_write_cb);
+    if (writing->parcel.chunk->code == MEDIA_PARCEL_CREATE_NOTIFY) {
+        writing->flags |= MEDIA_MSGFLAG_RESPONSED; /* won't be response. */
+        ret = uv_write(&writing->req, (uv_stream_t*)&proxy->cpipe->handle, &buf, 1,
+            media_uv_write_cb);
+        if (ret < 0)
+            media_uv_write_cb(&writing->req, ret);
 
-    if (ret < 0)
-        media_uv_free_writing(writing);
+        return ret;
+    }
+
+    /* Move to sentq, and wait for response. */
+    TAILQ_INSERT_TAIL(&proxy->sentq, writing, entry);
+    proxy->nb_sentq++;
+
+    ret = uv_write(&writing->req, (uv_stream_t*)&proxy->cpipe->handle, &buf, 1,
+        media_uv_write_queued_cb);
+    if (ret < 0) {
+        media_uv_write_queued_cb(&writing->req, ret);
+        return ret;
+    }
 
     return ret;
 }
@@ -529,7 +560,7 @@ static void media_uv_delivery_writing(MediaProxyPriv* proxy)
     {
         TAILQ_REMOVE(&proxy->pendq, writing, entry);
         proxy->nb_pendq--;
-        media_uv_send_writing(proxy, writing, true);
+        media_uv_send_writing(proxy, writing);
     }
 }
 
@@ -541,7 +572,7 @@ static int media_uv_queue_writing(MediaProxyPriv* proxy, MediaWritePriv* writing
     writing->proxy = proxy;
 
     if (proxy->flags == 0)
-        return media_uv_send_writing(proxy, writing, true);
+        return media_uv_send_writing(proxy, writing);
     else {
         TAILQ_INSERT_TAIL(&proxy->pendq, writing, entry);
         proxy->nb_pendq++;
@@ -560,7 +591,7 @@ static int media_uv_create_notify(MediaProxyPriv* proxy)
 
     snprintf(addr, sizeof(addr), "md_%p", proxy);
     media_parcel_append_printf(&writing->parcel, "%s%s", addr, CONFIG_RPTUN_LOCAL_CPUNAME);
-    return media_uv_send_writing(proxy, writing, false);
+    return media_uv_send_writing(proxy, writing);
 }
 
 static void media_uv_listen_one_cb(uv_stream_t* stream, int ret)
@@ -568,13 +599,13 @@ static void media_uv_listen_one_cb(uv_stream_t* stream, int ret)
     MediaPipePriv* server = uv_handle_get_data((uv_handle_t*)stream);
     MediaProxyPriv* proxy = server->proxy;
 
-    proxy->flags &= ~MEDIA_FLAG_LISTENING;
+    proxy->flags &= ~MEDIA_PROXYFLAG_LISTENING;
 
     /* Handle error and user's cancelation. */
     if (ret < 0)
         goto err1;
 
-    if (proxy->flags & MEDIA_FLAG_DISCONNECT) {
+    if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT) {
         ret = -ECANCELED;
         goto err1;
     }
@@ -589,12 +620,11 @@ static void media_uv_listen_one_cb(uv_stream_t* stream, int ret)
         goto err2;
 
     media_uv_close(server);
-    media_uv_delivery_writing(proxy);
-    uv_read_start((uv_stream_t*)&proxy->epipe->handle, media_uv_alloc_cb, media_uv_read_cb);
     MEDIA_DEBUG_PROXY(proxy);
     if (proxy->on_listen)
         proxy->on_listen(proxy->cookie, ret);
-
+    media_uv_delivery_writing(proxy);
+    uv_read_start((uv_stream_t*)&proxy->epipe->handle, media_uv_alloc_cb, media_uv_read_cb);
     return;
 
 err2:
@@ -641,7 +671,7 @@ static int media_uv_listen_one(MediaProxyPriv* proxy)
     if (ret < 0)
         goto err2;
 
-    proxy->flags |= MEDIA_FLAG_LISTENING;
+    proxy->flags |= MEDIA_PROXYFLAG_LISTENING;
     MEDIA_DEBUG_PROXY(proxy);
     return ret;
 
@@ -699,7 +729,7 @@ int media_uv_disconnect(void* handle, media_uv_callback on_release)
 {
     MediaProxyPriv* proxy = handle;
 
-    if (!proxy || (proxy->flags & MEDIA_FLAG_DISCONNECT))
+    if (!proxy || (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT))
         return -EINVAL;
 
     proxy->on_release = on_release;
@@ -707,7 +737,7 @@ int media_uv_disconnect(void* handle, media_uv_callback on_release)
     if (proxy->flags == 0) /* Needn't shutdown command socket if not ready. */
         media_uv_shutdown(proxy->cpipe);
 
-    proxy->flags |= MEDIA_FLAG_DISCONNECT;
+    proxy->flags |= MEDIA_PROXYFLAG_DISCONNECT;
     media_uv_free_proxy(proxy); /* Do real work if uv_pipes already closed. */
     return 0;
 }
@@ -722,7 +752,7 @@ int media_uv_reconnect(void* handle)
     if (proxy->flags == 0)
         media_uv_reconnect_one(proxy);
     else
-        proxy->flags |= MEDIA_FLAG_RECONNECT;
+        proxy->flags |= MEDIA_PROXYFLAG_RECONNECT;
 
     /* Notify reconnect result by on_connect callback. */
     return 0;
@@ -737,7 +767,7 @@ int media_uv_listen(void* handle, media_uv_callback on_listen,
     if (!proxy || !on_event)
         return -EINVAL;
 
-    if ((proxy->flags & MEDIA_FLAG_LISTENING) || proxy->epipe)
+    if ((proxy->flags & MEDIA_PROXYFLAG_LISTENING) || proxy->epipe)
         return -EPERM; /* Cannot create another listener. */
 
     proxy->on_listen = on_listen;
@@ -747,7 +777,7 @@ int media_uv_listen(void* handle, media_uv_callback on_listen,
     if (proxy->flags == 0)
         ret = media_uv_listen_one(proxy);
     else /* Set flag and do nothing if there are reconnect/disconnect to do. */
-        proxy->flags |= MEDIA_FLAG_LISTENING;
+        proxy->flags |= MEDIA_PROXYFLAG_LISTENING;
 
     return ret;
 }
@@ -761,7 +791,7 @@ int media_uv_send(void* handle, media_uv_parcel_callback on_receive,
     if (!proxy)
         return -EINVAL;
 
-    if (proxy->flags & MEDIA_FLAG_DISCONNECT)
+    if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT)
         return -EPERM;
 
     writing = media_uv_alloc_writing(MEDIA_PARCEL_SEND_ACK, parcel);
