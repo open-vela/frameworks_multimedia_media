@@ -41,29 +41,36 @@ extern "C" {
  ****************************************************************************/
 
 /**
- * @brief Open one recorder according to the incomming path.
+ * @brief Open a recorder path with given source type.
  *
- * @code
- *  // Example
- *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
+ * @param[in] params    MEDIA_SOURCE_*.
+ *                      Usually MEDIA_SOURCE_MIC.
+ * @return void*    Recorder handle on success; NULL on failure.
+ *
+ * @code To simply record file you should:
+ *  // 1. create a instance.
+ *  handle = media_recorder_open(MEDIA_SOURCE_MIC);
+ *
+ *  // 2. prepare the source you want to capture.
+ *  ret = media_recorder_prepare(handle, "/data/1.opus", options);
+ *
+ *  // 3. start capturing.
+ *  ret = media_recorder_start(handle);
+ *
+ *  // 4. stop capturing. if you still need this recorder instance, goto step2.
+ *  ret = media_recorder_stop(handle);
+ *
+ *  // 5. don't forget to destroy the instance.
+ *  ret = media_recorder_close(handle);
  * @endcode
- *
- * @param[in] params    open path params, usually MEDIA_SOURCE_MIC.
- * @return Recorder handle on success; NULL on failure.
  */
 void* media_recorder_open(const char* params);
 
 /**
- * @brief Close one recorder according to the incoming handle.
+ * @brief Close the recorder path.
  *
- * @code
- *  // Example
- *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
- *  int ret = media_recorder_close(handle);
- * @endcode
- *
- * @param[in] handle    The recorder handle
- * @return Zero on success; a negative errno value on failure.
+ * @param[in] handle    Recorder handle
+ * @return int Zero on success; a negative errno value on failure.
  */
 int media_recorder_close(void* handle);
 
@@ -71,34 +78,11 @@ int media_recorder_close(void* handle);
  * @brief Set event callback to the recorder, the callback will be called
  * when state changed or something user cares.
  *
- * @code
- *  struct recorder_state_s
- *  {
- *      sem_t sem;
- *      int   last_event;
- *      int   result;
- *      void *recorder_handle;
- *  };
- *  void callback(void* cookie, int event, int ret, const char *data){
- *      struct recorder_state_s* recorder_state = (struct recorder_state_s*) cookie;
- *      recorder_state->last_event = event;
- *      recorder_state->result = ret;
- *      sem_post(&recorder_state->sem);
- *  }
- *
- *  // You can modify or create as you wish.
- *  struct recorder_state_s* recorder_state = *state;
- *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
- *  int ret = media_recorder_set_event_callback(handle, recorder_state,
- *                                              callback);
- *  printf("%d", recorder_state->last_event);
- * @endcode
- *
  * @param[in] handle    The recorder handle
  * @param[in] cookie    User cookie, will be brought back to user
  *                      after calling event_cb and usually be modified
- * @param[in] event_cb  Event callback
- * @return Zero on success; a negative errno value on failure.
+ * @param[in] on_event  Event callback
+ * @return int Zero on success; a negative errno value on failure.
  */
 int media_recorder_set_event_callback(void* handle, void* cookie,
     media_event_callback event_cb);
@@ -106,164 +90,134 @@ int media_recorder_set_event_callback(void* handle, void* cookie,
 /**
  * @brief Prepare the recorder.
  *
- * @code
- *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
- *  // set event callback here.
- *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
- * @endcode
- *
- * @param[in] handle    Current recorder handle
- * @param[in] url       Valid data dest recorderd to, usually in wav format
+ * @param[in] handle    Recorder handle
+ * @param[in] url       Path of resource, there is 2 mode:
+ *                      - URL: `url` is valid, represent Local file path;
+ *                        media framework would open the path and record.
+ *                      - BUFFER: `url` is NULL, so caller should continuously
+ *                        send buffers to media framework for capturing;
+ *                        there are 2 ways to send buffers,
+ *                          - Use `media_recorder_read_data()`.
+ *                          - Use `media_recorder_get_socket()` and `read()`
  * @param[in] options   Extra configuration
- *                        - format: encapsulation format, 如:opus wav
- *                        - sample_rate: target sampling rate
- *                        - ch_layout: target channel layout
- *                        - b: target bitrate，如: "23900"
- *                        - vbr: 0: fixed code rate; 1: variable code rate
- *                        - level: encoding complexity. range：0-10. default:10
- *
- *
- *                      - If url is not NULL:
- *                           options is the url addtional description
- *                      - If url is NULL: options describes "buffer" mode:
- *                        - "format=s16le,sample_rate=44100,channels=2"
- *                        - "format=unknown"
- *
- *                        then use media_recorder_read_data() read data
- * @return Zero on success; a negative errno value on failure.
+ *                      - format: encapsulation format, such as:opus wav
+ *                      - sample_rate: target sampling rate
+ *                      - ch_layout: target channel layout
+ *                      - b: target bitrate，such as: "23900"
+ *                      - vbr: 0: fixed code rate; 1: variable code rate
+ *                      - level: encoding complexity. range：0-10. default:10
+ *                      (e.g. "format=opusraw:sample_rate=16000:ch_layout=mono:b=32000:
+ *                              vbr=0:level=1")
+ * @return int Zero on success; a negative errno value on failure.
  */
 int media_recorder_prepare(void* handle, const char* url, const char* options);
 
 /**
- * @brief Reset the recorder, clear the origin record and record new one.
+ * @brief Reset the recorder path.
  *
- * @code
- *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
- *  // set event callback here.
- *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
- *  ret = media_recorder_start(handle);
- *  int ret = media_recorder_reset(handle);
- * @endcode
+ * @param[in] handle    Recorder handle.
+ * @return int Zero on success; a negative errno value on failure.
  *
- * @param[in] handle    The recorder handle
- * @return Zero on success; a negative errno value on failure.
+ * @note This api is similar to `media_recorder_stop`.
  */
 int media_recorder_reset(void* handle);
 
 /**
- * @brief Read recorderd data from the recorder.
+ * @brief Read recorderd data from recorder.
  *
  * @attention This need media_recorder_prepare() url set to NULL.
  * This function is blocked.
  *
- * @code
- *  int buf_len = 10;
- *  void buf[buf_len];
- *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
- *  // set event callback here.
- *  int ret = media_recorder_prepare(handle, NULL, NULL);
- *  ret = media_recorder_start(handle);
- *  int len = media_recorder_read_data(handle, buf, buf_len);
- * @endcode
+ * @param[in] handle    Recorder handle.
+ * @param[in] data      Buffer address.
+ * @param[in] len       Buffer length to read.
+ * @return Read length on success; a negative errno value on failure.
  *
- * @param[in] handle    Current recorder path
- * @param[in] data      Buffer will be recorderd to
- * @param[in] len       Buffer len
- * @return Length of read data; a negative errno value on failure.
+ * @note This api is thread-safe, in buffer mode, you might need this
+ * in your worker thread.
  */
 ssize_t media_recorder_read_data(void* handle, void* data, size_t len);
 
 /**
- * @brief Get sockaddr for unblock mode read data
+ * @brief Get socket address info for buffer mode.
  *
- * @param[in] handle    The recorder handle
- * @param[in] addr      The addr pointer to store sockaddr
- * @return Zero on success; a negative errno value on failure.
+ * @param[in] handle    Recorder handle.
+ * @param[in] addr      Socket address info.
+ * @return int Zero on success; a negative errno value on failure.
+ *
+ * @note This api is thread-safe, in buffer mode, you can get socket fd
+ * for data transaction in your worker thread.
  */
 int media_recorder_get_sockaddr(void* handle, struct sockaddr_storage* addr);
 
 /**
- * @brief Get socket fd for non-block mode read data
+ * @brief Get socket fd for reading.
  *
- * @param[in] handle    The recorder handle
- * @return fd; a negative errno value on failure.
+ * @param[in] handle    Recorder handle.
+ * @return int Socket fd on success; a negative errno value on failure.
  */
 int media_recorder_get_socket(void* handle);
 
 /**
  * @brief Close socket fd when recorder finish recving data.
- * @param[in] handle    The recorder handle
+ *
+ * @param[in] handle    Recorder handle.
+ *
+ * @note This api is thread-safe, in buffer mode, you can finalize data
+ * transaction by this api in your worker thread.
  */
 void media_recorder_close_socket(void* handle);
 
 /**
- * @brief Start the recorder.
+ * @brief Start/resume the recording the resource.
  *
- * @code
- *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
- *  // set event callback here.
- *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
- *  ret = media_recorder_start(handle);
- * @endcode
+ * @param[in] handle    Recorder handle.
+ * @return int Zero on success; a negative errno value on failure.
  *
- * @param[in] handle    Current recorder handle
- * @return Zero on success; a negative errno value on failure.
+ * @note This api would generates MEDIA_EVENT_STARTED event.
  */
 int media_recorder_start(void* handle);
 
 /**
- * @brief Pause the recorder.
+ * @brief Pause the recorder after capturing start.
  *
- * @code
- *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
- *  // set event callback here.
- *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
- *  ret = media_recorder_start(handle);
- *  ret = media_recorder_pause(handle);
- * @endcode
+ * @param[in] handle    Recorder handle.
+ * @return int Zero on success; a negative errno value on failure.
  *
- * @param[in] handle    Current recorder handle
- * @return Zero on success; a negative errno value on failure.
+ * @note This api would generates MEDIA_EVENT_PAUSED event.
  */
 int media_recorder_pause(void* handle);
 
 /**
  * @brief Stop the recorder.
  *
- * @code
- *  void *handle = media_recorder_open(MEDIA_SOURCE_MIC);
- *  // set event callback here.
- *  int ret = media_recorder_prepare(handle, "/music/example.wav", NULL);
- *  ret = media_recorder_start(handle);
- *  sleep(10); // record for 10 s.
- *  ret = media_recorder_stop(handle);
- * @endcode
+ * @param[in] handle    Recorder handle.
+ * @return int Zero on success; a negative errno value on failure.
  *
- * @param[in] handle    Current recorder handle
- * @return Zero on success; a negative errno value on failure.
+ * @note This api would generates MEDIA_EVENT_STOPPED event.
  */
 int media_recorder_stop(void* handle);
 
 /**
  * @brief Set properties of the recorder path.
  *
- * @param[in] handle      Current recorder path
- * @param[in] target      Target filter
- * @param[in] key         Key
- * @param[in] value       Value
- * @return Zero on success; a negative errno value on failure.
+ * @param[in] handle      Current recorder path.
+ * @param[in] target      Target filter.
+ * @param[in] key         Key to set.
+ * @param[in] value       Value to be set.
+ * @return int Zero on success; a negative errno value on failure.
  */
 int media_recorder_set_property(void* handle, const char* target, const char* key, const char* value);
 
 /**
  * @brief Get properties of the recorder path.
  *
- * @param[in] handle      Current recorder path
- * @param[in] target      Target filter
- * @param[in] key         Key
- * @param[in] value       Buffer of value
- * @param[in] value_len   Buffer length of value
- * @return Zero on success; a negated errno value on failure.
+ * @param[in] handle      Current recorder path.
+ * @param[in] target      Target filter.
+ * @param[in] key         Key to set.
+ * @param[in] value       Buffer of value.
+ * @param[in] value_len   Buffer length of value.
+ * @return int Zero on success; a negated errno value on failure.
  */
 int media_recorder_get_property(void* handle, const char* target, const char* key, char* value, int value_len);
 
@@ -272,12 +226,12 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
  *
  * @attention Camera only.
  *
- * @param[in] params    Camera open path params
- * @param[in] filename  The store path for new picture
- * @param[in] number    The number of pictures taken
- * @param[in] event_cb  The callback to handle state feedback
- * @param[in] cookie    The private data of user
- * @return Zero on success; a negative errno value on failure.
+ * @param[in] params    Camera open path params.
+ * @param[in] filename  The store path for new picture.
+ * @param[in] number    The number of pictures taken.
+ * @param[in] event_cb  The callback to handle state feedback.
+ * @param[in] cookie    The private data of user.
+ * @return int Zero on success; a negative errno value on failure.
  */
 int media_recorder_take_picture(char* params, char* filename, size_t number, media_event_callback event_cb, void* cookie);
 
@@ -286,25 +240,26 @@ int media_recorder_take_picture(char* params, char* filename, size_t number, med
  *
  * @attention Camera only.
  *
- * @param[in] params    open params
- * @param[in] filename  The store path for new picture
- * @param[in] number    The number of taking picture
- * @param[in] event_cb  The callback to handle state feedback
- * @param[in] cookie    The private data of user
- * @return Non-NULL pointer on success; a NULL pointer on failure.
+ * @param[in] params    Open params.
+ * @param[in] filename  The store path for new picture.
+ * @param[in] number    The number of taking picture.
+ * @param[in] event_cb  The callback to handle state feedback.
+ * @param[in] cookie    The private data of user.
+ * @return void* Handle on success; a NULL pointer on failure.
  */
 void* media_recorder_start_picture(char* params, char* filename, size_t number, media_event_callback event_cb, void* cookie);
 
 /**
  * @brief Close the recorder when taking picture finished.
- * This func should be used together with media_recorder_start_picture()
- * to close the recorder. This func should be called in the event_callback func
- * of the media_recorder_start_picture() when user want to take pic asynclly.
  *
  * @attention Camera only.
  *
  * @param[in] handle    The recoder handle returned in media_recorder_start_picture()
- * @return Zero on success; a negated errno value on failure.
+ * @return int Zero on success; a negated errno value on failure.
+ *
+ * @note This func should be used together with media_recorder_start_picture()
+ * to close the recorder. This func should be called in the event_callback func
+ * of the media_recorder_start_picture() when user want to take pic asynclly.
  */
 int media_recorder_finish_picture(void* handle);
 
@@ -318,6 +273,11 @@ int media_recorder_finish_picture(void* handle);
  * @param[in] cookie        Long-term callback context for:
  *                          on_open, on_event, on_close.
  * @return void* Handle of recorder.
+ *
+ * @note Even if `on_open` has not been called, you can call other
+ * handle-based async APIs, and they will be queued inside the
+ * recorder handle as requests, and processed in order after
+ * `open` is completed.
  */
 void* media_uv_recorder_open(void* loop, const char* source,
     media_uv_callback on_open, void* cookie);
@@ -358,10 +318,10 @@ int media_uv_recorder_prepare(void* handle, const char* url, const char* options
 /**
  * @brief Start or resume the capturing with auto focus request.
  *
- * @param[in] handle    Async recorder handle.
- * @param[in] scenario  MEDIA_SCENARIO_* in media_defs.h ..
- * @param[in] on_play   Call after receiving result.
- * @param[in] cookie    One-time callback context.
+ * @param[in] handle     Async recorder handle.
+ * @param[in] scenario   MEDIA_SCENARIO_* in media_defs.h.
+ * @param[in] on_start   Call after receiving result.
+ * @param[in] cookie     One-time callback context.
  * @return int Zero on success, negative errno on failure.
  */
 int media_uv_recorder_start_auto(void* handle, const char* stream,
@@ -400,27 +360,27 @@ int media_uv_recorder_stop(void* handle, media_uv_callback on_stop, void* cookie
 /**
  * @brief Set properties of the recorder.
  *
- * @param[in] handle    Async recorder handle
- * @param[in] target    Target filter
- * @param[in] key       Key
- * @param[in] value     Value
+ * @param[in] handle    Async recorder handle.
+ * @param[in] target    Target filter.
+ * @param[in] key       Key.
+ * @param[in] value     Value.
  * @param[in] cb        Call after receiving result.
  * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negative errno value on failure.
+ * @return int Zero on success; a negative errno value on failure.
  */
 int media_uv_recorder_set_property(void* handle, const char* target, const char* key,
     const char* value, media_uv_callback cb, void* cookie);
 /**
  * @brief Get properties of the recorder.
  *
- * @param[in] handle      Async recorder handle
- * @param[in] target      Target filter
- * @param[in] key         Key
- * @param[in] value       Buffer of value
- * @param[in] value_len   Buffer length of value
- * @param[in] cb          Call after receiving result
+ * @param[in] handle      Async recorder handle.
+ * @param[in] target      Target filter.
+ * @param[in] key         Key.
+ * @param[in] value       Buffer of value.
+ * @param[in] value_len   Buffer length of value.
+ * @param[in] cb          Call after receiving result.
  * @param[in] cookie      One-time callback context.
- * @return Zero on success; a negated errno value on failure.
+ * @return int Zero on success; a negated errno value on failure.
  */
 int media_uv_recorder_get_property(void* handle, const char* target, const char* key,
     media_uv_string_callback cb, void* cookie);
@@ -428,9 +388,9 @@ int media_uv_recorder_get_property(void* handle, const char* target, const char*
  * @brief Reset the recorder, clear the origin record and record new one.
  *
  * @param[in] handle    Async recorder handle.
- * @param[in] cb        Call after receiving result
+ * @param[in] cb        Call after receiving result.
  * @param[in] cookie    One-time callback context.
- * @return Zero on success; a negative errno value on failure.
+ * @return int Zero on success; a negative errno value on failure.
  */
 int media_uv_recorder_reset(void* handle, media_uv_callback on_reset, void* cookie);
 
