@@ -109,10 +109,14 @@ static void media_uv_policy_connect_cb(void* cookie, int ret)
 
     if (ret == -ENOENT)
         media_uv_disconnect(priv->proxy, media_uv_policy_release_cb);
-    else if (ret < 0)
+
+    if (ret >= 0)
+        ret = media_uv_send(priv->proxy, priv->parser, priv->cb, priv->cookie, &priv->parcel);
+
+    if (ret < 0)
         media_uv_reconnect(priv->proxy);
-    else
-        media_uv_send(priv->proxy, priv->parser, priv->cb, priv->cookie, &priv->parcel);
+    else if (!priv->cb) /* Response not needed. */
+        media_uv_disconnect(priv->proxy, media_uv_policy_release_cb);
 }
 
 static void media_uv_policy_receive_cb(void* cookie,
