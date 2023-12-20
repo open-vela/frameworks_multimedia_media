@@ -124,11 +124,6 @@ static int media_uv_session_send(void* handle, const char* target,
     media_parcel parcel;
     int ret;
 
-    /* Parse response only if the command support
-       response and user cares. */
-    if (!cb)
-        parser = NULL;
-
     media_parcel_init(&parcel);
     ret = media_parcel_append_printf(&parcel, "%i%s%s%s%i",
         MEDIA_ID_SESSION, target, cmd, arg, res_len);
