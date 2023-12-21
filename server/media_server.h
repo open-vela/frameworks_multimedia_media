@@ -24,7 +24,6 @@
 #include <media_defs.h>
 #include <media_focus.h>
 #include <poll.h>
-#include <stdbool.h>
 
 #include "media_parcel.h"
 
@@ -52,11 +51,6 @@ void media_stub_notify_event(void* cookie, int event,
     int result, const char* extra);
 void media_stub_onreceive(void* cookie,
     struct media_parcel* in, struct media_parcel* out);
-
-int media_stub_set_stream_status(const char* name, bool active);
-int media_stub_get_stream_name(const char* stream, char* name, int len);
-void media_stub_process_command(const char* target,
-    const char* cmd, const char* arg);
 
 /****************************************************************************
  * Server Functions
