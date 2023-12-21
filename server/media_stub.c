@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <malloc.h>
 
-#include "media_common.h"
+#include "media_proxy.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -129,35 +129,4 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         media_parcel_append_printf(out, "%i%s", ret, response);
 
     free(response);
-}
-
-int media_stub_set_stream_status(const char* name, bool active)
-{
-#ifdef CONFIG_LIB_PFW
-    const char* cmd = active ? "include" : "exclude";
-
-    name = strchr(name, '@') + 1;
-    return media_policy_handler(media_get_policy(), "ActiveStreams", cmd, name, 1, NULL, 0);
-#else
-    return -ENOSYS;
-#endif
-}
-
-int media_stub_get_stream_name(const char* stream, char* name, int len)
-{
-#ifdef CONFIG_LIB_PFW
-    return media_policy_handler(media_get_policy(), stream, "get_string", NULL, 0, name, len);
-#else
-    return -ENOSYS;
-#endif
-}
-
-void media_stub_process_command(const char* target,
-    const char* cmd, const char* arg)
-{
-#ifdef CONFIG_LIB_FFMPEG
-    media_graph_handler(media_get_graph(), target, cmd, arg, NULL, 0);
-#else
-    return -ENOSYS;
-#endif
 }

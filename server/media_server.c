@@ -32,7 +32,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "media_common.h"
+#include "media_log.h"
+#include "media_proxy.h"
 #include "media_server.h"
 
 /****************************************************************************

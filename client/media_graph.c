@@ -30,7 +30,6 @@
 #include <stdio.h>
 #include <sys/un.h>
 
-#include "media_common.h"
 #include "media_proxy.h"
 
 /****************************************************************************
@@ -81,7 +80,7 @@ static void* media_open(int control, const char* params)
     if (!priv)
         return NULL;
 
-    if (media_proxy(control, priv, NULL, "open", params, 0, NULL, 0) < 0)
+    if (media_proxy(control, priv, NULL, "open", params, 0, NULL, 0, 0) < 0)
         goto err;
 
     atomic_store(&priv->refs, 1);
@@ -315,12 +314,12 @@ static int media_get_socket(void* handle)
 int media_process_command(const char* target, const char* cmd,
     const char* arg, char* res, int res_len)
 {
-    return media_proxy(MEDIA_ID_GRAPH, NULL, target, cmd, arg, 0, res, res_len);
+    return media_proxy(MEDIA_ID_GRAPH, NULL, target, cmd, arg, 0, res, res_len, false);
 }
 
 void media_graph_dump(const char* options)
 {
-    media_proxy(MEDIA_ID_GRAPH, NULL, NULL, "dump", options, 0, NULL, 0);
+    media_proxy(MEDIA_ID_GRAPH, NULL, NULL, "dump", options, 0, NULL, 0, false);
 }
 
 void* media_player_open(const char* params)

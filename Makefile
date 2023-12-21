@@ -21,14 +21,14 @@
 include $(APPDIR)/Make.defs
 
 MODULE  = $(CONFIG_MEDIA_SERVER)
+CSRCS  += $(wildcard utils/*.c)
+CSRCS  += client/media_dtmf.c client/media_focus.c client/media_graph.c \
+          client/media_policy.c client/media_session.c
 CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/utils
 
-CSRCS += $(wildcard client/*.c)
-ifeq ($(CONFIG_LIBUV),)
-  CSRCS := $(filter-out $(wildcard client/media_uv*.c), $(CSRCS))
+ifneq ($(CONFIG_LIBUV),)
+  CSRCS += $(wildcard client/media_uv*.c)
 endif
-
-CSRCS += $(wildcard utils/*.c)
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
   CSRCS += server/media_focus.c server/focus_stack.c

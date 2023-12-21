@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "media_common.h"
+#include "media_proxy.h"
 #include "media_uv.h"
 
 /****************************************************************************

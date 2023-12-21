@@ -27,7 +27,6 @@
 #include <media_focus.h>
 #include <stdio.h>
 
-#include "media_common.h"
 #include "media_proxy.h"
 
 /****************************************************************************
@@ -73,7 +72,7 @@ void* media_focus_request(int* suggestion, const char* scenario,
         return NULL;
 
     /* Find the focus stack and create listener. */
-    ret = media_proxy(MEDIA_ID_FOCUS, priv, NULL, "ping", NULL, 0, NULL, 0);
+    ret = media_proxy(MEDIA_ID_FOCUS, priv, NULL, "ping", NULL, 0, NULL, 0, false);
     if (ret < 0) {
         media_default_release_cb(priv);
         return NULL;
@@ -87,7 +86,7 @@ void* media_focus_request(int* suggestion, const char* scenario,
         goto err;
 
     /* Request only after acknowledge listener, or there might be suggestions missed. */
-    *suggestion = media_proxy_once(priv, scenario, "request", NULL, 0, NULL, 0);
+    *suggestion = media_proxy(MEDIA_ID_FOCUS, priv, scenario, "request", NULL, 0, NULL, 0, false);
     if (*suggestion < 0)
         goto err;
 
@@ -103,7 +102,7 @@ int media_focus_abandon(void* handle)
     MediaFocusPriv* priv = handle;
     int ret;
 
-    ret = media_proxy_once(priv, NULL, "abandon", NULL, 0, NULL, 0);
+    ret = media_proxy(MEDIA_ID_FOCUS, priv, NULL, "abandon", NULL, 0, NULL, 0, false);
     if (ret < 0 && ret != -ENOENT)
         return ret;
 
@@ -112,5 +111,5 @@ int media_focus_abandon(void* handle)
 
 void media_focus_dump(const char* options)
 {
-    media_proxy(MEDIA_ID_FOCUS, NULL, NULL, "dump", options, 0, NULL, 0);
+    media_proxy(MEDIA_ID_FOCUS, NULL, NULL, "dump", options, 0, NULL, 0, false);
 }

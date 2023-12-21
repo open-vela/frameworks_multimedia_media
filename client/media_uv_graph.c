@@ -26,14 +26,15 @@
 #include <media_defs.h>
 #include <media_focus.h>
 #include <media_player.h>
-#include <media_policy.h>
 #include <media_recorder.h>
 #include <stdio.h>
 #include <sys/queue.h>
 #include <uv.h>
 
-#include "media_common.h"
+#include "media_log.h"
 #include "media_metadata.h"
+#include "media_policy.h"
+#include "media_proxy.h"
 #include "media_uv.h"
 
 /****************************************************************************
