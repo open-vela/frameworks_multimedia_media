@@ -25,7 +25,7 @@
 #include <media_defs.h>
 #include <media_utils.h>
 
-#include "media_common.h"
+#include "media_proxy.h"
 
 /****************************************************************************
  * Public Functions
