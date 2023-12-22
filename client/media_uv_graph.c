@@ -58,10 +58,14 @@ typedef LIST_HEAD(MediaListenList, MediaListenPriv) MediaListenList;
     MediaListenList listeners;                    \
     media_uv_object_callback on_connection;       \
     /* Fields for auto focus. */                  \
-    void* focus;                                  \
-    bool suggest_active;                          \
-    media_uv_callback on_play;                    \
+    MediaFocusPriv* focus;
+
+typedef struct MediaFocusPriv {
+    void* stream;
+    void* handle; /* Focus handle. */
+    media_uv_callback on_play;
     void* on_play_cookie;
+} MediaFocusPriv;
 
 typedef struct MediaStreamPriv {
     MEDIA_STREAM_FIELDS
@@ -136,7 +140,11 @@ static int media_uv_stream_listen_init(MediaStreamPriv* priv, const char* addr);
 
 /* Functions to subscrible focus. */
 
-static void media_uv_stream_abandon_cb(void* cookie, int ret);
+static void media_uv_stream_abandon_focus_cb(void* cookie, int ret);
+static void media_uv_stream_abandon_focus(MediaStreamPriv* stream);
+static int media_uv_stream_request_focus(MediaStreamPriv* stream,
+    const char* scenario, media_focus_callback on_suggestion,
+    media_uv_callback on_play, void* cookie);
 static void media_uv_player_suggest_cb(int suggest, void* cookie);
 static void media_uv_recorder_suggest_cb(int suggest, void* cookie);
 
@@ -154,7 +162,7 @@ static void media_uv_player_query_volume_cb(void* cookie, int ret, int value);
 
 static void media_uv_stream_release(MediaStreamPriv* priv)
 {
-    if (priv && !priv->proxy && !priv->focus && LIST_EMPTY(&priv->listeners)) {
+    if (priv && !priv->proxy && LIST_EMPTY(&priv->listeners)) {
         if (priv->on_close)
             priv->on_close(priv->cookie, 0);
 
@@ -475,12 +483,54 @@ err:
     return ret;
 }
 
-static void media_uv_stream_abandon_cb(void* cookie, int ret)
+static void media_uv_stream_abandon_focus_cb(void* cookie, int ret)
 {
-    MediaStreamPriv* priv = cookie;
+    free(cookie);
+}
 
-    priv->focus = NULL; /* Mark focus is finalized. */
-    media_uv_stream_release(priv);
+static void media_uv_stream_abandon_focus(MediaStreamPriv* stream)
+{
+    MediaFocusPriv* priv;
+    int ret;
+
+    if (!stream)
+        return;
+
+    priv = stream->focus;
+    if (priv) {
+        ret = media_uv_focus_abandon(priv->handle, media_uv_stream_abandon_focus_cb);
+        if (ret >= 0) {
+            /* Detach focus and stream at once. */
+            priv->stream = NULL;
+            stream->focus = NULL;
+        }
+        MEDIA_INFO("%s:%p ret:%d\n", stream->name, stream, ret);
+    }
+}
+
+static int media_uv_stream_request_focus(MediaStreamPriv* stream,
+    const char* scenario, media_focus_callback on_suggestion,
+    media_uv_callback on_play, void* cookie)
+{
+    MediaFocusPriv* priv;
+
+    priv = zalloc(sizeof(MediaFocusPriv));
+    if (!priv)
+        return -ENOMEM;
+
+    priv->stream = stream;
+    priv->on_play = on_play;
+    priv->on_play_cookie = cookie;
+    priv->handle = media_uv_focus_request(stream->loop, scenario,
+        on_suggestion, priv);
+    if (!priv->handle) {
+        free(priv);
+        return -ENOMEM;
+    }
+
+    MEDIA_INFO("%s:%p\n", stream->name, stream);
+    stream->focus = priv;
+    return 0;
 }
 
 /****************************************************************************
@@ -559,45 +609,54 @@ static void media_uv_player_query_duration_cb(void* cookie, int ret, unsigned va
 
 static void media_uv_player_suggest_cb(int suggest, void* cookie)
 {
-    MediaPlayerPriv* priv = cookie;
+    MediaFocusPriv* priv = cookie;
+    MediaPlayerPriv* player = priv->stream;
+    bool suggest_active = false;
 
-    MEDIA_INFO("player:%s:%p suggest:%d\n", priv->name, priv, suggest);
+    if (!player) {
+        MEDIA_INFO("suggest:%d canceled\n", suggest);
+        goto out;
+    }
+
+    MEDIA_INFO("%s:%p suggest:%d\n", player->name, player, suggest);
+
     switch (suggest) {
     case MEDIA_FOCUS_PLAY:
-        priv->suggest_active = true;
-        media_uv_player_set_volume(priv, 1.0, NULL, NULL);
-        media_uv_player_start(priv, priv->on_play, priv->on_play_cookie);
+        suggest_active = true;
+        media_uv_player_set_volume(player, 1.0, NULL, NULL);
+        media_uv_player_start(player, priv->on_play, priv->on_play_cookie);
         break;
 
     case MEDIA_FOCUS_STOP:
-        priv->suggest_active = false;
-        media_uv_player_stop(priv, NULL, NULL);
-        media_uv_focus_abandon(priv->focus, media_uv_stream_abandon_cb);
+        suggest_active = false;
+        media_uv_player_stop(player, NULL, NULL);
+        media_uv_stream_abandon_focus(priv->stream);
         break;
 
     case MEDIA_FOCUS_PAUSE:
-        priv->suggest_active = false;
-        media_uv_player_pause(priv, NULL, NULL);
+        suggest_active = false;
+        media_uv_player_pause(player, NULL, NULL);
         break;
 
     case MEDIA_FOCUS_PLAY_BUT_SILENT:
-        priv->suggest_active = true;
-        media_uv_player_set_volume(priv, 0.0, NULL, NULL);
-        media_uv_player_start(priv, NULL, NULL);
+        suggest_active = true;
+        media_uv_player_set_volume(player, 0.0, NULL, NULL);
+        media_uv_player_start(player, NULL, NULL);
         break;
 
     case MEDIA_FOCUS_PLAY_WITH_DUCK:
-        priv->suggest_active = true;
-        media_uv_player_set_volume(priv, 0.1, NULL, NULL);
-        media_uv_player_start(priv, NULL, NULL);
+        suggest_active = true;
+        media_uv_player_set_volume(player, 0.1, NULL, NULL);
+        media_uv_player_start(player, NULL, NULL);
         break;
 
     case MEDIA_FOCUS_PLAY_WITH_KEEP:
         break;
     }
 
+out:
     if (priv->on_play) {
-        if (!priv->suggest_active) /* Notify user if focus request failed. */
+        if (!suggest_active) /* Notify user if focus request failed. */
             priv->on_play(priv->on_play_cookie, -EPERM);
 
         priv->on_play = NULL;
@@ -654,14 +713,9 @@ int media_uv_player_close(void* handle, int pending, media_uv_callback on_close)
 
     media_uv_stream_close_pipe(handle);
     media_uv_stream_listen_clear(handle, NULL);
+    media_uv_stream_abandon_focus(handle);
 
-    if (priv->focus)
-        ret = media_uv_focus_abandon(priv->focus, media_uv_stream_abandon_cb);
-
-    if (ret >= 0)
-        ret = media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
-
-    return ret;
+    return media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
 }
 
 int media_uv_player_listen(void* handle, media_event_callback on_event)
@@ -735,25 +789,13 @@ int media_uv_player_start_auto(void* handle, const char* scenario,
     if (!priv || !scenario || !scenario[0])
         return -EINVAL;
 
-    /* Follow focus latest suggestion if already requested. */
     if (priv->focus) {
-        if (priv->suggest_active)
-            return media_uv_player_start(priv, cb, cookie);
-        else
-            return -EPERM;
+        MEDIA_WARN("%s:%p force start\n", priv->name, priv);
+        return media_uv_player_start(priv, cb, cookie);
     }
 
-    /* Request focus. */
-    priv->on_play = cb;
-    priv->on_play_cookie = cookie;
-    priv->focus = media_uv_focus_request(priv->loop, scenario,
-        media_uv_player_suggest_cb, priv);
-    if (!priv->focus) {
-        free(priv);
-        return -ENOMEM;
-    }
-
-    return 0;
+    return media_uv_stream_request_focus(handle, scenario,
+        media_uv_player_suggest_cb, cb, cookie);
 }
 
 int media_uv_player_start(void* handle, media_uv_callback cb, void* cookie)
@@ -767,8 +809,12 @@ int media_uv_player_start(void* handle, media_uv_callback cb, void* cookie)
 
 int media_uv_player_pause(void* handle, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv)
         return -EINVAL;
+
+    media_uv_stream_abandon_focus(handle);
 
     return media_uv_stream_send(handle, NULL, "pause", NULL, 0,
         media_uv_stream_receive_cb, cb, cookie);
@@ -776,10 +822,14 @@ int media_uv_player_pause(void* handle, media_uv_callback cb, void* cookie)
 
 int media_uv_player_stop(void* handle, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv)
         return -EINVAL;
 
     media_uv_stream_close_pipe(handle);
+    media_uv_stream_abandon_focus(handle);
+
     return media_uv_stream_send(handle, NULL, "stop", NULL, 0,
         media_uv_stream_receive_cb, cb, cookie);
 }
@@ -924,34 +974,43 @@ int media_uv_player_query(void* handle, media_uv_object_callback cb, void* cooki
 
 static void media_uv_recorder_suggest_cb(int suggest, void* cookie)
 {
-    MediaRecorderPriv* priv = cookie;
+    MediaFocusPriv* priv = cookie;
+    MediaRecorderPriv* recorder = priv->stream;
+    bool suggest_active = false;
 
-    MEDIA_INFO("recorder:%s:%p suggest:%d\n", priv->name, priv, suggest);
+    if (!recorder) {
+        MEDIA_INFO("suggest:%d canceled\n", suggest);
+        goto out;
+    }
+
+    MEDIA_INFO("%s:%p suggest:%d\n", recorder->name, recorder, suggest);
+
     switch (suggest) {
     case MEDIA_FOCUS_PLAY:
     case MEDIA_FOCUS_PLAY_BUT_SILENT:
     case MEDIA_FOCUS_PLAY_WITH_DUCK:
-        priv->suggest_active = true;
-        media_uv_recorder_start(priv, priv->on_play, priv->on_play_cookie);
+        suggest_active = true;
+        media_uv_recorder_start(recorder, priv->on_play, priv->on_play_cookie);
         break;
 
     case MEDIA_FOCUS_STOP:
-        priv->suggest_active = false;
-        media_uv_recorder_stop(priv, NULL, NULL);
-        media_uv_focus_abandon(priv->focus, media_uv_stream_abandon_cb);
+        suggest_active = false;
+        media_uv_recorder_stop(recorder, NULL, NULL);
+        media_uv_stream_abandon_focus(priv->stream);
         break;
 
     case MEDIA_FOCUS_PAUSE:
-        priv->suggest_active = false;
-        media_uv_recorder_pause(priv, NULL, NULL);
+        suggest_active = false;
+        media_uv_recorder_pause(recorder, NULL, NULL);
         break;
 
     case MEDIA_FOCUS_PLAY_WITH_KEEP:
         break;
     }
 
+out:
     if (priv->on_play) {
-        if (!priv->suggest_active) /* Notify user if focus request failed. */
+        if (!suggest_active) /* Notify user if focus request failed. */
             priv->on_play(priv->on_play_cookie, -EPERM);
 
         priv->on_play = NULL;
@@ -1006,9 +1065,7 @@ int media_uv_recorder_close(void* handle, media_uv_callback on_close)
 
     media_uv_stream_close_pipe(handle);
     media_uv_stream_listen_clear(handle, NULL);
-
-    if (priv->focus)
-        ret = media_uv_focus_abandon(priv->focus, media_uv_stream_abandon_cb);
+    media_uv_stream_abandon_focus(handle);
 
     if (ret >= 0)
         ret = media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
@@ -1078,25 +1135,13 @@ int media_uv_recorder_start_auto(void* handle, const char* scenario,
     if (!priv || !scenario || !scenario[0])
         return -EINVAL;
 
-    /* Follow focus latest suggestion if already requested. */
     if (priv->focus) {
-        if (priv->suggest_active)
-            return media_uv_recorder_start(priv, cb, cookie);
-        else
-            return -EPERM;
+        MEDIA_WARN("%s:%p force start\n", priv->name, priv);
+        return media_uv_recorder_start(priv, cb, cookie);
     }
 
-    /* Request focus. */
-    priv->on_play = cb;
-    priv->on_play_cookie = cookie;
-    priv->focus = media_uv_focus_request(priv->loop, scenario,
-        media_uv_recorder_suggest_cb, priv);
-    if (!priv->focus) {
-        free(priv);
-        return -ENOMEM;
-    }
-
-    return 0;
+    return media_uv_stream_request_focus(handle, scenario,
+        media_uv_recorder_suggest_cb, cb, cookie);
 }
 
 int media_uv_recorder_start(void* handle, media_uv_callback cb, void* cookie)
@@ -1110,8 +1155,12 @@ int media_uv_recorder_start(void* handle, media_uv_callback cb, void* cookie)
 
 int media_uv_recorder_pause(void* handle, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaRecorderPriv* priv = handle;
+
+    if (!priv)
         return -EINVAL;
+
+    media_uv_stream_abandon_focus(handle);
 
     return media_uv_stream_send(handle, NULL, "pause", NULL, 0,
         media_uv_stream_receive_cb, cb, cookie);
@@ -1119,10 +1168,14 @@ int media_uv_recorder_pause(void* handle, media_uv_callback cb, void* cookie)
 
 int media_uv_recorder_stop(void* handle, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaRecorderPriv* priv = handle;
+
+    if (!priv)
         return -EINVAL;
 
     media_uv_stream_close_pipe(handle);
+    media_uv_stream_abandon_focus(handle);
+
     return media_uv_stream_send(handle, NULL, "stop", NULL, 0,
         media_uv_stream_receive_cb, cb, cookie);
 }
