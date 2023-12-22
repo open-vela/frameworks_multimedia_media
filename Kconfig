@@ -13,6 +13,10 @@ choice
 	prompt "MEDIA log level"
 	default MEDIA_LOG_INFO
 
+config MEDIA_FEATURE
+	bool "enable quickapp media feature"
+	default n
+
 config MEDIA_LOG_DEBUG
 	bool "MEDIA_LOG_DEBUG"
 
