@@ -43,6 +43,7 @@ typedef struct MediaIOPriv {
     atomic_int refs;
     sem_t sem;
     int socket;
+    int result;
 } MediaIOPriv;
 
 /****************************************************************************
@@ -53,6 +54,13 @@ static void media_recorder_take_picture_cb(void* cookie, int event, int result,
     const char* extra)
 {
     MediaIOPriv* priv = cookie;
+
+    priv->result = result;
+    if (result) {
+        sem_post(&priv->sem);
+        return;
+    }
+
     if (event == MEDIA_EVENT_COMPLETED) {
         media_recorder_finish_picture(priv->cookie);
         sem_post(&priv->sem);
@@ -569,6 +577,7 @@ int media_recorder_get_property(void* handle, const char* target, const char* ke
 
 int media_recorder_take_picture(char* params, char* filename, size_t number)
 {
+    int ret = 0;
     MediaIOPriv* priv;
 
     if (!number || number > INT_MAX)
@@ -587,9 +596,10 @@ int media_recorder_take_picture(char* params, char* filename, size_t number)
 
     sem_wait(&priv->sem);
     sem_destroy(&priv->sem);
-    free(priv);
+    ret = priv->result;
 
-    return 0;
+    free(priv);
+    return ret;
 }
 
 void* media_recorder_start_picture(char* params, char* filename, size_t number,
