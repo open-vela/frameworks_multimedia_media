@@ -92,6 +92,9 @@ int media_metadata_unserialize(media_metadata_t* data, const char* str)
     char title[128], artist[128];
     int ret;
 
+    if (!str)
+        return -EINVAL;
+
     ret = sscanf(str, "%d:%d:%d:%u:%u:%s\t%s", &data->flags, &data->state,
         &data->volume, &data->position, &data->duration, title, artist);
 
