@@ -105,8 +105,6 @@ static void media_uv_free_writing(MediaWritePriv* writing);
 static MediaWritePriv* media_uv_alloc_writing(int code, const media_parcel* parcel);
 static void media_uv_free_pipe(MediaPipePriv* pipe);
 static MediaPipePriv* media_uv_alloc_pipe(MediaProxyPriv* proxy);
-
-/* free the whole proxy. */
 static void media_uv_free_proxy(MediaProxyPriv* proxy);
 
 /* Shutdown and close. */
@@ -218,8 +216,14 @@ static void media_uv_free_proxy(MediaProxyPriv* proxy)
     if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT) {
         /* Concat 2 queue and clear all. */
         TAILQ_CONCAT(&proxy->sentq, &proxy->pendq, entry);
-        while ((writing = TAILQ_FIRST(&proxy->sentq)))
-            media_uv_write_cb(&writing->req, -ECANCELED);
+        while ((writing = TAILQ_FIRST(&proxy->sentq))) {
+            TAILQ_REMOVE(&proxy->sentq, writing, entry);
+            if (writing->parcel.chunk->code == MEDIA_PARCEL_SEND_ACK)
+                writing->on_receive(proxy->cookie,
+                    writing->cookies[0], writing->cookies[1], NULL);
+            writing->flags = MEDIA_MSGFLAG_WRITTEN | MEDIA_MSGFLAG_RESPONSED;
+            media_uv_free_writing(writing);
+        }
 
         if (proxy->on_release)
             proxy->on_release(proxy->cookie, 0);
@@ -480,10 +484,10 @@ static void media_uv_write_cb(uv_write_t* req, int status)
 
     /* Should remove from queue because there won't be response. */
     if (status < 0 && writing->parcel.chunk->code == MEDIA_PARCEL_SEND_ACK) {
-        writing->flags |= MEDIA_MSGFLAG_RESPONSED;
         TAILQ_REMOVE(&proxy->sentq, writing, entry);
         writing->on_receive(proxy->cookie,
             writing->cookies[0], writing->cookies[1], NULL);
+        writing->flags |= MEDIA_MSGFLAG_RESPONSED;
     }
 
     /* Should release wiriting because there won't be response. */
