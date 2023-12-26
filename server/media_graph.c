@@ -617,6 +617,9 @@ int media_graph_handler(void* graph, const char* target, const char* cmd,
         return 0;
     }
 
+    if (!target)
+        return -EINVAL;
+
     for (i = 0; i < priv->graph->nb_filters; i++) {
         AVFilterContext* filter = priv->graph->filters[i];
 
