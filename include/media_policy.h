@@ -48,6 +48,8 @@ extern "C" {
 #define MEDIA_DEVICE_MIC "mic"
 #define MEDIA_DEVICE_MODEM "modem"
 
+#define MEDIA_A2DP_OFFLOAD_MODE "A2dpOffloadMode"
+
 /****************************************************************************
  * Public Funtions
  ****************************************************************************/
