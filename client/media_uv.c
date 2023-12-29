@@ -256,7 +256,11 @@ static void media_uv_close(MediaPipePriv* pipe)
 
 static void media_uv_shutdown_cb(uv_shutdown_t* req, int status)
 {
+    MediaPipePriv* pipe = uv_req_get_data((uv_req_t*)req);
+
     free(req);
+    if (status < 0)
+        media_uv_close(pipe);
 }
 
 /**
@@ -274,8 +278,11 @@ static void media_uv_shutdown(MediaPipePriv* pipe)
     if (!req)
         return;
 
-    if (uv_shutdown((uv_shutdown_t*)req, (uv_stream_t*)&pipe->handle, media_uv_shutdown_cb) < 0)
+    uv_req_set_data((uv_req_t*)req, pipe);
+    if (uv_shutdown((uv_shutdown_t*)req, (uv_stream_t*)&pipe->handle, media_uv_shutdown_cb) < 0) {
+        media_uv_close(pipe);
         free(req);
+    }
 }
 
 static void media_uv_reconnect_one(MediaProxyPriv* proxy)
