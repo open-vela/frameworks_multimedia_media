@@ -26,7 +26,7 @@
 #include <media_policy.h>
 #include <stdio.h>
 
-#include "media_proxy.h"
+#include "media_common.h"
 #include "media_uv.h"
 
 /****************************************************************************

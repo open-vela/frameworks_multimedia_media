@@ -29,7 +29,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "media_log.h"
+#include "media_common.h"
 #include "media_server.h"
 
 /****************************************************************************

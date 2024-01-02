@@ -34,8 +34,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 
-#include "media_log.h"
-#include "media_proxy.h"
+#include "media_common.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -74,14 +73,6 @@ static const size_t g_media_policy_nb_plugins = sizeof(g_media_policy_plugins)
  * Private Functions
  ****************************************************************************/
 
-static void policy_process_command(const char* target, const char* cmd, const char* arg)
-{
-#ifdef CONFIG_LIB_FFMPEG
-    media_graph_handler(media_get_graph(), target, cmd, arg, NULL, 0);
-#endif
-    media_proxy(MEDIA_ID_GRAPH, NULL, target, cmd, arg, 0, NULL, 0, true);
-}
-
 static void pfw_ffmpeg_command_callback(void* cookie, const char* params)
 {
     char *target, *cmd, *arg, *outptr, *inptr, *str;
@@ -107,7 +98,7 @@ static void pfw_ffmpeg_command_callback(void* cookie, const char* params)
             goto out;
 
         arg = strtok_r(NULL, ",", &inptr);
-        policy_process_command(target, cmd, arg);
+        media_stub_process_command(target, cmd, arg);
 
         target = strtok_r(NULL, ";", &outptr);
     }

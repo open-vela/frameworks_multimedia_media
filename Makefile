@@ -19,42 +19,43 @@
 ############################################################################
 
 include $(APPDIR)/Make.defs
-CXXEXT     := .cpp
-CXXFLAGS   += -std=c++17
+CXXEXT   := .cpp
+CXXFLAGS += -std=c++17
 
 MODULE  = $(CONFIG_MEDIA_SERVER)
-CSRCS  += $(wildcard utils/*.c)
-CSRCS  += client/media_dtmf.c client/media_focus.c client/media_graph.c \
-          client/media_policy.c client/media_session.c
 CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/utils
 
-ifneq ($(CONFIG_LIBUV),)
-  CSRCS += $(wildcard client/media_uv*.c)
+CSRCS += $(wildcard client/*.c)
+ifeq ($(CONFIG_LIBUV),)
+  CSRCS := $(filter-out $(wildcard client/media_uv*.c), $(CSRCS))
 endif
+
+CSRCS += $(wildcard utils/*.c)
 
 ifeq ($(CONFIG_MEDIA_FEATURE),y)
 ifeq ($(CONFIG_ARCH), arm)
-TARGETDIR := arm
+  TARGETDIR := arm
 else ifeq ($(CONFIG_ARCH), arm64)
-TARGETDIR := aarch64
+  TARGETDIR := aarch64
 else ifeq ($(CONFIG_ARCH), xtensa)
-TARGETDIR := xtensa
+  TARGETDIR := xtensa
 else
-TARGETDIR := x86
-endif
-CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi
-CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi
-CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi/libffi/src/$(TARGETDIR)
-CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi/libffi/src/$(TARGETDIR)
-CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/include
-CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/include
-CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/src
-CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/src
-CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
-CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
-CXXSRCS  += feature/volume.cpp
-CXXSRCS  += feature/volume_impl.cpp
-endif
+  TARGETDIR := x86
+endif # CONFIG_ARCH
+
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi/libffi/src/$(TARGETDIR)
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi/libffi/src/$(TARGETDIR)
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/include
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/include
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/src
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/src
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
+  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
+  CXXSRCS  += feature/volume.cpp
+  CXXSRCS  += feature/volume_impl.cpp
+endif # CONFIG_MEDIA_FEATURE
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
   CSRCS += server/media_focus.c server/focus_stack.c
