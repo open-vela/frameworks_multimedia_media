@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/utils/media_proxy.h
+ * frameworks/media/client/media_proxy.h
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -36,34 +36,6 @@ extern "C" {
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-/* RPC definitions. */
-#define MEDIA_SOCKADDR_NAME "md:%s"
-#ifndef CONFIG_RPTUN_LOCAL_CPUNAME
-#define CONFIG_RPTUN_LOCAL_CPUNAME CONFIG_MEDIA_SERVER_CPUNAME
-#endif
-
-/* Module ID. */
-#define MEDIA_ID_GRAPH 1
-#define MEDIA_ID_POLICY 2
-#define MEDIA_ID_PLAYER 3
-#define MEDIA_ID_RECORDER 4
-#define MEDIA_ID_SESSION 5
-#define MEDIA_ID_FOCUS 6
-
-/* Player/Recorder data socket address. */
-#define MEDIA_GRAPH_SOCKADDR_NAME "med%p"
-
-/* Policy key criterion names. */
-#define MEDIA_POLICY_APPLY 1
-#define MEDIA_POLICY_NOT_APPLY 0
-#define MEDIA_POLICY_AUDIO_MODE "AudioMode"
-#define MEDIA_POLICY_DEVICE_USE "UsingDevices"
-#define MEDIA_POLICY_DEVICE_AVAILABLE "AvailableDevices"
-#define MEDIA_POLICY_HFP_SAMPLERATE "HFPSampleRate"
-#define MEDIA_POLICY_MUTE_MODE "MuteMode"
-#define MEDIA_POLICY_VOLUME "Volume"
-#define MEDIA_POLICY_MIC_MODE "MicMode"
 
 /* Common fields of rpc handle. */
 #define MEDIA_COMMON_FIELDS \
@@ -121,24 +93,12 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
  *                  For Session: event sent to player client.
  * @param res       Response address.
  * @param res_len   Response max lenghth.
- * @param remote    Only transact to remote servers if true
- *                  (for server transacts to other servers)
  * @return int      Zero on success; a negated errno value on failure.
  */
 int media_proxy(int id, void* handle, const char* target, const char* cmd,
-    const char* arg, int apply, char* res, int res_len, bool remote);
+    const char* arg, int apply, char* res, int res_len);
 
 void media_default_release_cb(void* handle);
-
-/**
- * @brief Get id name.
- *
- * For example, media_id_get_name(MEDIA_ID_GRAPH) returns "graph".
- *
- * @param id     MEDIA_ID_* .
- * @return const char* Always a printable string.
- */
-const char* media_id_get_name(int id);
 
 #ifdef __cplusplus
 }
