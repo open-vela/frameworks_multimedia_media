@@ -190,6 +190,7 @@ typedef void (*media_focus_callback)(int suggestion, void* cookie);
 #define MEDIA_METAFLAG_DURATION 0x8
 #define MEDIA_METAFLAG_TITLE 0x10
 #define MEDIA_METAFLAG_ARTIST 0x20
+#define MEDIA_METAFLAG_ALBUM 0x40
 
 typedef struct media_metadata_s {
     int flags; /* Indicates available fields. */
@@ -199,6 +200,7 @@ typedef struct media_metadata_s {
     unsigned duration;
     char* title;
     char* artist;
+    char* album;
 } media_metadata_t;
 
 /****************************************************************************
