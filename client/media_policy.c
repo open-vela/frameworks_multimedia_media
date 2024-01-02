@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "media_common.h"
 #include "media_proxy.h"
 
 /****************************************************************************
@@ -158,7 +159,7 @@ int media_policy_set_int(const char* name, int value, int apply)
     char tmp[32];
 
     snprintf(tmp, sizeof(tmp), "%d", value);
-    return media_proxy(MEDIA_ID_POLICY, NULL, name, "set_int", tmp, apply, NULL, 0, false);
+    return media_proxy(MEDIA_ID_POLICY, NULL, name, "set_int", tmp, apply, NULL, 0);
 }
 
 int media_policy_get_int(const char* name, int* value)
@@ -169,7 +170,7 @@ int media_policy_get_int(const char* name, int* value)
     if (!value)
         return -EINVAL;
 
-    ret = media_proxy(MEDIA_ID_POLICY, NULL, name, "get_int", NULL, 0, tmp, sizeof(tmp), false);
+    ret = media_proxy(MEDIA_ID_POLICY, NULL, name, "get_int", NULL, 0, tmp, sizeof(tmp));
     if (ret >= 0) {
         *value = atoi(tmp);
         ret = 0;
@@ -186,7 +187,7 @@ int media_policy_contain(const char* name, const char* values, int* result)
     if (!result)
         return -EINVAL;
 
-    ret = media_proxy(MEDIA_ID_POLICY, NULL, name, "contain", values, 0, tmp, sizeof(tmp), false);
+    ret = media_proxy(MEDIA_ID_POLICY, NULL, name, "contain", values, 0, tmp, sizeof(tmp));
     if (ret >= 0) {
         *result = atoi(tmp);
         ret = 0;
@@ -197,37 +198,37 @@ int media_policy_contain(const char* name, const char* values, int* result)
 
 int media_policy_set_string(const char* name, const char* value, int apply)
 {
-    return media_proxy(MEDIA_ID_POLICY, NULL, name, "set_string", value, apply, NULL, 0, false);
+    return media_proxy(MEDIA_ID_POLICY, NULL, name, "set_string", value, apply, NULL, 0);
 }
 
 int media_policy_get_string(const char* name, char* value, int len)
 {
-    return media_proxy(MEDIA_ID_POLICY, NULL, name, "get_string", NULL, 0, value, len, false);
+    return media_proxy(MEDIA_ID_POLICY, NULL, name, "get_string", NULL, 0, value, len);
 }
 
 int media_policy_include(const char* name, const char* values, int apply)
 {
-    return media_proxy(MEDIA_ID_POLICY, NULL, name, "include", values, apply, NULL, 0, false);
+    return media_proxy(MEDIA_ID_POLICY, NULL, name, "include", values, apply, NULL, 0);
 }
 
 int media_policy_exclude(const char* name, const char* values, int apply)
 {
-    return media_proxy(MEDIA_ID_POLICY, NULL, name, "exclude", values, apply, NULL, 0, false);
+    return media_proxy(MEDIA_ID_POLICY, NULL, name, "exclude", values, apply, NULL, 0);
 }
 
 int media_policy_increase(const char* name, int apply)
 {
-    return media_proxy(MEDIA_ID_POLICY, NULL, name, "increase", NULL, apply, NULL, 0, false);
+    return media_proxy(MEDIA_ID_POLICY, NULL, name, "increase", NULL, apply, NULL, 0);
 }
 
 int media_policy_decrease(const char* name, int apply)
 {
-    return media_proxy(MEDIA_ID_POLICY, NULL, name, "decrease", NULL, apply, NULL, 0, false);
+    return media_proxy(MEDIA_ID_POLICY, NULL, name, "decrease", NULL, apply, NULL, 0);
 }
 
 void media_policy_dump(const char* options)
 {
-    media_proxy(MEDIA_ID_POLICY, NULL, NULL, "dump", options, 0, NULL, 0, false);
+    media_proxy(MEDIA_ID_POLICY, NULL, NULL, "dump", options, 0, NULL, 0);
 }
 
 int media_policy_set_mic_mute(int mute)
