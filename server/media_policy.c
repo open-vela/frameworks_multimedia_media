@@ -227,10 +227,6 @@ int media_policy_handler(void* policy, const char* name, const char* cmd,
         ret = pfw_getstring(policy, name, res, res_len);
         if (ret >= 0)
             return 0;
-    } else if (!strcmp(cmd, "get_parameter")) {
-        ret = pfw_getparameter(policy, name, res, res_len);
-        if (ret >= 0)
-            return 0;
     } else if (!strcmp(cmd, "dump")) {
         dump = pfw_dump(policy);
         MEDIA_INFO("\n%s", dump);
