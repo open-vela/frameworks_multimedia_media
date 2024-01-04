@@ -85,7 +85,7 @@ static int media_uv_focus_send(MediaFocusPriv* priv,
 static void media_uv_focus_event_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel)
 {
-    int32_t suggest = MEDIA_EVENT_STOP;
+    int32_t suggest = MEDIA_FOCUS_STOP;
     MediaFocusPriv* priv = cookie;
 
     if (parcel)
