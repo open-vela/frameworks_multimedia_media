@@ -137,7 +137,7 @@ static void media_uv_stream_listen_clear(MediaStreamPriv* priv,
 static void media_uv_stream_listen_connection_cb(uv_stream_t* stream, int ret);
 static int media_uv_stream_listen_init(MediaStreamPriv* priv, const char* addr);
 
-/* Functions to subscrible focus. */
+/* Functions for focus suggestions. */
 
 static void media_uv_stream_abandon_focus_cb(void* cookie, int ret);
 static void media_uv_stream_abandon_focus(MediaStreamPriv* stream);
@@ -146,6 +146,7 @@ static int media_uv_stream_request_focus(MediaStreamPriv* stream,
     media_uv_callback on_play, void* cookie);
 static void media_uv_player_suggest_cb(int suggest, void* cookie);
 static void media_uv_recorder_suggest_cb(int suggest, void* cookie);
+static int media_uv_stream_pause(MediaStreamPriv* priv, void* cb, void* cookie);
 
 /* Functions to query metadata. */
 
@@ -532,6 +533,12 @@ static int media_uv_stream_request_focus(MediaStreamPriv* stream,
     return 0;
 }
 
+static int media_uv_stream_pause(MediaStreamPriv* priv, void* cb, void* cookie)
+{
+    return media_uv_stream_send(priv, NULL, "pause", NULL, 0,
+        media_uv_stream_receive_cb, cb, cookie);
+}
+
 /****************************************************************************
  * Player Functions
  ****************************************************************************/
@@ -629,12 +636,11 @@ static void media_uv_player_suggest_cb(int suggest, void* cookie)
     case MEDIA_FOCUS_STOP:
         suggest_active = false;
         media_uv_player_stop(player, NULL, NULL);
-        media_uv_stream_abandon_focus(priv->stream);
         break;
 
     case MEDIA_FOCUS_PAUSE:
         suggest_active = false;
-        media_uv_player_pause(player, NULL, NULL);
+        media_uv_stream_pause(priv->stream, NULL, NULL);
         break;
 
     case MEDIA_FOCUS_PLAY_BUT_SILENT:
@@ -815,8 +821,7 @@ int media_uv_player_pause(void* handle, media_uv_callback cb, void* cookie)
 
     media_uv_stream_abandon_focus(handle);
 
-    return media_uv_stream_send(handle, NULL, "pause", NULL, 0,
-        media_uv_stream_receive_cb, cb, cookie);
+    return media_uv_stream_pause(handle, cb, cookie);
 }
 
 int media_uv_player_stop(void* handle, media_uv_callback cb, void* cookie)
@@ -995,12 +1000,11 @@ static void media_uv_recorder_suggest_cb(int suggest, void* cookie)
     case MEDIA_FOCUS_STOP:
         suggest_active = false;
         media_uv_recorder_stop(recorder, NULL, NULL);
-        media_uv_stream_abandon_focus(priv->stream);
         break;
 
     case MEDIA_FOCUS_PAUSE:
         suggest_active = false;
-        media_uv_recorder_pause(recorder, NULL, NULL);
+        media_uv_stream_pause(priv->stream, NULL, NULL);
         break;
 
     case MEDIA_FOCUS_PLAY_WITH_KEEP:
@@ -1161,8 +1165,7 @@ int media_uv_recorder_pause(void* handle, media_uv_callback cb, void* cookie)
 
     media_uv_stream_abandon_focus(handle);
 
-    return media_uv_stream_send(handle, NULL, "pause", NULL, 0,
-        media_uv_stream_receive_cb, cb, cookie);
+    return media_uv_stream_pause(handle, cb, cookie);
 }
 
 int media_uv_recorder_stop(void* handle, media_uv_callback cb, void* cookie)
