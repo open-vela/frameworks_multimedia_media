@@ -55,6 +55,8 @@ endif # CONFIG_ARCH
   CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
   CXXSRCS  += feature/volume.cpp
   CXXSRCS  += feature/volume_impl.cpp
+  CSRCS  += feature/audio.c
+  CSRCS  += feature/audio_impl.c
 endif # CONFIG_MEDIA_FEATURE
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
