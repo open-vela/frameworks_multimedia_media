@@ -1,0 +1,73 @@
+/*
+ * Copyright (C) 2024 Xiaomi Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * 	 http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* clang-format off */
+
+module system.audio@1.0
+
+callback on_void();
+callback on_fail(string data, int code);
+
+struct AudioState {
+    string state;
+    string src;
+    float currentTime;
+    boolean autoplay;
+    boolean loop;
+    float volume;
+    boolean mute;
+    float duration;
+};
+
+callback on_get_state(AudioState state);
+
+struct MetaInfo {
+    string title;
+    string album;
+    string artist;
+};
+
+struct GetPalyStateParam {
+    callback on_get_state success;
+    callback on_fail fail;
+    callback on_void complete;
+};
+
+callback on_event();
+
+property string src;
+property MetaInfo meta writeonly;
+property float currentTime;
+property float duration readonly;
+property boolean autoplay;
+property boolean loop;
+property float volume;
+property boolean muted;
+property string streamType readonly;
+
+void play();
+void pause();
+void stop();
+void getPlayState(GetPalyStateParam p);
+
+property on_event onplay writeonly;
+property on_event onpause writeonly;
+property on_event onstop writeonly;
+property on_event onloadeddata writeonly;
+property on_event onended writeonly;
+property on_event ondurationchange writeonly;
+property on_event ontimeupdate writeonly;
+property on_event onerror writeonly;
