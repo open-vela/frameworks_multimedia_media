@@ -11,6 +11,7 @@ if MEDIA
 
 config MEDIA_FEATURE
 	bool "enable quickapp media feature"
+	depends on LIBUV
 	default n
 
 choice
