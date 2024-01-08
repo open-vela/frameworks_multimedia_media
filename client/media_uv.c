@@ -359,7 +359,7 @@ static int media_uv_connect_one(MediaProxyPriv* proxy)
 
     proxy->cpipe = media_uv_alloc_pipe(proxy);
     if (!proxy->cpipe)
-        goto err;
+        goto err1;
 
     /* Connect to media server. */
     snprintf(addr, sizeof(addr), MEDIA_SOCKADDR_NAME, proxy->cpu);
@@ -373,15 +373,17 @@ static int media_uv_connect_one(MediaProxyPriv* proxy)
             media_uv_connect_one_cb);
 #else
         ret = -ENOSYS;
-        goto err;
+        media_uv_close(proxy->cpipe);
+        goto err1;
 #endif
     }
 
     MEDIA_DEBUG_PROXY(proxy);
     return 0;
 
-err:
+err1:
     free(req);
+err:
     MEDIA_DEBUG_PROXY(proxy);
     return ret;
 }
