@@ -912,10 +912,13 @@ CMD2(close, int, id, int, pending_stop)
 
 #ifdef CONFIG_LIBUV_EXTENSION
     case MEDIATOOL_UVPLAYER:
+        if (!pending_stop)
+            mediatool_common_stop_inner(&mediatool->chain[id]);
         ret = media_uv_player_close(mediatool->chain[id].handle, pending_stop, mediatool_uv_common_close_cb);
         break;
 
     case MEDIATOOL_UVRECORDER:
+        mediatool_common_stop_inner(&mediatool->chain[id]);
         ret = media_uv_recorder_close(mediatool->chain[id].handle, mediatool_uv_common_close_cb);
         break;
 
