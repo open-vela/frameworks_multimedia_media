@@ -1687,7 +1687,7 @@ CMD3(take_picture, string_t, filtername, string_t, filename, int, number)
         printf("Failed to take_picture.");
     }
 
-    return 0;
+    return ret;
 }
 
 CMD3(take_picture_async, string_t, filtername, string_t, filename, int, number)
