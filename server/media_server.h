@@ -131,7 +131,7 @@ int media_session_handler(void* session, void* cookie, const char* target,
 
 void* media_policy_create(void* file);
 int media_policy_destroy(void* policy);
-int media_policy_handler(void* policy, const char* name, const char* cmd,
+int media_policy_handler(void* policy, void* cookie, const char* name, const char* cmd,
     const char* value, int apply, char* res, int res_len);
 
 int media_policy_get_stream_name(const char* stream, char* name, int len);

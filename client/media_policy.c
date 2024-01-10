@@ -31,6 +31,30 @@
 #include "media_proxy.h"
 
 /****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
+typedef struct MediaPolicyPriv {
+    MEDIA_COMMON_FIELDS
+    void* cookie;
+    media_policy_change_callback on_change;
+} MediaPolicyPriv;
+
+/****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+static void media_policy_change_cb(void* cookie, media_parcel* msg)
+{
+    MediaPolicyPriv* priv = cookie;
+    const char* literal;
+    int32_t number;
+
+    media_parcel_read_scanf(msg, "%i%i%s", NULL, &number, &literal);
+    priv->on_change(priv->cookie, number, literal);
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -152,6 +176,55 @@ int media_policy_decrease_stream_volume(const char* stream)
         return -ENAMETOOLONG;
 
     return media_policy_decrease(name, MEDIA_POLICY_APPLY);
+}
+
+void* media_policy_subscribe(const char* name,
+    media_policy_change_callback on_change, void* cookie)
+{
+    MediaPolicyPriv* priv;
+    int ret;
+
+    priv = zalloc(sizeof(MediaPolicyPriv));
+    if (!priv)
+        return NULL;
+
+    priv->cookie = cookie;
+    priv->on_change = on_change;
+
+    ret = media_proxy(MEDIA_ID_POLICY, priv, NULL, "ping", NULL, 0, NULL, 0);
+    if (ret < 0) {
+        media_default_release_cb(priv);
+        return NULL;
+    }
+
+    media_proxy_set_release_cb(priv->proxy, media_default_release_cb, priv);
+    ret = media_proxy_set_event_cb(priv->proxy, priv->cpu, media_policy_change_cb, priv);
+    if (ret < 0)
+        goto err;
+
+    if (media_proxy_once(priv, name, "subscribe", NULL, 0, NULL, 0) < 0)
+        goto err;
+
+    return priv;
+
+err:
+    media_policy_unsubscribe(priv->proxy);
+    return NULL;
+}
+
+int media_policy_unsubscribe(void* handle)
+{
+    MediaPolicyPriv* priv = handle;
+    int ret;
+
+    if (!handle)
+        return -EINVAL;
+
+    ret = media_proxy_once(priv, NULL, "unsubscribe", NULL, 0, NULL, 0);
+    if (ret < 0)
+        return ret;
+
+    return media_proxy_disconnect(priv->proxy);
 }
 
 int media_policy_set_int(const char* name, int value, int apply)
