@@ -193,17 +193,36 @@ static void pfw_save_criterion_cb(void* cookie, const char* name, int32_t state)
     }
 }
 
+static void media_policy_notify_cb(void* cookie, int number, char* literal)
+{
+    media_stub_notify_event(cookie, 0, number, literal);
+}
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-int media_policy_handler(void* policy, const char* name, const char* cmd,
+int media_policy_handler(void* policy, void* cookie, const char* name, const char* cmd,
     const char* value, int apply, char* res, int res_len)
 {
     int ret = -ENOSYS, tmp;
+    void* handle;
     char* dump;
 
-    if (!strcmp(cmd, "set_int")) {
+    if (!strcmp(cmd, "ping")) {
+        return 0;
+    } else if (!strcmp(cmd, "subscribe")) {
+        handle = pfw_subscribe(policy, name, media_policy_notify_cb, cookie);
+        if (!handle)
+            return -EINVAL;
+        media_server_set_data(cookie, handle);
+        return 0;
+    } else if (!strcmp(cmd, "unsubscribe")) {
+        handle = media_server_get_data(cookie);
+        pfw_unsubscribe(policy, handle);
+        media_stub_notify_finalize(&cookie);
+        return 0;
+    } else if (!strcmp(cmd, "set_int")) {
         ret = pfw_setint(policy, name, atoi(value));
     } else if (!strcmp(cmd, "increase")) {
         ret = pfw_increase(policy, name);

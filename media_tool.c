@@ -55,6 +55,7 @@
 #define MEDIATOOL_UVFOCUS 8
 #define MEDIATOOL_UVCONTROLLER 9
 #define MEDIATOOL_UVCONTROLLEE 10
+#define MEDIATOOL_POLICY 11
 
 #define GET_ARG_FUNC(out_type, arg)                  \
     static out_type get_##out_type##_arg(char* arg); \
@@ -337,6 +338,13 @@ static void mediatool_focus_callback(int suggestion, void* cookie)
 
     printf("%s, id %d, suggestion %s, suggestion %d, line %d\n",
         __func__, chain->id, str, suggestion, __LINE__);
+}
+
+static void mediatool_policy_callback(void* cookie, int number, const char* literal)
+{
+    mediatool_chain_t* chain = cookie;
+    printf("[%s] id:%d number:%d value:%s\n",
+        __func__, chain->id, number, literal);
 }
 
 static void mediatool_display_metadata(int id, const media_metadata_t* data)
@@ -908,6 +916,10 @@ CMD2(close, int, id, int, pending_stop)
 
     case MEDIATOOL_FOCUS:
         ret = media_focus_abandon(mediatool->chain[id].handle);
+        break;
+
+    case MEDIATOOL_POLICY:
+        ret = media_policy_unsubscribe(mediatool->chain[id].handle);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
@@ -1812,6 +1824,30 @@ CMD2(decrease, string_t, name, int, apply)
     return media_policy_decrease(name, apply);
 }
 
+CMD1(subscribe, string_t, name)
+{
+    long int i;
+
+    for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
+        if (!mediatool->chain[i].handle)
+            break;
+    }
+
+    if (i == MEDIATOOL_MAX_CHAIN)
+        return -ENOMEM;
+
+    mediatool->chain[i].id = i;
+    mediatool->chain[i].handle = media_policy_subscribe(
+        name, mediatool_policy_callback, &mediatool->chain[i]);
+    if (!mediatool->chain[i].handle) {
+        printf("media_policy_subscribe failed\n");
+        return 0;
+    }
+    mediatool->chain[i].type = MEDIATOOL_POLICY;
+    printf("policy ID %ld\n", i);
+    return 0;
+}
+
 CMD1(focus_request, string_t, name)
 {
     int suggestion;
@@ -2149,7 +2185,7 @@ static const mediatool_cmd_t g_mediatool_cmds[] = {
         "Send cmd to graph. PS:loglevel INFO:32 VERBOSE:40 DEBUG:48 TRACE:56" },
     { "dump",
         mediatool_cmd_dump,
-        "Dump graph and policy" },
+        "Dump graph and policy as well as focus" },
     { "setint",
         mediatool_cmd_setint,
         "Set criterion value with integer(setint NAME VALUE APPLY)" },
@@ -2177,6 +2213,12 @@ static const mediatool_cmd_t g_mediatool_cmds[] = {
     { "decrease",
         mediatool_cmd_decrease,
         "Decrease criterion value by one(decrease NAME APPLY)" },
+    { "subscribe",
+        mediatool_cmd_subscribe,
+        "Subscribe criterion value change (subscribe NAME)" },
+    { "unsubscribe",
+        mediatool_cmd_close,
+        "Unsubscribe criterion value change (unsubscribe ID)" },
     { "request",
         mediatool_cmd_focus_request,
         "Request media focus(request SCENARIO)" },
