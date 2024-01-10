@@ -456,38 +456,15 @@ int media_proxy(int id, void* handle, const char* target, const char* cmd,
 
         priv->cpu = cpu;
         ret = media_proxy_once(priv, target, cmd, arg, apply, res, res_len);
-        switch (id) {
-        case MEDIA_ID_GRAPH:
-            media_proxy_disconnect(priv->proxy);
-            ret = 0;
-            break;
 
-        case MEDIA_ID_POLICY:
-            media_proxy_disconnect(priv->proxy);
-            if (ret != -ENOSYS)
-                return ret; // return once found policy
-
-            break;
-
-        case MEDIA_ID_FOCUS:
-        case MEDIA_ID_PLAYER:
-        case MEDIA_ID_RECORDER:
-        case MEDIA_ID_SESSION:
-            if (ret < 0) {
-                media_proxy_disconnect(priv->proxy);
-                break;
-            }
-
-            /* keep the connection in need. */
-
-            if (handle) {
-                priv->cpu = strdup(cpu);
-                DEBUGASSERT(priv->cpu);
-            } else
-                media_proxy_disconnect(priv->proxy);
-
+        /* keep the connection in need. */
+        if (handle && ret >= 0) {
+            priv->cpu = strdup(cpu);
+            DEBUGASSERT(priv->cpu);
             return ret;
         }
+
+        media_proxy_disconnect(priv->proxy);
     }
 
     priv->proxy = NULL;

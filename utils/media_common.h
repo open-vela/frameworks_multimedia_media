@@ -48,17 +48,6 @@
 #define MEDIA_ID_SESSION 5
 #define MEDIA_ID_FOCUS 6
 
-/* Policy key criterion names. */
-#define MEDIA_POLICY_APPLY 1
-#define MEDIA_POLICY_NOT_APPLY 0
-#define MEDIA_POLICY_AUDIO_MODE "AudioMode"
-#define MEDIA_POLICY_DEVICE_USE "UsingDevices"
-#define MEDIA_POLICY_DEVICE_AVAILABLE "AvailableDevices"
-#define MEDIA_POLICY_HFP_SAMPLERATE "HFPSampleRate"
-#define MEDIA_POLICY_MUTE_MODE "MuteMode"
-#define MEDIA_POLICY_VOLUME "Volume"
-#define MEDIA_POLICY_MIC_MODE "MicMode"
-
 /* Debug log definition. */
 #define MEDIA_LOG(level, fmt, args...) \
     syslog(level, "[media][%s:%d] " fmt, __func__, __LINE__, ##args)

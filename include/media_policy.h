@@ -33,24 +33,6 @@ extern "C" {
 #endif
 
 /****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-#define MEDIA_AUDIO_MODE_NORMAL "normal" /*!< play and capture audio */
-#define MEDIA_AUDIO_MODE_PHONE "phone"
-#define MEDIA_AUDIO_MODE_RINGTONE "ringtone"
-#define MEDIA_AUDIO_MODE_VOIP "voip"
-
-#define MEDIA_DEVICE_A2DP "a2dp" /*!< bt cellphone */
-#define MEDIA_DEVICE_A2DP_SNK "a2dpsnk"
-#define MEDIA_DEVICE_BLE "ble"
-#define MEDIA_DEVICE_SCO "sco"
-#define MEDIA_DEVICE_MIC "mic"
-#define MEDIA_DEVICE_MODEM "modem"
-
-#define MEDIA_A2DP_OFFLOAD_MODE "A2dpOffloadMode"
-
-/****************************************************************************
  * Public Funtions
  ****************************************************************************/
 
@@ -373,6 +355,25 @@ int media_policy_increase(const char* name, int apply);
  * whether you need this API, then you definitely don't need.
  */
 int media_policy_decrease(const char* name, int apply);
+
+/**
+ * @brief Subscribe criterion on change.
+ *
+ * @param[in] name      Criterion name.
+ * @param[in] on_change Callback when criterion value change
+ * @return Handle for subscribe use, NULL on failure.
+ */
+void* media_policy_subscribe(const char* name,
+    media_policy_change_callback on_change, void* cookie);
+
+/**
+ * @brief Unubscribe criterion on change.
+ *
+ * @param[in] name      Criterion name.
+ * @param[in] handle    Handle for unsubscribe use.
+ * @return Zero for success, negative on failure.
+ */
+int media_policy_unsubscribe(void* handle);
 
 #ifdef CONFIG_LIBUV
 /**
