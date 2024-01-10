@@ -133,6 +133,43 @@ typedef void (*media_event_callback)(void* cookie, int event, int result,
 typedef void (*media_focus_callback)(int suggestion, void* cookie);
 
 /****************************************************************************
+ * Policy Definitions
+ ****************************************************************************/
+
+#define MEDIA_POLICY_APPLY 1
+#define MEDIA_POLICY_NOT_APPLY 0
+
+#define MEDIA_POLICY_AUDIO_MODE "AudioMode"
+#define MEDIA_POLICY_DEVICE_USE "UsingDevices"
+#define MEDIA_POLICY_DEVICE_AVAILABLE "AvailableDevices"
+#define MEDIA_POLICY_HFP_SAMPLERATE "HFPSampleRate"
+#define MEDIA_POLICY_MUTE_MODE "MuteMode"
+#define MEDIA_POLICY_VOLUME "Volume"
+#define MEDIA_POLICY_MIC_MODE "MicMode"
+#define MEDIA_A2DP_OFFLOAD_MODE "A2dpOffloadMode"
+
+#define MEDIA_AUDIO_MODE_NORMAL "normal" /*!< play and capture audio */
+#define MEDIA_AUDIO_MODE_PHONE "phone"
+#define MEDIA_AUDIO_MODE_RINGTONE "ringtone"
+#define MEDIA_AUDIO_MODE_VOIP "voip"
+
+#define MEDIA_DEVICE_A2DP "a2dp" /*!< bt cellphone */
+#define MEDIA_DEVICE_A2DP_SNK "a2dpsnk"
+#define MEDIA_DEVICE_BLE "ble"
+#define MEDIA_DEVICE_SCO "sco"
+#define MEDIA_DEVICE_MIC "mic"
+#define MEDIA_DEVICE_MODEM "modem"
+
+/**
+ * @brief Callback to receive current criterion value.
+ *
+ * @param[in] number     Current numerical value.
+ * @param[in] literal    Current literal value if have, NULL if not.
+ */
+typedef void (*media_policy_change_callback)(void* cookie,
+    int number, const char* literal);
+
+/****************************************************************************
  * Scenario Definitions
  ****************************************************************************/
 
