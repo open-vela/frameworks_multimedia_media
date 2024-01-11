@@ -44,19 +44,12 @@ else
 endif # CONFIG_ARCH
 
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi/libffi/src/$(TARGETDIR)
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi/libffi/src/$(TARGETDIR)
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/include
-  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/include
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/src
-  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/base/feature/src
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
-  CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
-  CXXSRCS  += feature/volume.cpp
-  CXXSRCS  += feature/volume_impl.cpp
   CSRCS  += feature/audio.c
   CSRCS  += feature/audio_impl.c
+  CSRCS  += feature/volume.c
+  CSRCS  += feature/volume_impl.c
 endif # CONFIG_MEDIA_FEATURE
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
