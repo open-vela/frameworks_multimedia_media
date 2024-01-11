@@ -29,7 +29,7 @@
 
 #include <ffi.h>
 #include <assert.h>
-#include <cstdarg>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,7 +47,7 @@ typedef struct _GetRet {
   FtDouble value;
 } system_volume_GetRet;
 
-system_volume_GetRet* system_volumeMallocGetRet();
+system_volume_GetRet* system_volumeMallocGetRet(void);
 
 typedef struct _GetInfo {
   FtCallbackId success;
@@ -55,7 +55,7 @@ typedef struct _GetInfo {
   FtCallbackId complete;
 } system_volume_GetInfo;
 
-system_volume_GetInfo* system_volumeMallocGetInfo();
+system_volume_GetInfo* system_volumeMallocGetInfo(void);
 
 typedef struct _SetInfo {
   FtDouble value;
@@ -64,12 +64,12 @@ typedef struct _SetInfo {
   FtCallbackId complete;
 } system_volume_SetInfo;
 
-system_volume_SetInfo* system_volumeMallocSetInfo();
+system_volume_SetInfo* system_volumeMallocSetInfo(void);
 
 
 // Function wrappers to be implemented
-void system_volume_wrap_setMediaValue(FeatureInstanceHandle feature, AppendData append_data, system_volume_SetInfo * info);
-void system_volume_wrap_getMediaValue(FeatureInstanceHandle feature, AppendData append_data, system_volume_GetInfo * info);
+void system_volume_wrap_setMediaValue(FeatureInstanceHandle feature, union AppendData append_data, system_volume_SetInfo * info);
+void system_volume_wrap_getMediaValue(FeatureInstanceHandle feature, union AppendData append_data, system_volume_GetInfo * info);
 
 // Interface constructors
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "feature.h"
+#include "feature_log.h"
 #include "media_defs.h"
 #include "media_policy.h"
 #include "volume.h"
@@ -30,7 +30,7 @@ enum OP {
 
 typedef struct {
     FeatureInstanceHandle feature;
-    OP op; /* The operation */
+    enum OP op; /* The operation */
     FtCallbackId success;
     FtCallbackId fail;
     FtCallbackId complete;
@@ -89,7 +89,7 @@ void volume_free(VolumeHandle* handle)
 }
 
 static void finish_callback(int status, FeatureInstanceHandle feature, const char* msg,
-                            system_volume_GetRet* volumeRet, VolumeHandle* handle)
+    system_volume_GetRet* volumeRet, VolumeHandle* handle)
 {
     if ((status == 0) && (FeatureCheckCallbackId(handle->feature, handle->success))) {
         if (volumeRet == NULL)
@@ -111,20 +111,20 @@ static void finish_callback(int status, FeatureInstanceHandle feature, const cha
 
 static void volume_set_cb(void* arg, int ret)
 {
-    if (arg == nullptr)
+    if (arg == NULL)
         return;
 
-    VolumeHandle* handle = static_cast<VolumeHandle*>(arg);
+    VolumeHandle* handle = (VolumeHandle*)(arg);
     FEATURE_LOG_INFO("[volume_set_cb:%d] ret=%d", handle->op, ret);
     finish_callback(ret, handle->feature, "volume_set_cb failed", NULL, handle);
 }
 
 static void volume_get_cb(void* arg, int ret, int value)
 {
-    if (arg == nullptr)
+    if (arg == NULL)
         return;
 
-    VolumeHandle* handle = static_cast<VolumeHandle*>(arg);
+    VolumeHandle* handle = (VolumeHandle*)(arg);
     FEATURE_LOG_INFO("[volume_get_cb:%d] value=%d, ret=%d", handle->op, value, ret);
     if (ret >= 0) {
         if ((value >= 0) && (value <= 10)) {
@@ -137,7 +137,7 @@ static void volume_get_cb(void* arg, int ret, int value)
         finish_callback(-1, handle->feature, "volume_get_cb volume invalid", NULL, handle);
 }
 
-void system_volume_wrap_setMediaValue(FeatureInstanceHandle feature, AppendData data, system_volume_SetInfo* info)
+void system_volume_wrap_setMediaValue(FeatureInstanceHandle feature, union AppendData data, system_volume_SetInfo* info)
 {
     FEATURE_LOG_DEBUG("%s::%s():value=%f.", file_tag, __FUNCTION__, info->value);
     VolumeHandle* handle = volume_malloc(feature);
@@ -159,14 +159,14 @@ void system_volume_wrap_setMediaValue(FeatureInstanceHandle feature, AppendData 
 
     FeatureManagerHandle manager = FeatureGetManagerHandleFromInstance(feature);
     int status = media_uv_policy_set_stream_volume(FeatureGetUVLoop(manager), MEDIA_STREAM_MUSIC,
-                                                   (int)(handle->value * 10), volume_set_cb, (void*)handle);
+        (int)(handle->value * 10), volume_set_cb, (void*)handle);
     if (status != 0) {
         FEATURE_LOG_ERROR("[SET] media_uv_policy_set_stream_volume failed");
         return finish_callback(ERROR_CODE, feature, "media_uv_policy_set_stream_volume fail", NULL, handle);
     }
 }
 
-void system_volume_wrap_getMediaValue(FeatureInstanceHandle feature, AppendData data, system_volume_GetInfo* info)
+void system_volume_wrap_getMediaValue(FeatureInstanceHandle feature, union AppendData data, system_volume_GetInfo* info)
 {
     FEATURE_LOG_DEBUG("%s::%s()\n", file_tag, __FUNCTION__);
     VolumeHandle* handle = volume_malloc(feature);
@@ -182,7 +182,7 @@ void system_volume_wrap_getMediaValue(FeatureInstanceHandle feature, AppendData 
 
     FeatureManagerHandle manager = FeatureGetManagerHandleFromInstance(feature);
     int status = media_uv_policy_get_stream_volume(FeatureGetUVLoop(manager), MEDIA_STREAM_MUSIC,
-                                                   volume_get_cb, (void*)handle);
+        volume_get_cb, (void*)handle);
     if (status != 0) {
         FEATURE_LOG_ERROR("[GET] media_uv_policy_get_stream_volume failed");
         return finish_callback(ERROR_CODE, feature, "media_uv_policy_get_stream_volume failed", NULL, handle);
