@@ -24,34 +24,35 @@
 #include "volume.h"
 #include "ajs_features_init.h"
 #include "feature_description.h"
+#include "feature_main_exports.h"
 
 #define countof(x) (sizeof(x) / sizeof(x[0]))
 
 /****** for JIDL struct 'GetRet' ******/
 static ObjectMember system_volume_GetRet_struct_members[] = {
     { "value", FT_DOUBLE, offsetof(system_volume_GetRet, value), sizeof(FtDouble) },
-    { nullptr },
+    { NULL },
 };
 
 // complex defination
-static const ObjectMapType system_volume_GetRet_struct_type {
+static const ObjectMapType system_volume_GetRet_struct_type = {
     .header = { .type = COMPLEX_STRUCT_MAP, .size = sizeof(system_volume_GetRet) },
     .members = system_volume_GetRet_struct_members
 };
 
 system_volume_GetRet* system_volumeMallocGetRet () {
     return (system_volume_GetRet*)FeatureMalloc(
-        sizeof(system_volume_GetRet), FT_MK_COMPLEX(&system_volume_GetRet_struct_type));
+        sizeof(system_volume_GetRet), FT_MK_COMPLEX_REF(&system_volume_GetRet_struct_type));
 }
 
 
 /****** for JIDL callback 'success_cb' ******/
 static const FeatureType system_volume_success_cb_parameters[] = {
-    FT_MK_COMPLEX_REF(&system_volume_GetRet_struct_type),
+    FT_MK_COMPLEX(&system_volume_GetRet_struct_type),
     FT_PARAM_END
 };
 
-static const CallbackType system_volume_success_cb_callback_type {
+static const CallbackType system_volume_success_cb_callback_type = {
     .header = { .type = COMPLEX_CALLBACK, .size = sizeof(FtCallbackId) },
     .parameters = system_volume_success_cb_parameters,
     .return_type = FT_VOID
@@ -65,7 +66,7 @@ static const FeatureType system_volume_fail_cb_parameters[] = {
     FT_PARAM_END
 };
 
-static const CallbackType system_volume_fail_cb_callback_type {
+static const CallbackType system_volume_fail_cb_callback_type = {
     .header = { .type = COMPLEX_CALLBACK, .size = sizeof(FtCallbackId) },
     .parameters = system_volume_fail_cb_parameters,
     .return_type = FT_VOID
@@ -78,7 +79,7 @@ static const FeatureType system_volume_complete_cb_parameters[] = {
     FT_PARAM_END
 };
 
-static const CallbackType system_volume_complete_cb_callback_type {
+static const CallbackType system_volume_complete_cb_callback_type = {
     .header = { .type = COMPLEX_CALLBACK, .size = sizeof(FtCallbackId) },
     .parameters = system_volume_complete_cb_parameters,
     .return_type = FT_VOID
@@ -90,18 +91,18 @@ static ObjectMember system_volume_GetInfo_struct_members[] = {
     { "success", FT_MK_COMPLEX(&system_volume_success_cb_callback_type), offsetof(system_volume_GetInfo, success), sizeof(FtCallbackId) },
     { "fail", FT_MK_COMPLEX(&system_volume_fail_cb_callback_type), offsetof(system_volume_GetInfo, fail), sizeof(FtCallbackId) },
     { "complete", FT_MK_COMPLEX(&system_volume_complete_cb_callback_type), offsetof(system_volume_GetInfo, complete), sizeof(FtCallbackId) },
-    { nullptr },
+    { NULL },
 };
 
 // complex defination
-static const ObjectMapType system_volume_GetInfo_struct_type {
+static const ObjectMapType system_volume_GetInfo_struct_type = {
     .header = { .type = COMPLEX_STRUCT_MAP, .size = sizeof(system_volume_GetInfo) },
     .members = system_volume_GetInfo_struct_members
 };
 
 system_volume_GetInfo* system_volumeMallocGetInfo () {
     return (system_volume_GetInfo*)FeatureMalloc(
-        sizeof(system_volume_GetInfo), FT_MK_COMPLEX(&system_volume_GetInfo_struct_type));
+        sizeof(system_volume_GetInfo), FT_MK_COMPLEX_REF(&system_volume_GetInfo_struct_type));
 }
 
 
@@ -111,24 +112,24 @@ static ObjectMember system_volume_SetInfo_struct_members[] = {
     { "success", FT_MK_COMPLEX(&system_volume_success_cb_callback_type), offsetof(system_volume_SetInfo, success), sizeof(FtCallbackId) },
     { "fail", FT_MK_COMPLEX(&system_volume_fail_cb_callback_type), offsetof(system_volume_SetInfo, fail), sizeof(FtCallbackId) },
     { "complete", FT_MK_COMPLEX(&system_volume_complete_cb_callback_type), offsetof(system_volume_SetInfo, complete), sizeof(FtCallbackId) },
-    { nullptr },
+    { NULL },
 };
 
 // complex defination
-static const ObjectMapType system_volume_SetInfo_struct_type {
+static const ObjectMapType system_volume_SetInfo_struct_type = {
     .header = { .type = COMPLEX_STRUCT_MAP, .size = sizeof(system_volume_SetInfo) },
     .members = system_volume_SetInfo_struct_members
 };
 
 system_volume_SetInfo* system_volumeMallocSetInfo () {
     return (system_volume_SetInfo*)FeatureMalloc(
-        sizeof(system_volume_SetInfo), FT_MK_COMPLEX(&system_volume_SetInfo_struct_type));
+        sizeof(system_volume_SetInfo), FT_MK_COMPLEX_REF(&system_volume_SetInfo_struct_type));
 }
 
 
 /****** for JIDL function 'setMediaValue' ******/
 static const FeatureType system_volume_setMediaValue_parameters[] = {
-    FT_MK_COMPLEX_REF(&system_volume_SetInfo_struct_type),
+    FT_MK_COMPLEX(&system_volume_SetInfo_struct_type),
     FT_PARAM_END
 };
 
@@ -141,7 +142,7 @@ static const MemberMethod system_volume_setMediaValue_member_method = {
 
 /****** for JIDL function 'getMediaValue' ******/
 static const FeatureType system_volume_getMediaValue_parameters[] = {
-    FT_MK_COMPLEX_REF(&system_volume_GetInfo_struct_type),
+    FT_MK_COMPLEX(&system_volume_GetInfo_struct_type),
     FT_PARAM_END
 };
 
@@ -157,17 +158,17 @@ static const Member system_volume_members[] = {
     {
         .type = MEMBER_METHOD,
         .name = "setMediaValue",
-        .method = system_volume_setMediaValue_member_method,
+        .method = &system_volume_setMediaValue_member_method,
     },
     {
         .type = MEMBER_METHOD,
         .name = "getMediaValue",
-        .method = system_volume_getMediaValue_member_method,
+        .method = &system_volume_getMediaValue_member_method,
     },
 };
 
 // callbacks
-static const struct FeatureCallbacks system_volume_callbacks {
+static const struct FeatureCallbacks system_volume_callbacks = {
     system_volume_onRegister,
     system_volume_onCreate,
     system_volume_onRequired,
@@ -188,6 +189,6 @@ static const FeatureDescription system_volume_desc = {
 
 QAPPFEATURE_INIT(system_volume)
 {
-    return mgr->registerFeature(features, &system_volume_desc);
+    return FeatureRegisterFeature(handle, &system_volume_desc);
 }
 /* clang-format on */
