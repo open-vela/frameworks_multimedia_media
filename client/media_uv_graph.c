@@ -23,11 +23,13 @@
  ****************************************************************************/
 
 #include <errno.h>
+#include <inttypes.h>
 #include <media_defs.h>
 #include <media_focus.h>
 #include <media_player.h>
 #include <media_policy.h>
 #include <media_recorder.h>
+#include <media_utils.h>
 #include <stdio.h>
 #include <sys/queue.h>
 #include <uv.h>
@@ -210,8 +212,16 @@ static void media_uv_stream_event_cb(void* cookie, void* cookie0, void* cookie1,
     MediaStreamPriv* priv = cookie;
     const char* response = NULL;
 
-    if (parcel)
+    if (parcel) {
         media_parcel_read_scanf(parcel, "%i%i%s", &event, &result, &response);
+        MEDIA_INFO("%s:%p %s(%" PRId32 ") ret:%" PRId32,
+            priv->name, priv, media_event_get_name(event), event, result);
+        if (event == MEDIA_EVENT_COMPLETED)
+            media_uv_stream_abandon_focus(priv);
+    }
+
+    if (priv->focus && result == -EPERM)
+        return; /* Ignore the invalid state changes. */
 
     priv->on_event(priv->cookie, event, result, response);
 }
