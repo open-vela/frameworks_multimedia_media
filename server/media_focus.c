@@ -31,6 +31,7 @@
 #include <sys/queue.h>
 
 #include "focus_stack.h"
+#include "media_common.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -167,13 +168,13 @@ static char* media_focus_streams_init(media_focus* focus, int col, char* line)
     char* streams = NULL;
 
     if (media_focus_stream_type_counts(line) == 0) {
-        auderr("invalid input in matrix stream\n");
+        MEDIA_ERR("invalid input in matrix stream\n");
         return NULL;
     }
     focus->num = media_focus_stream_type_counts(line);
     streams = zalloc((focus->num * col) * sizeof(char));
     if (streams == NULL) {
-        auderr("no mem for creating streams\n");
+        MEDIA_ERR("no mem for creating streams\n");
         return NULL;
     }
     char* ptr = strtok(line, ",");
@@ -201,7 +202,7 @@ static int media_focus_divided_by_colon(char* ptr_line, int* pro, int* pas)
 
     index_ptr = strchr(ptr_line, needle);
     if (index_ptr == NULL) {
-        auderr("invalid conf file\n");
+        MEDIA_ERR("invalid conf file\n");
         return -EINVAL;
     }
     *index_ptr = '\0';
@@ -226,7 +227,7 @@ static media_focus_cell* media_focus_matrix_init(int len, char* line, int* index
     if (matrix == NULL) {
         matrix = malloc((len * len) * sizeof(media_focus_cell));
         if (matrix == NULL) {
-            auderr("no mem for media focus matrix\n");
+            MEDIA_ERR("no mem for media focus matrix\n");
             return NULL;
         }
     }
@@ -292,7 +293,7 @@ static int media_focus_play_arbitrate(app_focus_id* top_id, app_focus_id* cur_id
 
     focus = media_get_focus();
     if (!focus) {
-        auderr("media focus intera matrix does not exist\n");
+        MEDIA_ERR("media focus intera matrix does not exist\n");
         return play_ret;
     }
     switch (cur_id->focus_state) {
@@ -307,7 +308,7 @@ static int media_focus_play_arbitrate(app_focus_id* top_id, app_focus_id* cur_id
         if (inter_location < (focus->num * focus->num)) {
             play_ret = (focus->matrix + inter_location)->pas_inter;
         } else {
-            auderr("no matched data\n");
+            MEDIA_ERR("no matched data\n");
             play_ret = MEDIA_FOCUS_STOP;
         }
         break;
@@ -346,11 +347,11 @@ static int media_focus_focus_id_insert(void* x, app_focus_id* new_focus_id)
         index_value += 1;
     }
     if (index_value < 0) {
-        auderr("no appro location for inserting new request\n");
+        MEDIA_ERR("no appro location for inserting new request\n");
         return -ENODATA;
     }
     if (app_focus_stack_insert(x, new_focus_id, index_value) < 0) {
-        auderr("inter media request failed\n");
+        MEDIA_ERR("inter media request failed\n");
         return -EINVAL;
     }
     return 0;
@@ -372,13 +373,13 @@ static void* media_focus_request_(
 
     // step 1: check if callback method is null or not
     if (return_type == NULL || callback_method == NULL) {
-        auderr("wrong callback method input\n");
+        MEDIA_ERR("wrong callback method input\n");
         return NULL;
     }
 
     // step 1.1: check if stream type is null or not
     if (stream_type == NULL) {
-        auderr("wrong stream type input\n");
+        MEDIA_ERR("wrong stream type input\n");
         return NULL;
     }
 
@@ -390,7 +391,7 @@ static void* media_focus_request_(
         }
     }
     if (new_stream_type < 0) {
-        auderr("wrong stream type input\n");
+        MEDIA_ERR("wrong stream type input\n");
         goto err;
     }
 
@@ -400,7 +401,7 @@ static void* media_focus_request_(
     // step 4: get valid id from focus stack
     valid_id = app_focus_free_client_id(focus->stack);
     if (valid_id < 0) {
-        auderr("audio focus stack is full\n");
+        MEDIA_ERR("audio focus stack is full\n");
         goto err;
     }
 
@@ -437,17 +438,17 @@ static void* media_focus_request_(
                 break;
             }
         } else {
-            auderr("no matched data\n");
+            MEDIA_ERR("no matched data\n");
             *return_type = MEDIA_FOCUS_STOP;
         }
-        audinfo("%s top stack focus info (client_id:%d, stream type:%s, focus_level:%d)\n", __func__,
+        MEDIA_INFO("old focus owner, id:%d, stream:%s level:%d\n",
             tmp_id.client_id, focus->streams + tmp_id.focus_level * STREAM_TYPE_LEN, tmp_id.focus_level);
 
-        audinfo("%s request focus info (client_id:%d, stream type:%s, focus_level:%d), reture type %d\n",
-            __func__, new_id.client_id, stream_type, new_id.focus_level, *return_type);
+        MEDIA_INFO("new focus owner, id:%d, stream:%s level:%d suggest:%d\n",
+            new_id.client_id, stream_type, new_id.focus_level, *return_type);
     } else {
-        audinfo("%s request focus info (client_id:%d, stream type:%s, focus_level:%d) direct push stack\n",
-            __func__, new_id.client_id, stream_type, new_id.focus_level);
+        MEDIA_INFO("focus owner, id:%d, stream:%s level:%d\n",
+            new_id.client_id, stream_type, new_id.focus_level);
         // step 7.2: stack top not exist, request directly
         *return_type = MEDIA_FOCUS_PLAY;
         ret = MEDIA_FOCUS_PLAY;
@@ -472,7 +473,7 @@ static int media_focus_abandon_(media_focus* focus, void* handle)
 
     // step 1: invalid app client id check
     if (app_client_id < ID_SHIFT - 1) {
-        auderr("invalid app client id input\n");
+        MEDIA_ERR("invalid app client id input\n");
         return -EINVAL;
     }
     app_client_id = HANDLE_TO_ID(app_client_id);
@@ -482,17 +483,17 @@ static int media_focus_abandon_(media_focus* focus, void* handle)
 
     // step 3: get exist top focus id
     if (app_focus_stack_top(focus->stack, &tmp_id) < 0) {
-        auderr("media focus stack is empty\n");
+        MEDIA_ERR("media focus stack is empty\n");
         return -ENOENT;
     }
     if (tmp_id.client_id == app_client_id) {
-        audinfo("%s focus info (client_id:%d, stream type:%s, focus_level:%d) abandon from top stack\n", __func__,
+        MEDIA_INFO("id:%d stream:%s level:%d\n",
             app_client_id, focus->streams + tmp_id.focus_level * STREAM_TYPE_LEN, tmp_id.focus_level);
         app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
         app_focus_stack_top_change_broadcast(focus->stack, NONBLOCK_CALLBACK_FLAG);
     } else {
         // step 4: abandon focus id in media focus stack
-        audinfo("%s focus info (client_id:%d) abandon from low stack\n", __func__, app_client_id);
+        MEDIA_INFO("id:%d\n", app_client_id);
         tmp_id.client_id = app_client_id;
         app_focus_stack_delete(focus->stack, &tmp_id, NONBLOCK_CALLBACK_FLAG);
     }
@@ -534,7 +535,7 @@ void* media_focus_create(void* file)
 
     fp = fopen(file, "re");
     if (fp == NULL) {
-        auderr("no such interaction matrix file\n");
+        MEDIA_ERR("no such interaction matrix file\n");
         return NULL;
     }
 
@@ -563,14 +564,14 @@ void* media_focus_create(void* file)
             // step 3.1: malloc space for stream types array based on number of stream type and fill with line read
             focus->streams = media_focus_streams_init(focus, STREAM_TYPE_LEN, line);
             if (!focus->streams) {
-                auderr("no mem for media focus streams\n");
+                MEDIA_ERR("no mem for media focus streams\n");
                 goto err;
             }
 
             // step 3.2 malloc space and init media stack
             focus->stack = app_focus_stack_init(CONFIG_MEDIA_FOCUS_STACK_DEPTH, &media_focus_stack_callback);
             if (!focus->stack) {
-                auderr("no mem for media focus stack\n");
+                MEDIA_ERR("no mem for media focus stack\n");
                 goto err;
             }
             break;
@@ -579,7 +580,7 @@ void* media_focus_create(void* file)
             // step 4: filler interaction play result from each line
             focus->matrix = media_focus_matrix_init(focus->num, line, &index, focus->matrix);
             if (!focus->matrix) {
-                auderr("no mem for media focus stack\n");
+                MEDIA_ERR("no mem for media focus stack\n");
                 goto err;
             }
             break;

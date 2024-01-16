@@ -514,7 +514,6 @@ static void media_uv_stream_abandon_focus(MediaStreamPriv* stream)
             priv->stream = NULL;
             stream->focus = NULL;
         }
-        MEDIA_INFO("%s:%p ret:%d\n", stream->name, stream, ret);
     }
 }
 
@@ -538,7 +537,6 @@ static int media_uv_stream_request_focus(MediaStreamPriv* stream,
         return -ENOMEM;
     }
 
-    MEDIA_INFO("%s:%p\n", stream->name, stream);
     stream->focus = priv;
     return 0;
 }

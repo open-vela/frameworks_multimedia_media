@@ -91,6 +91,7 @@ static void media_uv_focus_event_cb(void* cookie,
     if (parcel)
         media_parcel_read_int32(parcel, &suggest);
 
+    MEDIA_INFO("%s:%p suggest:%" PRId32 "\n", priv->name, priv, suggest);
     priv->on_suggest(suggest, priv->cookie);
 }
 
@@ -145,6 +146,7 @@ static void media_uv_focus_request_cb(void* cookie, int ret)
 {
     MediaFocusPriv* priv = cookie;
 
+    MEDIA_INFO("%s:%p suggest:%d\n", priv->name, priv, ret);
     priv->on_suggest(ret, priv->cookie);
 }
 
@@ -186,6 +188,7 @@ void* media_uv_focus_request(void* loop, const char* name,
         return NULL;
     }
 
+    MEDIA_INFO("%s:%p\n", priv->name, priv);
     return priv;
 }
 
@@ -202,5 +205,6 @@ int media_uv_focus_abandon(void* handle, media_uv_callback on_abandon)
     if (ret < 0)
         return ret;
 
+    MEDIA_INFO("%s:%p\n", priv->name, priv);
     return media_uv_disconnect(priv->proxy, media_uv_focus_release_cb);
 }
