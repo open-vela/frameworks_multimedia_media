@@ -55,6 +55,7 @@ static void media_uv_focus_receive_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel);
 static void media_uv_focus_ping_cb(void* cookie, int ret);
 static void media_uv_focus_request_cb(void* cookie, int ret);
+static void media_uv_focus_abandon_cb(void* cookie, int ret);
 
 static void media_uv_focus_listen_cb(void* cookie, int ret);
 static void media_uv_focus_release_cb(void* cookie, int ret);
@@ -150,6 +151,14 @@ static void media_uv_focus_request_cb(void* cookie, int ret)
     priv->on_suggest(ret, priv->cookie);
 }
 
+static void media_uv_focus_abandon_cb(void* cookie, int ret)
+{
+    MediaFocusPriv* priv = cookie;
+
+    MEDIA_INFO("%s:%p ret:%d\n", priv->name, priv, ret);
+    media_uv_disconnect(priv->proxy, media_uv_focus_release_cb);
+}
+
 static void media_uv_focus_release_cb(void* cookie, int ret)
 {
     MediaFocusPriv* priv = cookie;
@@ -201,10 +210,7 @@ int media_uv_focus_abandon(void* handle, media_uv_callback on_abandon)
         return -EINVAL;
 
     priv->on_abandon = on_abandon;
-    ret = media_uv_focus_send(priv, NULL, "abandon", NULL);
-    if (ret < 0)
-        return ret;
-
-    MEDIA_INFO("%s:%p\n", priv->name, priv);
-    return media_uv_disconnect(priv->proxy, media_uv_focus_release_cb);
+    ret = media_uv_focus_send(priv, NULL, "abandon", media_uv_focus_abandon_cb);
+    MEDIA_INFO("%s:%p ret:%d\n", priv->name, priv, ret);
+    return ret;
 }
