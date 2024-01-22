@@ -44,7 +44,7 @@
 
 #define MEDIATOOL_MAX_CHAIN 16
 #define MEDIATOOL_MAX_ARGC 16
-#define MEDIATOOL_MAX_SIZE 1024
+#define MEDIATOOL_MAX_SIZE 2048
 #define MEDIATOOL_PLAYER 1
 #define MEDIATOOL_RECORDER 2
 #define MEDIATOOL_CONTROLLER 3
@@ -627,6 +627,7 @@ static void mediatool_uv_recorder_read_cb(uv_stream_t* stream, ssize_t nread, co
     uv_fs_t close_req;
     uv_buf_t iov;
 
+    assert(nread <= MEDIATOOL_MAX_SIZE);
     chain->buf = buf->base;
     uv_req_set_data((uv_req_t*)&chain->fs_req, chain);
     if (nread < 0) {
