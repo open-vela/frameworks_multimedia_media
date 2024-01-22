@@ -204,7 +204,7 @@ int main(int argc, char* argv[])
             ret = g_media[i].get(g_media[i].handle, &priv->fds[n],
                 &priv->ctx[n], MAX_POLLFDS - n);
             if (ret < 0) {
-                MEDIA_ERR("%s get_pollfds failed\n", g_media[i].name);
+                MEDIA_ERR("%s get_pollfds failed %d\n", g_media[i].name, ret);
                 continue;
             }
 
@@ -233,7 +233,7 @@ int main(int argc, char* argv[])
 
             ret = g_media[i].run_once(g_media[i].handle);
             if (ret < 0)
-                MEDIA_ERR("%s run_once failed\n", g_media[i].name);
+                MEDIA_ERR("%s run_once failed %d\n", g_media[i].name, ret);
         }
     }
 
