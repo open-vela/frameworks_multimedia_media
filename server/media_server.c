@@ -139,11 +139,8 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
     if (priv == NULL || fd->fd <= 0)
         return -EINVAL;
 
-    if (fd->revents & POLLERR) {
-        MEDIA_DEBUG("fd:%d revent:%d\n", fd->fd, (int)fd->revents);
-        media_server_conn_close(conn);
-        return 0;
-    }
+    if (fd->revents & POLLERR)
+        goto out;
 
     while (1) {
         ret = media_parcel_recv(&conn->parcel, fd->fd, &conn->offset, MSG_DONTWAIT);
@@ -175,13 +172,15 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
         conn->offset = 0;
     }
 
-    if (fd->revents & POLLHUP) {
-        MEDIA_DEBUG("fd:%d revent:%d\n", fd->fd, (int)fd->revents);
-        media_server_conn_close(conn);
-        return 0;
-    }
+    if (((fd->revents & POLLIN) && ret == -EPIPE) || (fd->revents & POLLHUP))
+        goto out;
 
     return ret;
+
+out:
+    MEDIA_DEBUG("fd:%d revent:%d\n", fd->fd, (int)fd->revents);
+    media_server_conn_close(conn);
+    return 0;
 }
 
 /**
