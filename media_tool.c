@@ -598,6 +598,13 @@ static void mediatool_uv_take_picture_complete_cb(void* cookie, int ret)
 static void mediatool_uv_recorder_alloc_cb(uv_handle_t* handle,
     unsigned suggested_size, uv_buf_t* buf)
 {
+    mediatool_chain_t* chain = uv_handle_get_data(handle);
+
+    if (chain->buf) {
+        buf->base = NULL;
+        buf->len = 0;
+        return;
+    }
     buf->base = malloc(MEDIATOOL_MAX_SIZE);
     assert(buf->base);
     buf->len = MEDIATOOL_MAX_SIZE;
@@ -611,6 +618,7 @@ static void mediatool_uv_recorder_write_cb(uv_fs_t* req)
         printf("[%s][%d] Recorder write to file Failed: %s\n", __func__,
             __LINE__, uv_strerror(req->result));
         free(chain->buf);
+        chain->buf = NULL;
         return;
     } else
         printf("[%s][%d] Recorder Data written to file successfully.\n", __func__, __LINE__);
@@ -627,6 +635,10 @@ static void mediatool_uv_recorder_read_cb(uv_stream_t* stream, ssize_t nread, co
     uv_fs_t close_req;
     uv_buf_t iov;
 
+    if (nread == UV_ENOBUFS) {
+        printf("[%s][%d] Warning: last chain buf not consolved.\n", __func__, __LINE__);
+        return;
+    }
     assert(nread <= MEDIATOOL_MAX_SIZE);
     chain->buf = buf->base;
     uv_req_set_data((uv_req_t*)&chain->fs_req, chain);
