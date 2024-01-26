@@ -23,6 +23,7 @@
  ****************************************************************************/
 
 #include <nuttx/fs/fs.h>
+#include <nuttx/sched_note.h>
 
 #include <libavdevice/avdevice.h>
 #include <libavfilter/avfilter.h>
@@ -101,6 +102,20 @@ static const char* g_media_outputs[] = {
  * Private Functions
  ****************************************************************************/
 
+static void media_trace_begin(void* avcl, const char* fmt, va_list vl)
+{
+    char buffer[128];
+    vsnprintf(buffer, sizeof(buffer) - 1, fmt, vl);
+    sched_note_beginex(NOTE_TAG_ALWAYS, buffer);
+}
+
+static void media_trace_end(void* avcl, const char* fmt, va_list vl)
+{
+    char buffer[128];
+    vsnprintf(buffer, sizeof(buffer) - 1, fmt, vl);
+    sched_note_endex(NOTE_TAG_ALWAYS, buffer);
+}
+
 static void media_graph_filter_ready(AVFilterContext* ctx)
 {
     MediaGraphPriv* priv = ctx->graph->opaque;
@@ -148,6 +163,7 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
     int fd;
 
     av_log_set_callback(media_graph_log_callback);
+    av_trace_set_callback(media_trace_begin, media_trace_end);
     avdevice_register_all();
 
     av_log(NULL, AV_LOG_INFO, "%s, loadgraph from file: %s\n", __func__, conf);
