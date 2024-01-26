@@ -329,6 +329,7 @@ static void media_uv_stream_listen_close_cb(uv_handle_t* handle)
     MediaListenPriv* listener = uv_handle_get_data(handle);
     MediaStreamPriv* priv = listener->priv;
 
+    LIST_REMOVE(listener, entry);
     free(listener);
     media_uv_stream_release(priv);
 }
@@ -339,8 +340,9 @@ static void media_uv_stream_listen_close_cb(uv_handle_t* handle)
 static void media_uv_stream_listen_remove(MediaListenPriv* listener)
 {
     MEDIA_DEBUG("listener:%p\n", listener);
-    LIST_REMOVE(listener, entry);
-    uv_close((uv_handle_t*)&listener->pipe, media_uv_stream_listen_close_cb);
+
+    if (!uv_is_closing((uv_handle_t*)&listener->pipe))
+        uv_close((uv_handle_t*)&listener->pipe, media_uv_stream_listen_close_cb);
 }
 
 /**
