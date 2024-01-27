@@ -790,6 +790,9 @@ int media_uv_player_reset(void* handle, media_uv_callback cb, void* cookie)
     if (!handle)
         return -EINVAL;
 
+    media_uv_stream_close_pipe(handle);
+    media_uv_stream_abandon_focus(handle);
+
     return media_uv_stream_send(handle, NULL, "reset", NULL, 0,
         media_uv_stream_receive_cb, cb, cookie);
 }
@@ -1214,6 +1217,9 @@ int media_uv_recorder_reset(void* handle, media_uv_callback cb, void* cookie)
 {
     if (!handle)
         return -EINVAL;
+
+    media_uv_stream_close_pipe(handle);
+    media_uv_stream_abandon_focus(handle);
 
     return media_uv_stream_send(handle, NULL, "reset", NULL, 0,
         media_uv_stream_receive_cb, cb, cookie);
