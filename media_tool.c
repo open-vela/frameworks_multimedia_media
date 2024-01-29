@@ -714,7 +714,6 @@ static void mediatool_common_stop_thread(mediatool_chain_t* chain)
     if (chain->thread) {
         pthread_join(chain->thread, NULL);
         free(chain->buf);
-        close(chain->fd);
 
         chain->thread = 0;
         chain->buf = NULL;
