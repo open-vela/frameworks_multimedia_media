@@ -753,10 +753,8 @@ int media_uv_disconnect(void* handle, media_uv_callback on_release)
 {
     MediaProxyPriv* proxy = handle;
 
-    if (!proxy || (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT)) {
-        MEDIA_ERR_PROXY(proxy, -EINVAL);
+    if (!proxy || (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT))
         return -EINVAL;
-    }
 
     proxy->on_release = on_release;
 
@@ -772,10 +770,8 @@ int media_uv_reconnect(void* handle)
 {
     MediaProxyPriv* proxy = handle;
 
-    if (!proxy || proxy->epipe) {
-        MEDIA_ERR_PROXY(proxy, -EINVAL);
+    if (!proxy || proxy->epipe)
         return -EINVAL; /* Cannot reconnect if listener created. */
-    }
 
     if (proxy->flags == 0)
         media_uv_reconnect_one(proxy);
@@ -792,10 +788,8 @@ int media_uv_listen(void* handle, media_uv_callback on_listen,
     MediaProxyPriv* proxy = handle;
     int ret = 0;
 
-    if (!proxy || !on_event) {
-        ret = -EINVAL;
-        goto err;
-    }
+    if (!proxy || !on_event)
+        return -EINVAL;
 
     if ((proxy->flags & MEDIA_PROXYFLAG_LISTENING) || proxy->epipe) {
         ret = -EPERM; /* Cannot create another listener. */
@@ -825,10 +819,8 @@ int media_uv_send(void* handle, media_uv_parcel_callback on_receive,
     MediaWritePriv* writing;
     int ret;
 
-    if (!proxy) {
-        ret = -EINVAL;
-        goto err;
-    }
+    if (!proxy)
+        return -EINVAL;
 
     if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT) {
         ret = -EPERM;
