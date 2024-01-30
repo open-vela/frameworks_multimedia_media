@@ -487,8 +487,10 @@ static int media_uv_handle_parcel(MediaPipePriv* pipe)
             && !(proxy->flags & MEDIA_PROXYFLAG_RECONNECT))
             media_uv_delivery_writing(proxy);
 
-        if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT)
+        if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT) {
+            media_uv_delivery_writing(proxy);
             return UV_EOF;
+        }
 
         if (proxy->flags & MEDIA_PROXYFLAG_RECONNECT) {
             proxy->flags &= ~MEDIA_PROXYFLAG_RECONNECT;
