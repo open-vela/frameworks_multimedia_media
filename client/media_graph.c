@@ -460,6 +460,21 @@ int media_player_get_duration(void* handle, unsigned int* msec)
     return ret;
 }
 
+int media_player_get_latency(void* handle, unsigned int* latency)
+{
+    char tmp[32];
+    int ret;
+
+    if (!latency)
+        return -EINVAL;
+
+    ret = media_proxy_once(handle, NULL, "get_latency", NULL, 0, tmp, sizeof(tmp));
+    if (ret >= 0)
+        *latency = strtoul(tmp, NULL, 0);
+
+    return ret;
+}
+
 int media_player_set_volume(void* handle, float volume)
 {
     char tmp[32];

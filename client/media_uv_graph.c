@@ -912,6 +912,16 @@ int media_uv_player_get_duration(void* handle,
         media_uv_stream_receive_unsigned_cb, cb, cookie);
 }
 
+int media_uv_player_get_latency(void* handle,
+    media_uv_unsigned_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_stream_send(handle, NULL, "get_latency", NULL, 32,
+        media_uv_stream_receive_unsigned_cb, cb, cookie);
+}
+
 int media_uv_player_set_looping(void* handle, int loop,
     media_uv_callback cb, void* cookie)
 {
