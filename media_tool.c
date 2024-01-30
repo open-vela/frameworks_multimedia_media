@@ -422,6 +422,13 @@ static void mediatool_uv_common_get_duration_cb(void* cookie, int ret, unsigned 
     printf("[%s] id:%d ret:%d val:%u\n", __func__, chain->id, ret, duration);
 }
 
+static void mediatool_uv_common_get_latency_cb(void* cookie, int ret, unsigned latency)
+{
+    mediatool_chain_t* chain = cookie;
+
+    printf("[%s] id:%d ret:%d val:%u\n", __func__, chain->id, ret, latency);
+}
+
 static void mediatool_uv_common_get_volume_cb(void* cookie, int ret, float volume)
 {
     mediatool_chain_t* chain = cookie;
@@ -1562,6 +1569,38 @@ CMD1(duration, int, id)
     return 0;
 }
 
+CMD1(latency, int, id)
+{
+    unsigned int latency;
+    int ret;
+
+    if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
+        return -EINVAL;
+
+    switch (mediatool->chain[id].type) {
+    case MEDIATOOL_PLAYER:
+        ret = media_player_get_latency(mediatool->chain[id].handle, &latency);
+        break;
+
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        return media_uv_player_get_latency(mediatool->chain[id].handle,
+            mediatool_uv_common_get_latency_cb, &mediatool->chain[id]);
+#endif
+    default:
+        return 0;
+    }
+
+    if (ret < 0) {
+        printf("Latency ret %d\n", ret);
+        return ret;
+    }
+
+    printf("Latency %d frames\n", latency);
+
+    return 0;
+}
+
 CMD1(isplaying, int, id)
 {
     int ret;
@@ -2164,6 +2203,9 @@ static const mediatool_cmd_t g_mediatool_cmds[] = {
     { "duration",
         mediatool_cmd_duration,
         "Get player duration time ms(duration ID)" },
+    { "latency",
+        mediatool_cmd_latency,
+        "Get player latency time us(duration ID)" },
     { "isplay",
         mediatool_cmd_isplaying,
         "Get position is playing or not(isplay ID)" },
