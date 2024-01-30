@@ -263,6 +263,15 @@ int media_player_get_position(void* handle, unsigned int* position);
 int media_player_get_duration(void* handle, unsigned int* duration);
 
 /**
+ * @brief Gert latency of current resource.
+ *
+ * @param[in] handle    Player handle.
+ * @param[in] latency  latency in frames.
+ * @return int  Zero on success; a negated errno value on failure.
+ */
+int media_player_get_latency(void* handle, unsigned int* latency);
+
+/**
  * @brief Set volume.
  *
  * @param[in] handle    Player handle.
@@ -508,6 +517,17 @@ int media_uv_player_get_position(void* handle,
  */
 int media_uv_player_get_duration(void* handle,
     media_uv_unsigned_callback on_duration, void* cookie);
+
+/**
+ * @brief Get latency of current playing resource.
+ *
+ * @param[in] handle        Async player handle.
+ * @param[out] cb   Call after receiving result.
+ * @param[in] cookie        Callback argument for `on_latency`.
+ * @return int  Zero on success, negative errno on failure.
+ */
+int media_uv_player_get_latency(void* handle,
+    media_uv_unsigned_callback cb, void* cookie);
 
 /**
  * @brief Set the loop times.
