@@ -43,18 +43,24 @@
 
 #define MEDIA_CPU_DELIM " ,;\t\n"
 
-#define MEDIA_DEBUG_PROXY(p_)                                      \
-    do {                                                           \
-        MEDIA_DEBUG("%p f:%d pipe:%p,%p q:%d,%d done:%d,%d",       \
-            p_, p_->flags, p_->cpipe, p_->epipe,                   \
-            p_->nb_pendq, p_->nb_sentq, p_->nb_sent, p_->nb_recv); \
+#define MEDIA_DEBUG_PROXY(p_)                                          \
+    do {                                                               \
+        if (p_)                                                        \
+            MEDIA_DEBUG("%p f:%d pipe:%p,%p q:%d,%d done:%d,%d",       \
+                p_, p_->flags, p_->cpipe, p_->epipe,                   \
+                p_->nb_pendq, p_->nb_sentq, p_->nb_sent, p_->nb_recv); \
+        else                                                           \
+            MEDIA_DEBUG("null proxy\n");                               \
     } while (0)
 
-#define MEDIA_ERR_PROXY(p_, err_)                                        \
-    do {                                                                 \
-        MEDIA_ERR("%p f:%d pipe:%p,%p q:%d,%d done:%d,%d err:%d",        \
-            p_, p_->flags, p_->cpipe, p_->epipe,                         \
-            p_->nb_pendq, p_->nb_sentq, p_->nb_sent, p_->nb_recv, err_); \
+#define MEDIA_ERR_PROXY(p_, err_)                                            \
+    do {                                                                     \
+        if (p_)                                                              \
+            MEDIA_ERR("%p f:%d pipe:%p,%p q:%d,%d done:%d,%d err:%d",        \
+                p_, p_->flags, p_->cpipe, p_->epipe,                         \
+                p_->nb_pendq, p_->nb_sentq, p_->nb_sent, p_->nb_recv, err_); \
+        else                                                                 \
+            MEDIA_ERR("null proxy\n");                                       \
     } while (0)
 
 /****************************************************************************
