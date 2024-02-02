@@ -142,11 +142,12 @@ typedef void (*media_focus_callback)(int suggestion, void* cookie);
 #define MEDIA_POLICY_AUDIO_MODE "AudioMode"
 #define MEDIA_POLICY_DEVICE_USE "UsingDevices"
 #define MEDIA_POLICY_DEVICE_AVAILABLE "AvailableDevices"
-#define MEDIA_POLICY_HFP_SAMPLERATE "HFPSampleRate"
 #define MEDIA_POLICY_MUTE_MODE "MuteMode"
-#define MEDIA_POLICY_VOLUME "Volume"
 #define MEDIA_POLICY_MIC_MODE "MicMode"
-#define MEDIA_A2DP_OFFLOAD_MODE "A2dpOffloadMode"
+#define MEDIA_POLICY_VOLUME "Volume"
+#define MEDIA_POLICY_HFP_SAMPLERATE "HFPSampleRate"
+#define MEDIA_POLICY_A2DP_OFFLOAD_MODE "A2dpOffloadMode"
+#define MEDIA_POLICY_ANC_OFFLOAD_MODE "AncOffloadMode"
 
 #define MEDIA_AUDIO_MODE_NORMAL "normal" /*!< play and capture audio */
 #define MEDIA_AUDIO_MODE_PHONE "phone"
