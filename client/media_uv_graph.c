@@ -109,6 +109,7 @@ typedef struct MediaTakePicPriv {
 /* Functions to open/close proxy. */
 
 static void media_uv_stream_release(MediaStreamPriv* priv);
+static void media_uv_stream_disconnect_cb(void* cookie, int ret);
 static void media_uv_stream_close_cb(void* cookie, int ret);
 static void media_uv_stream_open_cb(void* cookie, int ret);
 static void media_uv_stream_connect_cb(void* cookie, int ret);
@@ -172,12 +173,20 @@ static void media_uv_stream_release(MediaStreamPriv* priv)
     }
 }
 
-static void media_uv_stream_close_cb(void* cookie, int ret)
+static void media_uv_stream_disconnect_cb(void* cookie, int ret)
 {
     MediaStreamPriv* priv = cookie;
 
     priv->proxy = NULL; /* Mark proxy is finalized. */
     media_uv_stream_release(priv);
+}
+
+static void media_uv_stream_close_cb(void* cookie, int ret)
+{
+    MediaStreamPriv* priv = cookie;
+
+    MEDIA_INFO("%s:%p ret:%d\n", priv->name, priv, ret);
+    media_uv_disconnect(priv->proxy, media_uv_stream_disconnect_cb);
 }
 
 static void media_uv_stream_open_cb(void* cookie, int ret)
@@ -704,7 +713,7 @@ void* media_uv_player_open(void* loop, const char* stream,
     priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
         media_uv_stream_connect_cb, priv);
     if (!priv->proxy) {
-        media_uv_stream_close_cb(priv, 0);
+        media_uv_stream_disconnect_cb(priv, 0);
         return NULL;
     }
 
@@ -722,7 +731,8 @@ int media_uv_player_close(void* handle, int pending, media_uv_callback on_close)
 
     priv->on_close = on_close;
     snprintf(tmp, sizeof(tmp), "%d", pending);
-    ret = media_uv_stream_send(priv, NULL, "close", tmp, 0, NULL, NULL, NULL);
+    ret = media_uv_stream_send(priv, NULL, "close", tmp, 0,
+        media_uv_stream_receive_cb, media_uv_stream_close_cb, priv);
     if (ret < 0)
         return ret;
 
@@ -730,7 +740,7 @@ int media_uv_player_close(void* handle, int pending, media_uv_callback on_close)
     media_uv_stream_listen_clear(handle, NULL);
     media_uv_stream_abandon_focus(handle);
 
-    return media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
+    return ret;
 }
 
 int media_uv_player_listen(void* handle, media_event_callback on_event)
@@ -1059,7 +1069,7 @@ void* media_uv_recorder_open(void* loop, const char* source,
     priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
         media_uv_stream_connect_cb, priv);
     if (!priv->proxy) {
-        media_uv_stream_close_cb(priv, 0);
+        media_uv_stream_disconnect_cb(priv, 0);
         return NULL;
     }
 
@@ -1075,16 +1085,14 @@ int media_uv_recorder_close(void* handle, media_uv_callback on_close)
         return -EINVAL;
 
     priv->on_close = on_close;
-    ret = media_uv_stream_send(priv, NULL, "close", NULL, 0, NULL, NULL, NULL);
+    ret = media_uv_stream_send(priv, NULL, "close", NULL, 0,
+        media_uv_stream_receive_cb, media_uv_stream_close_cb, priv);
     if (ret < 0)
         return ret;
 
     media_uv_stream_close_pipe(handle);
     media_uv_stream_listen_clear(handle, NULL);
     media_uv_stream_abandon_focus(handle);
-
-    if (ret >= 0)
-        ret = media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
 
     return ret;
 }
@@ -1251,7 +1259,7 @@ static int media_uv_recorder_take_picture_close(void* handle, bool send_close)
         ret = media_uv_stream_send(priv, NULL, "close", "1", 0, NULL, NULL, NULL);
 
     if (ret >= 0)
-        ret = media_uv_disconnect(priv->proxy, media_uv_stream_close_cb);
+        ret = media_uv_disconnect(priv->proxy, media_uv_stream_disconnect_cb);
 
     return ret;
 }
