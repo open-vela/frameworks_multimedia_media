@@ -39,7 +39,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_SERVER_MAXCONN 10
+#define MEDIA_SERVER_MAXCONN 16
 #define SAFE_CLOSE(fd) \
     do {               \
         if (fd > 0) {  \
@@ -237,6 +237,7 @@ static int media_server_accept(void* handle, struct pollfd* fd)
     }
 
     close(new_fd);
+    MEDIA_ERR("too many connections, fd: %d.\n", new_fd);
     return -EMFILE;
 }
 
