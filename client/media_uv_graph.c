@@ -1085,7 +1085,7 @@ int media_uv_recorder_close(void* handle, media_uv_callback on_close)
         return -EINVAL;
 
     priv->on_close = on_close;
-    ret = media_uv_stream_send(priv, NULL, "close", NULL, 0,
+    ret = media_uv_stream_send(priv, NULL, "close", "0", 0,
         media_uv_stream_receive_cb, media_uv_stream_close_cb, priv);
     if (ret < 0)
         return ret;
