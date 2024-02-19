@@ -1185,7 +1185,10 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
         if (mediatool->chain[id].type == MEDIATOOL_RECORDER)
             unlink(path);
 
-        mediatool->chain[id].fd = open(path, mediatool->chain[id].type == MEDIATOOL_PLAYER ? O_RDONLY | O_CLOEXEC : O_CREAT | O_RDWR | O_CLOEXEC, 0666);
+        if ((mediatool->chain[id].type == MEDIATOOL_RECORDER) || (mediatool->chain[id].type == MEDIATOOL_UVRECORDER))
+            mediatool->chain[id].fd = open(path, O_CREAT | O_RDWR | O_CLOEXEC | O_TRUNC, 0666);
+        else if ((mediatool->chain[id].type == MEDIATOOL_PLAYER) || (mediatool->chain[id].type == MEDIATOOL_UVPLAYER))
+            mediatool->chain[id].fd = open(path, O_RDONLY | O_CLOEXEC, 0666);
         if (mediatool->chain[id].fd < 0) {
             printf("buffer mode, file can't open\n");
             return -EINVAL;
