@@ -102,6 +102,7 @@ static const char* g_media_outputs[] = {
  * Private Functions
  ****************************************************************************/
 
+#ifdef CONFIG_MEDIA_TRACE
 static void media_trace_begin(void* avcl, const char* fmt, va_list vl)
 {
     char buffer[128];
@@ -115,6 +116,7 @@ static void media_trace_end(void* avcl, const char* fmt, va_list vl)
     vsnprintf(buffer, sizeof(buffer) - 1, fmt, vl);
     sched_note_endex(NOTE_TAG_ALWAYS, buffer);
 }
+#endif
 
 static void media_graph_filter_ready(AVFilterContext* ctx)
 {
@@ -163,7 +165,9 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
     int fd;
 
     av_log_set_callback(media_graph_log_callback);
+#ifdef CONFIG_MEDIA_TRACE
     av_trace_set_callback(media_trace_begin, media_trace_end);
+#endif
     avdevice_register_all();
 
     av_log(NULL, AV_LOG_INFO, "%s, loadgraph from file: %s\n", __func__, conf);

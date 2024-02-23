@@ -62,6 +62,10 @@ config MEDIA_FOCUS
 	bool "Enable media focus"
 	default n
 
+config MEDIA_TRACE
+	bool "Enable media trace"
+	default n
+
 config MEDIA_SERVER_PORT
 	int "Media server AF_INET listening port"
 	default -1
