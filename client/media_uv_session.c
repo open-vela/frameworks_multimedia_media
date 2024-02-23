@@ -48,6 +48,7 @@ typedef struct MediaSessionPriv {
  * Private Function Prototypes
  ****************************************************************************/
 
+static void media_uv_session_disconnect_cb(void* cookie, int ret);
 static void media_uv_session_close_cb(void* cookie, int ret);
 static void media_uv_session_event_cb(void* cookie, void* cookie0,
     void* cookie1, media_parcel* parcel);
@@ -75,7 +76,7 @@ static void media_uv_controllee_connect_cb(void* cookie, int ret);
  * Private Functions
  ****************************************************************************/
 
-static void media_uv_session_close_cb(void* cookie, int ret)
+static void media_uv_session_disconnect_cb(void* cookie, int ret)
 {
     MediaSessionPriv* priv = cookie;
 
@@ -84,6 +85,13 @@ static void media_uv_session_close_cb(void* cookie, int ret)
 
     media_metadata_deinit(&priv->data);
     free(priv);
+}
+
+static void media_uv_session_close_cb(void* cookie, int ret)
+{
+    MediaSessionPriv* priv = cookie;
+
+    media_uv_disconnect(priv->proxy, media_uv_session_disconnect_cb);
 }
 
 static void media_uv_session_event_cb(void* cookie, void* cookie0,
@@ -211,18 +219,13 @@ void* media_uv_session_open(void* loop, char* params,
 int media_uv_session_close(void* handle, media_uv_callback on_close)
 {
     MediaSessionPriv* priv = handle;
-    int ret;
 
     if (!handle)
         return -EINVAL;
 
     priv->on_close = on_close;
-    ret = media_uv_session_send(priv, NULL, "close", NULL, 0,
-        NULL, NULL, NULL);
-    if (ret < 0)
-        return ret;
-
-    return media_uv_disconnect(priv->proxy, media_uv_session_close_cb);
+    return media_uv_session_send(priv, NULL, "close", NULL, 0,
+        media_uv_session_receive_cb, media_uv_session_close_cb, priv);
 }
 
 int media_uv_session_listen(void* handle, media_event_callback on_event)
@@ -456,17 +459,13 @@ void* media_uv_session_register(void* loop, const char* params,
 int media_uv_session_unregister(void* handle, media_uv_callback on_release)
 {
     MediaSessionPriv* priv = handle;
-    int ret;
 
     if (!handle)
         return -EINVAL;
 
     priv->on_close = on_release;
-    ret = media_uv_session_send(handle, NULL, "unregister", NULL, 0, NULL, NULL, NULL);
-    if (ret < 0)
-        return ret;
-
-    return media_uv_disconnect(priv->proxy, media_uv_session_close_cb);
+    return media_uv_session_send(handle, NULL, "unregister", NULL, 0,
+        media_uv_session_receive_cb, media_uv_session_close_cb, priv);
 }
 
 int media_uv_session_notify(void* handle, int event, int result, const char* extra,
