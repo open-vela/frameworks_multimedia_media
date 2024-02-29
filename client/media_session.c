@@ -63,7 +63,10 @@ static void media_event_cb(void* cookie, media_parcel* msg)
     int32_t ret;
 
     media_parcel_read_scanf(msg, "%i%i%s", &event, &ret, &extra);
-    if (event == MEDIA_EVENT_CHANGED || event == MEDIA_EVENT_UPDATED)
+    if (event == MEDIA_EVENT_CHANGED) {
+        media_metadata_reinit(&priv->data);
+        priv->need_query = true;
+    } else if (event == MEDIA_EVENT_UPDATED)
         priv->need_query = true;
 
     if (priv->event)

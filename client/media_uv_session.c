@@ -105,7 +105,10 @@ static void media_uv_session_event_cb(void* cookie, void* cookie0,
         media_parcel_read_scanf(parcel, "%i%i%s", &event,
             &result, &response);
 
-    if (event == MEDIA_EVENT_CHANGED || event == MEDIA_EVENT_UPDATED)
+    if (event == MEDIA_EVENT_CHANGED) {
+        media_metadata_reinit(&priv->data);
+        priv->need_query = true;
+    } else if (event == MEDIA_EVENT_UPDATED)
         priv->need_query = true;
 
     priv->on_event(priv->cookie, event, result, response);
