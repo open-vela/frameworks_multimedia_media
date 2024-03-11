@@ -620,8 +620,7 @@ static void mediatool_uv_recorder_write_cb(uv_fs_t* req)
         free(chain->buf);
         chain->buf = NULL;
         return;
-    } else
-        printf("[%s][%d] Recorder Data written to file successfully.\n", __func__, __LINE__);
+    }
 
     free(chain->buf);
     chain->buf = NULL;
@@ -636,7 +635,7 @@ static void mediatool_uv_recorder_read_cb(uv_stream_t* stream, ssize_t nread, co
     uv_buf_t iov;
 
     if (nread == UV_ENOBUFS) {
-        printf("[%s][%d] Warning: last chain buf not consolved.\n", __func__, __LINE__);
+        usleep(1000);
         return;
     }
     assert(nread <= MEDIATOOL_MAX_SIZE);
