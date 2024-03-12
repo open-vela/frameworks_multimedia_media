@@ -433,6 +433,8 @@ void media_server_finalize(void* handle, void* cookie)
     if (conn->notify_fd > 0) {
         close(conn->notify_fd);
         conn->notify_fd = 0;
+        conn->data = NULL;
+        conn->offset = 0;
     }
 
     pthread_mutex_unlock(&conn->mutex);
