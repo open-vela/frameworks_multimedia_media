@@ -55,6 +55,8 @@ static void media_uv_policy_connect_cb(void* cookie, int ret);
 
 static void media_uv_policy_receive_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel);
+static void media_uv_policy_receive_default_cb(void* cookie,
+    void* cookie0, void* cookie1, media_parcel* parcel);
 static void media_uv_policy_receive_int_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel);
 static void media_uv_policy_receive_string_cb(void* cookie,
@@ -90,6 +92,13 @@ media_uv_policy_alloc(const char* name, const char* cmd, const char* value,
         return NULL;
     }
 
+    if (!priv->cb) {
+        priv->parser = media_uv_policy_receive_default_cb;
+        priv->cookie = cookie;
+        priv->cb = priv; /* XXX: need a common solution on dev.*/
+        return priv;
+    }
+
     priv->parser = parser;
     priv->cookie = cookie;
     priv->cb = cb;
@@ -115,8 +124,14 @@ static void media_uv_policy_connect_cb(void* cookie, int ret)
 
     if (ret < 0)
         media_uv_reconnect(priv->proxy);
-    else if (!priv->cb) /* Response not needed. */
-        media_uv_disconnect(priv->proxy, media_uv_policy_release_cb);
+}
+
+static void media_uv_policy_receive_default_cb(void* cookie,
+    void* cookie0, void* cookie1, media_parcel* parcel)
+{
+    MediaPolicyPriv* priv = cookie;
+
+    media_uv_disconnect(priv->proxy, media_uv_policy_release_cb);
 }
 
 static void media_uv_policy_receive_cb(void* cookie,
