@@ -295,9 +295,20 @@ static void mediatool_event_callback(void* cookie, int event,
     int ret, const char* extra)
 {
     mediatool_chain_t* chain = cookie;
+    media_metadata_t meta = { 0 };
 
     printf("[%s][%d] id:%d, event:%s(%d) ret:%d extra:%s\n",
         __func__, __LINE__, chain->id, media_event_get_name(event), event, ret, extra);
+
+    if (event == MEDIA_EVENT_STARTED) {
+        meta.flags = MEDIA_METAFLAG_STATE;
+        meta.state = 1;
+        media_session_update(chain->extra, &meta);
+    } else if (event == MEDIA_EVENT_STOPPED || event == MEDIA_EVENT_PAUSED || event == MEDIA_EVENT_COMPLETED) {
+        meta.flags = MEDIA_METAFLAG_STATE;
+        meta.state = 0;
+        media_session_update(chain->extra, &meta);
+    }
 }
 
 static void mediatool_takepic_callback(void* cookie, int event,
