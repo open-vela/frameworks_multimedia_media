@@ -476,7 +476,7 @@ static int media_uv_stream_listen_init(MediaStreamPriv* priv, const char* addr)
         if (!listener)
             return -ENOMEM;
 
-        if (!strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME)) {
+        if (!strcmp(cpu, CONFIG_RPMSG_LOCAL_CPUNAME)) {
             ret = uv_pipe_bind(&listener->pipe, addr);
         } else {
 #ifdef CONFIG_NET_RPMSG
@@ -783,7 +783,7 @@ int media_uv_player_prepare(void* handle, const char* url, const char* options,
             return ret;
 
         priv->on_connection = on_connection;
-        cpu = CONFIG_RPTUN_LOCAL_CPUNAME;
+        cpu = CONFIG_RPMSG_LOCAL_CPUNAME;
         url = addr;
     }
 
@@ -1147,7 +1147,7 @@ int media_uv_recorder_prepare(void* handle, const char* url, const char* options
             return ret;
 
         priv->on_connection = on_connection;
-        cpu = CONFIG_RPTUN_LOCAL_CPUNAME;
+        cpu = CONFIG_RPMSG_LOCAL_CPUNAME;
         url = addr;
     }
 

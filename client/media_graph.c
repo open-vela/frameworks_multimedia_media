@@ -134,7 +134,7 @@ static int media_get_sockaddr(void* handle, struct sockaddr_storage* addr_)
     if (!handle || !addr_)
         return -EINVAL;
 
-    if (!strcmp(priv->cpu, CONFIG_RPTUN_LOCAL_CPUNAME)) {
+    if (!strcmp(priv->cpu, CONFIG_RPMSG_LOCAL_CPUNAME)) {
         struct sockaddr_un* addr = (struct sockaddr_un*)addr_;
 
         addr->sun_family = AF_UNIX;
@@ -195,7 +195,7 @@ static int media_prepare(void* handle, const char* url, const char* options)
         if (fd < 0)
             return fd;
 
-        cpu = CONFIG_RPTUN_LOCAL_CPUNAME;
+        cpu = CONFIG_RPMSG_LOCAL_CPUNAME;
         snprintf(addr, sizeof(addr), MEDIA_GRAPH_SOCKADDR_NAME, priv);
         url = addr;
     }
