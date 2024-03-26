@@ -446,7 +446,7 @@ static int media_common_handler(MediaGraphPriv* priv, void* cookie,
 
     if (!strcmp(cmd, "prepare") && target) {
         /* Buffer mode, use `target` as cpuname, `arg` as sockname. */
-        if (!strcmp(target, CONFIG_RPTUN_LOCAL_CPUNAME))
+        if (!strcmp(target, CONFIG_RPMSG_LOCAL_CPUNAME))
             snprintf(url, sizeof(url), "unix:%s?listen=0", arg);
         else
             snprintf(url, sizeof(url), "rpmsg:%s:%s?listen=0", arg, target);

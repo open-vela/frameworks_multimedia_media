@@ -81,7 +81,7 @@ static void media_proxy_unref(void* handle)
 static void media_proxy_get_sockaddr(int* family, socklen_t* len, void* addr,
     const char* cpu, const char* key)
 {
-    if (!strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME)) {
+    if (!strcmp(cpu, CONFIG_RPMSG_LOCAL_CPUNAME)) {
         struct sockaddr_un* un_addr = addr;
 
         *family = PF_LOCAL;
@@ -126,7 +126,7 @@ static int media_proxy_create_listenfd(MediaClientPriv* priv, const char* cpu)
         goto err;
 
     media_parcel_append_string(&parcel, key);
-    media_parcel_append_string(&parcel, CONFIG_RPTUN_LOCAL_CPUNAME);
+    media_parcel_append_string(&parcel, CONFIG_RPMSG_LOCAL_CPUNAME);
     ret = media_parcel_send(&parcel, priv->fd, MEDIA_PARCEL_CREATE_NOTIFY, 0);
 
 err:

@@ -93,7 +93,7 @@ static int media_server_create_notify(struct media_server_priv* priv, media_parc
     if (key == NULL)
         return -EINVAL;
 
-    if (strcmp(cpu, CONFIG_RPTUN_LOCAL_CPUNAME)) {
+    if (strcmp(cpu, CONFIG_RPMSG_LOCAL_CPUNAME)) {
         family = AF_RPMSG;
         rpmsg_addr.rp_family = AF_RPMSG;
         strlcpy(rpmsg_addr.rp_name, key, RPMSG_SOCKET_NAME_SIZE);
@@ -259,7 +259,7 @@ static int media_server_listen(struct media_server_priv* priv, int family)
         priv->local_fd = fd;
         local_addr.sun_family = AF_LOCAL;
         snprintf(local_addr.sun_path, UNIX_PATH_MAX,
-            MEDIA_SOCKADDR_NAME, CONFIG_RPTUN_LOCAL_CPUNAME);
+            MEDIA_SOCKADDR_NAME, CONFIG_RPMSG_LOCAL_CPUNAME);
         addr = (struct sockaddr*)&local_addr;
         len = sizeof(struct sockaddr_un);
 #if CONFIG_MEDIA_SERVER_PORT >= 0
@@ -277,7 +277,7 @@ static int media_server_listen(struct media_server_priv* priv, int family)
         priv->rpmsg_fd = fd;
         rpmsg_addr.rp_family = AF_RPMSG;
         snprintf(rpmsg_addr.rp_name, RPMSG_SOCKET_NAME_SIZE,
-            MEDIA_SOCKADDR_NAME, CONFIG_RPTUN_LOCAL_CPUNAME);
+            MEDIA_SOCKADDR_NAME, CONFIG_RPMSG_LOCAL_CPUNAME);
         strcpy(rpmsg_addr.rp_cpu, "");
         addr = (struct sockaddr*)&rpmsg_addr;
         len = sizeof(struct sockaddr_rpmsg);

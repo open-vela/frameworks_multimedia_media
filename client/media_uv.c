@@ -385,7 +385,7 @@ static int media_uv_connect_one(MediaProxyPriv* proxy)
     /* Connect to media server. */
     snprintf(addr, sizeof(addr), MEDIA_SOCKADDR_NAME, proxy->cpu);
     proxy->flags |= MEDIA_PROXYFLAG_CONNECTING;
-    if (!strcmp(proxy->cpu, CONFIG_RPTUN_LOCAL_CPUNAME))
+    if (!strcmp(proxy->cpu, CONFIG_RPMSG_LOCAL_CPUNAME))
         uv_pipe_connect(req, &proxy->cpipe->handle, addr,
             media_uv_connect_one_cb);
     else {
@@ -616,7 +616,7 @@ static int media_uv_create_notify(MediaProxyPriv* proxy)
     }
 
     snprintf(addr, sizeof(addr), "md_%p", proxy);
-    media_parcel_append_printf(&writing->parcel, "%s%s", addr, CONFIG_RPTUN_LOCAL_CPUNAME);
+    media_parcel_append_printf(&writing->parcel, "%s%s", addr, CONFIG_RPMSG_LOCAL_CPUNAME);
     writing->proxy = proxy;
     return media_uv_send_writing(proxy, writing);
 }
@@ -678,7 +678,7 @@ static int media_uv_listen_one(MediaProxyPriv* proxy)
         goto err1;
 
     snprintf(addr, sizeof(addr), "md_%p", proxy);
-    if (!strcmp(proxy->cpu, CONFIG_RPTUN_LOCAL_CPUNAME))
+    if (!strcmp(proxy->cpu, CONFIG_RPMSG_LOCAL_CPUNAME))
         ret = uv_pipe_bind(&proxy->epipe->handle, addr);
     else
 #ifdef CONFIG_NET_RPMSG
