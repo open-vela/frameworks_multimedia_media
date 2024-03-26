@@ -872,7 +872,7 @@ int media_uv_player_set_volume(void* handle, float volume,
         return -EINVAL;
 
     snprintf(tmp, sizeof(tmp), "%f", volume);
-    return media_uv_stream_send(handle, "volume", "volume", tmp, 0,
+    return media_uv_stream_send(handle, NULL, "volume", tmp, 0,
         media_uv_stream_receive_cb, cb, cookie);
 }
 
@@ -881,7 +881,7 @@ int media_uv_player_get_volume(void* handle, media_uv_float_callback cb, void* c
     if (!handle)
         return -EINVAL;
 
-    return media_uv_stream_send(handle, "volume", "dump", NULL, 32,
+    return media_uv_stream_send(handle, NULL, "get_volume", NULL, 32,
         media_uv_stream_receive_volume_cb, cb, cookie);
 }
 

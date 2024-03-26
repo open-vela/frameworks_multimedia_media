@@ -485,7 +485,7 @@ int media_player_set_volume(void* handle, float volume)
     char tmp[32];
 
     snprintf(tmp, sizeof(tmp), "%f", volume);
-    return media_proxy_once(handle, "volume", "volume", tmp, 0, NULL, 0);
+    return media_proxy_once(handle, NULL, "volume", tmp, 0, NULL, 0);
 }
 
 int media_player_get_volume(void* handle, float* volume)
@@ -496,7 +496,7 @@ int media_player_get_volume(void* handle, float* volume)
     if (!volume)
         return -EINVAL;
 
-    ret = media_proxy_once(handle, "volume", "dump", NULL, 0, tmp, sizeof(tmp));
+    ret = media_proxy_once(handle, NULL, "get_volume", NULL, 0, tmp, sizeof(tmp));
     if (ret >= 0) {
         sscanf(tmp, "vol:%f", volume);
         ret = 0;
