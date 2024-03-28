@@ -92,7 +92,7 @@ media_uv_policy_alloc(const char* name, const char* cmd, const char* value,
         return NULL;
     }
 
-    if (!priv->cb) {
+    if (!cb) {
         priv->parser = media_uv_policy_receive_default_cb;
         priv->cookie = cookie;
         priv->cb = priv; /* XXX: need a common solution on dev.*/
