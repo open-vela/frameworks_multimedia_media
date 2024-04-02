@@ -59,7 +59,9 @@ typedef LIST_HEAD(MediaListenList, MediaListenPriv) MediaListenList;
     MediaListenList listeners;                    \
     media_uv_object_callback on_connection;       \
     /* Fields for auto focus. */                  \
-    MediaFocusPriv* focus;
+    MediaFocusPriv* focus;                        \
+    /* Fields for query metadata. */              \
+    MediaQueryPriv* query;
 
 typedef struct MediaFocusPriv {
     void* stream;
@@ -67,6 +69,14 @@ typedef struct MediaFocusPriv {
     media_uv_callback on_play;
     void* on_play_cookie;
 } MediaFocusPriv;
+
+typedef struct MediaQueryPriv {
+    void* player;
+    int expected;
+    void* cookie;
+    media_uv_object_callback on_query;
+    media_metadata_t diff;
+} MediaQueryPriv;
 
 typedef struct MediaStreamPriv {
     MEDIA_STREAM_FIELDS
@@ -76,14 +86,6 @@ typedef struct MediaPlayerPriv {
     MEDIA_STREAM_FIELDS
     media_metadata_t data;
 } MediaPlayerPriv;
-
-typedef struct MediaQueryPriv {
-    void* player;
-    int expected;
-    void* cookie;
-    media_uv_object_callback on_query;
-    media_metadata_t diff;
-} MediaQueryPriv;
 
 typedef struct MediaRecorderPriv {
     MEDIA_STREAM_FIELDS
@@ -169,6 +171,7 @@ static void media_uv_stream_release(MediaStreamPriv* priv)
         if (priv->on_close)
             priv->on_close(priv->cookie, 0);
 
+        free(priv->query);
         free(priv);
     }
 }
@@ -572,7 +575,6 @@ static void media_uv_player_query_complete(void* cookie)
         flags = ctx->diff.flags;
         media_metadata_update(&priv->data, &ctx->diff);
         ctx->on_query(ctx->cookie, flags, &priv->data);
-        free(ctx);
     }
 }
 
@@ -971,35 +973,36 @@ int media_uv_player_get_property(void* handle, const char* target, const char* k
 int media_uv_player_query(void* handle, media_uv_object_callback cb, void* cookie)
 {
     MediaPlayerPriv* priv = handle;
-    MediaQueryPriv* ctx;
 
     if (!priv || !cb)
         return -EINVAL;
 
-    ctx = zalloc(sizeof(MediaQueryPriv));
-    if (!ctx)
-        return -EINVAL;
+    if (!priv->query) {
+        priv->query = malloc(sizeof(MediaQueryPriv));
+        if (!priv->query)
+            return -ENOMEM;
+    }
 
-    ctx->on_query = cb;
-    ctx->player = priv;
-    ctx->cookie = cookie;
+    memset(priv->query, 0, sizeof(MediaQueryPriv));
+    priv->query->on_query = cb;
+    priv->query->player = priv;
+    priv->query->cookie = cookie;
 
-    if (media_uv_player_get_playing(handle, media_uv_player_query_state_cb, ctx) >= 0)
-        ctx->expected |= MEDIA_METAFLAG_STATE;
+    if (media_uv_player_get_playing(handle, media_uv_player_query_state_cb, priv->query) >= 0)
+        priv->query->expected |= MEDIA_METAFLAG_STATE;
 
     if (media_uv_policy_get_stream_volume(priv->loop, priv->name,
-            media_uv_player_query_volume_cb, ctx)
+            media_uv_player_query_volume_cb, priv->query)
         >= 0)
-        ctx->expected |= MEDIA_METAFLAG_VOLUME;
+        priv->query->expected |= MEDIA_METAFLAG_VOLUME;
 
-    if (media_uv_player_get_duration(handle, media_uv_player_query_duration_cb, ctx) >= 0)
-        ctx->expected |= MEDIA_METAFLAG_DURATION;
+    if (media_uv_player_get_duration(handle, media_uv_player_query_duration_cb, priv->query) >= 0)
+        priv->query->expected |= MEDIA_METAFLAG_DURATION;
 
-    if (media_uv_player_get_position(handle, media_uv_player_query_position_cb, ctx) >= 0)
-        ctx->expected |= MEDIA_METAFLAG_POSITION;
+    if (media_uv_player_get_position(handle, media_uv_player_query_position_cb, priv->query) >= 0)
+        priv->query->expected |= MEDIA_METAFLAG_POSITION;
 
-    if (!ctx->expected) {
-        free(ctx);
+    if (!priv->query->expected) {
         return -EINVAL;
     }
 
