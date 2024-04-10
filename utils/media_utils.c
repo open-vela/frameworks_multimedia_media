@@ -48,6 +48,8 @@ const char* media_event_get_name(int event)
         return "SEEKED";
     case MEDIA_EVENT_COMPLETED:
         return "COMPLETED";
+    case MEDIA_EVENT_ERRORED:
+        return "ERRORED";
     case MEDIA_EVENT_CHANGED:
         return "CHANGED";
     case MEDIA_EVENT_UPDATED:
