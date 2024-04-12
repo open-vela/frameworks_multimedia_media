@@ -309,12 +309,15 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
     return ret;
 }
 
-static void* media_find_filter(MediaGraphPriv* priv, const char* prefix,
-    bool input, bool available)
+static int media_find_filter(MediaGraphPriv* priv, const char* prefix,
+    bool input, bool available, AVFilterContext** pfilter)
 {
     AVFilterContext* filter = NULL;
     char name[64];
-    int i, j;
+    int i, j, ret;
+
+    // policy might do mapping (e.g. "Music" => "amovie_async@Music")
+    ret = media_stub_get_stream_name(prefix, name, sizeof(name));
 
     for (i = 0; i < priv->graph->nb_filters; i++) {
         filter = priv->graph->filters[i];
@@ -324,25 +327,33 @@ static void* media_find_filter(MediaGraphPriv* priv, const char* prefix,
                 // find an available input/output as prefix is not specified.
                 if (input) {
                     for (j = 0; g_media_inputs[j]; j++)
-                        if (!strcmp(filter->filter->name, g_media_inputs[j]))
-                            return filter;
+                        if (!strcmp(filter->filter->name, g_media_inputs[j])) {
+                            *pfilter = filter;
+                            return 0;
+                        }
                 } else {
                     for (j = 0; g_media_outputs[j]; j++)
-                        if (!strcmp(filter->filter->name, g_media_outputs[j]))
-                            return filter;
+                        if (!strcmp(filter->filter->name, g_media_outputs[j])) {
+                            *pfilter = filter;
+                            return 0;
+                        }
                 }
             } else {
-                // policy might do mapping (e.g. "Music" => "amovie_async@Music")
-                if (0 == media_stub_get_stream_name(prefix, name, sizeof(name)))
+                if (ret == 0)
                     prefix = name;
 
-                if (!strncmp(filter->name, prefix, strlen(prefix)))
-                    return filter;
+                if (!strncmp(filter->name, prefix, strlen(prefix))) {
+                    *pfilter = filter;
+                    return 0;
+                }
             }
         }
     }
 
-    return NULL;
+    *pfilter = NULL;
+    if (ret == 0) /* filter found in policy but not available. */
+        return -EINVAL;
+    return -ENOTSUP;
 }
 
 static void media_common_notify_cb(void* cookie, int event,
@@ -382,40 +393,44 @@ static void media_common_event_cb(void* cookie, int event,
     media_common_notify_cb(ctx, event, result, extra);
 }
 
-static MediaFilterPriv* media_common_open(MediaGraphPriv* priv,
-    const char* arg, void* cookie, bool player)
+static int media_common_open(MediaGraphPriv* priv,
+    const char* arg, void* cookie, bool player, MediaFilterPriv** pctx)
 {
     AVMovieAsyncEventCookie event;
     MediaFilterPriv* ctx;
+    int ret;
 
+    *pctx = NULL;
     ctx = zalloc(sizeof(MediaFilterPriv));
     if (!ctx)
-        return NULL;
+        return -ENOMEM;
 
-    ctx->filter = media_find_filter(priv, arg, player, true);
-    if (!ctx->filter)
+    ret = media_find_filter(priv, arg, player, true, &ctx->filter);
+    if (ret < 0)
         goto err;
 
     /* Launch filter worker thread. */
-    if (avfilter_process_command(ctx->filter, "open", NULL, NULL, 0, 0) < 0)
+    ret = avfilter_process_command(ctx->filter, "open", NULL, NULL, 0, 0);
+    if (ret < 0)
         goto err;
 
     event.cookie = ctx;
     event.event = media_common_event_cb;
 
-    if (avfilter_process_command(ctx->filter, "set_event", (const char*)&event, NULL, 0, 0) < 0) {
+    ret = avfilter_process_command(ctx->filter, "set_event", (const char*)&event, NULL, 0, 0);
+    if (ret < 0) {
         avfilter_process_command(ctx->filter, "close", NULL, NULL, 0, 0);
         goto err;
     }
 
     ctx->cookie = cookie;
     ctx->filter->opaque = ctx;
-
-    return ctx;
+    *pctx = ctx;
+    return 0;
 
 err:
     free(ctx);
-    return NULL;
+    return ret;
 }
 
 static int media_common_handler(MediaGraphPriv* priv, void* cookie,
@@ -426,11 +441,12 @@ static int media_common_handler(MediaGraphPriv* priv, void* cookie,
     AVFilterContext* filter = NULL;
     char url[PATH_MAX];
     int pending;
+    int ret = 0;
 
     if (!strcmp(cmd, "open")) {
-        ctx = media_common_open(priv, arg, cookie, player);
-        if (!ctx)
-            return -EINVAL;
+        ret = media_common_open(priv, arg, cookie, player, &ctx);
+        if (ret < 0)
+            return ret;
 
         media_server_set_data(cookie, ctx);
         return 0;
