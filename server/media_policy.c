@@ -209,7 +209,9 @@ int media_policy_handler(void* policy, void* cookie, const char* name, const cha
     void* handle;
     char* dump;
 
-    if (!strcmp(cmd, "ping")) {
+    if (!cmd) {
+        return -EINVAL;
+    } else if (!strcmp(cmd, "ping")) {
         return 0;
     } else if (!strcmp(cmd, "subscribe")) {
         handle = pfw_subscribe(policy, name, media_policy_notify_cb, cookie);
