@@ -24,12 +24,14 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <math.h>
 #include <poll.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
-#include <system/readline.h>
+#include <string.h>
 #include <unistd.h>
 #ifdef CONFIG_LIBUV_EXTENSION
 #include <uv.h>
@@ -2454,7 +2456,9 @@ int main(int argc, char* argv[])
     pthread_attr_t attr;
     char* buffer = NULL;
     pthread_t thread;
-    int ret, len;
+    size_t len = 0;
+    ssize_t n;
+    int ret;
 
     memset(&mediatool, 0, sizeof(mediatool));
     pthread_attr_init(&attr);
@@ -2467,16 +2471,16 @@ int main(int argc, char* argv[])
     while (1) {
         printf("mediatool> ");
         fflush(stdout);
-
-        if (!buffer) {
-            buffer = malloc(CONFIG_NSH_LINELEN);
-            assert(buffer);
-        }
-
-        len = readline_stream(buffer, CONFIG_NSH_LINELEN, stdin, stdout);
-        if (len <= 0)
+        n = getline(&buffer, &len, stdin);
+        if (n == -1)
             continue;
-        buffer[len] = '\0';
+
+        if (buffer[n - 1] == '\n') {
+            if (n == 1)
+                continue;
+            else
+                buffer[n - 1] = '\0';
+        }
 
         if (buffer[0] == '!') {
 #ifdef CONFIG_SYSTEM_SYSTEM
@@ -2484,12 +2488,6 @@ int main(int argc, char* argv[])
 #endif
             continue;
         }
-
-        if (buffer[len - 1] == '\n')
-            buffer[len - 1] = '\0';
-
-        if (buffer[0] == '\0')
-            continue;
 
         uv_async_queue_send(&mediatool.asyncq, buffer);
         if (!strcmp(buffer, "q"))
@@ -2506,22 +2504,26 @@ out:
 int main(int argc, char* argv[])
 {
     mediatool_t mediatool;
-    int ret, len;
-    char* buffer;
+    char* buffer = NULL;
+    size_t len = 0;
+    ssize_t n;
+    int ret;
 
     memset(&mediatool, 0, sizeof(mediatool));
-    buffer = malloc(CONFIG_NSH_LINELEN);
-    if (!buffer)
-        return -ENOMEM;
 
     while (1) {
         printf("mediatool> ");
         fflush(stdout);
-
-        len = readline_stream(buffer, CONFIG_NSH_LINELEN, stdin, stdout);
-        if (len <= 0)
+        n = getline(&buffer, &len, stdin);
+        if (n == -1)
             continue;
-        buffer[len] = '\0';
+
+        if (buffer[n - 1] == '\n') {
+            if (n == 1)
+                continue;
+            else
+                buffer[n - 1] = '\0';
+        }
 
         if (buffer[0] == '!') {
 #ifdef CONFIG_SYSTEM_SYSTEM
@@ -2529,12 +2531,6 @@ int main(int argc, char* argv[])
 #endif
             continue;
         }
-
-        if (buffer[len - 1] == '\n')
-            buffer[len - 1] = '\0';
-
-        if (buffer[0] == '\0')
-            continue;
 
         ret = mediatool_execute(&mediatool, buffer);
 
