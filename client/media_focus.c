@@ -26,6 +26,7 @@
 #include <media_defs.h>
 #include <media_focus.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "media_common.h"
 #include "media_proxy.h"
@@ -68,7 +69,7 @@ void* media_focus_request(int* suggestion, const char* scenario,
     if (!suggestion || !scenario)
         return NULL;
 
-    priv = zalloc(sizeof(MediaFocusPriv));
+    priv = calloc(1, sizeof(MediaFocusPriv));
     if (!priv)
         return NULL;
 

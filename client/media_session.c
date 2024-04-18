@@ -26,6 +26,7 @@
 #include <media_policy.h>
 #include <media_session.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "media_common.h"
 #include "media_metadata.h"
@@ -81,7 +82,7 @@ void* media_session_open(const char* params)
 {
     MediaSessionPriv* priv;
 
-    priv = zalloc(sizeof(MediaSessionPriv));
+    priv = calloc(1, sizeof(MediaSessionPriv));
     if (!priv)
         return NULL;
 
@@ -300,7 +301,7 @@ void* media_session_register(void* cookie, media_event_callback event_cb)
 {
     MediaSessionPriv* priv;
 
-    priv = zalloc(sizeof(MediaSessionPriv));
+    priv = calloc(1, sizeof(MediaSessionPriv));
     if (!priv)
         return NULL;
 
