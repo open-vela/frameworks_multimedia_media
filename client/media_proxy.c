@@ -104,11 +104,11 @@ static int media_proxy_create_listenfd(MediaClientPriv* priv, const char* cpu)
     struct sockaddr_storage addr;
     socklen_t socklen;
     media_parcel parcel;
-    char key[16];
+    char key[32];
     int family;
     int ret;
 
-    sprintf(key, "md_%p", priv);
+    snprintf(key, sizeof(key), "md_%p", priv);
     media_proxy_get_sockaddr(&family, &socklen, &addr, cpu, key);
 
     priv->listenfd = socket(family, SOCK_STREAM | SOCK_CLOEXEC, 0);
