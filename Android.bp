@@ -1,0 +1,37 @@
+cc_library_static {
+    name: "libmediaclient",
+
+    export_include_dirs: ["include"],
+
+    include_dirs: ["vendor/vela/frameworks/media/utils"],
+
+    srcs: [
+        "client/media_graph.c",
+        "client/media_proxy.c",
+        "client/media_policy.c",
+        "client/media_session.c",
+        "client/media_focus.c",
+        "client/media_dtmf.c",
+        "utils/*.c"
+          ],
+
+    shared_libs: [
+        "libcutils",
+    ],
+
+    cflags: [
+        "-DCONFIG_MEDIA_SERVER_CPUNAME=\"proxy\"",
+        "-DCONFIG_RPMSG_LOCAL_CPUNAME=\"server\"",
+        "-DCONFIG_MEDIA_PROXY_LISTEN_STACKSIZE=4096",
+        "-DCONFIG_MEDIA_PROXY_LISTEN_PRIORITY=100"
+    ],
+}
+
+cc_binary {
+    name: "mediatool",
+    srcs: ["media_tool.c"],
+    static_libs: [
+        "libmediaclient",
+    ],
+}
+
