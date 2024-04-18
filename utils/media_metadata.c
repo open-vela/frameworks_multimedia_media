@@ -22,6 +22,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <errno.h>
 #include <media_metadata.h>
 #include <stdio.h>
 #include <stdlib.h>
