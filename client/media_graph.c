@@ -28,7 +28,10 @@
 #include <semaphore.h>
 #include <stdatomic.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include "media_common.h"
 #include "media_proxy.h"
@@ -54,6 +57,8 @@ typedef struct MediaIOPriv {
 static void media_recorder_take_picture_cb(void* cookie, int event, int result,
     const char* extra)
 {
+    (void)extra;
+
     MediaIOPriv* priv = cookie;
 
     priv->result = result;
@@ -85,7 +90,7 @@ static void* media_open(int control, const char* params)
 {
     MediaIOPriv* priv;
 
-    priv = zalloc(sizeof(MediaIOPriv));
+    priv = calloc(1, sizeof(MediaIOPriv));
     if (!priv)
         return NULL;
 
@@ -599,7 +604,7 @@ int media_recorder_take_picture(char* params, char* filename, size_t number)
     if (!number || number > INT_MAX)
         return -EINVAL;
 
-    priv = zalloc(sizeof(MediaIOPriv));
+    priv = calloc(1, sizeof(MediaIOPriv));
     if (!priv)
         return -ENOMEM;
 

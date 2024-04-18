@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <media_policy.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "media_common.h"
@@ -184,7 +185,7 @@ void* media_policy_subscribe(const char* name,
     MediaPolicyPriv* priv;
     int ret;
 
-    priv = zalloc(sizeof(MediaPolicyPriv));
+    priv = calloc(1, sizeof(MediaPolicyPriv));
     if (!priv)
         return NULL;
 

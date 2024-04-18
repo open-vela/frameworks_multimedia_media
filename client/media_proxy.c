@@ -23,13 +23,16 @@
  ****************************************************************************/
 
 #include <assert.h>
+#include <errno.h>
 #include <netpacket/rpmsg.h>
+#include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include "media_common.h"
 #include "media_proxy.h"
@@ -136,7 +139,7 @@ err:
     return ret;
 }
 
-static void* media_proxy_listen_thread(pthread_addr_t pvarg)
+static void* media_proxy_listen_thread(void* pvarg)
 {
     MediaClientPriv* priv = pvarg;
     media_parcel parcel;
@@ -185,7 +188,7 @@ void* media_proxy_connect(const char* cpu)
     char key[32];
     int family;
 
-    priv = zalloc(sizeof(MediaClientPriv));
+    priv = calloc(1, sizeof(MediaClientPriv));
     if (priv == NULL)
         return NULL;
 
@@ -304,7 +307,7 @@ int media_proxy_set_event_cb(void* handle, const char* cpu, void* event_cb, void
     pthread_attr_setstacksize(&pattr, CONFIG_MEDIA_PROXY_LISTEN_STACKSIZE);
     param.sched_priority = CONFIG_MEDIA_PROXY_LISTEN_PRIORITY;
     pthread_attr_setschedparam(&pattr, &param);
-    ret = pthread_create(&priv->thread, &pattr, media_proxy_listen_thread, (pthread_addr_t)priv);
+    ret = pthread_create(&priv->thread, &pattr, media_proxy_listen_thread, priv);
     if (ret < 0) {
         close(priv->listenfd);
         media_proxy_unref(handle);
@@ -460,7 +463,7 @@ int media_proxy(int id, void* handle, const char* target, const char* cmd,
         /* keep the connection in need. */
         if (handle && ret >= 0) {
             priv->cpu = strdup(cpu);
-            DEBUGASSERT(priv->cpu);
+            assert(priv->cpu);
             return ret;
         }
 
