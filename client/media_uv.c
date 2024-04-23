@@ -272,11 +272,8 @@ static void media_uv_shutdown_cb(uv_shutdown_t* req, int status)
 {
     MediaPipePriv* pipe = uv_req_get_data((uv_req_t*)req);
 
+    media_uv_close(pipe);
     free(req);
-    if (status < 0) {
-        MEDIA_ERR_PROXY(pipe->proxy, status);
-        media_uv_close(pipe);
-    }
 }
 
 /**
