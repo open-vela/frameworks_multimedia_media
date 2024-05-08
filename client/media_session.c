@@ -274,6 +274,8 @@ int media_session_set_volume(void* handle, int volume)
      * MEDIA_EVENT_SET_VOLUME
      * MEDIA_METAFLAG_VOLUME_RANGE
      */
+    (void)handle;
+    (void)volume;
     return -ENOSYS;
 }
 
