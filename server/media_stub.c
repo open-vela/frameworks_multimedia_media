@@ -152,11 +152,11 @@ int media_stub_get_stream_name(const char* stream, char* name, int len)
 #endif
 }
 
-void media_stub_process_command(const char* target,
+int media_stub_process_command(const char* target,
     const char* cmd, const char* arg)
 {
 #ifdef CONFIG_LIB_FFMPEG
-    media_graph_handler(media_get_graph(), target, cmd, arg, NULL, 0);
+    return media_graph_handler(media_get_graph(), target, cmd, arg, NULL, 0);
 #else
     return -ENOSYS;
 #endif
