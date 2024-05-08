@@ -70,6 +70,8 @@
     static int mediatool_cmd_##func##_exec(mediatool_t* mediatool);                \
     static int mediatool_cmd_##func(mediatool_t* mediatool, int argc, char** argv) \
     {                                                                              \
+        (void)argc;                                                                \
+        (void)argv;                                                                \
         return mediatool_cmd_##func##_exec(mediatool);                             \
     }                                                                              \
     static int mediatool_cmd_##func##_exec(mediatool_t* mediatool)
@@ -893,6 +895,7 @@ CMD1(session_register, string_t, param)
 {
     long int i;
 
+    (void)param;
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
         if (!mediatool->chain[i].handle)
             break;
@@ -1288,6 +1291,7 @@ CMD2(start, int, id, string_t, scenario)
 {
     int ret = -EINVAL;
 
+    (void)scenario;
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
@@ -1763,6 +1767,7 @@ CMD3(take_picture, string_t, filtername, string_t, filename, int, number)
 {
     int ret = 0;
 
+    (void)mediatool;
     ret = media_recorder_take_picture(filtername, filename, number);
     if (ret < 0) {
         printf("Failed to take_picture.");
@@ -1775,6 +1780,7 @@ CMD3(take_picture_async, string_t, filtername, string_t, filename, int, number)
 {
     long int i;
 
+    (void)mediatool;
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
         if (!mediatool->chain[i].handle)
             break;
@@ -1797,6 +1803,7 @@ static int mediatool_cmd_send(mediatool_t* mediatool, int argc, char** argv)
 {
     char arg[64] = {};
 
+    (void)mediatool;
     for (int i = 3; i < argc; i++) {
         strlcat(arg, argv[i], sizeof(arg));
         if (i != argc - 1)
@@ -1812,6 +1819,7 @@ CMD1(dump, string_t, options)
      * so let's make it simple, just "dump".
      */
 
+    (void)mediatool;
     media_policy_dump(options);
     media_graph_dump(options);
     media_focus_dump(options);
@@ -1821,6 +1829,7 @@ CMD1(dump, string_t, options)
 
 CMD3(setint, string_t, name, int, value, int, apply)
 {
+    (void)mediatool;
     return media_policy_set_int(name, value, apply);
 }
 
@@ -1829,6 +1838,7 @@ CMD1(getint, string_t, name)
     int value;
     int ret;
 
+    (void)mediatool;
     ret = media_policy_get_int(name, &value);
     if (ret < 0)
         return -EINVAL;
@@ -1840,6 +1850,7 @@ CMD1(getint, string_t, name)
 
 CMD3(setstring, string_t, name, string_t, value, int, apply)
 {
+    (void)mediatool;
     return media_policy_set_string(name, value, apply);
 }
 
@@ -1848,6 +1859,7 @@ CMD1(getstring, string_t, name)
     char value[64];
     int ret;
 
+    (void)mediatool;
     ret = media_policy_get_string(name, value, sizeof(value));
     if (ret < 0)
         return -EINVAL;
@@ -1859,11 +1871,13 @@ CMD1(getstring, string_t, name)
 
 CMD3(include, string_t, name, string_t, value, int, apply)
 {
+    (void)mediatool;
     return media_policy_include(name, value, apply);
 }
 
 CMD3(exclude, string_t, name, string_t, value, int, apply)
 {
+    (void)mediatool;
     return media_policy_exclude(name, value, apply);
 }
 
@@ -1871,6 +1885,7 @@ CMD2(contain, string_t, name, string_t, value)
 {
     int result, ret;
 
+    (void)mediatool;
     ret = media_policy_contain(name, value, &result);
     if (ret < 0)
         return -EINVAL;
@@ -1882,11 +1897,13 @@ CMD2(contain, string_t, name, string_t, value)
 
 CMD2(increase, string_t, name, int, apply)
 {
+    (void)mediatool;
     return media_policy_increase(name, apply);
 }
 
 CMD2(decrease, string_t, name, int, apply)
 {
+    (void)mediatool;
     return media_policy_decrease(name, apply);
 }
 
@@ -2509,6 +2526,8 @@ int main(int argc, char* argv[])
     ssize_t n;
     int ret;
 
+    (void)argc;
+    (void)argv;
     memset(&mediatool, 0, sizeof(mediatool));
 
     while (1) {
