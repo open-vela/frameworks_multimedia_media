@@ -404,8 +404,8 @@ int media_parcel_read_double(media_parcel* parcel, double* val)
 
 const char* media_parcel_read_string(media_parcel* parcel)
 {
-    const void* beg;
-    const void* end;
+    const uint8_t* beg;
+    const uint8_t* end;
     const char* ret;
 
     beg = &parcel->chunk->buf[parcel->next];
