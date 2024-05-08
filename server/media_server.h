@@ -55,7 +55,7 @@ void media_stub_onreceive(void* cookie,
 
 int media_stub_set_stream_status(const char* name, bool active);
 int media_stub_get_stream_name(const char* stream, char* name, int len);
-void media_stub_process_command(const char* target,
+int media_stub_process_command(const char* target,
     const char* cmd, const char* arg);
 
 /****************************************************************************
