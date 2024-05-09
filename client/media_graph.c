@@ -46,6 +46,7 @@ typedef struct MediaIOPriv {
     media_event_callback event;
     atomic_int refs;
     sem_t sem;
+    int socket_fd;
     int socket;
     int result;
 } MediaIOPriv;
@@ -113,6 +114,8 @@ static void media_close_socket(void* handle)
     if (atomic_load(&priv->refs) == 1 && priv->socket) {
         close(priv->socket);
         priv->socket = 0;
+        if (priv->socket_fd > 0)
+            close(priv->socket_fd);
     }
 }
 
@@ -210,12 +213,12 @@ static int media_prepare(void* handle, const char* url, const char* options)
         if (ret < 0)
             goto out;
     }
-
     ret = media_proxy_once(priv, cpu, "prepare", url, 0, NULL, 0);
     if (ret < 0)
         goto out;
 
     if (fd > 0) {
+        priv->socket_fd = fd;
         priv->socket = accept4(fd, NULL, NULL, SOCK_CLOEXEC);
         if (priv->socket < 0) {
             priv->socket = 0;
@@ -224,9 +227,6 @@ static int media_prepare(void* handle, const char* url, const char* options)
     }
 
 out:
-    if (fd > 0)
-        close(fd);
-
     return ret;
 }
 
@@ -268,6 +268,8 @@ static ssize_t media_process_data(void* handle, bool player,
 
     close(priv->socket);
     priv->socket = 0;
+    if (priv->socket_fd > 0)
+        close(priv->socket_fd);
     ret = -errno;
 
 out:
