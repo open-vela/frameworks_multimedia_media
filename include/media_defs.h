@@ -162,6 +162,9 @@ typedef void (*media_focus_callback)(int suggestion, void* cookie);
 #define MEDIA_DEVICE_MIC "mic"
 #define MEDIA_DEVICE_MODEM "modem"
 
+#define MEDIA_DEVICE_IN_AUX_DIGITAL "digital_in"
+#define MEDIA_DEVICE_OUT_AUX_DIGITAL "digital_out"
+
 /**
  * @brief Callback to receive current criterion value.
  *
