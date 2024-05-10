@@ -67,7 +67,6 @@ extern "C" {
 #define MEDIA_EVENT_STOPPED 4
 #define MEDIA_EVENT_SEEKED 5 /* SEEKED is not a state. */
 #define MEDIA_EVENT_COMPLETED 6
-#define MEDIA_EVENT_ERRORED 8
 
 /* Control message and its result, used by session. */
 
