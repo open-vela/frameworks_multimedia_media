@@ -205,7 +205,7 @@ static void media_policy_notify_cb(void* cookie, int number, char* literal)
 int media_policy_handler(void* policy, void* cookie, const char* name, const char* cmd,
     const char* value, int apply, char* res, int res_len)
 {
-    int ret = -ENOSYS, tmp;
+    int ret = -ENOSYS, tmp[2];
     void* handle;
     char* dump;
 
@@ -237,17 +237,21 @@ int media_policy_handler(void* policy, void* cookie, const char* name, const cha
     } else if (!strcmp(cmd, "exclude")) {
         ret = pfw_exclude(policy, name, value);
     } else if (!strcmp(cmd, "contain")) {
-        ret = pfw_contain(policy, name, value, &tmp);
+        ret = pfw_contain(policy, name, value, &tmp[0]);
         if (ret >= 0)
-            return snprintf(res, res_len, "%d", tmp);
+            return snprintf(res, res_len, "%d", tmp[0]);
     } else if (!strcmp(cmd, "get_int")) {
-        ret = pfw_getint(policy, name, &tmp);
+        ret = pfw_getint(policy, name, &tmp[0]);
         if (ret >= 0)
-            return snprintf(res, res_len, "%d", tmp);
+            return snprintf(res, res_len, "%d", tmp[0]);
     } else if (!strcmp(cmd, "get_string")) {
         ret = pfw_getstring(policy, name, res, res_len);
         if (ret >= 0)
             return 0;
+    } else if (!strcmp(cmd, "get_range")) {
+        ret = pfw_getrange(policy, name, &tmp[0], &tmp[1]);
+        if (ret >= 0)
+            return snprintf(res, res_len, "%d,%d", tmp[0], tmp[1]);
     } else if (!strcmp(cmd, "dump")) {
         dump = pfw_dump(policy);
         MEDIA_INFO("\n%s", dump);
