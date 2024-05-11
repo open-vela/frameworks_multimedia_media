@@ -253,6 +253,23 @@ int media_policy_get_int(const char* name, int* value)
     return ret;
 }
 
+int media_policy_get_range(const char* name, int* min_value, int* max_value)
+{
+    char tmp[32];
+    int ret;
+
+    if (!min_value || !max_value)
+        return -EINVAL;
+
+    ret = media_proxy(MEDIA_ID_POLICY, NULL, name, "get_range", NULL, 0, tmp, sizeof(tmp));
+    if (ret >= 0) {
+        sscanf(tmp, "%d,%d", min_value, max_value);
+        ret = 0;
+    }
+
+    return ret;
+}
+
 int media_policy_contain(const char* name, const char* values, int* result)
 {
     char tmp[32];

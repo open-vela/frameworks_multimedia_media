@@ -1848,6 +1848,20 @@ CMD1(getint, string_t, name)
     return 0;
 }
 
+CMD1(getrange, string_t, name)
+{
+    int min_value, max_value;
+    int ret;
+
+    ret = media_policy_get_range(name, &min_value, &max_value);
+    if (ret < 0)
+        return -EINVAL;
+
+    printf("get criterion %s range min_value = %d, max_value = %d\n", name, min_value, max_value);
+
+    return 0;
+}
+
 CMD3(setstring, string_t, name, string_t, value, int, apply)
 {
     (void)mediatool;
@@ -2278,6 +2292,9 @@ static const mediatool_cmd_t g_mediatool_cmds[] = {
     { "getint",
         mediatool_cmd_getint,
         "Get criterion value in integer(getint NAME)" },
+    { "getrange",
+        mediatool_cmd_getrange,
+        "Get criterion range in integer(getrange NAME)" },
     { "setstring",
         mediatool_cmd_setstring,
         "Set criterion value with string(setstring NAME VALUE APPLY)" },
