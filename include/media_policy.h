@@ -266,6 +266,19 @@ int media_policy_set_int(const char* name, int value, int apply);
 int media_policy_get_int(const char* name, int* value);
 
 /**
+ * @brief Get numerical value range of criterion.
+ *
+ * @param[in] name      Criterion name
+ * @param[out] min_value    Numerical min value.
+ * @param[out] min_value    Numerical max value.
+ * @return int  Zero on success; a negative errno value on failure.
+ *
+ * @note This api is only for certain service, if you are not sure
+ * whether you need this API, then you definitely don't need.
+ */
+int media_policy_get_range(const char* name, int* min_value, int* max_value);
+
+/**
  * @brief Set literal value to criterion.
  *
  * @param[in] name  Criterion name.
