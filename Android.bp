@@ -20,8 +20,8 @@ cc_library_static {
     ],
 
     cflags: [
-        "-DCONFIG_MEDIA_SERVER_CPUNAME=\"proxy\"",
-        "-DCONFIG_RPMSG_LOCAL_CPUNAME=\"server\"",
+        "-DCONFIG_MEDIA_SERVER_CPUNAME=\"ap\"",
+        "-DCONFIG_RPMSG_LOCAL_CPUNAME=\"droid\"",
         "-DCONFIG_MEDIA_PROXY_LISTEN_STACKSIZE=4096",
         "-DCONFIG_MEDIA_PROXY_LISTEN_PRIORITY=100"
     ],
