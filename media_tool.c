@@ -169,6 +169,7 @@ typedef struct mediatool_chain_s {
     bool loop;
 
     bool direct;
+    bool direct_connect;
     char* buf;
     int size;
 
@@ -769,6 +770,10 @@ static int mediatool_common_stop_inner(mediatool_chain_t* chain)
         break;
 
     case MEDIATOOL_RECORDER:
+        if (chain->direct) {
+            chain->direct_connect = false;
+            pthread_join(chain->thread, NULL);
+        }
         ret = media_recorder_stop(chain->handle);
         break;
 
@@ -1167,9 +1172,11 @@ static void* mediatool_buffer_thread(void* arg)
         }
     } else {
         while (1) {
-            if (chain->direct)
+            if (chain->direct) {
+                if (!chain->direct_connect)
+                    goto out;
                 ret = mediatool_process_data(fd, false, chain->buf, chain->size);
-            else
+            } else
                 ret = media_recorder_read_data(chain->handle, chain->buf, chain->size);
 
             if (ret == 0) {
@@ -1269,6 +1276,9 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
         mediatool->chain[id].size = 512;
         mediatool->chain[id].buf = malloc(mediatool->chain[id].size);
         assert(mediatool->chain[id].buf);
+
+        if (direct)
+            mediatool->chain[id].direct_connect = true;
 
         ret = pthread_create(&thread, NULL, mediatool_buffer_thread, &mediatool->chain[id]);
         assert(!ret);
