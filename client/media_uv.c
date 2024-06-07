@@ -450,7 +450,7 @@ static void media_uv_read_cb(uv_stream_t* stream, ssize_t ret,
 
 err:
     if (ret != UV_EOF)
-        MEDIA_ERR_PROXY(pipe->proxy, ret);
+        MEDIA_ERR_PROXY(pipe->proxy, (int)ret);
 
     media_uv_close(pipe);
 }
