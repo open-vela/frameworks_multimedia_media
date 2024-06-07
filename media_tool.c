@@ -206,7 +206,7 @@ typedef char* string_t;
 #ifdef CONFIG_LIBUV_EXTENSION
 /* uv recorder buffer mode functions declaration */
 static void mediatool_uv_recorder_alloc_cb(uv_handle_t* handle,
-    unsigned suggested_size, uv_buf_t* buf);
+    size_t suggested_size, uv_buf_t* buf);
 static void mediatool_uv_recorder_write_cb(uv_fs_t* req);
 static void mediatool_uv_recorder_read_cb(uv_stream_t* stream,
     ssize_t nread, const uv_buf_t* buf);
@@ -612,7 +612,7 @@ static void mediatool_uv_take_picture_complete_cb(void* cookie, int ret)
 }
 
 static void mediatool_uv_recorder_alloc_cb(uv_handle_t* handle,
-    unsigned suggested_size, uv_buf_t* buf)
+    size_t suggested_size, uv_buf_t* buf)
 {
     mediatool_chain_t* chain = uv_handle_get_data(handle);
 
