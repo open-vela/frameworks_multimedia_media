@@ -121,6 +121,9 @@ static void media_uv_free_pipe(MediaPipePriv* pipe);
 static MediaPipePriv* media_uv_alloc_pipe(MediaProxyPriv* proxy);
 static void media_uv_free_proxy(MediaProxyPriv* proxy);
 
+/* clear queue and call cb. */
+static void media_uv_clear_queue(MediaProxyPriv* proxy);
+
 /* Shutdown and close. */
 static void media_uv_close_cb(uv_handle_t* handle);
 static void media_uv_close(MediaPipePriv* pipe);
@@ -211,6 +214,18 @@ static MediaPipePriv* media_uv_alloc_pipe(MediaProxyPriv* proxy)
     return pipe;
 }
 
+static void media_uv_clear_queue(MediaProxyPriv* proxy)
+{
+    MediaWritePriv* writing;
+
+    TAILQ_CONCAT(&proxy->sentq, &proxy->pendq, entry);
+    while ((writing = TAILQ_FIRST(&proxy->sentq))) {
+        TAILQ_REMOVE(&proxy->sentq, writing, entry);
+        writing->flags = MEDIA_MSGFLAG_WRITTEN | MEDIA_MSGFLAG_RESPONSED;
+        media_uv_free_writing(writing);
+    }
+}
+
 /**
  * @brief free proxy.
  *
@@ -221,24 +236,13 @@ static MediaPipePriv* media_uv_alloc_pipe(MediaProxyPriv* proxy)
  */
 static void media_uv_free_proxy(MediaProxyPriv* proxy)
 {
-    MediaWritePriv* writing;
-
     MEDIA_DEBUG_PROXY(proxy);
     if (proxy->cpipe || proxy->epipe)
         return; /* Sockets still active. */
 
     if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT) {
         /* Concat 2 queue and clear all. */
-        TAILQ_CONCAT(&proxy->sentq, &proxy->pendq, entry);
-        while ((writing = TAILQ_FIRST(&proxy->sentq))) {
-            TAILQ_REMOVE(&proxy->sentq, writing, entry);
-            if (writing->parcel.chunk->code == MEDIA_PARCEL_SEND_ACK)
-                writing->on_receive(proxy->cookie,
-                    writing->cookies[0], writing->cookies[1], NULL);
-            writing->flags = MEDIA_MSGFLAG_WRITTEN | MEDIA_MSGFLAG_RESPONSED;
-            media_uv_free_writing(writing);
-        }
-
+        media_uv_clear_queue(proxy);
         if (proxy->on_release)
             proxy->on_release(proxy->cookie, 0);
 
@@ -309,6 +313,7 @@ static void media_uv_reconnect_one(MediaProxyPriv* proxy)
     /* Try connect to next cpu. */
     proxy->cpu = strtok_r(NULL, MEDIA_CPU_DELIM, &proxy->cpus);
     if (!proxy->cpu) {
+        media_uv_clear_queue(proxy);
         proxy->on_connect(proxy->cookie, -ENOENT);
         return;
     }
@@ -826,6 +831,11 @@ int media_uv_send(void* handle, media_uv_parcel_callback on_receive,
 
     if (!proxy)
         return -EINVAL;
+
+    if (!proxy->cpu) {
+        ret = -ECANCELED;
+        goto err;
+    }
 
     if (proxy->flags & MEDIA_PROXYFLAG_DISCONNECT) {
         ret = -EPERM;
