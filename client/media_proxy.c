@@ -365,7 +365,7 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
 {
     MediaProxyPriv* priv = handle;
     media_parcel in, out;
-    const char* response;
+    const char* response = NULL;
     int ret = -EINVAL;
     int32_t resp = 0;
 
@@ -423,16 +423,14 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
 
     if (res_len > 0)
         strlcpy(res, response, res_len);
-    else if (response && strlen(response) > 0)
-        MEDIA_INFO("\n%s\n", response);
 
 out:
     media_parcel_deinit(&in);
     media_parcel_deinit(&out);
 
-    MEDIA_INFO("%s:%s:%p %s %s %s %s ret:%d resp:%d\n",
+    MEDIA_INFO("%s:%s:%p %s %s %s %s ret:%d resp:%d response:%s\n",
         media_id_get_name(priv->type), priv->cpu, (void*)(uintptr_t)priv, target ? target : "_",
-        cmd, arg ? arg : "_", apply ? "apply" : "_", ret, (int)resp);
+        cmd, arg ? arg : "_", apply ? "apply" : "_", ret, (int)resp, response ? response : "_");
     return ret < 0 ? ret : resp;
 }
 
