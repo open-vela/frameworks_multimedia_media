@@ -112,7 +112,7 @@ typedef void (*media_event_callback)(void* cookie, int event, int result,
 /**
  * @brief Callback to receive suggestions.
  *
- * @param[in] suggestion    MEIDA_FOCUS_* .
+ * @param[in] suggestion    MEDIA_FOCUS_* .
  * @param[in] cookie        Argument set by focus request.
  *
  * @code

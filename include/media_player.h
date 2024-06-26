@@ -278,7 +278,7 @@ int media_player_get_latency(void* handle, unsigned int* latency);
  * @param[in] volume    Volume in range [0.0, 1.0].
  * @return int  Zero on success; a negated errno value on failure.
  *
- * @warning You should always use `meida_policy_set_stream_volume`
+ * @warning You should always use `media_policy_set_stream_volume`
  * if possible; if you use this api to adjust your volume, you
  * can not align with stream volume policy configuration.
  */
@@ -466,7 +466,7 @@ int media_uv_player_stop(void* handle, media_uv_callback on_stop, void* cookie);
  * @param[in] cookie        Callback argument for `on_volume`.
  * @return int Zero on success, negative errno on failure.
  *
- * @warning You should always use `meida_policy_set_stream_volume`
+ * @warning You should always use `media_policy_set_stream_volume`
  * if possible; if you use this api to adjust your volume, you
  * can not align with stream volume policy configuration.
  */

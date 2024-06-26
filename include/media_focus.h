@@ -33,7 +33,7 @@
 /**
  * @brief Request Audio Focus.
  *
- * @param[out] initial_suggestion   MEIDA_FOCUS_* .
+ * @param[out] initial_suggestion   MEDIA_FOCUS_* .
  * @param[in] scenario              MEDIA_SCENARIO_* .
  * @param[out] on_suggestion        Callback to receive suggestions.
  * @param[in] cookie                Callback argument.
