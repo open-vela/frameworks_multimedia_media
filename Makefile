@@ -33,18 +33,6 @@ endif
 CSRCS += $(wildcard utils/*.c)
 
 ifeq ($(CONFIG_MEDIA_FEATURE),y)
-ifeq ($(CONFIG_ARCH), arm)
-  TARGETDIR := arm
-else ifeq ($(CONFIG_ARCH), arm64)
-  TARGETDIR := aarch64
-else ifeq ($(CONFIG_ARCH), xtensa)
-  TARGETDIR := xtensa
-else
-  TARGETDIR := x86
-endif # CONFIG_ARCH
-
-  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi
-  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libffi/libffi/src/$(TARGETDIR)
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
   CSRCS  += feature/audio.c
   CSRCS  += feature/audio_impl.c
