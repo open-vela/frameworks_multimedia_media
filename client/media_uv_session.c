@@ -222,13 +222,18 @@ void* media_uv_session_open(void* loop, char* params,
 int media_uv_session_close(void* handle, media_uv_callback on_close)
 {
     MediaSessionPriv* priv = handle;
+    int ret;
 
     if (!handle)
         return -EINVAL;
 
     priv->on_close = on_close;
-    return media_uv_session_send(priv, NULL, "close", NULL, 0,
+    ret = media_uv_session_send(priv, NULL, "close", NULL, 0,
         media_uv_session_receive_cb, media_uv_session_close_cb, priv);
+    if (ret < 0)
+        media_uv_session_close_cb(priv, ret);
+
+    return ret;
 }
 
 int media_uv_session_listen(void* handle, media_event_callback on_event)
@@ -462,13 +467,18 @@ void* media_uv_session_register(void* loop, const char* params,
 int media_uv_session_unregister(void* handle, media_uv_callback on_release)
 {
     MediaSessionPriv* priv = handle;
+    int ret;
 
     if (!handle)
         return -EINVAL;
 
     priv->on_close = on_release;
-    return media_uv_session_send(handle, NULL, "unregister", NULL, 0,
+    ret = media_uv_session_send(handle, NULL, "unregister", NULL, 0,
         media_uv_session_receive_cb, media_uv_session_close_cb, priv);
+    if (ret < 0)
+        media_uv_session_close_cb(priv, ret);
+
+    return ret;
 }
 
 int media_uv_session_notify(void* handle, int event, int result, const char* extra,
