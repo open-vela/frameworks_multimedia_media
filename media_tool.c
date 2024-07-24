@@ -2295,7 +2295,7 @@ static const mediatool_cmd_t g_mediatool_cmds[] = {
         "Send cmd to graph. PS:loglevel INFO:32 VERBOSE:40 DEBUG:48 TRACE:56" },
     { "dump",
         mediatool_cmd_dump,
-        "Dump graph and policy as well as focus" },
+        "Dump graph and policy as well as focus (dump:display as normal, dump -s:display as src filter, dump -l:display as pipeline)" },
     { "setint",
         mediatool_cmd_setint,
         "Set criterion value with integer(setint NAME VALUE APPLY)" },
