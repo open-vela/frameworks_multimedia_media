@@ -167,7 +167,7 @@ static void media_uv_player_query_volume_cb(void* cookie, int ret, int value);
 
 static void media_uv_stream_release(MediaStreamPriv* priv)
 {
-    if (priv && !priv->proxy && LIST_EMPTY(&priv->listeners)) {
+    if (priv && !priv->proxy && LIST_EMPTY(&priv->listeners) && (!priv->query || !priv->query->expected)) {
         if (priv->on_close)
             priv->on_close(priv->cookie, 0);
 
@@ -576,6 +576,8 @@ static void media_uv_player_query_complete(void* cookie)
         media_metadata_update(&priv->data, &ctx->diff);
         ctx->on_query(ctx->cookie, flags, &priv->data);
     }
+
+    media_uv_stream_release((MediaStreamPriv*)priv);
 }
 
 static void media_uv_player_query_state_cb(void* cookie, int ret, int value)
