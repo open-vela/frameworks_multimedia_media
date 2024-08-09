@@ -40,12 +40,17 @@ depend::
 	@python3 $(APPDIR)/frameworks/base/feature/tools/jidl/jsongensource.py \
 		$(APPDIR)/frameworks/media/feature/audio.jidl -out-dir \
 		$(APPDIR)/frameworks/media/feature -header audio.h -source audio.c
+	@python3 $(APPDIR)/frameworks/base/feature/tools/jidl/jsongensource.py \
+		$(APPDIR)/frameworks/media/feature/session.jidl -out-dir \
+		$(APPDIR)/frameworks/media/feature -header session.h -source session.c
 
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
   CSRCS  += feature/audio.c
   CSRCS  += feature/audio_impl.c
   CSRCS  += feature/volume.c
   CSRCS  += feature/volume_impl.c
+  CSRCS  += feature/session.c
+  CSRCS  += feature/session_impl.c
 endif # CONFIG_MEDIA_FEATURE
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
