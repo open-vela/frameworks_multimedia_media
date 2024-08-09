@@ -1,0 +1,43 @@
+/*
+ * Copyright (C) 2024 Xiaomi Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * 	 http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+module system.media.session@1.0
+
+callback success_cb(string msg)
+callback fail_cb(string errorMsg, int code)
+callback complete_cb()
+
+struct Feedback {
+    callback success_cb success
+    callback fail_cb fail
+    callback complete_cb complete
+}
+
+callback status_cb(string status)
+
+interface Session {
+    void start(Feedback fb)
+    void pause(Feedback fb)
+    void stop(Feedback fb)
+    void prev(Feedback fb)
+    void next(Feedback fb)
+    void increaseVolume(Feedback fb)
+    void decreaseVolume(Feedback fb)
+
+    property status_cb onEvent writeonly;
+}
+[ctor="true", target="media_session"]
+Session createSession(string params);
