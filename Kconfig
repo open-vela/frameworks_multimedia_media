@@ -66,6 +66,14 @@ config MEDIA_TRACE
 	bool "Enable media trace"
 	default n
 
+config MEDIA_SERVER_MAXCONN
+	int "Max socket connections"
+	default 16
+
+config MEDIA_SERVER_MAX_POLLFDS
+	int "Max poll fd counts"
+	default 64
+
 config MEDIA_SERVER_PORT
 	int "Media server AF_INET listening port"
 	default -1
