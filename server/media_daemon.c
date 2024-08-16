@@ -36,7 +36,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MAX_POLLFDS 64
+#define MAX_POLLFDS CONFIG_MEDIA_SERVER_MAX_POLLFDS
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /****************************************************************************

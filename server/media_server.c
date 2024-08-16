@@ -39,7 +39,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_SERVER_MAXCONN 16
+#define MEDIA_SERVER_MAXCONN CONFIG_MEDIA_SERVER_MAXCONN
 #define SAFE_CLOSE(fd) \
     do {               \
         if (fd > 0) {  \
