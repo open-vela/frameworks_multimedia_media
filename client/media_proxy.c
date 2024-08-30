@@ -448,7 +448,7 @@ int media_proxy(int id, void* handle, const char* target, const char* cmd,
     if (priv->proxy)
         return media_proxy_once(priv, target, cmd, arg, apply, res, res_len);
 
-    strlcpy(tmp, CONFIG_MEDIA_SERVER_CPUNAME, sizeof(tmp));
+    strlcpy(tmp, media_get_cpuname(), sizeof(tmp));
     for (cpu = strtok_r(tmp, " ,;|", &saveptr); cpu;
          cpu = strtok_r(NULL, " ,;|", &saveptr)) {
         priv->proxy = media_proxy_connect(cpu);
