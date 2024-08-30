@@ -475,7 +475,7 @@ static int media_uv_stream_listen_init(MediaStreamPriv* priv, const char* addr)
         return 0; /* Only create listeners once. */
 
     LIST_INIT(&priv->listeners);
-    strlcpy(tmp, CONFIG_MEDIA_SERVER_CPUNAME, sizeof(tmp));
+    strlcpy(tmp, media_get_cpuname(), sizeof(tmp));
     for (cpu = strtok_r(tmp, " ,;|", &saveptr); cpu;
          cpu = strtok_r(NULL, " ,;|", &saveptr)) {
         listener = media_uv_stream_listen_add(priv);
@@ -717,7 +717,7 @@ void* media_uv_player_open(void* loop, const char* stream,
     priv->cookie = cookie;
     priv->on_open = on_open;
     priv->id = MEDIA_ID_PLAYER;
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_stream_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_stream_disconnect_cb(priv, 0);
@@ -1084,7 +1084,7 @@ void* media_uv_recorder_open(void* loop, const char* source,
     priv->cookie = cookie;
     priv->on_open = on_open;
     priv->id = MEDIA_ID_RECORDER;
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_stream_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_stream_disconnect_cb(priv, 0);
