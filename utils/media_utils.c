@@ -22,6 +22,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <cutils/properties.h>
 #include <media_defs.h>
 #include <media_utils.h>
 
@@ -89,4 +90,16 @@ const char* media_id_get_name(int id)
     default:
         return "none";
     }
+}
+
+const char* media_get_cpuname(void)
+{
+#ifdef CONFIG_MEDIA_SERVER_CPUNAME
+    return CONFIG_MEDIA_SERVER_CPUNAME;
+#else
+    static char cpuname[PROPERTY_VALUE_MAX];
+    if (cpuname[0] == '\0')
+        property_get("vendor.audio.server.cpuname", cpuname, "audio");
+    return cpuname;
+#endif
 }

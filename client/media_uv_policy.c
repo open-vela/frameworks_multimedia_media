@@ -205,7 +205,7 @@ int media_uv_policy_set_string(void* loop, const char* name,
     if (!priv)
         return -ENOMEM;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_policy_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_policy_free(priv);
@@ -228,7 +228,7 @@ int media_uv_policy_get_string(void* loop, const char* name,
     if (!priv)
         return -ENOMEM;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_policy_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_policy_free(priv);
@@ -252,7 +252,7 @@ int media_uv_policy_set_int(void* loop, const char* name,
     if (!priv)
         return -ENOMEM;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_policy_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_policy_free(priv);
@@ -274,7 +274,7 @@ int media_uv_policy_get_int(void* loop, const char* name,
     if (!priv)
         return -ENOMEM;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_policy_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_policy_free(priv);
@@ -296,7 +296,7 @@ int media_uv_policy_increase(void* loop, const char* name, int apply,
     if (!priv)
         return -ENOMEM;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_policy_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_policy_free(priv);
@@ -318,7 +318,7 @@ int media_uv_policy_decrease(void* loop, const char* name, int apply,
     if (!priv)
         return -ENOMEM;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_policy_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_policy_free(priv);
@@ -340,7 +340,7 @@ int media_uv_policy_include(void* loop, const char* name,
     if (!priv)
         return -ENOMEM;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_policy_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_policy_free(priv);
@@ -363,7 +363,7 @@ int media_uv_policy_exclude(void* loop, const char* name,
     if (!priv)
         return -ENOMEM;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_policy_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_policy_free(priv);
@@ -386,7 +386,7 @@ int media_uv_policy_contain(void* loop, const char* name, const char* value,
     if (!priv)
         return -ENOMEM;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_policy_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_policy_free(priv);
