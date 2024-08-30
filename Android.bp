@@ -20,7 +20,6 @@ cc_library_static {
     ],
 
     cflags: [
-        "-DCONFIG_MEDIA_SERVER_CPUNAME=\"audio\"",
         "-DCONFIG_RPMSG_LOCAL_CPUNAME=\"droid\"",
         "-DCONFIG_MEDIA_PROXY_LISTEN_STACKSIZE=4096",
         "-DCONFIG_MEDIA_PROXY_LISTEN_PRIORITY=100"
@@ -33,6 +32,10 @@ cc_binary {
     vendor: true,
     static_libs: [
         "libmediaclient",
+    ],
+    shared_libs: [
+        "libcutils",
+        "libutils",
     ],
 }
 

@@ -93,4 +93,13 @@
  */
 const char* media_id_get_name(int id);
 
+/**
+ * @brief Get cpu name.
+ *
+ * For example, media_get_cpuname() returns "audio".
+ *
+ * @param void
+ * @return const char* Always a printable string.
+ */
+const char* media_get_cpuname(void);
 #endif /* FRAMEWORKS_MEDIA_UTILS_MEDIA_COMMON_H */

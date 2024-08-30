@@ -209,7 +209,7 @@ void* media_uv_session_open(void* loop, char* params,
     priv->on_open = on_open;
     media_metadata_init(&priv->data);
     priv->need_query = true;
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_controller_connect_cb, priv);
     if (!priv->proxy) {
         free(priv);
@@ -454,7 +454,7 @@ void* media_uv_session_register(void* loop, const char* params,
     priv->cookie = cookie;
     priv->on_event = on_event;
 
-    priv->proxy = media_uv_connect(loop, CONFIG_MEDIA_SERVER_CPUNAME,
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_controllee_connect_cb, priv);
     if (!priv->proxy) {
         free(priv);
