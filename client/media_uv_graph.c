@@ -328,6 +328,9 @@ static int media_uv_stream_send(void* stream, const char* target,
     if (ret < 0)
         return ret;
 
+    MEDIA_INFO("%s %p %s %s %s",
+        priv->name, priv->proxy, target ? target : "_", cmd, arg ? arg : "_");
+
     ret = media_uv_send(priv->proxy, parser, cb, cookie, &parcel);
     media_parcel_deinit(&parcel);
     return ret;

@@ -212,6 +212,9 @@ int media_uv_policy_set_string(void* loop, const char* name,
         return -ENOMEM;
     }
 
+    MEDIA_DEBUG("handle:%p %s %s %s.",
+        priv->proxy, name, "set_string", value ? value : "_");
+
     return 0;
 }
 
@@ -231,6 +234,8 @@ int media_uv_policy_get_string(void* loop, const char* name,
         media_uv_policy_free(priv);
         return -ENOMEM;
     }
+
+    MEDIA_DEBUG("handle:%p %s %s.", priv->proxy, name, "get_string");
 
     return 0;
 }
@@ -254,6 +259,8 @@ int media_uv_policy_set_int(void* loop, const char* name,
         return -ENOMEM;
     }
 
+    MEDIA_DEBUG("handle:%p %s %s %d.", priv->proxy, name, "set_int", value);
+
     return 0;
 }
 
@@ -273,6 +280,8 @@ int media_uv_policy_get_int(void* loop, const char* name,
         media_uv_policy_free(priv);
         return -ENOMEM;
     }
+
+    MEDIA_DEBUG("handle:%p %s %s.", priv->proxy, name, "get_int");
 
     return 0;
 }
@@ -294,6 +303,8 @@ int media_uv_policy_increase(void* loop, const char* name, int apply,
         return -ENOMEM;
     }
 
+    MEDIA_DEBUG("handle:%p %s %s.", priv->proxy, name, "increase");
+
     return 0;
 }
 
@@ -313,6 +324,8 @@ int media_uv_policy_decrease(void* loop, const char* name, int apply,
         media_uv_policy_free(priv);
         return -ENOMEM;
     }
+
+    MEDIA_DEBUG("handle:%p %s %s.", priv->proxy, name, "decrease");
 
     return 0;
 }
@@ -334,6 +347,9 @@ int media_uv_policy_include(void* loop, const char* name,
         return -ENOMEM;
     }
 
+    MEDIA_DEBUG("handle:%p %s %s %s.",
+        priv->proxy, name, "include", value ? value : "_");
+
     return 0;
 }
 
@@ -354,6 +370,9 @@ int media_uv_policy_exclude(void* loop, const char* name,
         return -ENOMEM;
     }
 
+    MEDIA_DEBUG("handle:%p %s %s %s.",
+        priv->proxy, name, "exclude", value ? value : "_");
+
     return 0;
 }
 
@@ -373,6 +392,9 @@ int media_uv_policy_contain(void* loop, const char* name, const char* value,
         media_uv_policy_free(priv);
         return -ENOMEM;
     }
+
+    MEDIA_DEBUG("handle:%p %s %s %s.",
+        priv->proxy, name, "contain", value ? value : "_");
 
     return 0;
 }
