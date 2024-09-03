@@ -68,7 +68,7 @@ typedef struct {
 static void audio_uv_get_duration_cb(void* cookie, int ret, unsigned duration);
 static void audio_uv_get_position_cb(void* cookie, int ret, unsigned position);
 static void init_audio_obj(AudioObject* obj);
-void system_audio_wrap_stop(FeatureInstanceHandle feature, union AppendData append_data);
+void system_audio_wrap_stop(FeatureInstanceHandle feature, AppendData append_data);
 
 /* common interface */
 void system_audio_onRegister(const char* feature_name)
@@ -208,7 +208,7 @@ static void system_audio_event_callback(void* cookie, int event, int ret, const 
 
     if (ret < 0) {
         FEATURE_LOG_ERROR("%s::%s() fail, ret < 0.\n", file_tag, __FUNCTION__);
-        union AppendData tmp;
+        AppendData tmp;
         system_audio_wrap_stop(obj->feature, tmp);
         return;
     }
@@ -332,7 +332,7 @@ static void audio_uv_get_duration_cb(void* cookie, int ret, unsigned duration)
 }
 
 /* warp function */
-void system_audio_wrap_play(FeatureInstanceHandle feature, union AppendData append_data)
+void system_audio_wrap_play(FeatureInstanceHandle feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -356,7 +356,7 @@ void system_audio_wrap_play(FeatureInstanceHandle feature, union AppendData appe
         audio_uv_open_cb, obj);
 }
 
-void system_audio_wrap_pause(FeatureInstanceHandle feature, union AppendData append_data)
+void system_audio_wrap_pause(FeatureInstanceHandle feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -371,7 +371,7 @@ void system_audio_wrap_pause(FeatureInstanceHandle feature, union AppendData app
     media_uv_player_pause(obj->handle, NULL, NULL);
 }
 
-void system_audio_wrap_stop(FeatureInstanceHandle feature, union AppendData append_data)
+void system_audio_wrap_stop(FeatureInstanceHandle feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -387,7 +387,7 @@ void system_audio_wrap_stop(FeatureInstanceHandle feature, union AppendData appe
     init_audio_obj(obj);
 }
 
-void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, union AppendData append_data, system_audio_GetPalyStateParam* p)
+void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, AppendData append_data, system_audio_GetPalyStateParam* p)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -423,7 +423,7 @@ void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, union AppendD
 }
 
 /* property function */
-FtString system_audio_get_src(void* feature, union AppendData append_data)
+FtString system_audio_get_src(void* feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -433,7 +433,7 @@ FtString system_audio_get_src(void* feature, union AppendData append_data)
     return obj->src;
 }
 
-void system_audio_set_src(void* feature, union AppendData append_data, FtString src)
+void system_audio_set_src(void* feature, AppendData append_data, FtString src)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -443,7 +443,7 @@ void system_audio_set_src(void* feature, union AppendData append_data, FtString 
     strncpy(obj->src, src, MAX_URL_LEN);
 }
 
-void system_audio_set_meta(void* feature, union AppendData append_data, system_audio_MetaInfo* meta)
+void system_audio_set_meta(void* feature, AppendData append_data, system_audio_MetaInfo* meta)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -456,7 +456,7 @@ void system_audio_set_meta(void* feature, union AppendData append_data, system_a
     strncpy(obj->meta.artist, meta->artist, MAX_ARTIST_LEN);
 }
 
-FtFloat system_audio_get_currentTime(void* feature, union AppendData append_data)
+FtFloat system_audio_get_currentTime(void* feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -468,7 +468,7 @@ FtFloat system_audio_get_currentTime(void* feature, union AppendData append_data
     return obj->currentTime;
 }
 
-void system_audio_set_currentTime(void* feature, union AppendData append_data, FtFloat currentTime)
+void system_audio_set_currentTime(void* feature, AppendData append_data, FtFloat currentTime)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -481,7 +481,7 @@ void system_audio_set_currentTime(void* feature, union AppendData append_data, F
     obj->currentTime = currentTime;
 }
 
-FtFloat system_audio_get_duration(void* feature, union AppendData append_data)
+FtFloat system_audio_get_duration(void* feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -493,7 +493,7 @@ FtFloat system_audio_get_duration(void* feature, union AppendData append_data)
     return obj->duration;
 }
 
-FtBool system_audio_get_autoplay(void* feature, union AppendData append_data)
+FtBool system_audio_get_autoplay(void* feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -505,7 +505,7 @@ FtBool system_audio_get_autoplay(void* feature, union AppendData append_data)
     return obj->autoplay;
 }
 
-void system_audio_set_autoplay(void* feature, union AppendData append_data, FtBool autoplay)
+void system_audio_set_autoplay(void* feature, AppendData append_data, FtBool autoplay)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -517,7 +517,7 @@ void system_audio_set_autoplay(void* feature, union AppendData append_data, FtBo
     obj->autoplay = autoplay;
 }
 
-FtBool system_audio_get_loop(void* feature, union AppendData append_data)
+FtBool system_audio_get_loop(void* feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -529,7 +529,7 @@ FtBool system_audio_get_loop(void* feature, union AppendData append_data)
     return obj->loop;
 }
 
-void system_audio_set_loop(void* feature, union AppendData append_data, FtBool loop)
+void system_audio_set_loop(void* feature, AppendData append_data, FtBool loop)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -542,7 +542,7 @@ void system_audio_set_loop(void* feature, union AppendData append_data, FtBool l
     obj->loop = loop;
 }
 
-FtFloat system_audio_get_volume(void* feature, union AppendData append_data)
+FtFloat system_audio_get_volume(void* feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -554,7 +554,7 @@ FtFloat system_audio_get_volume(void* feature, union AppendData append_data)
     return obj->volume;
 }
 
-void system_audio_set_volume(void* feature, union AppendData append_data, FtFloat volume)
+void system_audio_set_volume(void* feature, AppendData append_data, FtFloat volume)
 {
     FEATURE_LOG_DEBUG("%s::%s(), volume:%f\n", file_tag, __FUNCTION__, volume);
     AudioObject* obj;
@@ -567,19 +567,19 @@ void system_audio_set_volume(void* feature, union AppendData append_data, FtFloa
     obj->volume = volume;
 }
 
-FtBool system_audio_get_muted(void* feature, union AppendData append_data)
+FtBool system_audio_get_muted(void* feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     return system_audio_get_volume(feature, append_data) == 0;
 }
 
-void system_audio_set_muted(void* feature, union AppendData append_data, FtBool muted)
+void system_audio_set_muted(void* feature, AppendData append_data, FtBool muted)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     return system_audio_set_volume(feature, append_data, 0);
 }
 
-FtString system_audio_get_streamType(void* feature, union AppendData append_data)
+FtString system_audio_get_streamType(void* feature, AppendData append_data)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -592,7 +592,7 @@ FtString system_audio_get_streamType(void* feature, union AppendData append_data
 }
 
 /* event funciton*/
-void system_audio_set_onplay(void* feature, union AppendData append_data, FtCallbackId onplay)
+void system_audio_set_onplay(void* feature, AppendData append_data, FtCallbackId onplay)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -604,7 +604,7 @@ void system_audio_set_onplay(void* feature, union AppendData append_data, FtCall
     obj->event.onplay = onplay;
 }
 
-void system_audio_set_onpause(void* feature, union AppendData append_data, FtCallbackId onpause)
+void system_audio_set_onpause(void* feature, AppendData append_data, FtCallbackId onpause)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -616,7 +616,7 @@ void system_audio_set_onpause(void* feature, union AppendData append_data, FtCal
     obj->event.onpause = onpause;
 }
 
-void system_audio_set_onstop(void* feature, union AppendData append_data, FtCallbackId onstop)
+void system_audio_set_onstop(void* feature, AppendData append_data, FtCallbackId onstop)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -628,7 +628,7 @@ void system_audio_set_onstop(void* feature, union AppendData append_data, FtCall
     obj->event.onstop = onstop;
 }
 
-void system_audio_set_onloadeddata(void* feature, union AppendData append_data, FtCallbackId onloadeddata)
+void system_audio_set_onloadeddata(void* feature, AppendData append_data, FtCallbackId onloadeddata)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -640,7 +640,7 @@ void system_audio_set_onloadeddata(void* feature, union AppendData append_data, 
     obj->event.onloadeddata = onloadeddata;
 }
 
-void system_audio_set_onended(void* feature, union AppendData append_data, FtCallbackId onended)
+void system_audio_set_onended(void* feature, AppendData append_data, FtCallbackId onended)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -652,7 +652,7 @@ void system_audio_set_onended(void* feature, union AppendData append_data, FtCal
     obj->event.onended = onended;
 }
 
-void system_audio_set_ondurationchange(void* feature, union AppendData append_data, FtCallbackId ondurationchange)
+void system_audio_set_ondurationchange(void* feature, AppendData append_data, FtCallbackId ondurationchange)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -664,7 +664,7 @@ void system_audio_set_ondurationchange(void* feature, union AppendData append_da
     obj->event.ondurationchange = ondurationchange;
 }
 
-void system_audio_set_ontimeupdate(void* feature, union AppendData append_data, FtCallbackId ontimeupdate)
+void system_audio_set_ontimeupdate(void* feature, AppendData append_data, FtCallbackId ontimeupdate)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
@@ -676,7 +676,7 @@ void system_audio_set_ontimeupdate(void* feature, union AppendData append_data, 
     obj->event.ontimeupdate = ontimeupdate;
 }
 
-void system_audio_set_onerror(void* feature, union AppendData append_data, FtCallbackId onerror)
+void system_audio_set_onerror(void* feature, AppendData append_data, FtCallbackId onerror)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
