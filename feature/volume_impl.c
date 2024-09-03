@@ -137,7 +137,7 @@ static void volume_get_cb(void* arg, int ret, int value)
         finish_callback(-1, handle->feature, "volume_get_cb volume invalid", NULL, handle);
 }
 
-void system_volume_wrap_setMediaValue(FeatureInstanceHandle feature, union AppendData data, system_volume_SetInfo* info)
+void system_volume_wrap_setMediaValue(FeatureInstanceHandle feature, AppendData data, system_volume_SetInfo* info)
 {
     FEATURE_LOG_DEBUG("%s::%s():value=%f.", file_tag, __FUNCTION__, info->value);
     VolumeHandle* handle = volume_malloc(feature);
@@ -166,7 +166,7 @@ void system_volume_wrap_setMediaValue(FeatureInstanceHandle feature, union Appen
     }
 }
 
-void system_volume_wrap_getMediaValue(FeatureInstanceHandle feature, union AppendData data, system_volume_GetInfo* info)
+void system_volume_wrap_getMediaValue(FeatureInstanceHandle feature, AppendData data, system_volume_GetInfo* info)
 {
     FEATURE_LOG_DEBUG("%s::%s()\n", file_tag, __FUNCTION__);
     VolumeHandle* handle = volume_malloc(feature);
