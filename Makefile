@@ -33,6 +33,14 @@ endif
 CSRCS += $(wildcard utils/*.c)
 
 ifeq ($(CONFIG_MEDIA_FEATURE),y)
+depend::
+	@python3 $(APPDIR)/frameworks/base/feature/tools/jidl/jsongensource.py \
+		$(APPDIR)/frameworks/media/feature/volume.jidl -out-dir \
+		$(APPDIR)/frameworks/media/feature -header volume.h -source volume.c
+	@python3 $(APPDIR)/frameworks/base/feature/tools/jidl/jsongensource.py \
+		$(APPDIR)/frameworks/media/feature/audio.jidl -out-dir \
+		$(APPDIR)/frameworks/media/feature -header audio.h -source audio.c
+
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
   CSRCS  += feature/audio.c
   CSRCS  += feature/audio_impl.c
