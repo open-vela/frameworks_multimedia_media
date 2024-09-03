@@ -550,6 +550,7 @@ static int media_uv_send_writing(MediaProxyPriv* proxy, MediaWritePriv* writing)
     } else
         writing->flags |= MEDIA_MSGFLAG_RESPONSED; /* won't be response. */
 
+    MEDIA_DEBUG_PROXY(proxy);
     ret = uv_write(&writing->req, (uv_stream_t*)&proxy->cpipe->handle, &buf, 1,
         media_uv_write_cb);
     if (ret < 0)
@@ -745,6 +746,7 @@ void* media_uv_connect(void* loop, const char* cpus,
     if (!proxy->cpu)
         goto err2;
 
+    MEDIA_DEBUG("%s:%p cookie:%p\n", cpus, proxy, cookie);
     ret = media_uv_connect_one(proxy);
     if (ret < 0)
         goto err2;
