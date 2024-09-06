@@ -32,7 +32,7 @@ endif
 
 CSRCS += $(wildcard utils/*.c)
 
-ifeq ($(CONFIG_MEDIA_FEATURE),y)
+ifeq ($(CONFIG_FEATURE_FRAMEWORK),y)
 depend::
 	$(APPDIR)/../prebuilts/tools/rust/bin/jidl/jidl_gen_cpp \
 		$(APPDIR)/frameworks/multimedia/media/feature/volume.jidl --out-dir \
@@ -43,6 +43,9 @@ depend::
 	$(APPDIR)/../prebuilts/tools/rust/bin/jidl/jidl_gen_cpp \
 		$(APPDIR)/frameworks/multimedia/media/feature/session.jidl --out-dir \
 		$(APPDIR)/frameworks/multimedia/media/feature --header session.h --source session.c
+	$(APPDIR)/../prebuilts/tools/rust/bin/jidl/jidl_gen_cpp \
+		$(APPDIR)/frameworks/multimedia/media/feature/record.jidl --out-dir \
+		$(APPDIR)/frameworks/multimedia/media/feature --header record.h --source record.c
 
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/multimedia/media/feature
   CSRCS  += feature/audio.c
@@ -51,7 +54,9 @@ depend::
   CSRCS  += feature/volume_impl.c
   CSRCS  += feature/session.c
   CSRCS  += feature/session_impl.c
-endif # CONFIG_MEDIA_FEATURE
+  CSRCS  += feature/record.c
+  CSRCS  += feature/record_impl.c
+endif # CONFIG_FEATURE_FRAMEWORK
 
 ifneq ($(CONFIG_MEDIA_FOCUS),)
   CSRCS += server/media_focus.c server/focus_stack.c
