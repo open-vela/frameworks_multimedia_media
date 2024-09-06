@@ -108,16 +108,18 @@ if(CONFIG_MEDIA)
   nuttx_include_directories(${INCDIR})
   nuttx_add_dependencies(TARGET libmedia DEPENDS ffmpeg)
 
-  if(CONFIG_MEDIA_FEATURE)
+  if(CONFIG_FEATURE_FRAMEWORK)
     set(FEATURE_SRCS ${CMAKE_CURRENT_LIST_DIR}/feature/audio_impl.c
                      ${CMAKE_CURRENT_LIST_DIR}/feature/volume_impl.c
-                     ${CMAKE_CURRENT_LIST_DIR}/feature/session_impl.c)
+                     ${CMAKE_CURRENT_LIST_DIR}/feature/session_impl.c
+                     ${CMAKE_CURRENT_LIST_DIR}/feature/record_impl.c)
 
     set(JIDL_PATHS ${CMAKE_CURRENT_LIST_DIR}/feature/volume.jidl
                    ${CMAKE_CURRENT_LIST_DIR}/feature/audio.jidl
-                   ${CMAKE_CURRENT_LIST_DIR}/feature/session.jidl)
+                   ${CMAKE_CURRENT_LIST_DIR}/feature/session.jidl
+                   ${CMAKE_CURRENT_LIST_DIR}/feature/record.jidl)
 
-    set(FEATURE_NAMES system_volume system_audio system_media_session)
+    set(FEATURE_NAMES system_volume system_audio system_media_session system_record)
 
     nuttx_add_jidl(
       TARGET
