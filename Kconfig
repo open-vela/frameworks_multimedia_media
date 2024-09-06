@@ -9,11 +9,6 @@ config MEDIA
 
 if MEDIA
 
-config MEDIA_FEATURE
-	bool "enable quickapp media feature"
-	depends on LIBUV
-	default n
-
 choice
 	prompt "MEDIA log level"
 	default MEDIA_LOG_INFO
