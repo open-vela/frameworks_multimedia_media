@@ -110,10 +110,12 @@ err:
 static void media_close_socket(void* handle)
 {
     MediaIOPriv* priv = handle;
+    int socket;
 
     if (atomic_load(&priv->refs) == 1 && priv->socket) {
-        close(priv->socket);
+        socket = priv->socket;
         priv->socket = 0;
+        close(socket);
         if (priv->socket_fd > 0)
             close(priv->socket_fd);
     }
