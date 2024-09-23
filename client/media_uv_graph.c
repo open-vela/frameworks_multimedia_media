@@ -424,7 +424,7 @@ static void media_uv_stream_listen_connection_cb(uv_stream_t* stream, int ret)
     MediaListenPriv* listener = uv_handle_get_data((uv_handle_t*)stream);
     MediaStreamPriv* priv = listener->priv;
 
-    if (ret < 0 || priv->pipe) { /* Only one listener meets error. */
+    if (ret < 0 || !priv || priv->pipe) { /* Only one listener meets error. */
         media_uv_stream_listen_remove(listener);
         return;
     }
