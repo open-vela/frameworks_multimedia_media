@@ -424,6 +424,13 @@ static void mediatool_uv_player_reset_cb(void* cookie, int ret)
     printf("[%s] id:%d ret:%d\n", __func__, chain->id, ret);
 }
 
+static void mediatool_uv_common_get_playing_cb(void* cookie, int ret, int isplaying)
+{
+    mediatool_chain_t* chain = cookie;
+
+    printf("[%s] id:%d ret:%d val:%u\n", __func__, chain->id, ret, isplaying);
+}
+
 static void mediatool_uv_common_get_position_cb(void* cookie, int ret, unsigned position)
 {
     mediatool_chain_t* chain = cookie;
@@ -1647,16 +1654,25 @@ CMD1(isplaying, int, id)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
-    if (mediatool->chain[id].type != MEDIATOOL_PLAYER)
+    switch (mediatool->chain[id].type) {
+    case MEDIATOOL_PLAYER:
+        ret = media_player_is_playing(mediatool->chain[id].handle);
+        if (ret < 0) {
+            printf("is_playing ret %d\n", ret);
+            return ret;
+        }
+        printf("is_playing %d\n", ret);
+        break;
+
+#ifdef CONFIG_LIBUV_EXTENSION
+    case MEDIATOOL_UVPLAYER:
+        return media_uv_player_get_playing(mediatool->chain[id].handle,
+            mediatool_uv_common_get_playing_cb, &mediatool->chain[id]);
+#endif
+    default:
+        printf("mediatool.chain.type = %d is not 'player' or 'uv_player'\n ", mediatool->chain[id].type);
         return 0;
-
-    ret = media_player_is_playing(mediatool->chain[id].handle);
-    if (ret < 0) {
-        printf("is_playing ret %d\n", ret);
-        return ret;
     }
-
-    printf("Is_playing %d\n", ret);
 
     return 0;
 }
