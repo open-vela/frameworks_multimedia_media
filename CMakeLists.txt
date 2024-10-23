@@ -1,5 +1,5 @@
 # ##############################################################################
-# frameworks/media/CMakeLists.txt
+# frameworks/multimedia/media/CMakeLists.txt
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
@@ -42,7 +42,7 @@ if(CONFIG_MEDIA)
   set(CSRCS ${CSRCS} ${UTILS_SRCS})
 
   if(CONFIG_MEDIA_FEATURE)
-    set(FEATURE_TOP ${NUTTX_APPS_DIR}/frameworks/base/feature)
+    set(FEATURE_TOP ${NUTTX_APPS_DIR}/frameworks/runtimes/feature)
     list(APPEND INCDIR ${FEATURE_TOP}/include)
 
     set(CSRCS ${CSRCS} ${CMAKE_CURRENT_LIST_DIR}/feature/audio_impl.c
@@ -77,8 +77,8 @@ if(CONFIG_MEDIA)
 
   if(CONFIG_LIB_PFW)
     list(APPEND SERVER_SRCS server/media_policy.c)
-    list(APPEND INCDIR ${CMAKE_CURRENT_LIST_DIR}/../pfw/include)
-    list(APPEND INCDIR ${CMAKE_CURRENT_LIST_DIR}/../utils/include)
+    list(APPEND INCDIR ${CMAKE_CURRENT_LIST_DIR}/pfw/include)
+    list(APPEND INCDIR ${NUTTX_APPS_DIR}/frameworks/system/utils/include)
   endif()
 
   if(CONFIG_MEDIA_TOOL)
@@ -133,3 +133,5 @@ if(CONFIG_MEDIA)
     PROPERTY NUTTX_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_LIST_DIR}/include)
 
 endif()
+
+add_subdirectory(pfw)
