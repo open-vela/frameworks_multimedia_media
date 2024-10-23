@@ -1,5 +1,5 @@
 ############################################################################
-# frameworks/media/Makefile
+# frameworks/multimedia/media/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -23,7 +23,7 @@ CXXEXT   := .cpp
 CXXFLAGS += -std=c++17
 
 MODULE  = $(CONFIG_MEDIA_SERVER)
-CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/utils
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/multimedia/media/utils
 
 CSRCS += $(wildcard client/*.c)
 ifeq ($(CONFIG_LIBUV),)
@@ -34,17 +34,17 @@ CSRCS += $(wildcard utils/*.c)
 
 ifeq ($(CONFIG_MEDIA_FEATURE),y)
 depend::
-	@python3 $(APPDIR)/frameworks/base/feature/tools/jidl/jsongensource.py \
-		$(APPDIR)/frameworks/media/feature/volume.jidl -out-dir \
-		$(APPDIR)/frameworks/media/feature -header volume.h -source volume.c
-	@python3 $(APPDIR)/frameworks/base/feature/tools/jidl/jsongensource.py \
-		$(APPDIR)/frameworks/media/feature/audio.jidl -out-dir \
-		$(APPDIR)/frameworks/media/feature -header audio.h -source audio.c
-	@python3 $(APPDIR)/frameworks/base/feature/tools/jidl/jsongensource.py \
-		$(APPDIR)/frameworks/media/feature/session.jidl -out-dir \
-		$(APPDIR)/frameworks/media/feature -header session.h -source session.c
+	@python3 $(APPDIR)/frameworks/runtimes/feature/tools/jidl/jsongensource.py \
+		$(APPDIR)/frameworks/multimedia/media/feature/volume.jidl -out-dir \
+		$(APPDIR)/frameworks/multimedia/media/feature -header volume.h -source volume.c
+	@python3 $(APPDIR)/frameworks/runtimes/feature/tools/jidl/jsongensource.py \
+		$(APPDIR)/frameworks/multimedia/media/feature/audio.jidl -out-dir \
+		$(APPDIR)/frameworks/multimedia/media/feature -header audio.h -source audio.c
+	@python3 $(APPDIR)/frameworks/runtimes/feature/tools/jidl/jsongensource.py \
+		$(APPDIR)/frameworks/multimedia/media/feature/session.jidl -out-dir \
+		$(APPDIR)/frameworks/multimedia/media/feature -header session.h -source session.c
 
-  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/feature
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/multimedia/media/feature
   CSRCS  += feature/audio.c
   CSRCS  += feature/audio_impl.c
   CSRCS  += feature/volume.c
@@ -72,7 +72,7 @@ endif
 
 ifneq ($(CONFIG_LIB_PFW),)
   CSRCS  += server/media_policy.c
-  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/pfw/include
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/multimedia/media/pfw/include
 endif
 
 ifneq ($(CONFIG_MEDIA_TOOL),)

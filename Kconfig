@@ -117,3 +117,5 @@ config MEDIA_PROXY_LISTEN_PRIORITY
 	default 100
 
 endif # MEDIA
+
+osource "$APPSDIR/frameworks/multimedia/media/pfw/Kconfig"
