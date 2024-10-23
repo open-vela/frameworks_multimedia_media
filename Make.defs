@@ -1,5 +1,5 @@
 ############################################################################
-# frameworks/media/Make.defs
+# frameworks/multimedia/media/Make.defs
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -20,9 +20,11 @@
 
 ifneq ($(CONFIG_MEDIA),)
 
-CONFIGURED_APPS += $(APPDIR)/frameworks/media
+CONFIGURED_APPS += $(APPDIR)/frameworks/multimedia/media
 
-CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/include
-CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/media/include
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/multimedia/media/include
+CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/multimedia/media/include
 
 endif
+
+-include $(APPDIR)/frameworks/multimedia/media/pfw/Make.defs
