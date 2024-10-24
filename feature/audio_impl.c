@@ -705,7 +705,7 @@ error:
 
 void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, union AppendData append_data, system_audio_GetPalyStateParam* p)
 {
-    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     char* info;
     AudioObject* obj;
     system_audio_AudioState* audiostate;
