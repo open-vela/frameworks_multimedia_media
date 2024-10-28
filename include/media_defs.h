@@ -185,7 +185,8 @@ typedef void (*media_policy_change_callback)(void* cookie,
 #define MEDIA_SCENARIO_ALARM "Alarm"
 #define MEDIA_SCENARIO_DRAIN "Enforced"
 #define MEDIA_SCENARIO_NOTIFICATION "Notify" /* message notification */
-#define MEDIA_SCENARIO_RECORD "Record"
+#define MEDIA_SCENARIO_RECORD "Record" /* audio record */
+#define MEDIA_SCENARIO_VIDEOCAP "VideoCap" /* video record */
 #define MEDIA_SCENARIO_TTS "TTS" /* text-to-speech */
 #define MEDIA_SCENARIO_ACCESSIBILITY "Health" /* health notification */
 #define MEDIA_SCENARIO_SPORT "Sport"
