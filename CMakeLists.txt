@@ -35,7 +35,8 @@ if(CONFIG_MEDIA)
   set(SERVER_SRCS)
 
   if(NOT CONFIG_LIBUV)
-    list(FILTER CSRCS EXCLUDE REGEX client/media_uv*.c)
+    file(GLOB EXLUDE_FILES ${CMAKE_CURRENT_LIST_DIR}/client/media_uv*.c)
+    list(REMOVE_ITEM CSRCS ${EXLUDE_FILES})
   endif()
 
   file(GLOB UTILS_SRCS utils/*.c)
