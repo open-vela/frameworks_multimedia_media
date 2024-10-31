@@ -647,7 +647,7 @@ static void media_uv_player_suggest_cb(int suggest, void* cookie)
 
     if (!player) {
         MEDIA_INFO("suggest:%d canceled\n", suggest);
-        goto out;
+        return;
     }
 
     MEDIA_INFO("%s:%p suggest:%d\n", player->name, player, suggest);
@@ -685,7 +685,6 @@ static void media_uv_player_suggest_cb(int suggest, void* cookie)
         break;
     }
 
-out:
     if (priv->on_play) {
         if (!suggest_active) /* Notify user if focus request failed. */
             priv->on_play(priv->on_play_cookie, -EPERM);
@@ -1025,7 +1024,7 @@ static void media_uv_recorder_suggest_cb(int suggest, void* cookie)
 
     if (!recorder) {
         MEDIA_INFO("suggest:%d canceled\n", suggest);
-        goto out;
+        return;
     }
 
     MEDIA_INFO("%s:%p suggest:%d\n", recorder->name, recorder, suggest);
@@ -1052,7 +1051,6 @@ static void media_uv_recorder_suggest_cb(int suggest, void* cookie)
         break;
     }
 
-out:
     if (priv->on_play) {
         if (!suggest_active) /* Notify user if focus request failed. */
             priv->on_play(priv->on_play_cookie, -EPERM);
