@@ -20,6 +20,15 @@
 
 if(CONFIG_MEDIA)
 
+  nuttx_add_prebuilt(
+    BIN_TARGETS
+    libmedia
+    APP_TARGETS
+    ${CONFIG_MEDIA_SERVER_PROGNAME}
+    mediatool
+    EXPORT_FILES
+    include)
+
   # ############################################################################
   # Include Directory
   # ############################################################################
@@ -103,9 +112,9 @@ if(CONFIG_MEDIA)
   # Library Configuration
   # ############################################################################
 
-  nuttx_add_library(libmedia STATIC)
-  target_sources(libmedia PRIVATE ${CSRCS})
-  target_include_directories(libmedia PRIVATE ${INCDIR})
+  nuttx_library_ifndef(SKIP_PREBUILT libmedia)
+  nuttx_sources(${CSRCS})
+  nuttx_include_directories(${INCDIR})
   nuttx_add_dependencies(TARGET libmedia DEPENDS ffmpeg)
 
   if(CONFIG_MEDIA_FEATURE)
@@ -137,4 +146,6 @@ if(CONFIG_MEDIA)
 
 endif()
 
-add_subdirectory(pfw)
+if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/pfw/CMakeLists.txt)
+  add_subdirectory(pfw)
+endif()
