@@ -459,21 +459,6 @@ void media_server_finalize(void* handle, void* cookie)
     pthread_mutex_unlock(&conn->mutex);
 }
 
-int media_server_get_tran_fd(void* cookie)
-{
-    struct media_server_conn* conn = cookie;
-
-    return conn ? conn->tran_fd : -1;
-}
-
-void media_server_clean_conn(void* cookie)
-{
-    struct media_server_conn* conn = cookie;
-    conn->tran_fd = -EPERM;
-    conn->offset = 0;
-    media_parcel_deinit(&conn->parcel);
-}
-
 void media_server_set_data(void* cookie, void* data)
 {
     struct media_server_conn* conn = cookie;
@@ -489,7 +474,22 @@ void* media_server_get_data(void* cookie)
     return conn ? conn->data : NULL;
 }
 
-media_plugin_t media_server_plugin = {
+int media_server_get_tran_fd(void* cookie)
+{
+    struct media_server_conn* conn = cookie;
+
+    return conn ? conn->tran_fd : -1;
+}
+
+void media_server_clean_conn(void* cookie)
+{
+    struct media_server_conn* conn = cookie;
+    conn->tran_fd = -EPERM;
+    conn->offset = 0;
+    media_parcel_deinit(&conn->parcel);
+}
+
+MediadPlugin media_server_plugin = {
     .name = "media_server",
     .priv_size = sizeof(struct media_server_priv),
     .priv = NULL,

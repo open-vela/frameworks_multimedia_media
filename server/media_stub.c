@@ -110,7 +110,7 @@ int media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_plugin_command(media_plugin_get("media_graph"), conn, target, cmd, arg, 1, response, len);
+        ret = media_plugin_command(media_plugin_get("media_player"), cookie, target, cmd, arg, 0, response, len);
         break;
 
     case MEDIA_ID_RECORDER:

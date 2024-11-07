@@ -57,6 +57,10 @@ config MEDIA_FOCUS
 	bool "Enable media focus"
 	default n
 
+config MEDIA_PLAYER
+	bool "Enable media player"
+	default n
+
 config MEDIA_TRACE
 	bool "Enable media trace"
 	default n
@@ -84,6 +88,18 @@ config MEDIA_FOCUS_SUGGESTION_TIME_OUT
 	default 1000
 
 endif # MEDIA_FOCUS
+
+if MEDIA_PLAYER
+
+config MEDIA_PLAYER_STACKSIZE
+	int "Media player stack size"
+	default 61440
+
+config MEDIA_PLAYER_PRIORITY
+	int "Media player priority"
+	default 244
+
+endif # MEDIA_PLAYER
 
 endif # MEDIA_SERVER
 

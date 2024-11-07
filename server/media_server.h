@@ -72,8 +72,8 @@ void media_server_clean_conn(void* cookie);
 
 void media_server_set_data(void* cookie, void* data);
 void* media_server_get_data(void* cookie);
-int media_graph_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* target,
-    const char* cmd, const char* arg, int flags, char* res, int res_len);
+int media_server_get_tran_fd(void* cookie);
+void media_server_clean_conn(void* cookie);
 
 /****************************************************************************
  * Focus Functions
