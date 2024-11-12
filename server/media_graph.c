@@ -28,8 +28,10 @@
 #include <libavdevice/avdevice.h>
 #include <libavfilter/avfilter.h>
 #include <libavfilter/filters.h>
-#include <libavfilter/internal.h>
-#include <libavfilter/movie_async.h>
+#include <libavfilter/formats.h>
+#include <libavfilter/avfilter_internal.h>
+#include <libavfilter/avfilter-nx.h>
+#include <libavfilter/buffersrc.h>
 #include <libavutil/opt.h>
 
 #include <assert.h>
@@ -50,9 +52,6 @@
 
 #define MAX_GRAPH_SIZE 4096
 #define MAX_POLL_FILTERS 32
-
-#define MediaPlayerPriv MediaFilterPriv
-#define MediaRecorderPriv MediaFilterPriv
 
 /****************************************************************************
  * Private Types
@@ -97,15 +96,6 @@ static void media_trace_end(void* avcl, const char* fmt, va_list vl)
     sched_note_endex(NOTE_TAG_ALWAYS, buffer);
 }
 #endif
-
-static void media_graph_filter_ready(AVFilterContext* ctx)
-{
-    MediaGraphPriv* priv = ctx->graph->opaque;
-    eventfd_t val = 1;
-
-    if (priv->tid != gettid())
-        write(priv->fd, &val, sizeof(eventfd_t));
-}
 
 static void media_graph_log_callback(void* avcl, int level,
     const char* fmt, va_list vl)
@@ -491,15 +481,19 @@ static int media_graph_run_once(MediadPlugin *ctx)
     MediaGraphPriv* priv = ctx->priv;
     int ret;
 
-    ret = ff_filter_graph_run_all(priv->graph);
-    if (ret < 0)
-        return ret;
+    while (1) {
+        ret = ff_filter_graph_run_once(priv->graph);
+        if (ret < 0)
+            break;
+    }
 
-    do {
-        ret = media_graph_dequeue_command(priv, true);
-    } while (ret >= 0);
+    if (ret < 0) {
+        if (ret == AVERROR(EAGAIN))
+            return 0;
+        av_log(NULL, AV_LOG_ERROR, "media graph run error ret:%d:%s\n", ret, av_err2str(ret));
+    }
 
-    return ret == -EAGAIN ? 0 : ret;
+    return 0;
 }
 
 static int ff_filter_graph_has_pending_status(AVFilterGraph *graph)
@@ -543,12 +537,15 @@ static int media_graph_handler(MediadPlugin *ctx, void *cookie, const char *targ
     int i, ret = 0;
     char* dump;
 
+    MEDIA_INFO("cookie %p target %s cmd %s arg %s flags %d res %p res_len %d\n",
+        cookie, target, cmd, arg, flags, res, res_len);
+
     if (!target && !strcmp(cmd, "dump")) {
-        dump = avfilter_graph_dump_ext(priv->graph, arg);
+        dump = avfilter_graph_dump(priv->graph, NULL);
         if (dump)
             MEDIA_INFO("\n%s\n", dump);
 
-        free(dump);
+        av_free(dump);
         return 0;
     } else if (!strcmp(cmd, "loglevel")) {
         if (!arg)
@@ -591,3 +588,88 @@ MediadPlugin media_graph_plugin = {
     .uninit = media_graph_uninit,
     .process_command = media_graph_handler,
 };
+
+///////////////////////////////////////////////////////////////////
+typedef struct MediaGraphTrack {
+    AVFilterContext *src;
+    int format;
+    int samplerate;
+    AVChannelLayout ch_layout;
+    int64_t last_pts;
+} MediaGraphTrack;
+
+int media_graph_track_open(MediaGraphTrack **pctx, const char *stream_type,
+    int format, int sample_rate, int channels,
+    int (*on_event_cb)(void *udata, int evt, int64_t args), void *udata)
+{
+    MediaGraphPriv *priv = media_graph_plugin.priv;
+    MediaGraphTrack *ctx;
+    int ret;
+
+    ctx = av_calloc(1, sizeof(*ctx));
+    if (!ctx)
+        return -ENOMEM;
+
+    if (format < 0)
+        ctx->format = AV_SAMPLE_FMT_S16;
+    else
+        ctx->format = format;
+    if (sample_rate <= 0)
+        ctx->samplerate = 48000;
+    else
+        ctx->samplerate = sample_rate;
+
+    av_channel_layout_default(&ctx->ch_layout, channels ? channels : 2);
+
+    ctx->src = avfilter_graph_get_filter(priv->graph, stream_type);
+    if (!ctx->src) {
+        MEDIA_ERR("buffersrc:%s not found\n", stream_type);
+        ret = -EINVAL;
+        goto fail;
+    }
+
+    ret = av_buffersrc_set_event_cb(ctx->src, on_event_cb, udata);
+    if (ret < 0) {
+        MEDIA_ERR("buffersrc:%s failed ret:%d\n", ctx->src->name, ret);
+        goto fail;
+    }
+
+    *pctx = ctx;
+
+    return 0;
+fail:
+    av_channel_layout_uninit(&ctx->ch_layout);
+    av_free(ctx);
+    return ret;
+}
+
+int media_graph_track_close(MediaGraphTrack **pctx)
+{
+    MediaGraphTrack *ctx = *pctx;
+    if (!pctx || !ctx)
+        return -EINVAL;
+
+    av_buffersrc_set_event_cb(ctx->src, NULL, NULL);
+    av_channel_layout_uninit(&ctx->ch_layout);
+    av_free(ctx);
+    *pctx = NULL;
+    return 0;
+}
+
+int media_graph_track_write_frame(MediaGraphTrack *ctx, AVFrame *frame)
+{
+    int ret;
+    ret = av_buffersrc_add_frame_flags(ctx->src, frame, AV_BUFFERSRC_FLAG_KEEP_REF);
+    if (ret < 0) {
+        MEDIA_ERR("buffersrc:%s failed ret:%d\n", ctx->src->name, ret);
+        return ret;
+    }
+    if (ctx->last_pts <= 0) {
+        MediaGraphPriv *priv = media_graph_plugin.priv;
+        eventfd_t val = 1;
+        file_write(priv->filep, &val, sizeof(val));
+    }
+
+    ctx->last_pts += frame->nb_samples;
+    return 0;
+}
