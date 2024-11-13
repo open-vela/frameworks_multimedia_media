@@ -84,3 +84,5 @@ class MediaDump(gdb.Command):
                     )
 
         gdb.write("\n")
+
+MediaDump()
