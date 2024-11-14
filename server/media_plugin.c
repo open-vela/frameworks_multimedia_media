@@ -4,11 +4,11 @@
 
 #include "media_common.h"
 
-int mediad_plugin_init(media_plugin_t* plugin)
+int mediad_plugin_init(MediadPlugin *plugin)
 {
     int ret;
 
-    plugin->priv = zalloc(plugin->priv_size);
+    plugin->priv = calloc(1, plugin->priv_size);
     if (!plugin->priv) {
         return -ENOMEM;
     }
@@ -18,7 +18,6 @@ int mediad_plugin_init(media_plugin_t* plugin)
         if (ret < 0) {
             MEDIA_ERR("Media plugin:%s init failed: %d", plugin->name, ret);
             free(plugin->priv);
-            plugin->priv = NULL;
             return ret;
         }
     }
@@ -26,13 +25,15 @@ int mediad_plugin_init(media_plugin_t* plugin)
     return 0;
 }
 
-void mediad_plugin_uinit(media_plugin_t* plugin)
+void mediad_plugin_uinit(MediadPlugin *plugin)
 {
-    if (plugin->uninit && plugin->priv) {
-        MEDIA_INFO("Media plugin:%s uninit", plugin->name);
+    if (plugin->uninit) {
         plugin->uninit(plugin);
     }
 
-    free(plugin->priv);
-    plugin->priv = NULL;
+    if (plugin->priv) {
+        free(plugin->priv);
+        plugin->priv = NULL;
+    }
 }
+

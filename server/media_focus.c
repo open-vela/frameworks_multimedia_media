@@ -33,6 +33,7 @@
 #include <sys/timerfd.h>
 #include <time.h>
 
+#include "media_plugin.h"
 #include "focus_stack.h"
 #include "media_common.h"
 #include "media_plugin.h"
@@ -678,7 +679,7 @@ static int media_focus_handler_l(media_focus* focus, void* cookie, const char* n
  * Public Functions
  ****************************************************************************/
 
-static int media_focus_uninit(media_plugin_t* plugin)
+static int media_focus_uninit(MediadPlugin *plugin)
 {
     media_focus* focus = plugin->priv;
 
@@ -693,9 +694,9 @@ static int media_focus_uninit(media_plugin_t* plugin)
     return 0;
 }
 
-static int media_focus_init(media_plugin_t* ctx)
+static int media_focus_init(MediadPlugin *ctx)
 {
-    const char* file = CONFIG_MEDIA_SERVER_CONFIG_PATH "media_focus.conf";
+    const char *file = CONFIG_MEDIA_SERVER_CONFIG_PATH "media_focus.conf";
     FILE* fp;
     char* buf = NULL;
     int ret = 0;
@@ -825,32 +826,6 @@ int media_focus_debug_stack_return(app_focus_id* p_focus_list, int num)
     return app_focus_stack_return(focus->stack, p_focus_list, num);
 }
 
-static int media_focus_create_request(media_focus* focus, void* cookie, const char* name, const char* cmd, media_focus_request_t** out_req)
-{
-    media_focus* priv = focus;
-    media_focus_request_t* req;
-
-    req = zalloc(sizeof(media_focus_request_t));
-    if (req == NULL) {
-        MEDIA_ERR("no mem for creating req\n");
-        return -ENOMEM;
-    }
-
-    req->focus = focus;
-    req->cookie = cookie;
-
-    if (name)
-        strlcpy(req->name, name, sizeof(req->name));
-    if (cmd)
-        strlcpy(req->cmd, cmd, sizeof(req->cmd));
-
-    req->req_id = priv->sequence;
-    priv->sequence = (priv->sequence + 1) & INT_MAX;
-
-    *out_req = req;
-    return 0;
-}
-
 static int media_focus_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* name,
     const char* cmd, const char* args, int flags, char* res, int res_len)
 {
@@ -890,14 +865,14 @@ media_plugin_t media_focus_plugin = {
     .priv_size = sizeof(media_focus),
     .priv = NULL,
     .init = media_focus_init,
-    .get = media_focus_get_pollfds,
-    .available = media_focus_poll_available,
+    .get = NULL,
+    .available = NULL,
     .run_once = NULL,
     .uninit = media_focus_uninit,
     .process_command = media_focus_handler,
 };
 
-void* media_get_focus(void)
+void *media_get_focus(void)
 {
     return media_focus_plugin.priv;
 }

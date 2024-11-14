@@ -170,11 +170,11 @@ static void media_policy_notify_cb(void* cookie, int number, char* literal)
  * Public Functions
  ****************************************************************************/
 
-static int media_policy_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* name,
-    const char* cmd, const char* value, int apply, char* res, int res_len)
+static int media_policy_handler(MediadPlugin *ctx, void *cookie, const char *name, const char *cmd,
+    const char *value, int apply, char *res, int res_len)
 {
-    MediaPolicyPriv* priv = ctx->priv;
-    pfw_system_t* policy = priv->policy;
+    MediaPolicyPriv *priv = ctx->priv;
+    pfw_system_t *policy = priv->policy;
     int ret = -ENOSYS, tmp[2];
     void* handle;
     char* dump;
@@ -252,9 +252,9 @@ static int media_policy_handler(media_plugin_t* ctx, struct media_server_conn* c
     return 0;
 }
 
-static int media_policy_uninit(media_plugin_t* ctx)
+static int media_policy_uninit(MediadPlugin *ctx)
 {
-    MediaPolicyPriv* priv = ctx->priv;
+    MediaPolicyPriv *priv = ctx->priv;
 
     if (priv->policy) {
         pfw_destroy(priv->policy, NULL);
@@ -264,9 +264,9 @@ static int media_policy_uninit(media_plugin_t* ctx)
     return 0;
 }
 
-static int media_policy_init(media_plugin_t* ctx)
+static int media_policy_init(MediadPlugin *ctx)
 {
-    const char* paths[] = {
+    const char *paths[] = { 
         CONFIG_MEDIA_SERVER_CONFIG_PATH "criteria.txt",
         CONFIG_MEDIA_SERVER_CONFIG_PATH "settings.pfw"
     };
