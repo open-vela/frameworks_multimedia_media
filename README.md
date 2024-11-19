@@ -1,7 +1,7 @@
 
 # **Media Framework**
 
-[English|[简体中文](README_zh-cn.md)]
+[English | [简体中文](README_zh-cn.md)]
 
 ## **Overview**
 
