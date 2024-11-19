@@ -1,7 +1,7 @@
 
 # **Media Framework**
 
-[[English](./README.md)|简体中文]
+[[English](./README.md) | 简体中文]
 
 ## **概述**
 
@@ -59,12 +59,12 @@ Media Policy 通过 **PFW** 来构造路由策略、音频策略等各种状态�
 
 ![Media 分布式Server架构图](./images/Distributed_Server_Architecture_zh-cn.jpg)
 
-[Client模块](./client/README.md)
+[Client模块](./client/README_zh-cn.md)
 
-[Server模块](./server/README.md)
+[Server模块](./server/README_zh-cn.md)
 
 ## **测试 Media Framework**
 
  采用 Mediatool 测试程序，用于测试 Media Framework API，可模拟实际使用场景。
 
-[使用Mediatool工具测试Media Framework API](./mediatool.md)
+[使用Mediatool工具测试Media Framework API](./mediatool_zh-cn.md)
