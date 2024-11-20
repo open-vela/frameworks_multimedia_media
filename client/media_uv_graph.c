@@ -44,11 +44,12 @@
 
 typedef LIST_ENTRY(MediaListenPriv) MediaListenEntry;
 typedef LIST_HEAD(MediaListenList, MediaListenPriv) MediaListenList;
+struct MediaProxyPriv;
 
 #define MEDIA_STREAM_FIELDS                       \
     int id;                                       \
     char* name; /* Stream type or source type. */ \
-    void* proxy;                                  \
+    struct MediaProxyPriv* proxy;                 \
     void* cookie;                                 \
     media_uv_callback on_open;                    \
     media_uv_callback on_close;                   \
@@ -114,7 +115,7 @@ typedef struct MediaTakePicPriv {
 static void media_uv_stream_release(MediaStreamPriv* priv);
 static void media_uv_stream_disconnect_cb(void* cookie, int ret);
 static void media_uv_stream_close_cb(void* cookie, int ret);
-static void media_uv_stream_open_cb(void* cookie, int ret);
+static void media_uv_stream_open_cb(MediaStreamPriv* priv, int ret);
 static void media_uv_stream_connect_cb(void* cookie, int ret);
 
 /* Functions to send/receive parcel. */
@@ -127,7 +128,7 @@ static void media_uv_stream_receive_int_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel);
 static void media_uv_stream_receive_unsigned_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel);
-static int media_uv_stream_send(void* stream, const char* target,
+static int media_uv_stream_send(MediaStreamPriv* priv, const char* target,
     const char* cmd, const char* arg, int res_len,
     media_uv_parcel_callback parser, void* cb, void* cookie);
 
@@ -156,7 +157,7 @@ static int media_uv_stream_pause(MediaStreamPriv* priv, void* cb, void* cookie);
 
 /* Functions to query metadata. */
 
-static void media_uv_player_query_complete(void* cookie);
+static void media_uv_player_query_complete(MediaQueryPriv* ctx);
 static void media_uv_player_query_duration_cb(void* cookie, int ret, unsigned value);
 static void media_uv_player_query_position_cb(void* cookie, int ret, unsigned value);
 static void media_uv_player_query_state_cb(void* cookie, int ret, int value);
@@ -193,10 +194,8 @@ static void media_uv_stream_close_cb(void* cookie, int ret)
     media_uv_disconnect(priv->proxy, media_uv_stream_disconnect_cb);
 }
 
-static void media_uv_stream_open_cb(void* cookie, int ret)
+static void media_uv_stream_open_cb(MediaStreamPriv* priv, int ret)
 {
-    MediaStreamPriv* priv = cookie;
-
     if (ret < 0)
         media_uv_reconnect(priv->proxy);
     else {
@@ -315,11 +314,10 @@ static void media_uv_stream_receive_string_cb(void* cookie,
     cb(cookie1, result, response);
 }
 
-static int media_uv_stream_send(void* stream, const char* target,
+static int media_uv_stream_send(MediaStreamPriv* priv, const char* target,
     const char* cmd, const char* arg, int res_len,
     media_uv_parcel_callback parser, void* cb, void* cookie)
 {
-    MediaStreamPriv* priv = stream;
     media_parcel parcel;
     int ret;
 
@@ -571,9 +569,8 @@ static int media_uv_stream_pause(MediaStreamPriv* priv, void* cb, void* cookie)
  * Player Functions
  ****************************************************************************/
 
-static void media_uv_player_query_complete(void* cookie)
+static void media_uv_player_query_complete(MediaQueryPriv* ctx)
 {
-    MediaQueryPriv* ctx = cookie;
     MediaPlayerPriv* priv = ctx->player;
     int flags = 0;
 
@@ -742,8 +739,10 @@ int media_uv_player_close(void* handle, int pending, media_uv_callback on_close)
     priv->on_close = on_close;
     priv->active = false;
     snprintf(tmp, sizeof(tmp), "%d", pending);
-    ret = media_uv_stream_send(priv, NULL, "close", tmp, 0,
+    ret = media_uv_stream_send(handle, NULL, "close", tmp, 0,
         media_uv_stream_receive_cb, media_uv_stream_close_cb, priv);
+    if (ret < 0)
+        media_uv_stream_close_cb(handle, ret);
 
     media_uv_stream_close_pipe(handle);
     media_uv_stream_listen_clear(handle, NULL);
@@ -773,7 +772,7 @@ int media_uv_player_listen(void* handle, media_event_callback on_event)
         return -EINVAL;
 
     priv->on_event = on_event;
-    ret = media_uv_stream_send(priv, NULL, "set_event", NULL, 0, NULL, NULL, NULL);
+    ret = media_uv_stream_send(handle, NULL, "set_event", NULL, 0, NULL, NULL, NULL);
     if (ret < 0)
         return ret;
 
@@ -1139,8 +1138,10 @@ int media_uv_recorder_close(void* handle, media_uv_callback on_close)
 
     priv->on_close = on_close;
     priv->active = false;
-    ret = media_uv_stream_send(priv, NULL, "close", "0", 0,
+    ret = media_uv_stream_send(handle, NULL, "close", "0", 0,
         media_uv_stream_receive_cb, media_uv_stream_close_cb, priv);
+    if (ret < 0)
+        media_uv_stream_close_cb(handle, ret);
 
     media_uv_stream_close_pipe(handle);
     media_uv_stream_listen_clear(handle, NULL);
@@ -1161,7 +1162,7 @@ int media_uv_recorder_listen(void* handle, media_event_callback on_event)
         return -EINVAL;
 
     priv->on_event = on_event;
-    ret = media_uv_stream_send(priv, NULL, "set_event", NULL, 0, NULL, NULL, NULL);
+    ret = media_uv_stream_send(handle, NULL, "set_event", NULL, 0, NULL, NULL, NULL);
     if (ret < 0)
         return ret;
 
@@ -1319,7 +1320,7 @@ static int media_uv_recorder_take_picture_close(void* handle, bool send_close)
     priv->on_close = media_uv_recorder_take_picture_close_cb;
 
     if (send_close)
-        ret = media_uv_stream_send(priv, NULL, "close", "1", 0, NULL, NULL, NULL);
+        ret = media_uv_stream_send(handle, NULL, "close", "1", 0, NULL, NULL, NULL);
 
     if (ret >= 0)
         ret = media_uv_disconnect(priv->proxy, media_uv_stream_disconnect_cb);
