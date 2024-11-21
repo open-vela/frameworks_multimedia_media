@@ -293,7 +293,7 @@ static void mediatool_controllee_music_callback(void* cookie, int event,
 
     /* XXX: Another implemention for some status control message,
      * notify after received corresponding event from player's event callback */
-    media_session_notify(chain->handle, event, ret, NULL);
+    media_session_notify(chain->extra, event, ret, NULL);
 }
 
 static void mediatool_event_callback(void* cookie, int event,
