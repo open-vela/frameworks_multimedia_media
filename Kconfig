@@ -57,10 +57,6 @@ config MEDIA_FOCUS
 	bool "Enable media focus"
 	default n
 
-config MEDIA_PLAYER
-	bool "Enable media player"
-	default n
-
 config MEDIA_TRACE
 	bool "Enable media trace"
 	default n
@@ -77,20 +73,6 @@ config MEDIA_SERVER_PORT
 	int "Media server AF_INET listening port"
 	default -1
 
-if MEDIA_FOCUS
-
-config MEDIA_FOCUS_STACK_DEPTH
-	int "Media focus configurable stack size"
-	default 8
-
-config MEDIA_FOCUS_SUGGESTION_TIME_OUT
-	int "Media focus configurable suggestion time out with ms"
-	default 1000
-
-endif # MEDIA_FOCUS
-
-if MEDIA_PLAYER
-
 config MEDIA_PLAYER_STACKSIZE
 	int "Media player stack size"
 	default 61440
@@ -99,7 +81,13 @@ config MEDIA_PLAYER_PRIORITY
 	int "Media player priority"
 	default 244
 
-endif # MEDIA_PLAYER
+if MEDIA_FOCUS
+
+config MEDIA_FOCUS_STACK_DEPTH
+	int "Media focus configurable stack size"
+	default 8
+
+endif # MEDIA_FOCUS
 
 endif # MEDIA_SERVER
 

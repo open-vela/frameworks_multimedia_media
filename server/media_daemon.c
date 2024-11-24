@@ -59,9 +59,7 @@ extern media_plugin_t media_focus_plugin;
 #ifdef CONFIG_LIB_FFMPEG
 extern MediadPlugin media_graph_plugin;
 extern MediadPlugin media_session_plugin;
-#ifdef CONFIG_MEDIA_PLAYER
 extern MediadPlugin media_player_plugin;
-#endif
 #endif
 #ifdef CONFIG_LIB_PFW
 extern media_plugin_t media_policy_plugin;
@@ -78,9 +76,7 @@ MediadPlugin* g_media[] = {
 #ifdef CONFIG_LIB_FFMPEG
     &media_graph_plugin,
     &media_session_plugin,
-#ifdef CONFIG_MEDIA_PLAYER
     &media_player_plugin,
-#endif
 #endif
 #ifdef CONFIG_LIB_PFW
     &media_policy_plugin,
