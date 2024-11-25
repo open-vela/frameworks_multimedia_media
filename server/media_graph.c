@@ -140,11 +140,11 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
 #endif
     avdevice_register_all();
 
-    av_log(NULL, AV_LOG_INFO, "%s, loadgraph from file: %s\n", __func__, conf);
+    MEDIA_INFO("%s, loadgraph from file: %s\n", __func__, conf);
 
     fd = open(conf, O_RDONLY | O_BINARY | O_CLOEXEC);
     if (fd < 0) {
-        av_log(NULL, AV_LOG_ERROR, "%s, can't open media graph file\n", __func__);
+        MEDIA_ERR("%s, can't open media graph file\n", __func__);
         return -errno;
     }
 
@@ -157,13 +157,15 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
 
     graph_desc[ret] = 0;
 
+    MEDIA_INFO("%s, graph_desc:\n%s\n", __func__, graph_desc);
+
     priv->graph = avfilter_graph_alloc();
     if (!priv->graph)
         return -ENOMEM;
 
     ret = avfilter_graph_parse2(priv->graph, graph_desc, &input, &output);
     if (ret < 0) {
-        av_log(NULL, AV_LOG_ERROR, "%s, media graph parse error\n", __func__);
+        MEDIA_ERR("%s, media graph parse error\n", __func__);
         goto out;
     }
 
@@ -172,7 +174,7 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
 
     ret = avfilter_graph_config(priv->graph, NULL);
     if (ret < 0) {
-        av_log(NULL, AV_LOG_ERROR, "%s, media graph config error\n", __func__);
+        MEDIA_ERR("%s, media graph config error\n", __func__);
         goto out;
     }
 
@@ -186,13 +188,13 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
         if ((filter->filter->flags & AVFILTER_FLAG_SUPPORT_POLL) != 0) {
             priv->pollfts[priv->pollftn++] = filter;
             if (priv->pollftn > MAX_POLL_FILTERS) {
-                av_log(NULL, AV_LOG_ERROR, "%s, media graph too many pollfds\n", __func__);
+                MEDIA_ERR("%s, media graph too many pollfds\n", __func__);
                 goto out;
             }
         }
     }
 
-    av_log(NULL, AV_LOG_INFO, "%s, loadgraph succeed\n", __func__);
+    MEDIA_INFO("%s, loadgraph succeed\n", __func__);
     return 0;
 out:
     avfilter_graph_free(&priv->graph);
@@ -490,7 +492,7 @@ static int media_graph_run_once(MediadPlugin *ctx)
     if (ret < 0) {
         if (ret == AVERROR(EAGAIN))
             return 0;
-        av_log(NULL, AV_LOG_ERROR, "media graph run error ret:%d:%s\n", ret, av_err2str(ret));
+        MEDIA_ERR("media graph run error ret:%d:%s\n", ret, av_err2str(ret));
     }
 
     return 0;
@@ -523,7 +525,7 @@ static int media_graph_process_command(MediaGraphPriv *priv, AVFilterContext *fi
         return avfilter_process_command(filter, cmd, arg, res, res_len, 0);
 
     if (!ff_filter_graph_has_pending_status(filter->graph)) {
-        av_log(NULL, AV_LOG_INFO, "process %s %s %s\n", filter->name, cmd, arg ? arg : "_");
+        MEDIA_INFO("process %s %s %s\n", filter->name, cmd, arg ? arg : "_");
         return avfilter_process_command(filter, cmd, arg, NULL, 0, 0);
     }
 
