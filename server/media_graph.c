@@ -172,6 +172,8 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
     avfilter_inout_free(&input);
     avfilter_inout_free(&output);
 
+    avfilter_graph_set_auto_convert(priv->graph, AVFILTER_AUTO_CONVERT_NONE);
+
     ret = avfilter_graph_config(priv->graph, NULL);
     if (ret < 0) {
         MEDIA_ERR("%s, media graph config error\n", __func__);
