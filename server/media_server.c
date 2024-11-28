@@ -156,11 +156,8 @@ static int media_server_receive(struct media_server_priv* priv, struct pollfd* f
 
         case MEDIA_PARCEL_SEND_ACK:
             media_parcel_init(&ack);
-            ret = media_stub_onreceive(conn, &conn->parcel, &ack);
-            if (ret != MEDIA_ERROR_DELAY_ACK)
-                ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
-            else
-                ret = 0;
+            media_stub_onreceive(conn, &conn->parcel, &ack);
+            ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
             media_parcel_deinit(&ack);
             break;
 
@@ -316,7 +313,6 @@ static int media_server_init(MediadPlugin *ctx)
     if (ret < 0)
         return ret;
 #endif
-    priv->onreceive = media_stub_onreceive;
     return 0;
 }
 
