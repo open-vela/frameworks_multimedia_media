@@ -32,7 +32,7 @@ typedef struct MediadPlugin {
     int (*get)(struct MediadPlugin *ctx, struct pollfd *fds, void **cookies, int count);
     int (*available)(struct MediadPlugin *ctx, struct pollfd *fds, void *cookies);
     int (*run_once)(struct MediadPlugin *ctx);
-    int (*process_command)(struct MediadPlugin *ctx, void *cookie, const char *target,
+    int (*process_command)(struct MediadPlugin *ctx, struct media_server_conn *conn, const char *target,
         const char *cmd, const char *arg, int flags, char *res, int res_len);
 } MediadPlugin;
 

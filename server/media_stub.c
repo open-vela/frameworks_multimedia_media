@@ -53,20 +53,15 @@ void media_stub_notify_event(void* cookie, int event,
     media_parcel_deinit(&notify);
 }
 
-static inline int media_plugin_command(media_plugin_t* plugin, struct media_server_conn* conn, const char* target,
-    const char* cmd, const char* arg, int flags, char* res, int res_len)
+static inline int media_plugin_command(MediadPlugin *plugin, struct media_server_conn *conn, const char *target,
+    const char *cmd, const char *arg, int flags, char *res, int res_len)
 {
     if (plugin->process_command)
         return plugin->process_command(plugin, conn, target, cmd, arg, flags, res, res_len);
     return -ENOSYS;
 }
 
-int media_stub_reply(void* cookie, media_parcel* parcel)
-{
-    return media_server_reply(media_get_server(), cookie, parcel);
-}
-
-int media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media_parcel* out)
+void media_stub_onreceive(struct media_server_conn *conn, media_parcel *in, media_parcel *out)
 {
     const char *target = NULL, *cmd = NULL, *arg = NULL;
     int32_t len = 0, flags = 0, id = 0, size = 0, ret = 0;
@@ -110,7 +105,7 @@ int media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_plugin_command(media_plugin_get("media_player"), cookie, target, cmd, arg, 0, response, len);
+        ret = media_plugin_command(media_plugin_get("media_player"), conn, target, cmd, arg, 0, response, len);
         break;
 
     case MEDIA_ID_RECORDER:

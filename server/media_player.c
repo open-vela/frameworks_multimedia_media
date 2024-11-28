@@ -1152,7 +1152,7 @@ static int media_player_uninit(MediadPlugin* handle)
     return 0;
 }
 
-static int media_player_handler(MediadPlugin* handle, void* cookie, const char* target, const char* cmd, const char* arg, int flags, char* res, int res_len)
+static int media_player_handler(MediadPlugin* handle, struct media_server_conn* conn, const char* target, const char* cmd, const char* arg, int flags, char* res, int res_len)
 {
     MediaPlayerPriv* priv = handle->priv;
     int ret = 0;
@@ -1173,18 +1173,18 @@ static int media_player_handler(MediadPlugin* handle, void* cookie, const char* 
         if (ret < 0)
             goto out;
 
-        ctx->tran_fd = media_server_get_tran_fd(cookie);
+        ctx->tran_fd = media_server_get_tran_fd(conn);
         if (ctx->tran_fd < 0) {
             MEDIA_ERR("player get tran fd failed...\n");
             ret = -EINVAL;
             goto out;
         }
 
-        media_server_clean_conn(cookie);
+        media_server_clean_conn(conn);
 
         strncpy(ctx->name, arg, sizeof(ctx->name));
 
-        ctx->cookie = cookie;
+        ctx->cookie = conn;
 
         MEDIA_INFO("open player success...\n");
     }

@@ -534,7 +534,7 @@ static int media_graph_process_command(MediaGraphPriv *priv, AVFilterContext *fi
     return -EINVAL;
 }
 
-static int media_graph_handler(MediadPlugin *ctx, void *cookie, const char *target, const char *cmd,
+static int media_graph_handler(MediadPlugin *ctx, struct media_server_conn *conn, const char *target, const char *cmd,
     const char *arg, int flags, char *res, int res_len)
 {
     MediaGraphPriv* priv = ctx->priv;
@@ -542,7 +542,7 @@ static int media_graph_handler(MediadPlugin *ctx, void *cookie, const char *targ
     char* dump;
 
     MEDIA_INFO("cookie %p target %s cmd %s arg %s flags %d res %p res_len %d\n",
-        cookie, target, cmd, arg, flags, res, res_len);
+        conn, target, cmd, arg, flags, res, res_len);
 
     if (!target && !strcmp(cmd, "dump")) {
         dump = avfilter_graph_dump(priv->graph, NULL);

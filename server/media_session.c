@@ -266,11 +266,11 @@ static int media_session_destroy(MediadPlugin* ctx)
     return 0;
 }
 
-static int media_session_handler(MediadPlugin *ctx, void *cookie, const char *target,
+static int media_session_handler(MediadPlugin *ctx, struct media_server_conn *conn, const char *target,
     const char *cmd, const char *arg, int flags, char *res, int res_len)
 {
-    MediaControllerPriv* controller = media_server_get_data(cookie);
-    MediaControlleePriv* controllee = media_server_get_data(cookie);
+    MediaControllerPriv* controller = media_server_get_data(conn);
+    MediaControlleePriv* controllee = media_server_get_data(conn);
     MediaSessionPriv* priv = ctx->priv;
     int event, result;
 
