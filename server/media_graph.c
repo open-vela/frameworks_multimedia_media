@@ -662,14 +662,16 @@ int media_graph_track_close(MediaGraphTrack **pctx)
 
 int media_graph_track_write_frame(MediaGraphTrack *ctx, AVFrame *frame)
 {
+    MediaGraphPriv *priv = media_graph_plugin.priv;
     int ret;
+
     ret = av_buffersrc_add_frame_flags(ctx->src, frame, AV_BUFFERSRC_FLAG_KEEP_REF);
     if (ret < 0) {
         MEDIA_ERR("buffersrc:%s failed ret:%d\n", ctx->src->name, ret);
         return ret;
     }
-    if (ctx->last_pts <= 0) {
-        MediaGraphPriv *priv = media_graph_plugin.priv;
+
+    if (priv->tid != gettid()) {
         eventfd_t val = 1;
         file_write(priv->filep, &val, sizeof(val));
     }
