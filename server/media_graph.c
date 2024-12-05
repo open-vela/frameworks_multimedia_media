@@ -581,6 +581,14 @@ static int media_graph_handler(MediadPlugin *ctx, struct media_server_conn *conn
     return 0;
 }
 
+static void media_graph_try_touch(MediaGraphPriv *priv)
+{
+    if (priv->tid != gettid()) {
+        eventfd_t val = 1;
+        file_write(priv->filep, &val, sizeof(val));
+    }
+}
+
 MediadPlugin media_graph_plugin = {
     .name = "media_graph",
     .priv_size = sizeof(MediaGraphPriv),
@@ -638,6 +646,7 @@ int media_graph_track_open(MediaGraphTrack **pctx, const char *stream_type,
         goto fail;
     }
 
+    media_graph_try_touch(priv);
     *pctx = ctx;
 
     return 0;
@@ -649,11 +658,13 @@ fail:
 
 int media_graph_track_close(MediaGraphTrack **pctx)
 {
+    MediaGraphPriv *priv = media_graph_plugin.priv;
     MediaGraphTrack *ctx = *pctx;
     if (!pctx || !ctx)
         return -EINVAL;
 
     av_buffersrc_set_event_cb(ctx->src, NULL, NULL);
+    media_graph_try_touch(priv);
     av_channel_layout_uninit(&ctx->ch_layout);
     av_free(ctx);
     *pctx = NULL;
@@ -671,11 +682,7 @@ int media_graph_track_write_frame(MediaGraphTrack *ctx, AVFrame *frame)
         return ret;
     }
 
-    if (priv->tid != gettid()) {
-        eventfd_t val = 1;
-        file_write(priv->filep, &val, sizeof(val));
-    }
-
+    media_graph_try_touch(priv);
     ctx->last_pts += frame->nb_samples;
     return 0;
 }
