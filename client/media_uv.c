@@ -257,10 +257,10 @@ static void media_uv_close_cb(uv_handle_t* handle)
 
     MEDIA_DEBUG_PROXY(proxy);
     if (pipe == proxy->cpipe) {
-        MEDIA_INFO("DEBUG close cpipe:%p\n", pipe);
+        MEDIA_INFO("close cpipe:%p proxy:%p\n", pipe, proxy);
         proxy->cpipe = NULL;
     } else if (pipe == proxy->epipe) {
-        MEDIA_INFO("DEBUG close epipe:%p\n", pipe);
+        MEDIA_INFO("close epipe:%p proxy:%p\n", pipe, proxy);
         proxy->epipe = NULL;
     }
 
@@ -404,7 +404,7 @@ static int media_uv_connect_one(MediaProxyPriv* proxy)
 #endif
     }
 
-    MEDIA_INFO("DEBUG connect cpipe:%p\n", proxy->cpipe);
+    MEDIA_INFO("connect cpipe:%p proxy:%p\n", proxy->cpipe, proxy);
     MEDIA_DEBUG_PROXY(proxy);
     return 0;
 
@@ -653,7 +653,7 @@ static void media_uv_listen_one_cb(uv_stream_t* stream, int ret)
     if (ret < 0)
         goto err2;
 
-    MEDIA_INFO("DEBUG connect epipe:%p\n", proxy->epipe);
+    MEDIA_INFO("connect epipe:%p proxy:%p\n", proxy->epipe, proxy);
     media_uv_close(server);
     MEDIA_DEBUG_PROXY(proxy);
     if (proxy->on_listen)
