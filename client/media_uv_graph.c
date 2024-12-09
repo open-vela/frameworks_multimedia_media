@@ -328,8 +328,8 @@ static int media_uv_stream_send(void* stream, const char* target,
     if (ret < 0)
         return ret;
 
-    MEDIA_INFO("%s %p %s %s %s",
-        priv->name, priv->proxy, target ? target : "_", cmd, arg ? arg : "_");
+    MEDIA_INFO("%s:%p %p %s %s %s",
+        priv->name, priv, priv->proxy, target ? target : "_", cmd, arg ? arg : "_");
 
     ret = media_uv_send(priv->proxy, parser, cb, cookie, &parcel);
     media_parcel_deinit(&parcel);
@@ -406,6 +406,7 @@ static void media_uv_stream_close_pipe_cb(uv_handle_t* handle)
 static void media_uv_stream_close_pipe(MediaStreamPriv* priv)
 {
     if (priv->pipe) {
+        MEDIA_INFO("%s:%p close pipe:%p\n", priv->name, priv, priv->pipe);
         uv_close((uv_handle_t*)priv->pipe, media_uv_stream_close_pipe_cb);
         priv->pipe = NULL;
     }
@@ -450,7 +451,7 @@ static void media_uv_stream_listen_connection_cb(uv_stream_t* stream, int ret)
         return;
     }
 
-    MEDIA_DEBUG("listener:%p accept:%p\n", listener, priv->pipe);
+    MEDIA_INFO("%s:%p listener:%p accept:%p\n", priv->name, priv, listener, priv->pipe);
     media_uv_stream_listen_clear(priv, listener); /* Clear redundant listeners. */
     if (!priv->on_connection) {
         media_uv_stream_close_pipe(priv);
@@ -555,6 +556,7 @@ static int media_uv_stream_request_focus(MediaStreamPriv* stream,
     }
 
     stream->focus = priv;
+    MEDIA_INFO("%s:%p %s:%p %p\n", stream->name, priv->stream, scenario, priv, priv->handle);
     return 0;
 }
 
@@ -646,11 +648,11 @@ static void media_uv_player_suggest_cb(int suggest, void* cookie)
     bool suggest_active = false;
 
     if (!player) {
-        MEDIA_INFO("suggest:%d canceled\n", suggest);
+        MEDIA_INFO("focus:%p suggest:%d canceled\n", priv, suggest);
         return;
     }
 
-    MEDIA_INFO("%s:%p suggest:%d\n", player->name, player, suggest);
+    MEDIA_INFO("%s:%p focus:%p %p suggest:%d\n", player->name, player, priv, priv->handle, suggest);
 
     switch (suggest) {
     case MEDIA_FOCUS_PLAY:
@@ -824,7 +826,7 @@ int media_uv_player_start_auto(void* handle, const char* scenario,
         return -EINVAL;
 
     if (priv->focus) {
-        MEDIA_WARN("%s:%p force start\n", priv->name, priv);
+        MEDIA_WARN("%s:%p %p force start\n", priv->name, priv, priv->focus);
         return media_uv_player_start(priv, cb, cookie);
     }
 
@@ -1023,11 +1025,11 @@ static void media_uv_recorder_suggest_cb(int suggest, void* cookie)
     bool suggest_active = false;
 
     if (!recorder) {
-        MEDIA_INFO("suggest:%d canceled\n", suggest);
+        MEDIA_INFO("focus:%p suggest:%d canceled\n", priv, suggest);
         return;
     }
 
-    MEDIA_INFO("%s:%p suggest:%d\n", recorder->name, recorder, suggest);
+    MEDIA_INFO("%s:%p focus:%p %p suggest:%d\n", recorder->name, recorder, priv, priv->handle, suggest);
 
     switch (suggest) {
     case MEDIA_FOCUS_PLAY:
