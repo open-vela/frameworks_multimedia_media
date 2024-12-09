@@ -129,6 +129,12 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
     if (out)
         media_parcel_append_printf(out, "%i%s", ret, response);
 
+    if (ret < 0) {
+        MEDIA_INFO("%s:%s %s %s %" PRId32 " %s\n",
+            media_id_get_name(id), target ? target : "_", cmd, arg ? arg : "_",
+            ret, response ? response : "_");
+    }
+
     free(response);
 }
 

@@ -265,7 +265,7 @@ int media_policy_handler(void* policy, void* cookie, const char* name, const cha
         }
     } else if (!strcmp(cmd, "dump")) {
         dump = pfw_dump(policy);
-        MEDIA_DEBUG("\n%s", dump);
+        MEDIA_INFO("\n%s", dump);
         free(dump);
         return 0;
     }
