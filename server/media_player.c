@@ -90,6 +90,8 @@
 #define MEDIA_PLAYER_CMD_QUEUE_MAX 16
 #define MEDIA_PLAYER_DATA_QUEUE_SIZE 4
 
+#define MEDIA_PLAYER_SLIENCE_FRAME_DURATION 20
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -132,7 +134,6 @@ typedef struct MediaPlayerContext {
     int loop_count;
     int offload;
     int pending_stop;
-    int nb_miss_frames;
     int audio_idx;
     int video_idx;
     uint32_t nb_streams;
@@ -169,6 +170,31 @@ static AVFrame* media_player_queue_pop(MediaPlayerContext* ctx, int idx);
  * Private Functions
  ****************************************************************************/
 
+static AVFrame* media_player_generate_slience_frame(MediaPlayerContext* ctx)
+{
+    AVFrame* frame = av_frame_alloc();
+    if (frame) {
+        frame->sample_rate = ctx->streams[ctx->audio_idx].codec_ctx->sample_rate;
+        frame->format = ctx->streams[ctx->audio_idx].codec_ctx->sample_fmt;
+        frame->ch_layout = ctx->streams[ctx->audio_idx].codec_ctx->ch_layout;
+        frame->nb_samples = frame->sample_rate * av_get_bytes_per_sample(frame->format) *
+                            MEDIA_PLAYER_SLIENCE_FRAME_DURATION / 1000;
+
+        if (av_frame_get_buffer(frame, 0) < 0) {
+            av_frame_free(&frame);
+            MEDIA_ERR("av_frame_get_buffer failed for slience frame.");
+            return NULL;
+        }
+
+        av_samples_set_silence((uint8_t**)frame->extended_data, 0, frame->nb_samples,
+                               frame->ch_layout.nb_channels, frame->format);
+    } else {
+        MEDIA_ERR("av_frame_alloc failed for slience frame.");
+    }
+
+    return frame;
+}
+
 static int media_player_on_event_cb(void *udata, int evt, int64_t args)
 {
     MediaPlayerContext* ctx = (MediaPlayerContext*)udata;
@@ -177,6 +203,8 @@ static int media_player_on_event_cb(void *udata, int evt, int64_t args)
     MEDIA_INFO("audio track event: %d", evt);
     if (evt == MEDIA_GRAPH_EVT_NEED_FRAME) {
         frame = media_player_queue_pop(ctx, ctx->audio_idx);
+        if (!frame)
+            frame = media_player_generate_slience_frame(ctx);
         pthread_mutex_lock(&ctx->mutex);
         if (frame) {
             if (ctx->audio_track) {
@@ -191,8 +219,7 @@ static int media_player_on_event_cb(void *udata, int evt, int64_t args)
                 av_frame_free(&frame);
             }
         } else {
-            MEDIA_WARN("audio track recv dat failed.");
-            ctx->nb_miss_frames++;
+            MEDIA_ERR("audio track recv dat failed.");
         }
         pthread_mutex_unlock(&ctx->mutex);
     } else {
@@ -282,30 +309,6 @@ static int media_player_read_frame(MediaPlayerContext* ctx)
 
     av_packet_unref(&pkt);
     return ret == AVERROR_INVALIDDATA ? 0 : ret;
-}
-
-static int media_player_direct_write(MediaPlayerContext* ctx)
-{
-    AVFrame* frame;
-    int ret;
-
-    frame = media_player_queue_pop(ctx, ctx->audio_idx);
-    if (frame) {
-        pthread_mutex_lock(&ctx->mutex);
-        ret= media_graph_track_write_frame(ctx->audio_track, frame);
-        if (ret < 0) {
-            MEDIA_ERR("audio track write frame failed, ret %d.", ret);
-            av_frame_free(&frame);
-            pthread_mutex_unlock(&ctx->mutex);
-            return ret;
-        }
-        ctx->nb_miss_frames--;
-        pthread_mutex_unlock(&ctx->mutex);
-    } else {
-        MEDIA_ERR("audio track recv dat failed.");
-    }
-
-    return ret;
 }
 
 static int media_player_queue_push(MediaPlayerContext* ctx, int idx, AVFrame* frame)
@@ -784,7 +787,6 @@ end:
 static void media_player_ctx_release(MediaPlayerContext* ctx)
 {
     ctx->state = MEDIA_PLAYER_STATE_NOP;
-    ctx->nb_miss_frames = 0;
     ctx->loop_count = 0;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
@@ -1210,12 +1212,8 @@ static void* media_player_thread(void* arg)
                 exit = true;
         } else if (ctx->state == MEDIA_PLAYER_STATE_STARTED) {
             pthread_mutex_unlock(&ctx->mutex);
-
             if (media_player_queue_cnt(ctx, ctx->audio_idx) < ctx->streams[ctx->audio_idx].nb_queue_max)
                 exit = media_player_proc_dat(ctx);
-
-            if (ctx->nb_miss_frames > 0 && media_player_queue_cnt(ctx, ctx->audio_idx) > 0)
-                media_player_direct_write(ctx);
         } else if (exit) {
             ctx->state = MEDIA_PLAYER_STATE_NOP;
             pthread_mutex_unlock(&ctx->mutex);
