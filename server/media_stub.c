@@ -113,7 +113,7 @@ void media_stub_onreceive(struct media_server_conn *conn, media_parcel *in, medi
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_plugin_command(media_plugin_get("media_graph"), conn, target, cmd, arg, 0, response, len);
+        ret = media_plugin_command(media_plugin_get("media_recorder"), conn, target, cmd, arg, 0, response, len);
         break;
 
     case MEDIA_ID_SESSION:

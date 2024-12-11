@@ -60,6 +60,7 @@ extern media_plugin_t media_focus_plugin;
 extern MediadPlugin media_graph_plugin;
 extern MediadPlugin media_session_plugin;
 extern MediadPlugin media_player_plugin;
+extern MediadPlugin media_recorder_plugin;
 #endif
 #ifdef CONFIG_LIB_PFW
 extern media_plugin_t media_policy_plugin;
@@ -77,6 +78,7 @@ MediadPlugin* g_media[] = {
     &media_graph_plugin,
     &media_session_plugin,
     &media_player_plugin,
+    &media_recorder_plugin,
 #endif
 #ifdef CONFIG_LIB_PFW
     &media_policy_plugin,

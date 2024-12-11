@@ -1901,6 +1901,7 @@ CMD1(dump, string_t, options)
     media_policy_dump(options);
     media_graph_dump(options);
     media_player_dump(options);
+    media_recorder_dump(options);
     media_focus_dump(options);
 
     return 0;

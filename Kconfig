@@ -81,6 +81,14 @@ config MEDIA_PLAYER_PRIORITY
 	int "Media player priority"
 	default 244
 
+config MEDIA_RECORDER_STACKSIZE
+	int "Media recorder stack size"
+	default 61440
+
+config MEDIA_RECORDER_PRIORITY
+	int "Media recorder priority"
+	default 244
+
 if MEDIA_FOCUS
 
 config MEDIA_FOCUS_STACK_DEPTH

@@ -68,6 +68,13 @@ void media_graph_dump(const char* options);
 void media_player_dump(const char* options);
 
 /**
+ * @brief Dump media recorder
+ *
+ * @param[in] options   dump options
+ */
+void media_recorder_dump(const char* options);
+
+/**
  * @brief Dump media policy
  *
  * @param[in] options   dump options
