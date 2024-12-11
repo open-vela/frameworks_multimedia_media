@@ -41,6 +41,7 @@
 #include "libavformat/internal.h"
 #include "libavutil/avassert.h"
 #include "libavutil/avstring.h"
+#include "libavutil/bprint.h"
 #include "libavutil/opt.h"
 
 #include "media_common.h"
@@ -154,7 +155,6 @@ typedef struct MediaPlayerContext {
 
 typedef struct MediaPlayerPriv {
     pthread_mutex_t mutex;
-    int cnt;
     MediaPlayerContext ctxs[MEDIA_PLAYER_MAX_CNT];
 } MediaPlayerPriv;
 
@@ -784,6 +784,17 @@ end:
     return ret;
 }
 
+static void media_player_ctx_init(MediaPlayerContext* ctx)
+{
+    ctx->state = MEDIA_PLAYER_STATE_STOPPED;
+    ctx->cmd_max = MEDIA_PLAYER_CMD_QUEUE_MAX;
+    ctx->audio_idx = -1;
+    ctx->video_idx = -1;
+    SIMPLEQ_INIT(&ctx->cmd_queue);
+    media_parcel_init(&ctx->parcel);
+    pthread_mutex_init(&ctx->mutex, NULL);
+}
+
 static void media_player_ctx_release(MediaPlayerContext* ctx)
 {
     ctx->state = MEDIA_PLAYER_STATE_NOP;
@@ -1192,6 +1203,38 @@ static MediaPlayerContext* media_player_get_available_session(MediaPlayerPriv* p
     return ctx;
 }
 
+static void media_player_dump(MediaPlayerPriv* priv)
+{
+    MediaPlayerContext *ctx;
+    AVBPrint buf;
+    int i;
+
+    av_bprint_init(&buf, 0, AV_BPRINT_SIZE_UNLIMITED);
+    av_bprintf(&buf, "\n--------------player dump start-------------\n");
+    for (i = 0; i < MEDIA_PLAYER_MAX_CNT; i++) {
+        ctx = &priv->ctxs[i];
+        if (ctx->state == MEDIA_PLAYER_STATE_NOP)
+            continue;
+        av_bprintf(&buf, "player[%d, %s] state:%d", i, ctx->name, ctx->state);
+        if (ctx->audio_idx >=0)
+            av_bprintf(&buf, ", a: %d %s %"PRId64" %d ch:%d %d", ctx->audio_idx,
+            avcodec_get_name(ctx->streams[ctx->audio_idx].codec_ctx->codec_id),
+            ctx->streams[ctx->audio_idx].codec_ctx->bit_rate,
+            ctx->streams[ctx->audio_idx].codec_ctx->sample_rate,
+            ctx->streams[ctx->audio_idx].codec_ctx->ch_layout.nb_channels,
+            media_player_queue_cnt(ctx, ctx->audio_idx));
+        if (ctx->video_idx >=0)
+            av_bprintf(&buf, ", v: %d %s %dx%d %d", ctx->video_idx,
+            avcodec_get_name(ctx->streams[ctx->video_idx].codec_ctx->codec_id),
+            ctx->streams[ctx->audio_idx].codec_ctx->width,
+            ctx->streams[ctx->audio_idx].codec_ctx->height,
+            media_player_queue_cnt(ctx, ctx->video_idx));
+    }
+    av_bprintf(&buf, "\n--------------player dump end---------------\n");
+    MEDIA_INFO("%s\n", buf.str);
+    av_bprint_finalize(&buf, NULL);
+}
+
 static void* media_player_thread(void* arg)
 {
     MediaPlayerContext* ctx = (MediaPlayerContext*)arg;
@@ -1240,15 +1283,7 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
 
     strlcpy(ctx->name, name, sizeof(ctx->name));
 
-    ctx->state = MEDIA_PLAYER_STATE_STOPPED;
-    ctx->cmd_max = MEDIA_PLAYER_CMD_QUEUE_MAX;
-    ctx->audio_idx = -1;
-    ctx->video_idx = -1;
-
-    media_parcel_init(&ctx->parcel);
-
-    SIMPLEQ_INIT(&ctx->cmd_queue);
-    pthread_mutex_init(&ctx->mutex, NULL);
+    media_player_ctx_init(ctx);
 
     pthread_attr_init(&attr);
     pthread_attr_setstacksize(&attr, CONFIG_MEDIA_PLAYER_STACKSIZE);
@@ -1318,7 +1353,10 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
         strncpy(ctx->name, arg, sizeof(ctx->name));
 
         MEDIA_INFO("open player success...\n");
+    } else if (!strcmp(cmd, "dump")) {
+        media_player_dump(priv);
     }
+
 
 out:
     pthread_mutex_unlock(&priv->mutex);

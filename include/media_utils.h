@@ -61,6 +61,13 @@ int media_process_command(const char* target, const char* cmd,
 void media_graph_dump(const char* options);
 
 /**
+ * @brief Dump media player
+ *
+ * @param[in] options   dump options
+ */
+void media_player_dump(const char* options);
+
+/**
  * @brief Dump media policy
  *
  * @param[in] options   dump options

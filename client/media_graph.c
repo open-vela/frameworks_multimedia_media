@@ -340,6 +340,11 @@ void media_graph_dump(const char* options)
     media_proxy(MEDIA_ID_GRAPH, NULL, NULL, "dump", options, 0, NULL, 0);
 }
 
+void media_player_dump(const char* options)
+{
+    media_proxy(MEDIA_ID_PLAYER, NULL, NULL, "dump", options, 0, NULL, 0);
+}
+
 void* media_player_open(const char* params)
 {
     return media_open(MEDIA_ID_PLAYER, params);
