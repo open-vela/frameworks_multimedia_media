@@ -27,12 +27,16 @@
 
 #include <libavdevice/avdevice.h>
 #include <libavfilter/avfilter.h>
+#include <libavfilter/avfilter_internal.h>
+#include <libavfilter/buffersrc.h>
 #include <libavfilter/filters.h>
 #include <libavfilter/formats.h>
-#include <libavfilter/avfilter_internal.h>
-#include <libavfilter/avfilter-nx.h>
-#include <libavfilter/buffersrc.h>
+#include <libavutil/bprint.h>
+#include <libavutil/mem.h>
 #include <libavutil/opt.h>
+#include <libavutil/pixfmt.h>
+#include <libavutil/pixdesc.h>
+#include <libavutil/samplefmt.h>
 
 #include <assert.h>
 #include <fcntl.h>
@@ -500,7 +504,7 @@ static int media_graph_run_once(MediadPlugin *ctx)
     return 0;
 }
 
-static int ff_filter_graph_has_pending_status(AVFilterGraph *graph)
+static int media_graph_has_pending_status(AVFilterGraph *graph)
 {
     int i, j;
 
@@ -520,13 +524,152 @@ static int ff_filter_graph_has_pending_status(AVFilterGraph *graph)
     return false;
 }
 
+static int media_graph_dump_link(AVBPrint *buf, AVFilterLink *link)
+{
+    const char *format;
+    AVBPrint dummy_buffer;
+    FilterLinkInternal *li = ff_link_internal(link);
+
+    if (!buf) {
+        buf = &dummy_buffer;
+        av_bprint_init(buf, 0, AV_BPRINT_SIZE_COUNT_ONLY);
+    }
+    switch (link->type) {
+    case AVMEDIA_TYPE_VIDEO:
+        format = av_x_if_null(av_get_pix_fmt_name(link->format), "?");
+        av_bprintf(buf, "[%dx%d %d:%d %s]", link->w, link->h,
+            link->sample_aspect_ratio.num,
+            link->sample_aspect_ratio.den,
+            format);
+        break;
+
+    case AVMEDIA_TYPE_AUDIO:
+        format = av_x_if_null(av_get_sample_fmt_name(link->format), "?");
+        av_bprintf(buf, "[%dHz %s: fifo:%d wt:%d icnt:%"PRId64" ocnt:%"PRId64" ",
+            (int)link->sample_rate, format, (int)ff_framequeue_queued_frames(&li->fifo),
+            li->frame_wanted_out, li->l.frame_count_in, li->l.frame_count_out);
+        av_channel_layout_describe_bprint(&link->ch_layout, buf);
+        av_bprint_chars(buf, ']', 1);
+        break;
+
+    default:
+        av_bprintf(buf, "?");
+        break;
+    }
+    return buf->len;
+}
+
+static void media_graph_dump_to_buf(AVBPrint *buf, AVFilterGraph *graph)
+{
+    unsigned i, j, x, e;
+
+    for (i = 0; i < graph->nb_filters; i++) {
+        AVFilterContext *filter = graph->filters[i];
+        unsigned max_src_name = 0, max_dst_name = 0;
+        unsigned max_in_name = 0, max_out_name = 0;
+        unsigned max_in_fmt = 0, max_out_fmt = 0;
+        unsigned width, height, in_indent;
+        unsigned lname = strlen(filter->name);
+        unsigned ltype = strlen(filter->filter->name);
+
+        for (j = 0; j < filter->nb_inputs; j++) {
+            AVFilterLink *l = filter->inputs[j];
+            unsigned ln = strlen(l->src->name) + 1 + strlen(l->srcpad->name);
+            max_src_name = FFMAX(max_src_name, ln);
+            max_in_name = FFMAX(max_in_name, strlen(l->dstpad->name));
+            max_in_fmt = FFMAX(max_in_fmt, media_graph_dump_link(NULL, l));
+        }
+        for (j = 0; j < filter->nb_outputs; j++) {
+            AVFilterLink *l = filter->outputs[j];
+            unsigned ln = strlen(l->dst->name) + 1 + strlen(l->dstpad->name);
+            max_dst_name = FFMAX(max_dst_name, ln);
+            max_out_name = FFMAX(max_out_name, strlen(l->srcpad->name));
+            max_out_fmt = FFMAX(max_out_fmt, media_graph_dump_link(NULL, l));
+        }
+        in_indent = max_src_name + max_in_name + max_in_fmt;
+        in_indent += in_indent ? 4 : 0;
+        width = FFMAX(lname + 2, ltype + 4);
+        height = FFMAX3(2, filter->nb_inputs, filter->nb_outputs);
+        av_bprint_chars(buf, ' ', in_indent);
+        av_bprintf(buf, "+");
+        av_bprint_chars(buf, '-', width);
+        av_bprintf(buf, "+\n");
+        for (j = 0; j < height; j++) {
+            unsigned in_no = j - (height - filter->nb_inputs) / 2;
+            unsigned out_no = j - (height - filter->nb_outputs) / 2;
+
+            /* Input link */
+            if (in_no < filter->nb_inputs) {
+                AVFilterLink *l = filter->inputs[in_no];
+                e = buf->len + max_src_name + 2;
+                av_bprintf(buf, "%s:%s", l->src->name, l->srcpad->name);
+                av_bprint_chars(buf, '-', e - buf->len);
+                e = buf->len + max_in_fmt + 2 + max_in_name - strlen(l->dstpad->name);
+                media_graph_dump_link(buf, l);
+                av_bprint_chars(buf, '-', e - buf->len);
+                av_bprintf(buf, "%s", l->dstpad->name);
+            } else {
+                av_bprint_chars(buf, ' ', in_indent);
+            }
+
+            /* Filter */
+            av_bprintf(buf, "|");
+            if (j == (height - 2) / 2) {
+                x = (width - lname) / 2;
+                av_bprintf(buf, "%*s%-*s", x, "", width - x, filter->name);
+            } else if (j == (height - 2) / 2 + 1) {
+                x = (width - ltype - 2) / 2;
+                av_bprintf(buf, "%*s(%s)%*s", x, "", filter->filter->name,
+                    width - ltype - 2 - x, "");
+            } else {
+                av_bprint_chars(buf, ' ', width);
+            }
+            av_bprintf(buf, "|");
+
+            /* Output link */
+            if (out_no < filter->nb_outputs) {
+                AVFilterLink *l = filter->outputs[out_no];
+                unsigned ln = strlen(l->dst->name) + 1 + strlen(l->dstpad->name);
+                e = buf->len + max_out_name + 2;
+                av_bprintf(buf, "%s", l->srcpad->name);
+                av_bprint_chars(buf, '-', e - buf->len);
+                e = buf->len + max_out_fmt + 2 + max_dst_name - ln;
+                media_graph_dump_link(buf, l);
+                av_bprint_chars(buf, '-', e - buf->len);
+                av_bprintf(buf, "%s:%s", l->dst->name, l->dstpad->name);
+            }
+            av_bprintf(buf, "\n");
+        }
+        av_bprint_chars(buf, ' ', in_indent);
+        av_bprintf(buf, "+");
+        av_bprint_chars(buf, '-', width);
+        av_bprintf(buf, "+\n");
+        av_bprintf(buf, "\n");
+    }
+}
+
+static char *media_graph_server_dump(AVFilterGraph *graph, const char *options)
+{
+    AVBPrint buf;
+    char *dump;
+
+    av_bprint_init(&buf, 0, AV_BPRINT_SIZE_COUNT_ONLY);
+    media_graph_dump_to_buf(&buf, graph);
+    dump = av_malloc(buf.len + 1);
+    if (!dump)
+        return NULL;
+    av_bprint_init_for_buffer(&buf, dump, buf.len + 1);
+    media_graph_dump_to_buf(&buf, graph);
+    return dump;
+}
+
 static int media_graph_process_command(MediaGraphPriv *priv, AVFilterContext *filter, const char *cmd,
                                        const char *arg, char *res, int res_len)
 {
     if (res && res_len > 0)
         return avfilter_process_command(filter, cmd, arg, res, res_len, 0);
 
-    if (!ff_filter_graph_has_pending_status(filter->graph)) {
+    if (!media_graph_has_pending_status(filter->graph)) {
         MEDIA_INFO("process %s %s %s\n", filter->name, cmd, arg ? arg : "_");
         return avfilter_process_command(filter, cmd, arg, NULL, 0, 0);
     }
@@ -545,7 +688,7 @@ static int media_graph_handler(MediadPlugin *ctx, struct media_server_conn *conn
         conn, target, cmd, arg, flags, res, res_len);
 
     if (!target && !strcmp(cmd, "dump")) {
-        dump = avfilter_graph_dump_ext(priv->graph, NULL);
+        dump = media_graph_server_dump(priv->graph, NULL);
         if (dump)
             MEDIA_INFO("\n%s\n", dump);
 
