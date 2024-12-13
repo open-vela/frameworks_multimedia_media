@@ -21,7 +21,7 @@
 
 static const char* file_tag = "[jidl_feature] audio_impl";
 
-#define MAX_URL_LEN 128
+#define MAX_URL_LEN 1024
 #define MAX_TITLE_LEN 64
 #define MAX_ALBUM_LEN 64
 #define MAX_ARTIST_LEN 64
@@ -31,15 +31,22 @@ static const char* file_tag = "[jidl_feature] audio_impl";
 #define MEDIA_STATE_PAUSED 1
 #define MEDIA_STATE_STOPPED 2
 
+#define APP_PATH_PREFIX "internal://"
+
 typedef struct {
-    FtCallbackId onplay;
-    FtCallbackId onpause;
-    FtCallbackId onstop;
-    FtCallbackId onloadeddata;
-    FtCallbackId onended;
-    FtCallbackId ondurationchange;
-    FtCallbackId ontimeupdate;
-    FtCallbackId onerror;
+    FeatureInstanceHandle feature;
+    FtCallbackId callbackId;
+} CallbackInfo;
+
+typedef struct {
+    CallbackInfo onplay;
+    CallbackInfo onpause;
+    CallbackInfo onstop;
+    CallbackInfo onloadeddata;
+    CallbackInfo onended;
+    CallbackInfo ondurationchange;
+    CallbackInfo ontimeupdate;
+    CallbackInfo onerror;
 } Event;
 
 typedef struct {
@@ -50,7 +57,7 @@ typedef struct {
 
 typedef struct {
     void* handle;
-    FeatureInstanceHandle feature;
+    FeatureProtoHandle proto;
     Event event;
     uv_timer_t timer;
 
@@ -67,8 +74,9 @@ typedef struct {
 
 static void audio_uv_get_duration_cb(void* cookie, int ret, unsigned duration);
 static void audio_uv_get_position_cb(void* cookie, int ret, unsigned position);
+static void audio_uv_close_cb(void* cookie, int ret);
 static void init_audio_obj(AudioObject* obj);
-void system_audio_wrap_stop(FeatureInstanceHandle feature, AppendData append_data);
+void system_audio_wrap_stop(FeatureInstanceHandle feature, union AppendData append_data);
 
 /* common interface */
 void system_audio_onRegister(const char* feature_name)
@@ -78,41 +86,45 @@ void system_audio_onRegister(const char* feature_name)
 
 void system_audio_onCreate(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
 {
-    FEATURE_LOG_DEBUG("%s::%s(), FeatureProtoHandle: %p\n", file_tag, __FUNCTION__, handle);
-}
-
-void system_audio_onRequired(FeatureRuntimeContext ctx, FeatureInstanceHandle handle)
-{
-    FEATURE_LOG_DEBUG("%s::%s(), FeatureInstanceHandle: %p\n", file_tag, __FUNCTION__, handle);
+    FEATURE_LOG_INFO("%s::%s(), FeatureProtoHandle: %p\n", file_tag, __FUNCTION__, handle);
     AudioObject* obj;
 
     obj = (AudioObject*)malloc(sizeof(AudioObject));
     if (!obj) {
         FEATURE_LOG_ERROR("%s::%s(), malloc AudioObject fail\n", file_tag, __FUNCTION__);
-        FeatureSetObjectData(handle, NULL);
+        FeatureSetProtoData(handle, NULL);
         return;
     }
 
     init_audio_obj(obj);
-    obj->feature = handle;
+    obj->proto = handle;
     memset(&obj->event, 0, sizeof(obj->event));
 
-    FeatureSetObjectData(handle, obj);
+    FeatureSetProtoData(handle, obj);
+}
+
+void system_audio_onRequired(FeatureRuntimeContext ctx, FeatureInstanceHandle handle)
+{
+    FEATURE_LOG_DEBUG("%s::%s(), FeatureInstanceHandle: %p\n", file_tag, __FUNCTION__, handle);
 }
 
 void system_audio_onDetached(FeatureRuntimeContext ctx, FeatureInstanceHandle handle)
 {
     FEATURE_LOG_DEBUG("%s::%s(), FeatureInstanceHandle: %p\n", file_tag, __FUNCTION__, handle);
-    AudioObject* obj;
-    obj = (AudioObject*)FeatureGetObjectData(handle);
-    if (obj)
-        free(obj);
-    FeatureSetObjectData(handle, NULL);
 }
 
 void system_audio_onDestroy(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
 {
-    FEATURE_LOG_DEBUG("%s::%s(), FeatureProtoHandle: %p\n", file_tag, __FUNCTION__, handle);
+    FEATURE_LOG_INFO("%s::%s(), FeatureProtoHandle: %p\n", file_tag, __FUNCTION__, handle);
+
+    AudioObject* obj;
+
+    obj = (AudioObject*)FeatureGetProtoData(handle);
+
+    if (!obj || !obj->handle)
+        return;
+
+    media_uv_player_close(obj->handle, 0, audio_uv_close_cb);
 }
 
 void system_audio_onUnregister(const char* feature_name)
@@ -177,7 +189,7 @@ static void timeupdate_loop_timer(AudioObject* obj)
     if (!obj)
         return;
 
-    manager = FeatureGetManagerHandleFromInstance(obj->feature);
+    manager = FeatureGetManagerHandleFromProto(obj->proto);
     loop = FeatureGetUVLoop(manager);
     if (!loop)
         return;
@@ -189,7 +201,7 @@ static void timeupdate_loop_timer(AudioObject* obj)
 
 static void update_duration(AudioObject* obj)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     if (!obj || !obj->handle)
         return;
 
@@ -208,37 +220,37 @@ static void system_audio_event_callback(void* cookie, int event, int ret, const 
 
     if (ret < 0) {
         FEATURE_LOG_ERROR("%s::%s() fail, ret < 0.\n", file_tag, __FUNCTION__);
-        AppendData tmp;
-        system_audio_wrap_stop(obj->feature, tmp);
+        media_uv_player_close(obj->handle, 0, NULL);
+        init_audio_obj(obj);
         return;
     }
 
     switch (event) {
     case MEDIA_EVENT_PREPARED:
-        if (FeatureCheckCallbackId(obj->feature, obj->event.onloadeddata))
-            FeatureInvokeCallback(obj->feature, obj->event.onloadeddata);
+        if (FeatureCheckCallbackId(obj->event.onloadeddata.feature, obj->event.onloadeddata.callbackId))
+            FeatureInvokeCallback(obj->event.onloadeddata.feature, obj->event.onloadeddata.callbackId);
         break;
     case MEDIA_EVENT_STARTED:
         obj->state = MEDIA_STATE_STARTED;
-        if (FeatureCheckCallbackId(obj->feature, obj->event.onplay))
-            FeatureInvokeCallback(obj->feature, obj->event.onplay);
+        if (FeatureCheckCallbackId(obj->event.onplay.feature, obj->event.onplay.callbackId))
+            FeatureInvokeCallback(obj->event.onplay.feature, obj->event.onplay.callbackId);
         update_duration(obj);
         timeupdate_loop_timer(obj);
         break;
     case MEDIA_EVENT_PAUSED:
         obj->state = MEDIA_STATE_PAUSED;
-        if (FeatureCheckCallbackId(obj->feature, obj->event.onpause))
-            FeatureInvokeCallback(obj->feature, obj->event.onpause);
+        if (FeatureCheckCallbackId(obj->event.onpause.feature, obj->event.onpause.callbackId))
+            FeatureInvokeCallback(obj->event.onpause.feature, obj->event.onpause.callbackId);
         break;
     case MEDIA_EVENT_STOPPED:
         obj->state = MEDIA_STATE_STOPPED;
-        if (FeatureCheckCallbackId(obj->feature, obj->event.onstop))
-            FeatureInvokeCallback(obj->feature, obj->event.onstop);
+        if (FeatureCheckCallbackId(obj->event.onstop.feature, obj->event.onstop.callbackId))
+            FeatureInvokeCallback(obj->event.onstop.feature, obj->event.onstop.callbackId);
         break;
     case MEDIA_EVENT_COMPLETED:
         obj->state = MEDIA_STATE_STOPPED;
-        if (FeatureCheckCallbackId(obj->feature, obj->event.onended))
-            FeatureInvokeCallback(obj->feature, obj->event.onended);
+        if (FeatureCheckCallbackId(obj->event.onended.feature, obj->event.onended.callbackId))
+            FeatureInvokeCallback(obj->event.onended.feature, obj->event.onended.callbackId);
         break;
 
     default:
@@ -249,7 +261,7 @@ static void system_audio_event_callback(void* cookie, int event, int ret, const 
 /* uv interface cb function */
 static void audio_uv_prepare_cb(void* cookie, int ret)
 {
-    FEATURE_LOG_DEBUG("%s::%s(), ret: %d\n", file_tag, __FUNCTION__, ret);
+    FEATURE_LOG_INFO("%s::%s(), ret: %d\n", file_tag, __FUNCTION__, ret);
     AudioObject* obj;
 
     obj = (AudioObject*)cookie;
@@ -273,9 +285,8 @@ fail:
 
 static void audio_uv_open_cb(void* cookie, int ret)
 {
-    FEATURE_LOG_DEBUG("%s::%s(), ret: %d\n", file_tag, __FUNCTION__, ret);
+    FEATURE_LOG_INFO("%s::%s(), ret: %d\n", file_tag, __FUNCTION__, ret);
     AudioObject* obj;
-
     obj = (AudioObject*)cookie;
     if (!obj || !obj->handle)
         return;
@@ -302,7 +313,7 @@ fail:
 
 static void audio_uv_get_position_cb(void* cookie, int ret, unsigned position)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),ret:%d, position:%d\n", file_tag, __FUNCTION__, ret, position);
+    FEATURE_LOG_INFO("%s::%s(),ret:%d, position:%d\n", file_tag, __FUNCTION__, ret, position);
     AudioObject* obj;
 
     obj = (AudioObject*)cookie;
@@ -312,13 +323,13 @@ static void audio_uv_get_position_cb(void* cookie, int ret, unsigned position)
     if (ret >= 0)
         obj->currentTime = position / 1000;
 
-    if (FeatureCheckCallbackId(obj->feature, obj->event.ontimeupdate))
-        FeatureInvokeCallback(obj->feature, obj->event.ontimeupdate);
+    if (FeatureCheckCallbackId(obj->event.ontimeupdate.feature, obj->event.ontimeupdate.callbackId))
+        FeatureInvokeCallback(obj->event.ontimeupdate.feature, obj->event.ontimeupdate.callbackId);
 }
 
 static void audio_uv_get_duration_cb(void* cookie, int ret, unsigned duration)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),ret:%d, duration:%d\n", file_tag, __FUNCTION__, ret, duration);
+    FEATURE_LOG_INFO("%s::%s(),ret:%d, duration:%d\n", file_tag, __FUNCTION__, ret, duration);
     AudioObject* obj;
     obj = (AudioObject*)cookie;
     if (!obj)
@@ -327,18 +338,28 @@ static void audio_uv_get_duration_cb(void* cookie, int ret, unsigned duration)
     if (ret >= 0)
         obj->duration = duration / 1000;
 
-    if (FeatureCheckCallbackId(obj->feature, obj->event.ondurationchange))
-        FeatureInvokeCallback(obj->feature, obj->event.ondurationchange);
+    if (FeatureCheckCallbackId(obj->event.ondurationchange.feature, obj->event.ondurationchange.callbackId))
+        FeatureInvokeCallback(obj->event.ondurationchange.feature, obj->event.ondurationchange.callbackId);
+}
+
+static void audio_uv_close_cb(void* cookie, int ret)
+{
+    FEATURE_LOG_INFO("%s::%s()\n", file_tag, __FUNCTION__);
+    AudioObject* obj;
+
+    obj = (AudioObject*)cookie;
+    if (obj)
+        free(obj);
 }
 
 /* warp function */
-void system_audio_wrap_play(FeatureInstanceHandle feature, AppendData append_data)
+void system_audio_wrap_play(FeatureInstanceHandle feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
     FeatureManagerHandle manager;
 
-    obj = (AudioObject*)FeatureGetObjectData(feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
@@ -356,12 +377,12 @@ void system_audio_wrap_play(FeatureInstanceHandle feature, AppendData append_dat
         audio_uv_open_cb, obj);
 }
 
-void system_audio_wrap_pause(FeatureInstanceHandle feature, AppendData append_data)
+void system_audio_wrap_pause(FeatureInstanceHandle feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData(feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj || !obj->handle)
         return;
 
@@ -371,12 +392,12 @@ void system_audio_wrap_pause(FeatureInstanceHandle feature, AppendData append_da
     media_uv_player_pause(obj->handle, NULL, NULL);
 }
 
-void system_audio_wrap_stop(FeatureInstanceHandle feature, AppendData append_data)
+void system_audio_wrap_stop(FeatureInstanceHandle feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData(feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj || !obj->handle)
         return;
 
@@ -387,20 +408,25 @@ void system_audio_wrap_stop(FeatureInstanceHandle feature, AppendData append_dat
     init_audio_obj(obj);
 }
 
-void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, AppendData append_data, system_audio_GetPalyStateParam* p)
+void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, union AppendData append_data, system_audio_GetPalyStateParam* p)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
+    char* info;
     AudioObject* obj;
     system_audio_AudioState* audiostate;
 
-    obj = (AudioObject*)FeatureGetObjectData(feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
     audiostate = system_audioMallocAudioState();
 
-    audiostate->state = get_state_string(obj->state);
-    audiostate->src = obj->src;
+    info = (char*)FeatureMalloc(strlen(get_state_string(obj->state)) + 1, FT_CHAR);
+    strcpy(info, get_state_string(obj->state));
+    audiostate->state = info;
+    info = (char*)FeatureMalloc(strlen(obj->src) + 1, FT_CHAR);
+    strcpy(info, obj->src);
+    audiostate->src = info;
     audiostate->currentTime = obj->currentTime;
     audiostate->autoplay = obj->autoplay;
     audiostate->loop = obj->loop;
@@ -423,57 +449,116 @@ void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, AppendData ap
 }
 
 /* property function */
-FtString system_audio_get_src(void* feature, AppendData append_data)
+FtString system_audio_get_src(void* feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
+
     AudioObject* obj;
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return NULL;
-    return obj->src;
+
+    FtString src = (FtString)FeatureMalloc(MAX_URL_LEN + 1, FT_CHAR);
+    strncpy((char*)src, obj->src, MAX_URL_LEN);
+
+    return src;
 }
 
-void system_audio_set_src(void* feature, AppendData append_data, FtString src)
+void system_audio_set_src(void* feature, union AppendData append_data, FtString src)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
-    AudioObject* obj;
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
-    if (!obj)
-        return;
-    strncpy(obj->src, src, MAX_URL_LEN);
-}
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
 
-void system_audio_set_meta(void* feature, AppendData append_data, system_audio_MetaInfo* meta)
-{
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
-    if (!obj)
+    const char* pkg;
+
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
+    if (!obj || !src)
         return;
 
-    strncpy(obj->meta.title, meta->title, MAX_TITLE_LEN);
-    strncpy(obj->meta.album, meta->album, MAX_ALBUM_LEN);
-    strncpy(obj->meta.artist, meta->artist, MAX_ARTIST_LEN);
+    pkg = FeatureGetPackageName(FeatureGetProtoHandle(feature));
+    if (!pkg)
+        return;
+
+    if (!strncmp(src, APP_PATH_PREFIX, strlen(APP_PATH_PREFIX))) {
+        const char* offset = src + strlen(APP_PATH_PREFIX);
+        const char* type_end = strchr(offset, '/');
+        if (!type_end) {
+            FEATURE_LOG_ERROR("Invalid path format: %s", src);
+            return;
+        }
+
+        int type_len = type_end - offset;
+        if (type_len >= sizeof(obj->src) || type_len == 0) {
+            FEATURE_LOG_ERROR("Type part is too long or empty");
+            return;
+        }
+        const char* vaild_types[] = { "cache", "file", "mass", "tmp" };
+        const size_t vaild_types_count = sizeof(vaild_types) / sizeof(vaild_types[0]);
+
+        int type_valid = 0;
+        for (int i = 0; i < vaild_types_count; ++i) {
+            if (!strncmp(vaild_types[i], offset, type_len)) {
+                type_valid = 1;
+                break;
+            }
+        }
+
+        if (!type_valid) {
+            FEATURE_LOG_ERROR("Invalid type in src: %s", src);
+            return;
+        }
+
+        if (!strcmp(offset, "tmp"))
+            snprintf(obj->src, sizeof(obj->src), "%s/%.*s%s",
+                CONFIG_HAP_APP_PATH, (int)type_len, offset,
+                type_end + 1);
+        else
+            snprintf(obj->src, sizeof(obj->src), "%s/%.*s/%s/%s",
+                CONFIG_HAP_APP_PATH, (int)type_len, offset,
+                pkg, type_end + 1);
+    } else if (*src == '/')
+        snprintf(obj->src, sizeof(obj->src), "%s/app/%s%s",
+            CONFIG_HAP_APP_PATH, pkg, src);
+    else
+        strncpy(obj->src, src, sizeof(obj->src));
+
+    FEATURE_LOG_INFO("audio set src:%s", obj->src);
 }
 
-FtFloat system_audio_get_currentTime(void* feature, AppendData append_data)
+void system_audio_set_meta(void* feature, union AppendData append_data, system_audio_MetaInfo* meta)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
+    AudioObject* obj;
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
+    if (!obj)
+        return;
+    if (meta->title != NULL)
+        strncpy(obj->meta.title, meta->title, MAX_TITLE_LEN);
+    if (meta->album != NULL)
+        strncpy(obj->meta.album, meta->album, MAX_ALBUM_LEN);
+    if (meta->artist != NULL)
+        strncpy(obj->meta.artist, meta->artist, MAX_ARTIST_LEN);
+}
+
+FtFloat system_audio_get_currentTime(void* feature, union AppendData append_data)
+{
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return 0;
 
     return obj->currentTime;
 }
 
-void system_audio_set_currentTime(void* feature, AppendData append_data, FtFloat currentTime)
+void system_audio_set_currentTime(void* feature, union AppendData append_data, FtFloat currentTime)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj || !obj->handle)
         return;
 
@@ -481,60 +566,60 @@ void system_audio_set_currentTime(void* feature, AppendData append_data, FtFloat
     obj->currentTime = currentTime;
 }
 
-FtFloat system_audio_get_duration(void* feature, AppendData append_data)
+FtFloat system_audio_get_duration(void* feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return -1;
 
     return obj->duration;
 }
 
-FtBool system_audio_get_autoplay(void* feature, AppendData append_data)
+FtBool system_audio_get_autoplay(void* feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return false;
 
     return obj->autoplay;
 }
 
-void system_audio_set_autoplay(void* feature, AppendData append_data, FtBool autoplay)
+void system_audio_set_autoplay(void* feature, union AppendData append_data, FtBool autoplay)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
     obj->autoplay = autoplay;
 }
 
-FtBool system_audio_get_loop(void* feature, AppendData append_data)
+FtBool system_audio_get_loop(void* feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return false;
 
     return obj->loop;
 }
 
-void system_audio_set_loop(void* feature, AppendData append_data, FtBool loop)
+void system_audio_set_loop(void* feature, union AppendData append_data, FtBool loop)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj || !obj->handle)
         return;
 
@@ -542,24 +627,24 @@ void system_audio_set_loop(void* feature, AppendData append_data, FtBool loop)
     obj->loop = loop;
 }
 
-FtFloat system_audio_get_volume(void* feature, AppendData append_data)
+FtFloat system_audio_get_volume(void* feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return 0;
 
     return obj->volume;
 }
 
-void system_audio_set_volume(void* feature, AppendData append_data, FtFloat volume)
+void system_audio_set_volume(void* feature, union AppendData append_data, FtFloat volume)
 {
-    FEATURE_LOG_DEBUG("%s::%s(), volume:%f\n", file_tag, __FUNCTION__, volume);
+    FEATURE_LOG_INFO("%s::%s(), volume:%f\n", file_tag, __FUNCTION__, volume);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj || !obj->handle)
         return;
 
@@ -567,24 +652,24 @@ void system_audio_set_volume(void* feature, AppendData append_data, FtFloat volu
     obj->volume = volume;
 }
 
-FtBool system_audio_get_muted(void* feature, AppendData append_data)
+FtBool system_audio_get_muted(void* feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     return system_audio_get_volume(feature, append_data) == 0;
 }
 
-void system_audio_set_muted(void* feature, AppendData append_data, FtBool muted)
+void system_audio_set_muted(void* feature, union AppendData append_data, FtBool muted)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     return system_audio_set_volume(feature, append_data, 0);
 }
 
-FtString system_audio_get_streamType(void* feature, AppendData append_data)
+FtString system_audio_get_streamType(void* feature, union AppendData append_data)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return MEDIA_STREAM_MUSIC;
 
@@ -592,98 +677,106 @@ FtString system_audio_get_streamType(void* feature, AppendData append_data)
 }
 
 /* event funciton*/
-void system_audio_set_onplay(void* feature, AppendData append_data, FtCallbackId onplay)
+void system_audio_set_onplay(void* feature, union AppendData append_data, FtCallbackId onplay)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
-    obj->event.onplay = onplay;
+    obj->event.onplay.callbackId = onplay;
+    obj->event.onplay.feature = feature;
 }
 
-void system_audio_set_onpause(void* feature, AppendData append_data, FtCallbackId onpause)
+void system_audio_set_onpause(void* feature, union AppendData append_data, FtCallbackId onpause)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
-    obj->event.onpause = onpause;
+    obj->event.onpause.callbackId = onpause;
+    obj->event.onpause.feature = feature;
 }
 
-void system_audio_set_onstop(void* feature, AppendData append_data, FtCallbackId onstop)
+void system_audio_set_onstop(void* feature, union AppendData append_data, FtCallbackId onstop)
 {
-    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
-    obj->event.onstop = onstop;
+    obj->event.onstop.callbackId = onstop;
+    obj->event.onstop.feature = feature;
 }
 
-void system_audio_set_onloadeddata(void* feature, AppendData append_data, FtCallbackId onloadeddata)
+void system_audio_set_onloadeddata(void* feature, union AppendData append_data, FtCallbackId onloadeddata)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
-    obj->event.onloadeddata = onloadeddata;
+    obj->event.onloadeddata.callbackId = onloadeddata;
+    obj->event.onloadeddata.feature = feature;
 }
 
-void system_audio_set_onended(void* feature, AppendData append_data, FtCallbackId onended)
+void system_audio_set_onended(void* feature, union AppendData append_data, FtCallbackId onended)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
-    obj->event.onended = onended;
+    obj->event.onended.callbackId = onended;
+    obj->event.onended.feature = feature;
 }
 
-void system_audio_set_ondurationchange(void* feature, AppendData append_data, FtCallbackId ondurationchange)
+void system_audio_set_ondurationchange(void* feature, union AppendData append_data, FtCallbackId ondurationchange)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
-    obj->event.ondurationchange = ondurationchange;
+    obj->event.ondurationchange.callbackId = ondurationchange;
+    obj->event.ondurationchange.feature = feature;
 }
 
-void system_audio_set_ontimeupdate(void* feature, AppendData append_data, FtCallbackId ontimeupdate)
+void system_audio_set_ontimeupdate(void* feature, union AppendData append_data, FtCallbackId ontimeupdate)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
-    obj->event.ontimeupdate = ontimeupdate;
+    obj->event.ontimeupdate.callbackId = ontimeupdate;
+    obj->event.ontimeupdate.feature = feature;
 }
 
-void system_audio_set_onerror(void* feature, AppendData append_data, FtCallbackId onerror)
+void system_audio_set_onerror(void* feature, union AppendData append_data, FtCallbackId onerror)
 {
     FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
-    obj = (AudioObject*)FeatureGetObjectData((FeatureInstanceHandle)feature);
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return;
 
-    obj->event.onerror = onerror;
+    obj->event.onerror.callbackId = onerror;
+    obj->event.onerror.feature = feature;
 }
