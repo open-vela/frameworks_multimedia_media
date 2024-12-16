@@ -125,6 +125,7 @@ static int media_server_create_notify(struct media_server_priv* priv, media_parc
 
 static void media_server_conn_close(struct media_server_conn* conn)
 {
+    MEDIA_DEBUG("%s fd:%d\n", __func__, conn->tran_fd);
     close(conn->tran_fd);
     conn->tran_fd = -EPERM;
     conn->offset = 0;
@@ -219,6 +220,8 @@ static bool media_server_conn_init(struct media_server_conn* conn, int fd)
         conn->offset = 0;
     }
 
+    MEDIA_DEBUG("%s fd:%d available:%d\n", __func__, fd, available);
+
     return available;
 }
 
@@ -235,8 +238,10 @@ static int media_server_accept(struct media_server_priv* priv, struct pollfd* fd
         return -errno;
 
     for (i = 0; i < MEDIA_SERVER_MAXCONN; i++) {
-        if (media_server_conn_init(&priv->conns[i], new_fd))
+        if (media_server_conn_init(&priv->conns[i], new_fd)) {
+            MEDIA_DEBUG("%s media_server_conn_init success, fd: %d.\n", __func__, new_fd);
             return 0;
+        }
     }
 
     close(new_fd);
