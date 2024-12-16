@@ -63,13 +63,5 @@ int media_graph_track_open(MediaGraphTrack **pctx, const char *stream_type,
  * Note that it must also be called during pause. Get it again after resume.
  */
 int media_graph_track_close(MediaGraphTrack **pctx);
-/*
- * Write an avframe to a audio track.
- * @ctx: [in] audio track context
- * @frame: [in] frame
- * @return: 0 on success, negative value on error
- */
-typedef struct AVFrame AVFrame;
-int media_graph_track_write_frame(MediaGraphTrack *ctx, AVFrame *frame);
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_GRAPH_H */

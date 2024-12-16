@@ -192,7 +192,7 @@ static int media_player_on_event_cb(void *udata, int evt, int64_t args)
 {
     MediaPlayerContext* ctx = (MediaPlayerContext*)udata;
     AVFrame* frame;
-    int ret = 0;
+
     MEDIA_INFO("audio track event: %d", evt);
     if (evt == MEDIA_GRAPH_EVT_NEED_FRAME) {
         frame = media_player_queue_pop(ctx, ctx->audio_idx);
@@ -200,17 +200,7 @@ static int media_player_on_event_cb(void *udata, int evt, int64_t args)
             frame = media_player_generate_slience_frame(ctx);
         pthread_mutex_lock(&ctx->mutex);
         if (frame) {
-            if (ctx->audio_track) {
-                ret= media_graph_track_write_frame(ctx->audio_track, frame);
-                if (ret < 0) {
-                    MEDIA_ERR("audio track write frame failed, ret %d.", ret);
-                    av_frame_free(&frame);
-                    pthread_mutex_unlock(&ctx->mutex);
-                    return ret;
-                }
-            } else {
-                av_frame_free(&frame);
-            }
+            av_frame_free(&frame);
         } else {
             MEDIA_ERR("audio track recv dat failed.");
         }

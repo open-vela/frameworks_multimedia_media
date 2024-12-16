@@ -747,6 +747,8 @@ MediadPlugin media_graph_plugin = {
 ///////////////////////////////////////////////////////////////////
 typedef struct MediaGraphTrack {
     AVFilterContext *src;
+    void *link_handle;
+
     int format;
     int samplerate;
     AVChannelLayout ch_layout;
@@ -759,6 +761,7 @@ int media_graph_track_open(MediaGraphTrack **pctx, const char *stream_type,
 {
     MediaGraphPriv *priv = media_graph_plugin.priv;
     MediaGraphTrack *ctx;
+    char msg[32] = {0};
     int ret;
 
     ctx = av_calloc(1, sizeof(*ctx));
@@ -783,9 +786,10 @@ int media_graph_track_open(MediaGraphTrack **pctx, const char *stream_type,
         goto fail;
     }
 
-    ret = av_buffersrc_set_event_cb(ctx->src, on_event_cb, udata);
+    snprintf(msg, sizeof(msg), "%p %p", on_event_cb, udata);
+    ret = avfilter_process_command(ctx->src, "link", msg, (char *)&ctx->link_handle, sizeof(void **), 0);
     if (ret < 0) {
-        MEDIA_ERR("buffersrc:%s failed ret:%d\n", ctx->src->name, ret);
+        MEDIA_ERR("buffersrc:%s link failed ret:%d\n", ctx->src->name, ret);
         goto fail;
     }
 
@@ -803,29 +807,18 @@ int media_graph_track_close(MediaGraphTrack **pctx)
 {
     MediaGraphPriv *priv = media_graph_plugin.priv;
     MediaGraphTrack *ctx = *pctx;
+    int ret;
+
     if (!pctx || !ctx)
         return -EINVAL;
 
-    av_buffersrc_set_event_cb(ctx->src, NULL, NULL);
+    ret = avfilter_process_command(ctx->src, "unlink", (char *)ctx->link_handle, NULL, 0, 0);
+    if (ret < 0)
+        MEDIA_ERR("buffersrc:%s unlink failed ret:%d\n", ctx->src->name, ret);
+
     media_graph_try_touch(priv);
     av_channel_layout_uninit(&ctx->ch_layout);
     av_free(ctx);
     *pctx = NULL;
-    return 0;
-}
-
-int media_graph_track_write_frame(MediaGraphTrack *ctx, AVFrame *frame)
-{
-    MediaGraphPriv *priv = media_graph_plugin.priv;
-    int ret;
-
-    ret = av_buffersrc_add_frame_flags(ctx->src, frame, AV_BUFFERSRC_FLAG_KEEP_REF);
-    if (ret < 0) {
-        MEDIA_ERR("buffersrc:%s failed ret:%d\n", ctx->src->name, ret);
-        return ret;
-    }
-
-    media_graph_try_touch(priv);
-    ctx->last_pts += frame->nb_samples;
     return 0;
 }
