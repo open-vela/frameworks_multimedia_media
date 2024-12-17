@@ -74,6 +74,9 @@ void* media_player_open(const char* stream);
  * @param[in] pending_stop  Whether pending stop before close:
  *                          - 0: stop immediately for closing;
  *                          - 1: stop till complete current playing track.
+ *                          Besides, This parameter is only applicable to audio player.
+ *                          Setting this parameter to 1 for video player does not have
+ *                          the pending_stop function.
  * @return int  Zero on success; a negated errno value on failure.
  */
 int media_player_close(void* handle, int pending_stop);
