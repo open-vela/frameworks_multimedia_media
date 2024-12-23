@@ -53,37 +53,6 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_PLAYER_EVENT_NOP       0
-#define MEDIA_PLAYER_EVENT_PREPARED  1
-#define MEDIA_PLAYER_EVENT_STARTED   2
-#define MEDIA_PLAYER_EVENT_PAUSED    3
-#define MEDIA_PLAYER_EVENT_STOPPED   4
-#define MEDIA_PLAYER_EVENT_SEEKED    5
-#define MEDIA_PLAYER_EVENT_COMPLETED 6
-#define MEDIA_PLAYER_EVENT_CLOSED    7
-
-#define MEDIA_PLAYER_STATE_NOP       MEDIA_PLAYER_EVENT_NOP
-#define MEDIA_PLAYER_STATE_PREPARED  MEDIA_PLAYER_EVENT_PREPARED
-#define MEDIA_PLAYER_STATE_STARTED   MEDIA_PLAYER_EVENT_STARTED
-#define MEDIA_PLAYER_STATE_PAUSED    MEDIA_PLAYER_EVENT_PAUSED
-#define MEDIA_PLAYER_STATE_STOPPED   MEDIA_PLAYER_EVENT_STOPPED
-#define MEDIA_PLAYER_STATE_SEEKED    MEDIA_PLAYER_EVENT_SEEKED
-#define MEDIA_PLAYER_STATE_COMPLETED MEDIA_PLAYER_EVENT_COMPLETED
-#define MEDIA_PLAYER_STATE_CLOSED    MEDIA_PLAYER_EVENT_CLOSED
-
-#define MEDIA_PLAYER_CMD_OPEN        1
-#define MEDIA_PLAYER_CMD_SET_EVENT   2
-#define MEDIA_PLAYER_CMD_SET_OPTIONS 3
-#define MEDIA_PLAYER_CMD_SET_LOOP    4
-#define MEDIA_PLAYER_CMD_PREPARE     5
-#define MEDIA_PLAYER_CMD_START       6
-#define MEDIA_PLAYER_CMD_PAUSE       7
-#define MEDIA_PLAYER_CMD_SEEK        8
-
-#define MEDIA_PLAYER_CMD_STOP  100
-#define MEDIA_PLAYER_CMD_RESET 101
-#define MEDIA_PLAYER_CMD_CLOSE 102
-
 #define MEDIA_PLAYER_CMD_QUEUE_IDX  (1 << 0)
 #define MEDIA_PLAYER_DATA_QUEUE_IDX (1 << 1)
 
@@ -96,6 +65,30 @@
 /****************************************************************************
  * Private Types
  ****************************************************************************/
+
+enum media_player_state {
+    MEDIA_PLAYER_STATE_IDLE = 0,
+    MEDIA_PLAYER_STATE_PREPARED,
+    MEDIA_PLAYER_STATE_STARTED,
+    MEDIA_PLAYER_STATE_PAUSED,
+    MEDIA_PLAYER_STATE_STOPPED,
+    MEDIA_PLAYER_STATE_COMPLETED,
+};
+
+enum media_player_cmd {
+    MEDIA_PLAYER_CMD_OPEN = 1,
+    MEDIA_PLAYER_CMD_SET_EVENT,
+    MEDIA_PLAYER_CMD_SET_OPTIONS,
+    MEDIA_PLAYER_CMD_SET_LOOP,
+    MEDIA_PLAYER_CMD_PREPARE,
+    MEDIA_PLAYER_CMD_START,
+    MEDIA_PLAYER_CMD_PAUSE,
+    MEDIA_PLAYER_CMD_SEEK,
+    MEDIA_PLAYER_CMD_STOP,
+    MEDIA_PLAYER_CMD_RESET,
+    MEDIA_PLAYER_CMD_CLOSE,
+};
+
 typedef struct PlayerCmd {
     SIMPLEQ_ENTRY(PlayerCmd) entry;
     int cmd;
@@ -703,19 +696,6 @@ static int media_player_notify_event(MediaPlayerContext* ctx, int event, int res
 
 static void media_player_event_cb(MediaPlayerContext* ctx, int event, int result, const char* extra)
 {
-    switch (event) {
-    case MEDIA_PLAYER_EVENT_STARTED:
-        break;
-    case MEDIA_PLAYER_EVENT_PAUSED:
-    case MEDIA_PLAYER_EVENT_STOPPED:
-    case MEDIA_PLAYER_EVENT_COMPLETED:
-        break;
-
-    case MEDIA_PLAYER_EVENT_CLOSED:
-        media_player_notify_finalize(ctx);
-        return;
-    }
-
     if (ctx->event)
         media_player_notify_event(ctx, event, result, extra);
 }
@@ -742,7 +722,7 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
         ret = 0;
 
     ctx->state = MEDIA_PLAYER_STATE_COMPLETED;
-    media_player_event_cb(ctx, MEDIA_PLAYER_EVENT_COMPLETED, ret, NULL);
+    media_player_event_cb(ctx, MEDIA_EVENT_COMPLETED, ret, NULL);
 
     if (!ctx->pending_stop)
         return false;
@@ -780,7 +760,7 @@ static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush)
 
 end:
 
-    media_player_event_cb(ctx, MEDIA_PLAYER_EVENT_SEEKED, ret, NULL);
+    media_player_event_cb(ctx, MEDIA_EVENT_SEEKED, ret, NULL);
     return ret;
 }
 
@@ -797,7 +777,7 @@ static void media_player_ctx_init(MediaPlayerContext* ctx)
 
 static void media_player_ctx_release(MediaPlayerContext* ctx)
 {
-    ctx->state = MEDIA_PLAYER_STATE_NOP;
+    ctx->state = MEDIA_PLAYER_STATE_IDLE;
     ctx->loop_count = 0;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
@@ -809,14 +789,12 @@ static int media_player_close(MediaPlayerContext* ctx)
 {
     int i;
 
-    ctx->state = MEDIA_PLAYER_STATE_CLOSED;
-
     for (i = 0; i < ctx->nb_streams; i++) {
         ff_framequeue_free(&ctx->streams[i].queue);
     }
 
     av_freep(&ctx->streams);
-    media_player_event_cb(ctx, MEDIA_PLAYER_EVENT_CLOSED, 0, NULL);
+    media_player_notify_finalize(ctx);
     return 0;
 }
 
@@ -834,7 +812,7 @@ static int media_player_pause(MediaPlayerContext* ctx)
         media_graph_track_close(&ctx->audio_track);
     pthread_mutex_unlock(&ctx->mutex);
 
-    media_player_event_cb(ctx, MEDIA_PLAYER_EVENT_PAUSED, ret, NULL);
+    media_player_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
     return 0;
 }
 
@@ -855,7 +833,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
     ctx->pending_stop = 0;
     ctx->state = MEDIA_PLAYER_STATE_STOPPED;
 
-    media_player_event_cb(ctx, MEDIA_PLAYER_EVENT_STOPPED, 0, NULL);
+    media_player_event_cb(ctx, MEDIA_EVENT_STOPPED, 0, NULL);
     return 0;
 }
 
@@ -873,7 +851,7 @@ static int media_player_start(MediaPlayerContext* ctx)
     if (!ctx->audio_track)
         ret = media_player_open_audiotrack(ctx);
 
-    media_player_event_cb(ctx, MEDIA_PLAYER_EVENT_STARTED, ret, NULL);
+    media_player_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
     return 0;
 }
 
@@ -889,7 +867,7 @@ static int media_player_prepare(MediaPlayerContext* ctx, const char* filename)
         ctx->state = MEDIA_PLAYER_STATE_PREPARED;
 
 out:
-    media_player_event_cb(ctx, MEDIA_PLAYER_EVENT_PREPARED, ret, NULL);
+    media_player_event_cb(ctx, MEDIA_EVENT_PREPARED, ret, NULL);
     return 0;
 }
 
@@ -1196,7 +1174,7 @@ static MediaPlayerContext* media_player_get_available_session(MediaPlayerPriv* p
 
     for (i = 0; i < MEDIA_PLAYER_MAX_CNT; i++) {
         ctx = &priv->ctxs[i];
-        if (ctx->state == MEDIA_PLAYER_STATE_NOP)
+        if (ctx->state == MEDIA_PLAYER_STATE_IDLE)
             break;
     }
 
@@ -1213,7 +1191,7 @@ static void media_player_dump(MediaPlayerPriv* priv)
     av_bprintf(&buf, "\n--------------player dump start-------------\n");
     for (i = 0; i < MEDIA_PLAYER_MAX_CNT; i++) {
         ctx = &priv->ctxs[i];
-        if (ctx->state == MEDIA_PLAYER_STATE_NOP)
+        if (ctx->state == MEDIA_PLAYER_STATE_IDLE)
             continue;
         av_bprintf(&buf, "player[%d, %s] state:%d", i, ctx->name, ctx->state);
         if (ctx->audio_idx >=0)
@@ -1258,7 +1236,7 @@ static void* media_player_thread(void* arg)
             if (media_player_queue_cnt(ctx, ctx->audio_idx) < ctx->streams[ctx->audio_idx].nb_queue_max)
                 exit = media_player_proc_dat(ctx);
         } else if (exit) {
-            ctx->state = MEDIA_PLAYER_STATE_NOP;
+            ctx->state = MEDIA_PLAYER_STATE_IDLE;
             pthread_mutex_unlock(&ctx->mutex);
             break;
         }
@@ -1278,7 +1256,7 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
     pthread_t thread;
     int ret;
 
-    if (ctx->state != MEDIA_PLAYER_STATE_NOP || name == NULL)
+    if (ctx->state != MEDIA_PLAYER_STATE_IDLE || name == NULL)
         return AVERROR(EINVAL);
 
     strlcpy(ctx->name, name, sizeof(ctx->name));
@@ -1291,7 +1269,7 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
     pthread_attr_setschedparam(&attr, &param);
     ret = pthread_create(&thread, &attr, media_player_thread, ctx);
     if (ret != 0) {
-        ctx->state = MEDIA_PLAYER_STATE_NOP;
+        ctx->state = MEDIA_PLAYER_STATE_IDLE;
         return AVERROR(ret);
     }
 

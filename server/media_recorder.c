@@ -54,32 +54,6 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_RECORDER_EVENT_NOP       0
-#define MEDIA_RECORDER_EVENT_PREPARED  1
-#define MEDIA_RECORDER_EVENT_STARTED   2
-#define MEDIA_RECORDER_EVENT_PAUSED    3
-#define MEDIA_RECORDER_EVENT_STOPPED   4
-#define MEDIA_RECORDER_EVENT_COMPLETED 5
-#define MEDIA_RECORDER_EVENT_CLOSED    6
-
-#define MEDIA_RECORDER_STATE_NOP       MEDIA_RECORDER_EVENT_NOP
-#define MEDIA_RECORDER_STATE_PREPARED  MEDIA_RECORDER_EVENT_PREPARED
-#define MEDIA_RECORDER_STATE_STARTED   MEDIA_RECORDER_EVENT_STARTED
-#define MEDIA_RECORDER_STATE_PAUSED    MEDIA_RECORDER_EVENT_PAUSED
-#define MEDIA_RECORDER_STATE_STOPPED   MEDIA_RECORDER_EVENT_STOPPED
-#define MEDIA_RECORDER_STATE_COMPLETED MEDIA_RECORDER_EVENT_COMPLETED
-#define MEDIA_RECORDER_STATE_CLOSED    MEDIA_RECORDER_EVENT_CLOSED
-
-#define MEDIA_RECORDER_CMD_OPEN        1
-#define MEDIA_RECORDER_CMD_SET_EVENT   2
-#define MEDIA_RECORDER_CMD_SET_OPTIONS 3
-#define MEDIA_RECORDER_CMD_PREPARE     4
-#define MEDIA_RECORDER_CMD_START       5
-#define MEDIA_RECORDER_CMD_PAUSE       6
-#define MEDIA_RECORDER_CMD_STOP        7
-#define MEDIA_RECORDER_CMD_RESET       8
-#define MEDIA_RECORDER_CMD_CLOSE       9
-
 #define MEDIA_RECORDER_CMD_QUEUE_IDX  (1 << 0)
 #define MEDIA_RECORDER_DATA_QUEUE_IDX (1 << 1)
 
@@ -93,6 +67,28 @@
 /****************************************************************************
  * Private Types
  ****************************************************************************/
+
+enum media_recorder_state {
+    MEDIA_RECORDER_STATE_IDLE = 0,
+    MEDIA_RECORDER_STATE_PREPARED,
+    MEDIA_RECORDER_STATE_STARTED,
+    MEDIA_RECORDER_STATE_PAUSED,
+    MEDIA_RECORDER_STATE_STOPPED,
+    MEDIA_RECORDER_STATE_COMPLETED,
+};
+
+enum media_recorder_cmd {
+    MEDIA_RECORDER_CMD_OPEN = 1,
+    MEDIA_RECORDER_CMD_SET_EVENT,
+    MEDIA_RECORDER_CMD_SET_OPTIONS,
+    MEDIA_RECORDER_CMD_PREPARE,
+    MEDIA_RECORDER_CMD_START,
+    MEDIA_RECORDER_CMD_PAUSE,
+    MEDIA_RECORDER_CMD_STOP,
+    MEDIA_RECORDER_CMD_RESET,
+    MEDIA_RECORDER_CMD_CLOSE,
+};
+
 typedef struct RecorderCmd {
     SIMPLEQ_ENTRY(RecorderCmd)
     entry;
@@ -244,19 +240,6 @@ static int media_recorder_notify_event(MediaRecorderContext* ctx, int event,
 static void media_recorder_event_cb(MediaRecorderContext* ctx, int event,
                                     int result, const char* extra)
 {
-    switch (event) {
-    case MEDIA_RECORDER_EVENT_STARTED:
-        break;
-    case MEDIA_RECORDER_EVENT_PAUSED:
-    case MEDIA_RECORDER_EVENT_STOPPED:
-    case MEDIA_RECORDER_EVENT_COMPLETED:
-        break;
-
-    case MEDIA_RECORDER_EVENT_CLOSED:
-        media_recorder_notify_finalize(ctx);
-        return;
-    }
-
     if (ctx->event)
         media_recorder_notify_event(ctx, event, result, extra);
 }
@@ -580,7 +563,7 @@ static void media_recorder_clean(MediaRecorderContext* ctx)
     if (ctx->state != MEDIA_RECORDER_STATE_STOPPED) {
         media_recorder_close_muxer(ctx);
         ctx->state = MEDIA_RECORDER_STATE_STOPPED;
-        media_recorder_notify_event(ctx, MEDIA_RECORDER_EVENT_STOPPED, 0, NULL);
+        media_recorder_notify_event(ctx, MEDIA_EVENT_STOPPED, 0, NULL);
     }
 }
 
@@ -663,7 +646,7 @@ out:
 
     media_recorder_clear_queue(ctx, MEDIA_RECORDER_DATA_QUEUE_IDX);
     ctx->state = MEDIA_RECORDER_STATE_COMPLETED;
-    media_recorder_notify_event(ctx, MEDIA_RECORDER_EVENT_COMPLETED,
+    media_recorder_notify_event(ctx, MEDIA_EVENT_COMPLETED,
                                 ret == AVERROR_EOF ? 0 : ret, NULL);
     media_recorder_clean(ctx);
     return ret;
@@ -671,8 +654,8 @@ out:
 
 static void media_recorder_ctx_init(MediaRecorderContext* ctx)
 {
-    ctx->state     = MEDIA_RECORDER_STATE_STOPPED;
-    ctx->cmd_max   = MEDIA_RECORDER_CMD_QUEUE_MAX;
+    ctx->state = MEDIA_RECORDER_STATE_STOPPED;
+    ctx->cmd_max = MEDIA_RECORDER_CMD_QUEUE_MAX;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
     SIMPLEQ_INIT(&ctx->cmd_queue);
@@ -682,7 +665,7 @@ static void media_recorder_ctx_init(MediaRecorderContext* ctx)
 
 static void media_recorder_ctx_release(MediaRecorderContext* ctx)
 {
-    ctx->state     = MEDIA_RECORDER_STATE_NOP;
+    ctx->state = MEDIA_RECORDER_STATE_IDLE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
     media_parcel_deinit(&ctx->parcel);
@@ -698,7 +681,7 @@ static int media_recorder_pause(MediaRecorderContext* ctx)
         ret = 0;
     }
 
-    media_recorder_event_cb(ctx, MEDIA_RECORDER_EVENT_PAUSED, ret, NULL);
+    media_recorder_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
     return 0;
 }
 
@@ -737,7 +720,7 @@ static int media_recorder_close(MediaRecorderContext* ctx)
     }
 
     av_freep(&ctx->streams);
-    media_recorder_event_cb(ctx, MEDIA_RECORDER_EVENT_CLOSED, 0, NULL);
+    media_recorder_notify_finalize(ctx);
     return 0;
 }
 
@@ -757,7 +740,7 @@ static int media_recorder_start(MediaRecorderContext* ctx)
 #endif
 
 out:
-    media_recorder_event_cb(ctx, MEDIA_RECORDER_EVENT_STARTED, ret, NULL);
+    media_recorder_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
     return ret;
 }
 
@@ -795,7 +778,7 @@ static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filenam
     ctx->state = MEDIA_RECORDER_STATE_PREPARED;
 
 out:
-    media_recorder_event_cb(ctx, MEDIA_RECORDER_EVENT_PREPARED, ret, NULL);
+    media_recorder_event_cb(ctx, MEDIA_EVENT_PREPARED, ret, NULL);
     return ret;
 }
 
@@ -1083,7 +1066,7 @@ static MediaRecorderContext* media_recorder_get_available_session(MediaRecorderP
 
     for (i = 0; i < MEDIA_RECORDER_MAX_CNT; i++) {
         ctx = &priv->ctxs[i];
-        if (ctx->state == MEDIA_RECORDER_STATE_NOP)
+        if (ctx->state == MEDIA_RECORDER_STATE_IDLE)
             break;
     }
 
@@ -1100,7 +1083,7 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
     av_bprintf(&buf, "\n--------------recorder dump start-------------\n");
     for (i = 0; i < MEDIA_RECORDER_MAX_CNT; i++) {
         ctx = &priv->ctxs[i];
-        if (ctx->state == MEDIA_RECORDER_STATE_NOP)
+        if (ctx->state == MEDIA_RECORDER_STATE_IDLE)
             continue;
         av_bprintf(&buf, "recorder[%d, %s] state:%d", i, ctx->name, ctx->state);
         if (ctx->audio_idx >= 0)
@@ -1146,7 +1129,7 @@ static void* media_recorder_thread(void* arg)
             if (media_recorder_proc_dat(ctx) == AVERROR_EOF)
                 exit = true;
         } else if (exit) {
-            ctx->state = MEDIA_RECORDER_STATE_NOP;
+            ctx->state = MEDIA_RECORDER_STATE_IDLE;
             pthread_mutex_unlock(&ctx->mutex);
             break;
         }
@@ -1166,7 +1149,7 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
     pthread_t thread;
     int ret;
 
-    if (ctx->state != MEDIA_RECORDER_STATE_NOP || name == NULL)
+    if (ctx->state != MEDIA_RECORDER_STATE_IDLE || name == NULL)
         return AVERROR(EINVAL);
 
     strlcpy(ctx->name, name, sizeof(ctx->name));
@@ -1179,7 +1162,7 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
     pthread_attr_setschedparam(&attr, &param);
     ret = pthread_create(&thread, &attr, media_recorder_thread, ctx);
     if (ret != 0) {
-        ctx->state = MEDIA_RECORDER_STATE_NOP;
+        ctx->state = MEDIA_RECORDER_STATE_IDLE;
         return AVERROR(ret);
     }
 
