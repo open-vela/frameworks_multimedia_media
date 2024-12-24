@@ -384,6 +384,7 @@ static void media_common_event_cb(void* cookie, int event,
 
     case AVMOVIE_ASYNC_EVENT_CLOSED:
         media_stub_set_stream_status(ctx->filter->name, false);
+        media_server_set_data(ctx->cookie, NULL);
         media_stub_notify_finalize(&ctx->cookie);
         ctx->filter->opaque = NULL;
         free(ctx);
@@ -473,8 +474,10 @@ static int media_common_handler(media_plugin_t* pctx, struct media_server_conn* 
         if (arg)
             sscanf(arg, "%d", &pending);
 
-        if (!arg || !pending)
+        if (!arg || !pending) {
+            media_server_set_data(ctx->cookie, NULL);
             media_stub_notify_finalize(&ctx->cookie);
+        }
     } else if (target) {
         /* Find other filter if user specified one. */
         filter = avfilter_find_on_link(ctx->filter, target, NULL, player, NULL);
