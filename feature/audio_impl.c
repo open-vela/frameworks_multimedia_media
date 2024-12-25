@@ -31,6 +31,8 @@ static const char* file_tag = "[jidl_feature] audio_impl";
 #define MEDIA_STATE_PAUSED 1
 #define MEDIA_STATE_STOPPED 2
 
+#define AUDIO_TIMEUPDATE_TIMEOUT 250
+
 #define APP_PATH_PREFIX "internal://"
 
 typedef struct {
@@ -75,8 +77,8 @@ typedef struct {
 static void audio_uv_get_duration_cb(void* cookie, int ret, unsigned duration);
 static void audio_uv_get_position_cb(void* cookie, int ret, unsigned position);
 static void audio_uv_close_cb(void* cookie, int ret);
+static void timer_close_cb(uv_handle_t* handle);
 static void init_audio_obj(AudioObject* obj);
-void system_audio_wrap_stop(FeatureInstanceHandle feature, union AppendData append_data);
 
 /* common interface */
 void system_audio_onRegister(const char* feature_name)
@@ -87,17 +89,34 @@ void system_audio_onRegister(const char* feature_name)
 void system_audio_onCreate(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
 {
     FEATURE_LOG_INFO("%s::%s(), FeatureProtoHandle: %p\n", file_tag, __FUNCTION__, handle);
+
+    FeatureManagerHandle manager;
     AudioObject* obj;
+    uv_loop_t* loop;
 
     obj = (AudioObject*)malloc(sizeof(AudioObject));
     if (!obj) {
         FEATURE_LOG_ERROR("%s::%s(), malloc AudioObject fail\n", file_tag, __FUNCTION__);
-        FeatureSetProtoData(handle, NULL);
         return;
     }
 
     init_audio_obj(obj);
     obj->proto = handle;
+
+    manager = FeatureGetManagerHandleFromProto(obj->proto);
+    loop = FeatureGetUVLoop(manager);
+    if (!loop) {
+        FEATURE_LOG_ERROR("%s::%s(), FeatureGetUVLoop fail\n", file_tag, __FUNCTION__);
+        free(obj);
+        return;
+    }
+
+    if (uv_timer_init(loop, &obj->timer) < 0) {
+        FEATURE_LOG_ERROR("timer init failed\n", file_tag, __FUNCTION__);
+        return;
+    }
+
+    obj->timer.data = obj;
     memset(&obj->event, 0, sizeof(obj->event));
 
     FeatureSetProtoData(handle, obj);
@@ -124,7 +143,7 @@ void system_audio_onDestroy(FeatureRuntimeContext ctx, FeatureProtoHandle handle
     if (!obj || !obj->handle)
         return;
 
-    media_uv_player_close(obj->handle, 0, audio_uv_close_cb);
+    uv_close((uv_handle_t*)&obj->timer, timer_close_cb);
 }
 
 void system_audio_onUnregister(const char* feature_name)
@@ -163,6 +182,14 @@ static const char* get_state_string(int state)
         return "stop";
 }
 
+static void timer_close_cb(uv_handle_t* handle)
+{
+    AudioObject* obj;
+
+    obj = handle->data;
+    media_uv_player_close(obj->handle, 0, audio_uv_close_cb);
+}
+
 static void timeupdate_timer_cb(uv_timer_t* handle)
 {
     AudioObject* obj;
@@ -180,23 +207,6 @@ static void timeupdate_timer_cb(uv_timer_t* handle)
 
     media_uv_player_get_position(obj->handle,
         audio_uv_get_position_cb, obj);
-}
-
-static void timeupdate_loop_timer(AudioObject* obj)
-{
-    FeatureManagerHandle manager;
-    uv_loop_t* loop;
-    if (!obj)
-        return;
-
-    manager = FeatureGetManagerHandleFromProto(obj->proto);
-    loop = FeatureGetUVLoop(manager);
-    if (!loop)
-        return;
-
-    uv_timer_init(loop, &obj->timer);
-    obj->timer.data = obj;
-    uv_timer_start(&obj->timer, timeupdate_timer_cb, 0, 250);
 }
 
 static void update_duration(AudioObject* obj)
@@ -235,7 +245,7 @@ static void system_audio_event_callback(void* cookie, int event, int ret, const 
         if (FeatureCheckCallbackId(obj->event.onplay.feature, obj->event.onplay.callbackId))
             FeatureInvokeCallback(obj->event.onplay.feature, obj->event.onplay.callbackId);
         update_duration(obj);
-        timeupdate_loop_timer(obj);
+        uv_timer_start(&obj->timer, timeupdate_timer_cb, 0, AUDIO_TIMEUPDATE_TIMEOUT);
         break;
     case MEDIA_EVENT_PAUSED:
         obj->state = MEDIA_STATE_PAUSED;
