@@ -775,6 +775,7 @@ static void media_player_ctx_release(MediaPlayerContext* ctx)
     ctx->loop_count = 0;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
+    media_player_notify_finalize(ctx);
     media_parcel_deinit(&ctx->parcel);
     pthread_mutex_destroy(&ctx->mutex);
 }
@@ -788,7 +789,6 @@ static int media_player_close(MediaPlayerContext* ctx)
     }
 
     av_freep(&ctx->streams);
-    media_player_notify_finalize(ctx);
     return 0;
 }
 

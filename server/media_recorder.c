@@ -668,6 +668,7 @@ static void media_recorder_ctx_release(MediaRecorderContext* ctx)
     ctx->state = MEDIA_RECORDER_STATE_IDLE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
+    media_recorder_notify_finalize(ctx);
     media_parcel_deinit(&ctx->parcel);
     pthread_mutex_destroy(&ctx->mutex);
 }
@@ -720,7 +721,6 @@ static int media_recorder_close(MediaRecorderContext* ctx)
     }
 
     av_freep(&ctx->streams);
-    media_recorder_notify_finalize(ctx);
     return 0;
 }
 
