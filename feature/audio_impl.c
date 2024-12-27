@@ -31,7 +31,7 @@ static const char* file_tag = "[jidl_feature] audio_impl";
 #define MEDIA_STATE_PAUSED 1
 #define MEDIA_STATE_STOPPED 2
 
-#define AUDIO_TIMEUPDATE_TIMEOUT 250
+#define AUDIO_TIMEUPDATE_TIMEOUT 1000
 
 #define APP_PATH_PREFIX "internal://"
 
@@ -58,7 +58,8 @@ typedef struct {
 } MetaInfo;
 
 typedef struct {
-    void* handle;
+    void* player;
+    void* session;
     FeatureProtoHandle proto;
     Event event;
     uv_timer_t timer;
@@ -74,11 +75,22 @@ typedef struct {
     bool loop;
 } AudioObject;
 
-static void audio_uv_get_duration_cb(void* cookie, int ret, unsigned duration);
-static void audio_uv_get_position_cb(void* cookie, int ret, unsigned position);
-static void audio_uv_close_cb(void* cookie, int ret);
-static void timer_close_cb(uv_handle_t* handle);
-static void init_audio_obj(AudioObject* obj);
+/* uv interface cb function */
+static void audio_get_duration_cb(void* cookie, int ret, unsigned duration);
+static void audio_get_position_cb(void* cookie, int ret, unsigned position);
+static void audio_session_close_cb(void* cookie, int ret);
+static void audio_player_close_cb(void* cookie, int ret);
+static void audio_timer_close_cb(uv_handle_t* handle);
+static void audio_start_cb(void* cookie, int ret);
+
+/*event callback*/
+static void audio_player_event_callback(void* cookie, int event, int ret, const char* data);
+static void audio_session_event_callback(void* cookie, int event, int ret, const char* extra);
+
+/* inner interface */
+static void audio_try_free(AudioObject* obj);
+static void audio_reset_obj(AudioObject* obj);
+static void audio_close(AudioObject* obj);
 
 /* common interface */
 void system_audio_onRegister(const char* feature_name)
@@ -94,32 +106,48 @@ void system_audio_onCreate(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
     AudioObject* obj;
     uv_loop_t* loop;
 
-    obj = (AudioObject*)malloc(sizeof(AudioObject));
+    obj = (AudioObject*)calloc(1, sizeof(AudioObject));
     if (!obj) {
-        FEATURE_LOG_ERROR("%s::%s(), malloc AudioObject fail\n", file_tag, __FUNCTION__);
+        FEATURE_LOG_ERROR("%s::%s(), calloc AudioObject failed\n", file_tag, __FUNCTION__);
         return;
     }
 
-    init_audio_obj(obj);
+    audio_reset_obj(obj);
     obj->proto = handle;
 
-    manager = FeatureGetManagerHandleFromProto(obj->proto);
+    manager = FeatureGetManagerHandleFromProto(handle);
     loop = FeatureGetUVLoop(manager);
-    if (!loop) {
-        FEATURE_LOG_ERROR("%s::%s(), FeatureGetUVLoop fail\n", file_tag, __FUNCTION__);
-        free(obj);
-        return;
+    obj->session = media_uv_session_register(loop, NULL, audio_session_event_callback, obj);
+    if (!obj->session) {
+        FEATURE_LOG_ERROR("%s::%s(), session register failed\n", file_tag, __FUNCTION__);
+        goto cleanup;
     }
 
-    if (uv_timer_init(loop, &obj->timer) < 0) {
-        FEATURE_LOG_ERROR("timer init failed\n", file_tag, __FUNCTION__);
-        return;
+    obj->player = media_uv_player_open(loop, obj->streamType, NULL, obj);
+    if (!obj->player) {
+        FEATURE_LOG_ERROR("%s::%s(), player open failed\n", file_tag, __FUNCTION__);
+        goto cleanup;
     }
 
+    if (media_uv_player_listen(obj->player, audio_player_event_callback) < 0) {
+        FEATURE_LOG_ERROR("%s::%s(), player listen failed\n", file_tag, __FUNCTION__);
+        goto cleanup;
+    }
+
+    uv_timer_init(loop, &obj->timer);
     obj->timer.data = obj;
-    memset(&obj->event, 0, sizeof(obj->event));
 
     FeatureSetProtoData(handle, obj);
+    return;
+
+cleanup:
+    if (obj->player)
+        media_uv_player_close(obj->player, 0, NULL);
+    if (obj->session)
+        media_uv_session_unregister(obj->session, NULL);
+    free(obj);
+
+    return;
 }
 
 void system_audio_onRequired(FeatureRuntimeContext ctx, FeatureInstanceHandle handle)
@@ -139,11 +167,10 @@ void system_audio_onDestroy(FeatureRuntimeContext ctx, FeatureProtoHandle handle
     AudioObject* obj;
 
     obj = (AudioObject*)FeatureGetProtoData(handle);
-
-    if (!obj || !obj->handle)
+    if (!obj || !obj->player)
         return;
 
-    uv_close((uv_handle_t*)&obj->timer, timer_close_cb);
+    uv_close((uv_handle_t*)&obj->timer, audio_timer_close_cb);
 }
 
 void system_audio_onUnregister(const char* feature_name)
@@ -152,7 +179,7 @@ void system_audio_onUnregister(const char* feature_name)
 }
 
 /* inner interface */
-static void init_audio_obj(AudioObject* obj)
+static void audio_reset_obj(AudioObject* obj)
 {
     if (!obj)
         return;
@@ -163,13 +190,28 @@ static void init_audio_obj(AudioObject* obj)
     memset(obj->meta.artist, 0, MAX_ARTIST_LEN);
     strncpy(obj->streamType, MEDIA_STREAM_MUSIC, MAX_STREAMTYPE_LEN);
 
-    obj->handle = NULL;
     obj->state = MEDIA_STATE_STOPPED;
     obj->currentTime = 0;
     obj->duration = -1;
     obj->volume = 1;
     obj->autoplay = false;
     obj->loop = false;
+}
+
+static void audio_close(AudioObject* obj)
+{
+    int ret;
+
+    if (!obj)
+        return;
+
+    ret = media_uv_player_close(obj->player, 0, audio_player_close_cb);
+    if (ret < 0)
+        FEATURE_LOG_ERROR("player:%p close, ret:%d\n", obj->player, ret);
+
+    ret = media_uv_session_unregister(obj->session, audio_session_close_cb);
+    if (ret < 0)
+        FEATURE_LOG_ERROR("session:%p unregister, ret:%d\n", obj->session, ret);
 }
 
 static const char* get_state_string(int state)
@@ -182,17 +224,16 @@ static const char* get_state_string(int state)
         return "stop";
 }
 
-static void timer_close_cb(uv_handle_t* handle)
+static void audio_try_free(AudioObject* obj)
 {
-    AudioObject* obj;
-
-    obj = handle->data;
-    media_uv_player_close(obj->handle, 0, audio_uv_close_cb);
+    if (!obj->player && !obj->session)
+        free(obj);
 }
 
 static void timeupdate_timer_cb(uv_timer_t* handle)
 {
     AudioObject* obj;
+
     if (!handle)
         return;
 
@@ -200,29 +241,60 @@ static void timeupdate_timer_cb(uv_timer_t* handle)
     if (!obj)
         return;
 
-    if (obj->state != MEDIA_STATE_STARTED) {
-        uv_timer_stop(&obj->timer);
-        return;
-    }
-
-    media_uv_player_get_position(obj->handle,
-        audio_uv_get_position_cb, obj);
+    if (obj->state == MEDIA_STATE_STARTED)
+        media_uv_player_get_position(obj->player, audio_get_position_cb, obj);
 }
 
 static void update_duration(AudioObject* obj)
 {
     FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
-    if (!obj || !obj->handle)
+    if (!obj || !obj->player)
         return;
 
-    media_uv_player_get_duration(obj->handle, audio_uv_get_duration_cb, obj);
+    media_uv_player_get_duration(obj->player, audio_get_duration_cb, obj);
 }
 
-static void system_audio_event_callback(void* cookie, int event, int ret, const char* data)
+static void audio_session_event_callback(void* cookie, int event, int ret, const char* extra)
 {
-    FEATURE_LOG_INFO("%s::%s(), event:%d, ret: %d\n", file_tag, __FUNCTION__, event, ret);
-    AudioObject* obj = (AudioObject*)cookie;
+    FEATURE_LOG_INFO("session_event_cb cookie:%p event:%s(%d) ret:%d extra:%s\n",
+        cookie, media_event_get_name(event), event, ret, extra);
 
+    AudioObject* obj;
+
+    obj = (AudioObject*)cookie;
+    if (!obj) {
+        FEATURE_LOG_ERROR("%s::%s() fail, obj is null.\n", file_tag, __FUNCTION__);
+        return;
+    }
+
+    /* Received control event from session, call user's operation callback. */
+    switch (event) {
+    case MEDIA_EVENT_START:
+        media_uv_player_start_auto(obj->player, MEDIA_SCENARIO_MUSIC, audio_start_cb, obj);
+        break;
+
+    case MEDIA_EVENT_PAUSE:
+        media_uv_player_pause(obj->player, NULL, NULL);
+        break;
+
+    case MEDIA_EVENT_STOP:
+        media_uv_player_stop(obj->player, NULL, NULL);
+        break;
+
+    default:
+        break;
+    }
+}
+
+static void audio_player_event_callback(void* cookie, int event, int ret, const char* extra)
+{
+    FEATURE_LOG_INFO("player_event_cb cookie:%p event:%s(%d) ret:%d extra:%s\n",
+        cookie, media_event_get_name(event), event, ret, extra);
+
+    media_metadata_t data = { 0 };
+    AudioObject* obj;
+
+    obj = (AudioObject*)cookie;
     if (!obj) {
         FEATURE_LOG_ERROR("%s::%s() fail, obj is null.\n", file_tag, __FUNCTION__);
         return;
@@ -230,8 +302,7 @@ static void system_audio_event_callback(void* cookie, int event, int ret, const 
 
     if (ret < 0) {
         FEATURE_LOG_ERROR("%s::%s() fail, ret < 0.\n", file_tag, __FUNCTION__);
-        media_uv_player_close(obj->handle, 0, NULL);
-        init_audio_obj(obj);
+        media_uv_player_stop(obj->player, 0, NULL);
         return;
     }
 
@@ -239,24 +310,42 @@ static void system_audio_event_callback(void* cookie, int event, int ret, const 
     case MEDIA_EVENT_PREPARED:
         if (FeatureCheckCallbackId(obj->event.onloadeddata.feature, obj->event.onloadeddata.callbackId))
             FeatureInvokeCallback(obj->event.onloadeddata.feature, obj->event.onloadeddata.callbackId);
+
+        data.flags = MEDIA_METAFLAG_TITLE | MEDIA_METAFLAG_ARTIST | MEDIA_METAFLAG_ALBUM;
+        data.title = obj->meta.title;
+        data.artist = obj->meta.artist;
+        data.album = obj->meta.album;
         break;
+
     case MEDIA_EVENT_STARTED:
         obj->state = MEDIA_STATE_STARTED;
         if (FeatureCheckCallbackId(obj->event.onplay.feature, obj->event.onplay.callbackId))
             FeatureInvokeCallback(obj->event.onplay.feature, obj->event.onplay.callbackId);
         update_duration(obj);
         uv_timer_start(&obj->timer, timeupdate_timer_cb, 0, AUDIO_TIMEUPDATE_TIMEOUT);
+        data.flags = MEDIA_METAFLAG_STATE;
+        data.state = 1;
         break;
+
     case MEDIA_EVENT_PAUSED:
         obj->state = MEDIA_STATE_PAUSED;
+        uv_timer_stop(&obj->timer);
         if (FeatureCheckCallbackId(obj->event.onpause.feature, obj->event.onpause.callbackId))
             FeatureInvokeCallback(obj->event.onpause.feature, obj->event.onpause.callbackId);
+        data.flags = MEDIA_METAFLAG_STATE;
+        data.state = 0;
         break;
+
     case MEDIA_EVENT_STOPPED:
         obj->state = MEDIA_STATE_STOPPED;
+        uv_timer_stop(&obj->timer);
+        audio_reset_obj(obj);
         if (FeatureCheckCallbackId(obj->event.onstop.feature, obj->event.onstop.callbackId))
             FeatureInvokeCallback(obj->event.onstop.feature, obj->event.onstop.callbackId);
+        data.flags = MEDIA_METAFLAG_STATE;
+        data.state = 0;
         break;
+
     case MEDIA_EVENT_COMPLETED:
         obj->state = MEDIA_STATE_STOPPED;
         if (FeatureCheckCallbackId(obj->event.onended.feature, obj->event.onended.callbackId))
@@ -266,64 +355,55 @@ static void system_audio_event_callback(void* cookie, int event, int ret, const 
     default:
         break;
     }
+
+    ret = media_uv_session_update(obj->session, &data, NULL, NULL);
+    if (ret < 0)
+        FEATURE_LOG_ERROR("%s::%s()media session update fail, ret:%d.\n", file_tag, __FUNCTION__, ret);
 }
 
 /* uv interface cb function */
-static void audio_uv_prepare_cb(void* cookie, int ret)
+static void audio_timer_close_cb(uv_handle_t* handle)
+{
+    audio_close((AudioObject*)handle->data);
+}
+
+static void audio_session_close_cb(void* cookie, int ret)
+{
+    FEATURE_LOG_INFO("player:%p closed", cookie);
+    AudioObject* obj;
+
+    obj = (AudioObject*)cookie;
+    obj->session = NULL;
+    audio_try_free(obj);
+}
+
+static void audio_player_close_cb(void* cookie, int ret)
+{
+    FEATURE_LOG_INFO("player:%p closed", cookie);
+    AudioObject* obj;
+
+    obj = (AudioObject*)cookie;
+    obj->player = NULL;
+    audio_try_free(obj);
+}
+
+static void audio_start_cb(void* cookie, int ret)
 {
     FEATURE_LOG_INFO("%s::%s(), ret: %d\n", file_tag, __FUNCTION__, ret);
     AudioObject* obj;
 
     obj = (AudioObject*)cookie;
-    if (!obj || !obj->handle)
-        return;
-
-    if (ret < 0)
-        goto fail;
-
-    ret = media_uv_player_start(obj->handle, NULL, NULL);
-    if (ret < 0)
-        goto fail;
-
-    return;
-
-fail:
-    FEATURE_LOG_ERROR("%s::%s() error, ret:%d\n", file_tag, __FUNCTION__, ret);
-    media_uv_player_close(obj->handle, 0, NULL);
-    init_audio_obj(obj);
+    if (ret < 0) {
+        FEATURE_LOG_ERROR("player:%p start failed, ret:%d\n", obj->player, ret);
+        audio_player_event_callback(obj->player, MEDIA_EVENT_STOPPED, 0, NULL);
+    }
 }
 
-static void audio_uv_open_cb(void* cookie, int ret)
-{
-    FEATURE_LOG_INFO("%s::%s(), ret: %d\n", file_tag, __FUNCTION__, ret);
-    AudioObject* obj;
-    obj = (AudioObject*)cookie;
-    if (!obj || !obj->handle)
-        return;
-
-    if (ret < 0)
-        goto fail;
-
-    ret = media_uv_player_listen(obj->handle, system_audio_event_callback);
-    if (ret < 0)
-        goto fail;
-
-    ret = media_uv_player_prepare(obj->handle, obj->src, NULL,
-        NULL, audio_uv_prepare_cb, obj);
-    if (ret < 0)
-        goto fail;
-
-    return;
-
-fail:
-    FEATURE_LOG_ERROR("%s::%s() error, ret:%d\n", file_tag, __FUNCTION__, ret);
-    media_uv_player_close(obj->handle, 0, NULL);
-    init_audio_obj(obj);
-}
-
-static void audio_uv_get_position_cb(void* cookie, int ret, unsigned position)
+static void audio_get_position_cb(void* cookie, int ret, unsigned position)
 {
     FEATURE_LOG_INFO("%s::%s(),ret:%d, position:%d\n", file_tag, __FUNCTION__, ret, position);
+
+    media_metadata_t data = { 0 };
     AudioObject* obj;
 
     obj = (AudioObject*)cookie;
@@ -335,12 +415,20 @@ static void audio_uv_get_position_cb(void* cookie, int ret, unsigned position)
 
     if (FeatureCheckCallbackId(obj->event.ontimeupdate.feature, obj->event.ontimeupdate.callbackId))
         FeatureInvokeCallback(obj->event.ontimeupdate.feature, obj->event.ontimeupdate.callbackId);
+
+    data.flags = MEDIA_METAFLAG_POSITION;
+    data.position = position;
+    if (media_uv_session_update(obj->session, &data, NULL, NULL) < 0)
+        FEATURE_LOG_ERROR("%s::%s()media session update fail, ret:%d.\n", file_tag, __FUNCTION__, ret);
 }
 
-static void audio_uv_get_duration_cb(void* cookie, int ret, unsigned duration)
+static void audio_get_duration_cb(void* cookie, int ret, unsigned duration)
 {
     FEATURE_LOG_INFO("%s::%s(),ret:%d, duration:%d\n", file_tag, __FUNCTION__, ret, duration);
+
+    media_metadata_t data = { 0 };
     AudioObject* obj;
+
     obj = (AudioObject*)cookie;
     if (!obj)
         return;
@@ -350,72 +438,83 @@ static void audio_uv_get_duration_cb(void* cookie, int ret, unsigned duration)
 
     if (FeatureCheckCallbackId(obj->event.ondurationchange.feature, obj->event.ondurationchange.callbackId))
         FeatureInvokeCallback(obj->event.ondurationchange.feature, obj->event.ondurationchange.callbackId);
-}
 
-static void audio_uv_close_cb(void* cookie, int ret)
-{
-    FEATURE_LOG_INFO("%s::%s()\n", file_tag, __FUNCTION__);
-    AudioObject* obj;
-
-    obj = (AudioObject*)cookie;
-    if (obj)
-        free(obj);
+    data.flags = MEDIA_METAFLAG_DURATION;
+    data.duration = duration;
+    if (media_uv_session_update(obj->session, &data, NULL, NULL) < 0)
+        FEATURE_LOG_ERROR("%s::%s()media session update fail, ret:%d.\n", file_tag, __FUNCTION__, ret);
 }
 
 /* warp function */
 void system_audio_wrap_play(FeatureInstanceHandle feature, union AppendData append_data)
 {
     FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
+
     AudioObject* obj;
-    FeatureManagerHandle manager;
+    int ret;
 
     obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
-    if (!obj)
+    if (!obj || !obj->player)
         return;
 
-    if (obj->state == MEDIA_STATE_STARTED)
-        return;
+    if (obj->state == MEDIA_STATE_STOPPED) {
+        if (!obj->src[0]) {
+            FEATURE_LOG_ERROR("player:%p audio info src is NULL.\n", obj->player);
+            return;
+        }
 
-    // resume
-    if (obj->state == MEDIA_STATE_PAUSED && obj->handle) {
-        media_uv_player_start(obj->handle, NULL, NULL);
-        return;
+        ret = media_uv_player_prepare(obj->player, obj->src, NULL,
+            NULL, NULL, NULL);
+        FEATURE_LOG_INFO("player:%p prepare, ret:%d", obj->player, ret);
+        if (ret < 0)
+            return;
+
+        /* for the scenario where the user seek before playback */
+        if (obj->currentTime)
+            media_uv_player_seek(obj->player, obj->currentTime, NULL, NULL);
     }
 
-    manager = FeatureGetManagerHandleFromInstance(feature);
-    obj->handle = media_uv_player_open(FeatureGetUVLoop(manager), MEDIA_STREAM_MUSIC,
-        audio_uv_open_cb, obj);
+    ret = media_uv_player_start_auto(obj->player, MEDIA_SCENARIO_MUSIC, audio_start_cb, obj);
+    FEATURE_LOG_INFO("player:%p start, ret:%d", obj->player, ret);
 }
 
 void system_audio_wrap_pause(FeatureInstanceHandle feature, union AppendData append_data)
 {
     FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
+
     AudioObject* obj;
+    int ret;
 
     obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
-    if (!obj || !obj->handle)
+    if (!obj || !obj->player)
         return;
 
-    if (obj->state != MEDIA_STATE_STARTED)
+    if (obj->state != MEDIA_STATE_STARTED) {
+        FEATURE_LOG_WARN("player:%p not in started state, cannot pause", obj->player);
         return;
+    }
 
-    media_uv_player_pause(obj->handle, NULL, NULL);
+    ret = media_uv_player_pause(obj->player, NULL, NULL);
+    FEATURE_LOG_INFO("player:%p pause, ret:%d", obj->player, ret);
 }
 
 void system_audio_wrap_stop(FeatureInstanceHandle feature, union AppendData append_data)
 {
     FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
+    int ret;
 
     obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
-    if (!obj || !obj->handle)
+    if (!obj || !obj->player)
         return;
 
-    if (obj->state == MEDIA_STATE_STOPPED)
+    if (obj->state == MEDIA_STATE_STOPPED) {
+        FEATURE_LOG_WARN("player:%p already stopped, no action needed", obj->player);
         return;
+    }
 
-    media_uv_player_close(obj->handle, 0, NULL);
-    init_audio_obj(obj);
+    ret = media_uv_player_stop(obj->player, 0, NULL);
+    FEATURE_LOG_INFO("player:%p stop, ret:%d", obj->player, ret);
 }
 
 void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, union AppendData append_data, system_audio_GetPalyStateParam* p)
@@ -569,10 +668,10 @@ void system_audio_set_currentTime(void* feature, union AppendData append_data, F
     AudioObject* obj;
 
     obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
-    if (!obj || !obj->handle)
+    if (!obj || !obj->player)
         return;
 
-    media_uv_player_seek(obj->handle, currentTime, NULL, NULL);
+    media_uv_player_seek(obj->player, currentTime, NULL, NULL);
     obj->currentTime = currentTime;
 }
 
@@ -630,10 +729,10 @@ void system_audio_set_loop(void* feature, union AppendData append_data, FtBool l
     AudioObject* obj;
 
     obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
-    if (!obj || !obj->handle)
+    if (!obj || !obj->player)
         return;
 
-    media_uv_player_set_looping(obj->handle, loop ? -1 : 0, NULL, NULL);
+    media_uv_player_set_looping(obj->player, loop ? -1 : 0, NULL, NULL);
     obj->loop = loop;
 }
 
@@ -655,10 +754,10 @@ void system_audio_set_volume(void* feature, union AppendData append_data, FtFloa
     AudioObject* obj;
 
     obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
-    if (!obj || !obj->handle)
+    if (!obj || !obj->player)
         return;
 
-    media_uv_player_set_volume(obj->handle, volume, NULL, NULL);
+    media_uv_player_set_volume(obj->player, volume, NULL, NULL);
     obj->volume = volume;
 }
 
