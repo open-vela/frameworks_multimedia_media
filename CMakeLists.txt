@@ -47,7 +47,8 @@ if(CONFIG_MEDIA)
     list(APPEND INCDIR ${FEATURE_TOP}/include)
 
     set(CSRCS ${CSRCS} ${CMAKE_CURRENT_LIST_DIR}/feature/audio_impl.c
-              ${CMAKE_CURRENT_LIST_DIR}/feature/volume_impl.c)
+              ${CMAKE_CURRENT_LIST_DIR}/feature/volume_impl.c
+              ${CMAKE_CURRENT_LIST_DIR}/feature/session_impl.c)
   endif()
 
   if(CONFIG_MEDIA_FOCUS)
@@ -109,7 +110,8 @@ if(CONFIG_MEDIA)
 
   if(CONFIG_MEDIA_FEATURE)
     set(JIDL_PATHS ${CMAKE_CURRENT_LIST_DIR}/feature/volume.jidl
-                   ${CMAKE_CURRENT_LIST_DIR}/feature/audio.jidl)
+                   ${CMAKE_CURRENT_LIST_DIR}/feature/audio.jidl
+                   ${CMAKE_CURRENT_LIST_DIR}/feature/session.jidl)
 
     include(nuttx_add_jidl)
     set(PY_SCRIPT ${FEATURE_TOP}/tools/jidl/jsongensource.py)
