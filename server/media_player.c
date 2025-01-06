@@ -200,6 +200,8 @@ static int media_player_on_event_cb(void *udata, int evt, int64_t args)
             frame = media_player_generate_slience_frame(ctx);
         pthread_mutex_lock(&ctx->mutex);
         if (frame) {
+            AVFrame* out_frame = (AVFrame*)(uintptr_t)args;
+            av_frame_move_ref(out_frame, frame);
             av_frame_free(&frame);
         } else {
             MEDIA_ERR("audio track recv dat failed.");
