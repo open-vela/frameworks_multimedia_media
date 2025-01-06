@@ -566,21 +566,23 @@ static void media_player_close_demuxer(MediaPlayerContext* ctx)
     OutputStream* stream;
     int i;
 
-    for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
-        if (media_player_stream_inactive(ctx, i))
-            continue;
-
-        stream = &ctx->streams[i];
-        if (stream) {
-            stream->index = -1;
-            avcodec_free_context(&stream->codec_ctx);
-        }
-    }
-
-    avformat_close_input(&ctx->format_ctx);
 
     if (ctx->format_opt)
         av_dict_free(&ctx->format_opt);
+
+    if (ctx->format_ctx) {
+        for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
+            if (media_player_stream_inactive(ctx, i))
+                continue;
+
+            stream = &ctx->streams[i];
+            if (stream) {
+                stream->index = -1;
+                avcodec_free_context(&stream->codec_ctx);
+            }
+        }
+        avformat_close_input(&ctx->format_ctx);
+    }
 
     ctx->current_ms = 0;
 }
