@@ -131,6 +131,8 @@ typedef struct MediaRecorderContext {
 #ifdef MEDIA_RECORDER_TEST_STREAM
     timer_t timer_id;
 #endif
+
+    MediaGraphTrack* audio_track;
 } MediaRecorderContext;
 
 typedef struct MediaRecorderPriv {
@@ -537,6 +539,37 @@ static int media_recorder_init_stream(MediaRecorderContext* ctx)
     return 0;
 }
 
+static int media_recorder_on_event_cb(void *udata, int evt, int64_t args)
+{
+    MediaRecorderContext* ctx = (MediaRecorderContext*)udata;
+    AVFrame* frame;
+
+    MEDIA_INFO("audio track event: %d", evt);
+    if (evt == MEDIA_GRAPH_EVT_EMIT_FRAME) {
+        AVFrame* in_frame = (AVFrame*)(uintptr_t)args;
+        frame = av_frame_clone(in_frame);
+        media_recorder_queue_push(ctx, ctx->audio_idx, frame);
+    } else {
+        MEDIA_ERR("unknown audio track event: %d", evt);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int media_recorder_open_audiotrack(MediaRecorderContext* ctx)
+{
+    int ret = 0;
+
+    ret = media_graph_track_open(&ctx->audio_track, ctx->name,-1, 0, 0,
+                                 media_recorder_on_event_cb, ctx);
+    if (ret < 0)
+        MEDIA_ERR("media_graph_track_open failed, ret %d.\n", ret);
+    else
+        MEDIA_INFO("media_graph_track_open success, ret %d.\n", ret);
+    return ret;
+}
+
 static void media_recorder_close_muxer(MediaRecorderContext* ctx)
 {
     int i;
@@ -684,6 +717,11 @@ static int media_recorder_pause(MediaRecorderContext* ctx)
         ret = 0;
     }
 
+    pthread_mutex_lock(&ctx->mutex);
+    if (ctx->audio_track)
+        media_graph_track_close(&ctx->audio_track);
+    pthread_mutex_unlock(&ctx->mutex);
+
     media_recorder_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
     return 0;
 }
@@ -697,6 +735,11 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
 #ifdef MEDIA_RECORDER_TEST_STREAM
     media_recorder_delete_testtimer(ctx);
 #endif
+
+    pthread_mutex_lock(&ctx->mutex);
+    if (ctx->audio_track)
+        media_graph_track_close(&ctx->audio_track);
+    pthread_mutex_unlock(&ctx->mutex);
 
     if (ctx->state == MEDIA_RECORDER_STATE_PREPARED || ctx->state == MEDIA_RECORDER_STATE_COMPLETED)
         goto out;
@@ -735,6 +778,9 @@ static int media_recorder_start(MediaRecorderContext* ctx)
 
     ret = 0;
     ctx->state = MEDIA_RECORDER_STATE_STARTED;
+
+    if (!ctx->audio_track)
+        ret = media_recorder_open_audiotrack(ctx);
 
 #ifdef MEDIA_RECORDER_TEST_STREAM
     // create test timer for audio recorder
