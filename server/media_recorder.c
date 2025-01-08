@@ -1132,8 +1132,9 @@ static void* media_recorder_thread(void* arg)
             ctx->state = MEDIA_RECORDER_STATE_IDLE;
             pthread_mutex_unlock(&ctx->mutex);
             break;
+        } else {
+            pthread_mutex_unlock(&ctx->mutex);
         }
-        pthread_mutex_unlock(&ctx->mutex);
     }
 
     media_recorder_ctx_release(ctx);

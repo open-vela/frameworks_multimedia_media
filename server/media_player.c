@@ -1233,8 +1233,9 @@ static void* media_player_thread(void* arg)
             ctx->state = MEDIA_PLAYER_STATE_IDLE;
             pthread_mutex_unlock(&ctx->mutex);
             break;
+        } else {
+            pthread_mutex_unlock(&ctx->mutex);
         }
-        pthread_mutex_unlock(&ctx->mutex);
     }
 
     media_player_ctx_release(ctx);
