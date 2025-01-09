@@ -668,6 +668,8 @@ static void media_recorder_ctx_release(MediaRecorderContext* ctx)
     ctx->state = MEDIA_RECORDER_STATE_IDLE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
+    ctx->nb_streams = 0;
+    ctx->event = 0;
     media_recorder_notify_finalize(ctx);
     media_parcel_deinit(&ctx->parcel);
     pthread_mutex_destroy(&ctx->mutex);

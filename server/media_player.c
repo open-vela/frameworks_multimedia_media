@@ -772,9 +772,13 @@ static void media_player_ctx_init(MediaPlayerContext* ctx)
 static void media_player_ctx_release(MediaPlayerContext* ctx)
 {
     ctx->state = MEDIA_PLAYER_STATE_IDLE;
-    ctx->loop_count = 0;
-    ctx->audio_idx = -1;
-    ctx->video_idx = -1;
+    ctx->audio_idx      = -1;
+    ctx->video_idx      = -1;
+    ctx->loop_count     = 0;
+    ctx->nb_streams     = 0;
+    ctx->offload        = 0;
+    ctx->pending_stop   = 0;
+    ctx->event          = 0;
     media_player_notify_finalize(ctx);
     media_parcel_deinit(&ctx->parcel);
     pthread_mutex_destroy(&ctx->mutex);
