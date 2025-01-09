@@ -432,12 +432,12 @@ static int media_recorder_init_stream(MediaRecorderContext* ctx)
     int i;
 
     // init output stream by stream type.
-    // A: only audio, V: only video, others: audio and video
-    if (ctx->name[0] == 'A') {
+    // a: only audio, v: only video, others: audio and video
+    if (ctx->name[0] == 'a') {
         stream_cnt     = 1;
         types[0]       = AVMEDIA_TYPE_AUDIO;
         ctx->audio_idx = 0;
-    } else if (ctx->name[0] == 'V') {
+    } else if (ctx->name[0] == 'v') {
         stream_cnt     = 1;
         types[0]       = AVMEDIA_TYPE_VIDEO;
         ctx->video_idx = 0;
