@@ -61,9 +61,6 @@
 #define MEDIA_RECORDER_CMD_QUEUE_MAX   16
 #define MEDIA_RECORDER_DATA_QUEUE_SIZE 4
 
-#define MEDIA_RECORDER_TEST_STREAM
-#define MEDIA_RECORDER_SLIENCE_PERIOD 40
-
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -127,11 +124,6 @@ typedef struct MediaRecorderContext {
     AVFormatContext* format_ctx;          /* output format context */
     const AVOutputFormat* format;         /* output format */
     struct RecorderCmdQueue cmd_queue;
-
-#ifdef MEDIA_RECORDER_TEST_STREAM
-    timer_t timer_id;
-#endif
-
     MediaGraphTrack* audio_track;
 } MediaRecorderContext;
 
@@ -148,72 +140,6 @@ static int media_recorder_queue_push(MediaRecorderContext* ctx, int idx, AVFrame
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
-#ifdef MEDIA_RECORDER_TEST_STREAM
-
-static void media_recorder_generate_testaudio(union sigval value)
-{
-    MediaRecorderContext* ctx = (MediaRecorderContext*)value.sival_ptr;
-    AVFrame* frame = av_frame_alloc();
-    static int64_t pts = 0;
-
-    if (!frame) {
-        MEDIA_ERR("alloc frame failed");
-        return;
-    }
-
-    frame->sample_rate = ctx->streams[ctx->audio_idx].enc_ctx->sample_rate;
-    frame->format      = ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt;
-    frame->ch_layout   = ctx->streams[ctx->audio_idx].enc_ctx->ch_layout;
-    frame->nb_samples  = frame->sample_rate * MEDIA_RECORDER_SLIENCE_PERIOD / 1000;
-
-    if (av_frame_get_buffer(frame, 0) < 0) {
-        MEDIA_ERR("alloc frame buffer failed");
-        av_frame_free(&frame);
-        return;
-    }
-
-    frame->time_base = (AVRational) { 1, frame->sample_rate };
-    frame->pts = pts + ((int64_t)MEDIA_RECORDER_SLIENCE_PERIOD * frame->sample_rate / 1000);
-    pts = frame->pts;
-    av_samples_set_silence(frame->data, 0, frame->nb_samples,
-                           frame->ch_layout.nb_channels, frame->format);
-
-    media_recorder_queue_push(ctx, ctx->audio_idx, frame);
-}
-
-static int media_recorder_create_testtimer(MediaRecorderContext* ctx)
-{
-    struct itimerspec its;
-    struct sigevent se;
-
-    se.sigev_notify            = SIGEV_THREAD;
-    se.sigev_value.sival_ptr   = ctx;
-    se.sigev_notify_function   = media_recorder_generate_testaudio;
-    se.sigev_notify_attributes = NULL;
-
-    if (timer_create(CLOCK_MONOTONIC, &se, &ctx->timer_id) < 0)
-        return -errno;
-
-    its.it_value.tv_sec     = 0;
-    its.it_value.tv_nsec    = MEDIA_RECORDER_SLIENCE_PERIOD * 1000 * 1000;
-    its.it_interval.tv_sec  = 0;
-    its.it_interval.tv_nsec = MEDIA_RECORDER_SLIENCE_PERIOD * 1000 * 1000;
-
-    if (timer_settime(ctx->timer_id, 0, &its, NULL) < 0)
-        return -errno;
-
-    return 0;
-}
-
-static int media_recorder_delete_testtimer(MediaRecorderContext* ctx)
-{
-    if (ctx->timer_id)
-        timer_delete(ctx->timer_id);
-    return 0;
-}
-
-#endif // MEDIA_RECORDER_TEST_STREAM
 
 static void media_recorder_notify_finalize(MediaRecorderContext* ctx)
 {
@@ -732,10 +658,6 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
     if (ctx->state == MEDIA_RECORDER_STATE_STOPPED)
         return 0;
 
-#ifdef MEDIA_RECORDER_TEST_STREAM
-    media_recorder_delete_testtimer(ctx);
-#endif
-
     pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_track)
         media_graph_track_close(&ctx->audio_track);
@@ -781,11 +703,6 @@ static int media_recorder_start(MediaRecorderContext* ctx)
 
     if (!ctx->audio_track)
         ret = media_recorder_open_audiotrack(ctx);
-
-#ifdef MEDIA_RECORDER_TEST_STREAM
-    // create test timer for audio recorder
-    media_recorder_create_testtimer(ctx);
-#endif
 
 out:
     media_recorder_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
