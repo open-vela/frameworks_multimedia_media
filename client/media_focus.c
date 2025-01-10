@@ -138,7 +138,7 @@ static void* media_focus_request_l(int* suggestion, const char* scenario,
     return priv;
 
 err:
-    media_focus_abandon(priv);
+    media_focus_abandon_l(priv, true);
     return NULL;
 }
 
