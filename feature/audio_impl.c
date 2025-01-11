@@ -324,7 +324,6 @@ static void audio_player_event_callback(void* cookie, int event, int ret, const 
 
     switch (event) {
     case MEDIA_EVENT_PREPARED:
-        obj->state = MEDIA_STATE_PREPARED;
         if (FeatureCheckCallbackId(obj->event.onloadeddata.feature, obj->event.onloadeddata.callbackId))
             FeatureInvokeCallback(obj->event.onloadeddata.feature, obj->event.onloadeddata.callbackId);
 
@@ -335,7 +334,6 @@ static void audio_player_event_callback(void* cookie, int event, int ret, const 
         break;
 
     case MEDIA_EVENT_STARTED:
-        obj->state = MEDIA_STATE_STARTED;
         if (FeatureCheckCallbackId(obj->event.onplay.feature, obj->event.onplay.callbackId))
             FeatureInvokeCallback(obj->event.onplay.feature, obj->event.onplay.callbackId);
         update_duration(obj);
@@ -345,7 +343,6 @@ static void audio_player_event_callback(void* cookie, int event, int ret, const 
         break;
 
     case MEDIA_EVENT_PAUSED:
-        obj->state = MEDIA_STATE_PAUSED;
         uv_timer_stop(&obj->timer);
         if (FeatureCheckCallbackId(obj->event.onpause.feature, obj->event.onpause.callbackId))
             FeatureInvokeCallback(obj->event.onpause.feature, obj->event.onpause.callbackId);
@@ -354,9 +351,7 @@ static void audio_player_event_callback(void* cookie, int event, int ret, const 
         break;
 
     case MEDIA_EVENT_STOPPED:
-        obj->state = MEDIA_STATE_STOPPED;
         uv_timer_stop(&obj->timer);
-        audio_reset_obj(obj);
         if (FeatureCheckCallbackId(obj->event.onstop.feature, obj->event.onstop.callbackId))
             FeatureInvokeCallback(obj->event.onstop.feature, obj->event.onstop.callbackId);
         data.flags = MEDIA_METAFLAG_STATE;
@@ -544,7 +539,7 @@ void system_audio_wrap_play(FeatureInstanceHandle feature, union AppendData appe
         FEATURE_LOG_INFO("player:%p prepare, ret:%d", obj->player, ret);
         if (ret < 0)
             goto error;
-
+        obj->state = MEDIA_STATE_PREPARED;
         /* for the scenario where the user seek before playback */
         if (obj->currentTime)
             media_uv_player_seek(obj->player, obj->currentTime, NULL, NULL);
@@ -554,7 +549,7 @@ void system_audio_wrap_play(FeatureInstanceHandle feature, union AppendData appe
     FEATURE_LOG_INFO("player:%p start, ret:%d", obj->player, ret);
     if (ret < 0)
         goto error;
-
+    obj->state = MEDIA_STATE_STARTED;
     return;
 error:
     if (FeatureCheckCallbackId(obj->event.onerror.feature, obj->event.onerror.callbackId))
@@ -618,6 +613,7 @@ void system_audio_wrap_stop(FeatureInstanceHandle feature, union AppendData appe
         goto error;
 
     obj->state = MEDIA_STATE_STOPPED;
+    audio_reset_obj(obj);
     return;
 error:
     if (FeatureCheckCallbackId(obj->event.onerror.feature, obj->event.onerror.callbackId))
