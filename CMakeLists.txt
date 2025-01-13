@@ -51,15 +51,6 @@ if(CONFIG_MEDIA)
   file(GLOB UTILS_SRCS utils/*.c)
   set(CSRCS ${CSRCS} ${UTILS_SRCS})
 
-  if(CONFIG_MEDIA_FEATURE)
-    set(FEATURE_TOP ${NUTTX_APPS_DIR}/frameworks/runtimes/feature)
-    list(APPEND INCDIR ${FEATURE_TOP}/include)
-
-    set(CSRCS ${CSRCS} ${CMAKE_CURRENT_LIST_DIR}/feature/audio_impl.c
-              ${CMAKE_CURRENT_LIST_DIR}/feature/volume_impl.c
-              ${CMAKE_CURRENT_LIST_DIR}/feature/session_impl.c)
-  endif()
-
   if(CONFIG_MEDIA_FOCUS)
     list(APPEND SERVER_SRCS server/media_focus.c server/focus_stack.c)
   endif()
@@ -118,23 +109,25 @@ if(CONFIG_MEDIA)
   nuttx_add_dependencies(TARGET libmedia DEPENDS ffmpeg)
 
   if(CONFIG_MEDIA_FEATURE)
+    set(FEATURE_SRCS ${CMAKE_CURRENT_LIST_DIR}/feature/audio_impl.c
+                     ${CMAKE_CURRENT_LIST_DIR}/feature/volume_impl.c
+                     ${CMAKE_CURRENT_LIST_DIR}/feature/session_impl.c)
+
     set(JIDL_PATHS ${CMAKE_CURRENT_LIST_DIR}/feature/volume.jidl
                    ${CMAKE_CURRENT_LIST_DIR}/feature/audio.jidl
                    ${CMAKE_CURRENT_LIST_DIR}/feature/session.jidl)
 
-    include(nuttx_add_jidl)
-    set(PY_SCRIPT ${FEATURE_TOP}/tools/jidl/jsongensource.py)
-    set(BINARY_EXT_MODULES_DIR ${CMAKE_BINARY_DIR}/feature/modules/)
+    set(FEATURE_NAMES system_volume system_audio system_media_session)
 
     nuttx_add_jidl(
       TARGET
       libmedia
-      JIDL_SCRIPT
-      ${PY_SCRIPT}
-      JIDL_OUT_DIR
-      ${BINARY_EXT_MODULES_DIR}
+      FEATURE_SRCS
+      ${FEATURE_SRCS}
       JIDLS
       ${JIDL_PATHS}
+      FEATURE_NAMES
+      ${FEATURE_NAMES}
       OUT_SRC_EXT
       c)
   endif() # CONFIG_MEDIA_FEATURE
