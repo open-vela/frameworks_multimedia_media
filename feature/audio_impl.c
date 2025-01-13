@@ -121,6 +121,7 @@ void system_audio_onCreate(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
 
     audio_reset_obj(obj);
     obj->proto = handle;
+    obj->volume = 1.0;
     obj->state = MEDIA_STATE_OPENING;
 
     manager = FeatureGetManagerHandleFromProto(handle);
@@ -200,7 +201,6 @@ static void audio_reset_obj(AudioObject* obj)
 
     obj->currentTime = 0;
     obj->duration = -1;
-    obj->volume = 1;
     obj->autoplay = false;
     obj->loop = false;
 }
