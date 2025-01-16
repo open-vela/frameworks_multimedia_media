@@ -48,6 +48,7 @@
 #include "media_plugin.h"
 #include "media_server.h"
 #include "media_graph.h"
+#include "media_video_output.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -144,6 +145,7 @@ typedef struct MediaPlayerContext {
     OutputStream* streams; /**< array of all streams, one per output */
 
     MediaGraphStream* audio_output;
+    MediaVOutputContext* video_output;
 } MediaPlayerContext;
 
 typedef struct MediaPlayerPriv {
@@ -230,11 +232,24 @@ static int media_player_queue_cnt(MediaPlayerContext* ctx, int idx)
 {
     int count = 0;
 
+    if (idx < 0)
+        return 0;
+
     pthread_mutex_lock(&ctx->mutex);
     count = ff_framequeue_queued_frames(&ctx->streams[idx].queue);
     pthread_mutex_unlock(&ctx->mutex);
 
     return count;
+}
+
+static inline int media_player_is_need_process(MediaPlayerContext* ctx)
+{
+     return ((ctx->audio_idx != -1 &&
+            (media_player_queue_cnt(ctx, ctx->audio_idx) <
+             ctx->streams[ctx->audio_idx].nb_queue_max)) ||
+            (ctx->video_idx != -1 &&
+             (media_player_queue_cnt(ctx, ctx->video_idx) <
+             ctx->streams[ctx->video_idx].nb_queue_max)));
 }
 
 static AVFrame *media_player_queue_pop(MediaPlayerContext* ctx, int idx)
@@ -543,7 +558,16 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
                                           media_player_on_event_cb, ctx);
             if (ret < 0) {
                 MEDIA_ERR("media_graph_stream_open failed.\n");
-                ret = AVERROR(EINVAL);
+            }
+        } else if (codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+            char options[128] = {0};
+            // these option is set by user
+            snprintf(options, sizeof(options), "format=%s:devname=%s:pix_fmt=%d",
+                     "fbdev", "/dev/fb0", AV_PIX_FMT_BGRA);
+
+            ret = media_video_output_open(&ctx->video_output, MEDIA_VOUTPUT_FBDEV, options);
+            if (ret < 0) {
+                MEDIA_ERR("Failed to open video_output\n");
                 goto out;
             }
         }
@@ -784,6 +808,9 @@ static int media_player_close(MediaPlayerContext* ctx)
     for (i = 0; i < ctx->nb_streams; i++) {
         ff_framequeue_free(&ctx->streams[i].queue);
     }
+
+    if (ctx->video_output)
+        media_video_output_close(&ctx->video_output);
 
     av_freep(&ctx->streams);
     return 0;
@@ -1113,7 +1140,7 @@ static int media_player_poll_available(MediaPlayerContext* ctx)
     fds[0].events = POLLIN;
     fds[0].revents = 0;
 
-    ret = poll(fds, 1, 10);
+    ret = poll(fds, 1, 5);
     if (ret == -1) {
         return ret;
     } else if (ret == 0) {
@@ -1205,8 +1232,8 @@ static void media_player_dump(MediaPlayerPriv* priv)
         if (ctx->video_idx >=0)
             av_bprintf(&buf, ", v: %d %s %dx%d %d", ctx->video_idx,
             avcodec_get_name(ctx->streams[ctx->video_idx].codec_ctx->codec_id),
-            ctx->streams[ctx->audio_idx].codec_ctx->width,
-            ctx->streams[ctx->audio_idx].codec_ctx->height,
+            ctx->streams[ctx->video_idx].codec_ctx->width,
+            ctx->streams[ctx->video_idx].codec_ctx->height,
             media_player_queue_cnt(ctx, ctx->video_idx));
     }
     av_bprintf(&buf, "\n--------------player dump end---------------\n");
@@ -1234,8 +1261,17 @@ static void* media_player_thread(void* arg)
                 exit = true;
         } else if (ctx->state == MEDIA_PLAYER_STATE_STARTED) {
             pthread_mutex_unlock(&ctx->mutex);
-            if (media_player_queue_cnt(ctx, ctx->audio_idx) < ctx->streams[ctx->audio_idx].nb_queue_max)
+            if (media_player_is_need_process(ctx))
                 exit = media_player_proc_dat(ctx);
+
+            if (media_player_queue_cnt(ctx, ctx->video_idx) > 0) {
+                AVFrame* frame = media_player_queue_pop(ctx, ctx->video_idx);
+                ret = media_video_output_write_frame(ctx->video_output, frame);
+                if (ret < 0) {
+                    MEDIA_ERR("video_output write frame failed %d\n", ret);
+                }
+            }
+
         } else if (exit) {
             ctx->state = MEDIA_PLAYER_STATE_IDLE;
             pthread_mutex_unlock(&ctx->mutex);

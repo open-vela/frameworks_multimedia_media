@@ -74,6 +74,7 @@ ifneq ($(CONFIG_LIB_FFMPEG),)
   CSRCS  += server/media_graph.c server/media_session.c
   CSRCS  += server/media_player.c
   CSRCS  += server/media_recorder.c
+  CSRCS  += server/media_video_output.c
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/ffmpeg/ffmpeg
 endif
 
