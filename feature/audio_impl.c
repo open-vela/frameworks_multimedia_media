@@ -112,6 +112,8 @@ void system_audio_onCreate(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
     FeatureManagerHandle manager;
     AudioObject* obj;
     uv_loop_t* loop;
+    int volume;
+    int ret;
 
     obj = (AudioObject*)calloc(1, sizeof(AudioObject));
     if (!obj) {
@@ -121,12 +123,16 @@ void system_audio_onCreate(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
 
     audio_reset_obj(obj);
     obj->proto = handle;
-    obj->volume = 1.0;
     obj->state = MEDIA_STATE_OPENING;
 
     manager = FeatureGetManagerHandleFromProto(handle);
     loop = FeatureGetUVLoop(manager);
     obj->session = media_uv_session_register(loop, NULL, audio_session_event_callback, obj);
+
+    ret = media_policy_get_stream_volume(obj->streamType, &volume);
+    if (ret >= 0)
+        obj->volume = volume / 10.0;
+
     if (!obj->session) {
         FEATURE_LOG_ERROR("%s::%s(), session register failed\n", file_tag, __FUNCTION__);
         goto cleanup;
@@ -855,13 +861,17 @@ FtFloat system_audio_get_volume(void* feature, union AppendData append_data)
 void system_audio_set_volume(void* feature, union AppendData append_data, FtFloat volume)
 {
     FEATURE_LOG_INFO("%s::%s(), volume:%f\n", file_tag, __FUNCTION__, volume);
+    FeatureManagerHandle manager;
     AudioObject* obj;
+    uv_loop_t* loop;
 
     obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj || !obj->player)
         return;
 
-    media_uv_player_set_volume(obj->player, volume, NULL, NULL);
+    manager = FeatureGetManagerHandleFromProto(obj->proto);
+    loop = FeatureGetUVLoop(manager);
+    media_uv_policy_set_stream_volume(loop, obj->streamType, volume * 10, NULL, NULL);
     obj->volume = volume;
 }
 
