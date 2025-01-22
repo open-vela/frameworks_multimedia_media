@@ -76,6 +76,7 @@ typedef struct {
     PlayerState state;
     float currentTime;
     float duration;
+    float percent;
     float volume;
     bool autoplay;
     bool loop;
@@ -205,6 +206,7 @@ static void audio_reset_obj(AudioObject* obj)
     memset(obj->meta.artist, 0, MAX_ARTIST_LEN);
     strncpy(obj->streamType, MEDIA_STREAM_MUSIC, MAX_STREAMTYPE_LEN);
 
+    obj->percent = 0;
     obj->currentTime = 0;
     obj->duration = -1;
     obj->autoplay = false;
@@ -479,8 +481,10 @@ static void audio_get_position_cb(void* cookie, int ret, unsigned position)
     if (!obj)
         return;
 
-    if (ret >= 0)
+    if (ret >= 0) {
         obj->currentTime = position / 1000;
+        obj->percent = (obj->currentTime * 100.0) / obj->duration;
+    }
 
     if (FeatureCheckCallbackId(obj->event.ontimeupdate.feature, obj->event.ontimeupdate.callbackId))
         FeatureInvokeCallback(obj->event.ontimeupdate.feature, obj->event.ontimeupdate.callbackId);
@@ -652,6 +656,7 @@ void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, union AppendD
     audiostate->volume = obj->volume;
     audiostate->mute = obj->volume == 0;
     audiostate->duration = obj->duration;
+    audiostate->percent = obj->percent;
 
     if (FeatureCheckCallbackId(feature, p->success)) {
         FeatureInvokeCallback(feature, p->success, audiostate);
@@ -783,6 +788,18 @@ void system_audio_set_currentTime(void* feature, union AppendData append_data, F
 
     media_uv_player_seek(obj->player, currentTime, NULL, NULL);
     obj->currentTime = currentTime;
+}
+
+FtFloat system_audio_get_percent(void* feature, union AppendData append_data)
+{
+    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
+    AudioObject* obj;
+
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
+    if (!obj)
+        return 0;
+
+    return obj->percent;
 }
 
 FtFloat system_audio_get_duration(void* feature, union AppendData append_data)
