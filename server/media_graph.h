@@ -27,41 +27,43 @@
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-enum MediaGraphTrackEvent {
-    MEDIA_GRAPH_EVT_NEED_FRAME = 0,
-    MEDIA_GRAPH_EVT_EMIT_FRAME,
-    MEDIA_GRAPH_EVT_CMD_UNLINK,
-};
+
 /*
- * Open a audio track.
- * @ctx: [in,out] audio track context
+ * Open a audio stream.
+ * @ctx: [in,out] audio stream context
  * @stream_type: stream type, eg. "abuffer@Music0"
- * @format: audio format, eg. AV_SAMPLE_FMT_S16 and -1 means unknown
- * @sample_rate: sample rate, eg. 44100 and 0 means unknown
- * @channels: channels, eg. 2 and 0 means unknown
  * @on_event_cb: callback function
  * @udata: on_event_cb user data
  * @return: 0 on success, negative value on error
  *
  * on_event_cb: callback function
  *      @udata: user data
- *      @evt: event eg.
- *        EVT_NEED_DATA, source need more data
- *        EVT_CMD_UNLINK，AS tell PS has unlink-event happened
- *        EVT_EMIT_DATA, if adevsrc was registed cb, means a frame genareted
+ *      @evt: event type
  *      @args: event arguments
  */
-typedef struct MediaGraphTrack MediaGraphTrack;
-int media_graph_track_open(MediaGraphTrack **pctx, const char *stream_type,
-    int format, int sample_rate, int channels,
-    int (*on_event_cb)(void *udata, int evt, int64_t args), void *udata);
+typedef struct MediaGraphStream MediaGraphStream;
+
+int media_graph_stream_open(MediaGraphStream** pctx,
+                            const char* stream_type,
+                            int (*event_cb)(void* udata, int evt, int64_t args),
+                            void* udata);
 /*
- * Release a audio track.
- * @ctx: [in,out] audio track context
+ * Release a audio stream.
+ * @ctx: [in,out] audio stream context
  * @return: 0 on success, negative value on error
  *
  * Note that it must also be called during pause. Get it again after resume.
  */
-int media_graph_track_close(MediaGraphTrack **pctx);
+int media_graph_stream_close(MediaGraphStream** pctx);
+
+/*
+ * Set options for a audio stream.
+ * @ctx: [in,out] audio stream context
+ * @options: options string eg. "sample_fmt=1:ch_layout=stereo:sample_rate=48000"
+ * @return: 0 on success, negative value on error
+ *
+ */
+
+int media_graph_stream_set_options(MediaGraphStream* ctx, const char* options);
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_GRAPH_H */

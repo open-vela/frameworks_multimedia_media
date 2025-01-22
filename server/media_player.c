@@ -143,7 +143,7 @@ typedef struct MediaPlayerContext {
     AVFormatContext* format_ctx;
     OutputStream* streams; /**< array of all streams, one per output */
 
-    MediaGraphTrack* audio_track;
+    MediaGraphStream* audio_output;
 } MediaPlayerContext;
 
 typedef struct MediaPlayerPriv {
@@ -193,23 +193,17 @@ static int media_player_on_event_cb(void *udata, int evt, int64_t args)
     MediaPlayerContext* ctx = (MediaPlayerContext*)udata;
     AVFrame* frame;
 
-    MEDIA_INFO("audio track event: %d", evt);
-    if (evt == MEDIA_GRAPH_EVT_NEED_FRAME) {
-        frame = media_player_queue_pop(ctx, ctx->audio_idx);
-        if (!frame)
-            frame = media_player_generate_slience_frame(ctx);
-        pthread_mutex_lock(&ctx->mutex);
-        if (frame) {
-            AVFrame* out_frame = (AVFrame*)(uintptr_t)args;
-            av_frame_move_ref(out_frame, frame);
-            av_frame_free(&frame);
-        } else {
-            MEDIA_ERR("audio track recv dat failed.");
-        }
-        pthread_mutex_unlock(&ctx->mutex);
+    MEDIA_DEBUG("audio audio_output event: %d", evt);
+
+    frame = media_player_queue_pop(ctx, ctx->audio_idx);
+    if (!frame)
+        frame = media_player_generate_slience_frame(ctx);
+    if (frame) {
+        AVFrame* out_frame = (AVFrame*)(uintptr_t)args;
+        av_frame_move_ref(out_frame, frame);
+        av_frame_free(&frame);
     } else {
-        MEDIA_ERR("unknown audio track event: %d", evt);
-        return -EINVAL;
+        MEDIA_ERR("audio audio_output recv dat failed.");
     }
 
     return 0;
@@ -444,19 +438,6 @@ static void media_player_map_protocol(
     av_strlcpy(dst, url, length);
 }
 
-static int media_player_open_audiotrack(MediaPlayerContext* ctx)
-{
-    int ret = 0;
-
-    ret = media_graph_track_open(&ctx->audio_track, ctx->name,-1, 0, 0,
-                                 media_player_on_event_cb, ctx);
-    if (ret < 0)
-        MEDIA_ERR("media_graph_track_open failed, ret %d.\n", ret);
-    else
-        MEDIA_INFO("media_graph_track_open success, ret %d.\n", ret);
-    return ret;
-}
-
 static int media_player_open_decoder(MediaPlayerContext* ctx, OutputStream* stream, AVCodecParameters* codecpar)
 {
     const AVCodec* codec;
@@ -556,10 +537,22 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         stream_out->frame_rate = stream->r_frame_rate;
         stream_out->next_pts = AV_NOPTS_VALUE;
         stream_out->codec_ctx->pkt_timebase = stream->time_base;
+
+        if (stream_out->codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
+            ret = media_graph_stream_open(&ctx->audio_output ,ctx->name ,
+                                          media_player_on_event_cb, ctx);
+            if (ret < 0) {
+                MEDIA_ERR("media_graph_stream_open failed.\n");
+                ret = AVERROR(EINVAL);
+                goto out;
+            }
+        }
     }
 
     return 0;
+
 out:
+
     return ret;
 }
 
@@ -806,8 +799,8 @@ static int media_player_pause(MediaPlayerContext* ctx)
         ret = 0;
     }
     pthread_mutex_lock(&ctx->mutex);
-    if (ctx->audio_track)
-        media_graph_track_close(&ctx->audio_track);
+    if (ctx->audio_output)
+        media_graph_stream_close(&ctx->audio_output);
     pthread_mutex_unlock(&ctx->mutex);
 
     media_player_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
@@ -824,8 +817,8 @@ static int media_player_stop(MediaPlayerContext* ctx)
     media_player_close_demuxer(ctx);
 
     pthread_mutex_lock(&ctx->mutex);
-    if (ctx->audio_track)
-        media_graph_track_close(&ctx->audio_track);
+    if (ctx->audio_output)
+        media_graph_stream_close(&ctx->audio_output);
     pthread_mutex_unlock(&ctx->mutex);
 
     ctx->pending_stop = 0;
@@ -837,18 +830,28 @@ static int media_player_stop(MediaPlayerContext* ctx)
 
 static int media_player_start(MediaPlayerContext* ctx)
 {
-    int ret = AVERROR(EPERM);
+    int ret = 0;
 
-    if (ctx->state == MEDIA_PLAYER_STATE_PREPARED ||
-        ctx->state == MEDIA_PLAYER_STATE_PAUSED ||
-        ctx->state == MEDIA_PLAYER_STATE_COMPLETED) {
-        ctx->state = MEDIA_PLAYER_STATE_STARTED;
-        ret = 0;
+    if (ctx->state != MEDIA_PLAYER_STATE_PREPARED &&
+        ctx->state != MEDIA_PLAYER_STATE_PAUSED &&
+        ctx->state != MEDIA_PLAYER_STATE_COMPLETED) {
+        ret = AVERROR(EPERM);
+        goto error;
     }
 
-    if (!ctx->audio_track)
-        ret = media_player_open_audiotrack(ctx);
+    if (ctx->audio_idx >= 0 && !ctx->audio_output) {
+        ret = media_graph_stream_open(&ctx->audio_output ,ctx->name ,
+                                       media_player_on_event_cb, ctx);
+        if (ret < 0) {
+            MEDIA_ERR("media_graph_stream_open failed.\n");
+            ret = AVERROR(EINVAL);
+            goto error;
+        }
+    }
 
+    ctx->state = MEDIA_PLAYER_STATE_STARTED;
+
+error:
     media_player_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
     return 0;
 }

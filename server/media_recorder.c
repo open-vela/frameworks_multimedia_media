@@ -124,7 +124,8 @@ typedef struct MediaRecorderContext {
     AVFormatContext* format_ctx;          /* output format context */
     const AVOutputFormat* format;         /* output format */
     struct RecorderCmdQueue cmd_queue;
-    MediaGraphTrack* audio_track;
+
+    MediaGraphStream* audio_input;
 } MediaRecorderContext;
 
 typedef struct MediaRecorderPriv {
@@ -470,30 +471,13 @@ static int media_recorder_on_event_cb(void *udata, int evt, int64_t args)
     MediaRecorderContext* ctx = (MediaRecorderContext*)udata;
     AVFrame* frame;
 
-    MEDIA_INFO("audio track event: %d", evt);
-    if (evt == MEDIA_GRAPH_EVT_EMIT_FRAME) {
-        AVFrame* in_frame = (AVFrame*)(uintptr_t)args;
-        frame = av_frame_clone(in_frame);
-        media_recorder_queue_push(ctx, ctx->audio_idx, frame);
-    } else {
-        MEDIA_ERR("unknown audio track event: %d", evt);
-        return -EINVAL;
-    }
+    MEDIA_DEBUG("audio input event: %d", evt);
+
+    AVFrame* in_frame = (AVFrame*)(uintptr_t)args;
+    frame = av_frame_clone(in_frame);
+    media_recorder_queue_push(ctx, ctx->audio_idx, frame);
 
     return 0;
-}
-
-static int media_recorder_open_audiotrack(MediaRecorderContext* ctx)
-{
-    int ret = 0;
-
-    ret = media_graph_track_open(&ctx->audio_track, ctx->name,-1, 0, 0,
-                                 media_recorder_on_event_cb, ctx);
-    if (ret < 0)
-        MEDIA_ERR("media_graph_track_open failed, ret %d.\n", ret);
-    else
-        MEDIA_INFO("media_graph_track_open success, ret %d.\n", ret);
-    return ret;
 }
 
 static void media_recorder_close_muxer(MediaRecorderContext* ctx)
@@ -644,8 +628,8 @@ static int media_recorder_pause(MediaRecorderContext* ctx)
     }
 
     pthread_mutex_lock(&ctx->mutex);
-    if (ctx->audio_track)
-        media_graph_track_close(&ctx->audio_track);
+    if (ctx->audio_input)
+        media_graph_stream_close(&ctx->audio_input);
     pthread_mutex_unlock(&ctx->mutex);
 
     media_recorder_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
@@ -659,8 +643,8 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
         return 0;
 
     pthread_mutex_lock(&ctx->mutex);
-    if (ctx->audio_track)
-        media_graph_track_close(&ctx->audio_track);
+    if (ctx->audio_input)
+        media_graph_stream_close(&ctx->audio_input);
     pthread_mutex_unlock(&ctx->mutex);
 
     if (ctx->state == MEDIA_RECORDER_STATE_PREPARED || ctx->state == MEDIA_RECORDER_STATE_COMPLETED)
@@ -701,8 +685,15 @@ static int media_recorder_start(MediaRecorderContext* ctx)
     ret = 0;
     ctx->state = MEDIA_RECORDER_STATE_STARTED;
 
-    if (!ctx->audio_track)
-        ret = media_recorder_open_audiotrack(ctx);
+    if (!ctx->audio_input) {
+        ret = media_graph_stream_open(&ctx->audio_input, ctx->name,
+                                       media_recorder_on_event_cb, ctx);
+        if (ret < 0)
+            MEDIA_ERR("media_graph_stream_open failed, ret %d.\n", ret);
+        else
+            MEDIA_INFO("media_graph_stream_open success.\n");
+        return ret;
+    }
 
 out:
     media_recorder_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
@@ -723,8 +714,11 @@ static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filenam
         format = tag->value;
 
     ctx->format = av_guess_format(format, filename, NULL);
-    if (!ctx->format)
-        return AVERROR(EINVAL);
+    if (!ctx->format) {
+        MEDIA_ERR("unknown format.\n");
+        ret = AVERROR(EINVAL);
+        goto out;
+    }
 
     ret = media_recorder_open_muxer(ctx, filename);
     if (ret < 0)

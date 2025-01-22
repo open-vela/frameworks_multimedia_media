@@ -49,6 +49,7 @@
 #include "media_common.h"
 #include "media_plugin.h"
 #include "media_server.h"
+#include "media_graph.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -76,6 +77,11 @@ typedef struct MediaFilterPriv {
     void* cookie;
     bool event;
 } MediaFilterPriv;
+
+typedef struct MediaGraphStream {
+    AVFilterContext *src;
+    void *link_handle;
+} MediaGraphStream;
 
 /****************************************************************************
  * Private Data
@@ -747,40 +753,40 @@ MediadPlugin media_graph_plugin = {
     .process_command = media_graph_handler,
 };
 
-///////////////////////////////////////////////////////////////////
-typedef struct MediaGraphTrack {
-    AVFilterContext *src;
-    void *link_handle;
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
 
-    int format;
-    int samplerate;
-    AVChannelLayout ch_layout;
-    int64_t last_pts;
-} MediaGraphTrack;
-
-int media_graph_track_open(MediaGraphTrack **pctx, const char *stream_type,
-    int format, int sample_rate, int channels,
-    int (*on_event_cb)(void *udata, int evt, int64_t args), void *udata)
+int media_graph_stream_set_options(MediaGraphStream* ctx, const char* options)
 {
     MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphTrack *ctx;
-    char msg[32] = {0};
+    int ret;
+
+    if (!ctx)
+        return -EINVAL;
+
+    ret = avfilter_process_command(ctx->src, "set_options", options, NULL, 0, 0);
+    if (ret < 0)
+        MEDIA_ERR("%s set_options failed ret:%d\n", ctx->src->name, ret);
+
+    media_graph_try_touch(priv);
+
+    return ret;
+}
+
+int media_graph_stream_open(MediaGraphStream** pctx,
+                            const char* stream_type,
+                            int (*event_cb)(void* udata, int evt, int64_t args),
+                            void* udata)
+{
+    MediaGraphPriv *priv = media_graph_plugin.priv;
+    MediaGraphStream *ctx;
+    char msg[32] = { 0 };
     int ret;
 
     ctx = av_calloc(1, sizeof(*ctx));
     if (!ctx)
         return -ENOMEM;
-
-    if (format < 0)
-        ctx->format = AV_SAMPLE_FMT_S16;
-    else
-        ctx->format = format;
-    if (sample_rate <= 0)
-        ctx->samplerate = 48000;
-    else
-        ctx->samplerate = sample_rate;
-
-    av_channel_layout_default(&ctx->ch_layout, channels ? channels : 2);
 
     ctx->src = avfilter_graph_get_filter(priv->graph, stream_type);
     if (!ctx->src) {
@@ -789,10 +795,10 @@ int media_graph_track_open(MediaGraphTrack **pctx, const char *stream_type,
         goto fail;
     }
 
-    snprintf(msg, sizeof(msg), "%p %p", on_event_cb, udata);
+    snprintf(msg, sizeof(msg), "%p %p", event_cb, udata);
     ret = avfilter_process_command(ctx->src, "link", msg, (char *)&ctx->link_handle, sizeof(void **), 0);
     if (ret < 0) {
-        MEDIA_ERR("buffersrc:%s link failed ret:%d\n", ctx->src->name, ret);
+        MEDIA_ERR("%s link failed ret:%d\n", ctx->src->name, ret);
         goto fail;
     }
 
@@ -801,15 +807,14 @@ int media_graph_track_open(MediaGraphTrack **pctx, const char *stream_type,
 
     return 0;
 fail:
-    av_channel_layout_uninit(&ctx->ch_layout);
     av_free(ctx);
     return ret;
 }
 
-int media_graph_track_close(MediaGraphTrack **pctx)
+int media_graph_stream_close(MediaGraphStream** pctx)
 {
     MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphTrack *ctx = *pctx;
+    MediaGraphStream *ctx = *pctx;
     int ret;
 
     if (!pctx || !ctx)
@@ -817,11 +822,10 @@ int media_graph_track_close(MediaGraphTrack **pctx)
 
     ret = avfilter_process_command(ctx->src, "unlink", (char *)ctx->link_handle, NULL, 0, 0);
     if (ret < 0)
-        MEDIA_ERR("buffersrc:%s unlink failed ret:%d\n", ctx->src->name, ret);
+        MEDIA_ERR("%s unlink failed ret:%d\n", ctx->src->name, ret);
 
     media_graph_try_touch(priv);
-    av_channel_layout_uninit(&ctx->ch_layout);
     av_free(ctx);
     *pctx = NULL;
-    return 0;
+    return ret;
 }
