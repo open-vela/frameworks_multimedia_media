@@ -34,15 +34,15 @@ CSRCS += $(wildcard utils/*.c)
 
 ifeq ($(CONFIG_MEDIA_FEATURE),y)
 depend::
-	@python3 $(APPDIR)/frameworks/runtimes/feature/tools/jidl/jsongensource.py \
-		$(APPDIR)/frameworks/multimedia/media/feature/volume.jidl -out-dir \
-		$(APPDIR)/frameworks/multimedia/media/feature -header volume.h -source volume.c
-	@python3 $(APPDIR)/frameworks/runtimes/feature/tools/jidl/jsongensource.py \
-		$(APPDIR)/frameworks/multimedia/media/feature/audio.jidl -out-dir \
-		$(APPDIR)/frameworks/multimedia/media/feature -header audio.h -source audio.c
-	@python3 $(APPDIR)/frameworks/runtimes/feature/tools/jidl/jsongensource.py \
-		$(APPDIR)/frameworks/multimedia/media/feature/session.jidl -out-dir \
-		$(APPDIR)/frameworks/multimedia/media/feature -header session.h -source session.c
+	$(APPDIR)/../prebuilts/tools/rust/bin/jidl/jidl_gen_cpp \
+		$(APPDIR)/frameworks/multimedia/media/feature/volume.jidl --out-dir \
+		$(APPDIR)/frameworks/multimedia/media/feature --header volume.h --source volume.c
+	$(APPDIR)/../prebuilts/tools/rust/bin/jidl/jidl_gen_cpp \
+		$(APPDIR)/frameworks/multimedia/media/feature/audio.jidl --out-dir \
+		$(APPDIR)/frameworks/multimedia/media/feature --header audio.h --source audio.c
+	$(APPDIR)/../prebuilts/tools/rust/bin/jidl/jidl_gen_cpp \
+		$(APPDIR)/frameworks/multimedia/media/feature/session.jidl --out-dir \
+		$(APPDIR)/frameworks/multimedia/media/feature --header session.h --source session.c
 
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/multimedia/media/feature
   CSRCS  += feature/audio.c
