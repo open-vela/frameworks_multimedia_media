@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <media_defs.h>
 #include <media_focus.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -38,7 +39,9 @@
 typedef struct MediaFocusPriv {
     void* proxy;
     char* name; /* TODO: use independent focus type. */
+    int auto_reply;
     media_focus_callback on_suggest;
+    media_focus_callback2 on_suggest2;
     media_uv_callback on_abandon;
     void* cookie;
 } MediaFocusPriv;
@@ -72,13 +75,32 @@ static int media_uv_focus_send(MediaFocusPriv* priv,
     int ret;
 
     media_parcel_init(&parcel);
-    ret = media_parcel_append_printf(&parcel, "%i%s%s%i",
-        MEDIA_ID_FOCUS, target, cmd, 0);
+    ret = media_parcel_append_printf(&parcel, "%i%s%s%s%i",
+        MEDIA_ID_FOCUS, target, cmd, "", 0);
     if (ret < 0)
         return ret;
 
     ret = media_uv_send(priv->proxy, cb ? media_uv_focus_receive_cb : NULL,
         cb, priv, &parcel);
+
+    media_parcel_deinit(&parcel);
+    return ret;
+}
+
+static int media_uv_focus_reply_to_notification(MediaFocusPriv* priv, int media_id, int req_id)
+{
+    media_parcel parcel;
+    char arg[16];
+    int ret = 0;
+
+    media_parcel_init(&parcel);
+    snprintf(arg, sizeof(arg), "%d", req_id);
+    ret = media_parcel_append_printf(&parcel, "%i%s%s%s%i", media_id, "", "reply", arg, 0);
+    if (ret < 0)
+        return ret;
+
+    ret = media_uv_send(priv->proxy, NULL, NULL, NULL, &parcel);
+
     media_parcel_deinit(&parcel);
     return ret;
 }
@@ -86,14 +108,25 @@ static int media_uv_focus_send(MediaFocusPriv* priv,
 static void media_uv_focus_event_cb(void* cookie,
     void* cookie0, void* cookie1, media_parcel* parcel)
 {
-    int32_t suggest = MEDIA_FOCUS_STOP;
     MediaFocusPriv* priv = cookie;
+    int32_t suggest = MEDIA_FOCUS_STOP;
+    int32_t req_id = 0;
 
-    if (parcel)
+    if (parcel) {
         media_parcel_read_int32(parcel, &suggest);
+        media_parcel_read_int32(parcel, &req_id);
+    }
 
-    MEDIA_INFO("%s:%p suggest:%" PRId32 "\n", priv->name, priv, suggest);
-    priv->on_suggest(suggest, priv->cookie);
+    MEDIA_INFO("%s:%p suggest:%" PRId32 " req_id:%" PRId32 "\n", priv->name, priv, suggest, req_id);
+    if (priv->on_suggest) {
+        priv->on_suggest(suggest, priv->cookie);
+        media_uv_focus_reply_to_notification(priv, MEDIA_ID_FOCUS, req_id);
+        return;
+    }
+
+    priv->on_suggest2(suggest, req_id, priv->cookie);
+    if (req_id >= 0 && priv->auto_reply)
+        media_uv_focus_reply_to_notification(priv, MEDIA_ID_FOCUS, req_id);
 }
 
 static void media_uv_focus_receive_cb(void* cookie,
@@ -108,12 +141,22 @@ static void media_uv_focus_receive_cb(void* cookie,
     cb(cookie1, result);
 }
 
+static void media_uv_focus_on_suggest(void* cookie, int ret)
+{
+    MediaFocusPriv* priv = cookie;
+
+    if (!priv->on_suggest2)
+        priv->on_suggest(ret, priv->cookie);
+    else
+        priv->on_suggest2(ret, -1, priv->cookie);
+}
+
 static void media_uv_focus_connect_cb(void* cookie, int ret)
 {
     MediaFocusPriv* priv = cookie;
 
     if (ret < 0)
-        priv->on_suggest(ret, priv->cookie);
+        media_uv_focus_on_suggest(priv, ret);
     else
         media_uv_focus_send(priv, NULL, "ping", media_uv_focus_ping_cb);
 }
@@ -137,7 +180,7 @@ static void media_uv_focus_listen_cb(void* cookie, int ret)
      * or there might be suggestion missed.
      */
     if (ret < 0)
-        priv->on_suggest(ret, priv->cookie);
+        media_uv_focus_on_suggest(priv, ret);
     else
         media_uv_focus_send(priv, priv->name, "request",
             media_uv_focus_request_cb);
@@ -148,7 +191,7 @@ static void media_uv_focus_request_cb(void* cookie, int ret)
     MediaFocusPriv* priv = cookie;
 
     MEDIA_INFO("%s:%p suggest:%d\n", priv->name, priv, ret);
-    priv->on_suggest(ret, priv->cookie);
+    media_uv_focus_on_suggest(priv, ret);
 }
 
 static void media_uv_focus_abandon_cb(void* cookie, int ret)
@@ -169,16 +212,13 @@ static void media_uv_focus_release_cb(void* cookie, int ret)
     free(priv);
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-
-void* media_uv_focus_request(void* loop, const char* name,
-    media_focus_callback on_suggest, void* cookie)
+static void* media_uv_focus_request_l(void* loop, const char* name,
+    media_focus_callback on_suggest, media_focus_callback2 on_suggest2,
+    int auto_reply, void* cookie)
 {
     MediaFocusPriv* priv;
 
-    if (!name || name[0] == '\0' || !on_suggest)
+    if (!name || name[0] == '\0' || (!on_suggest && !on_suggest2))
         return NULL;
 
     priv = zalloc(sizeof(MediaFocusPriv) + strlen(name) + 1);
@@ -189,7 +229,9 @@ void* media_uv_focus_request(void* loop, const char* name,
     strcpy(priv->name, name);
 
     priv->cookie = cookie;
+    priv->auto_reply = auto_reply;
     priv->on_suggest = on_suggest;
+    priv->on_suggest2 = on_suggest2;
     priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_focus_connect_cb, priv);
     if (!priv->proxy) {
@@ -199,6 +241,22 @@ void* media_uv_focus_request(void* loop, const char* name,
 
     MEDIA_INFO("%s:%p\n", priv->name, priv);
     return priv;
+}
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+void* media_uv_focus_request(void* loop, const char* name,
+    media_focus_callback on_suggest, void* cookie)
+{
+    return media_uv_focus_request_l(loop, name, on_suggest, NULL, 0, cookie);
+}
+
+void* media_uv_focus_request2(void* loop, const char* name,
+    media_focus_callback2 on_suggest, int auto_reply, void* cookie)
+{
+    return media_uv_focus_request_l(loop, name, NULL, on_suggest, auto_reply, cookie);
 }
 
 int media_uv_focus_abandon(void* handle, media_uv_callback on_abandon)
@@ -211,6 +269,19 @@ int media_uv_focus_abandon(void* handle, media_uv_callback on_abandon)
 
     priv->on_abandon = on_abandon;
     ret = media_uv_focus_send(priv, NULL, "abandon", media_uv_focus_abandon_cb);
+    MEDIA_INFO("%s:%p ret:%d\n", priv->name, priv, ret);
+    return ret;
+}
+
+int media_uv_focus_reply(void* handle, int req_id)
+{
+    MediaFocusPriv* priv = handle;
+    int ret = 0;
+
+    if (!priv || req_id < 0 || !priv->on_suggest2 || priv->auto_reply)
+        return -EINVAL;
+
+    ret = media_uv_focus_reply_to_notification(priv, MEDIA_ID_FOCUS, req_id);
     MEDIA_INFO("%s:%p ret:%d\n", priv->name, priv, ret);
     return ret;
 }
