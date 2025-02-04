@@ -110,6 +110,9 @@ typedef void (*media_event_callback)(void* cookie, int event, int result,
 #define MEDIA_FOCUS_PLAY_WITH_KEEP 5 /* Nothing should be done. */
 
 /**
+ * @deprecated This function is deprecated and will be removed in future versions.
+ * Use media_focus_callback2() instead.
+ *
  * @brief Callback to receive suggestions.
  *
  * @param[in] suggestion    MEDIA_FOCUS_* .
@@ -131,6 +134,30 @@ typedef void (*media_event_callback)(void* cookie, int event, int result,
  * @endcode
  */
 typedef void (*media_focus_callback)(int suggestion, void* cookie);
+
+/**
+ * @brief Callback to receive suggestions.
+ *
+ * @param[in] suggestion    MEDIA_FOCUS_* .
+ * @param[in] req_id        Request id.
+ * @param[in] cookie        Argument set by focus request.
+ *
+ * @code
+ *  void user_focu_callback(int suggestion, void* cookie)
+ *  {
+ *      switch(suggestion) {
+ *      case MEDIA_FOCUS_PLAY:
+ *      case MEDIA_FOCUS_STOP:
+ *      case MEDIA_FOCUS_PAUSE:
+ *      case MEDIA_FOCUS_PLAY_BUT_SILENT:
+ *      case MEDIA_FOCUS_PLAY_WITH_DUCK:
+ *      case MEDIA_FOCUS_PLAY_WITH_KEEP:
+ *      default:
+ *      }
+ *  }
+ * @endcode
+ */
+typedef void (*media_focus_callback2)(int suggestion, int req_id, void* cookie);
 
 /****************************************************************************
  * Policy Definitions
