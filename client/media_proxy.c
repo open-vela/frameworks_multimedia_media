@@ -377,8 +377,8 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
 
     switch (priv->type) {
     case MEDIA_ID_FOCUS:
-        ret = media_parcel_append_printf(&in, "%i%s%s%i", priv->type,
-            target, cmd, res_len);
+        ret = media_parcel_append_printf(&in, "%i%s%s%s%i", priv->type,
+            target, cmd, "", res_len);
         break;
 
     case MEDIA_ID_GRAPH:
