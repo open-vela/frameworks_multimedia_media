@@ -73,4 +73,31 @@ int media_video_output_close(MediaVOutputContext** pctx);
  */
 int media_video_output_write_frame(MediaVOutputContext* ctx, AVFrame* frame);
 
+/**
+ * @brief Get the pollfd for the video output device
+ *
+ * This function retrieves the file descriptors associated with the video output device
+ * that can be used with the poll() system call. It populates the provided array of
+ * struct pollfd with the relevant file descriptors and events to monitor.
+ *
+ * @param ctx Pointer to MediaVOutputContext.
+ * @param fds Pointer to an array of struct pollfd where the file descriptors and events will be stored.
+ * @param count The number of elements in the fds array.
+ * @return Returns the number of valid file descriptors added to the fds array on success.
+ *         Returns a negative error code on failure.
+ */
+int media_video_output_get_pollfd(MediaVOutputContext* ctx, struct pollfd* fds, int count);
+
+/**
+ * @brief Notify video output device poll available
+ *
+ * This function is used to notify if the video output device is available for I/O operations.
+ *
+ * @param ctx Pointer to MediaVOutputContext.
+ * @param fds Pointer to a `struct pollfd` where the file descriptor and
+ * events of the video output device will be stored.
+ * @return Returns 0 on success, a negative error code on failure.
+ */
+int media_video_output_poll_available(MediaVOutputContext* ctx, struct pollfd* fds);
+
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_VIDEO_OUTPUT_H */

@@ -61,6 +61,7 @@
 #define MEDIA_PLAYER_MAX_CNT 10
 #define MEDIA_PLAYER_CMD_QUEUE_MAX 16
 #define MEDIA_PLAYER_DATA_QUEUE_SIZE 4
+#define MEDIA_PLAYER_MAX_POLLFDS 4
 
 #define MEDIA_PLAYER_SILENCE_FRAME_DURATION 20
 
@@ -115,6 +116,14 @@ typedef struct OutputStream {
     int64_t next_pts;
 } OutputStream;
 
+typedef struct MediaPlayerContext MediaPlayerContext;
+
+typedef struct MediaPlayerPoll {
+    const char* name;
+    int (*get_pollfds)(MediaPlayerContext* ctx, struct pollfd* fds, int count);
+    int (*poll_available)(MediaPlayerContext* ctx, struct pollfd* fds);
+} MediaPlayerPoll;
+
 typedef struct MediaPlayerContext {
     /* communication with media client */
     int                 tran_fd;
@@ -143,6 +152,12 @@ typedef struct MediaPlayerContext {
     AVFormatContext*    format_ctx;
     OutputStream*       streams;        /**< array of all streams, one per output */
 
+    /* poll event */
+    int                 poll_cnt;
+    int                 idx[MEDIA_PLAYER_MAX_POLLFDS];
+    struct pollfd       fds[MEDIA_PLAYER_MAX_POLLFDS];
+    MediaPlayerPoll     poll[MEDIA_PLAYER_MAX_POLLFDS];
+
     /* avsync parameters */
     int                 frame_duration; /** < frame duration in ms */
     int                 max_latency;    /** < max latency in ms */
@@ -151,6 +166,7 @@ typedef struct MediaPlayerContext {
     enum MediaPlayerSyncMode sync_mode;
 
     /* audio or video output */
+    MediaVOutputType     vout_type;
     MediaGraphStream*    audio_output;
     MediaVOutputContext* video_output;
 } MediaPlayerContext;
@@ -165,12 +181,35 @@ typedef struct MediaPlayerPriv {
  ****************************************************************************/
 static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush);
 static int media_player_stop(MediaPlayerContext* ctx);
-static int media_player_poll_available(MediaPlayerContext* ctx);
+static void media_player_poll(MediaPlayerContext* ctx);
 static AVFrame* media_player_queue_pop(MediaPlayerContext* ctx, int idx);
+static int media_player_queue_cnt(MediaPlayerContext* ctx, int idx);
+static int media_player_get_pollfd(MediaPlayerContext* ctx, struct pollfd* fds, int count);
+static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* fds);
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+static int media_player_output_get_pollfds(MediaPlayerContext* ctx, struct pollfd* fds, int count)
+{
+    return media_video_output_get_pollfd(ctx->video_output, fds, count);
+}
+
+static int media_player_output_poll_available(MediaPlayerContext* ctx, struct pollfd* fds)
+{
+    return media_video_output_poll_available(ctx->video_output, fds);
+}
+
+static void media_player_poll_add(MediaPlayerContext* ctx, const char* name,
+                int (*get_pollfds)(MediaPlayerContext* ctx, struct pollfd* fds, int count),
+                int (*poll_available)(MediaPlayerContext* ctx, struct pollfd* fds))
+{
+    ctx->poll[ctx->poll_cnt].name = name;
+    ctx->poll[ctx->poll_cnt].get_pollfds = get_pollfds;
+    ctx->poll[ctx->poll_cnt].poll_available = poll_available;
+    ctx->poll_cnt++;
+}
 
 static AVFrame* media_player_generate_silence_frame(MediaPlayerContext* ctx)
 {
@@ -251,7 +290,7 @@ static int media_player_queue_cnt(MediaPlayerContext* ctx, int idx)
 
 static inline int media_player_is_need_process(MediaPlayerContext* ctx)
 {
-     return ((ctx->audio_idx != -1 &&
+    return ((ctx->audio_idx != -1 &&
             (media_player_queue_cnt(ctx, ctx->audio_idx) <
              ctx->streams[ctx->audio_idx].nb_queue_max)) ||
             (ctx->video_idx != -1 &&
@@ -435,7 +474,8 @@ static int media_player_interrupt(void* opaque)
 
     pthread_mutex_lock(&ctx->mutex);
 
-    media_player_poll_available(ctx);
+    // TODO: only poll ctrl_fd
+    media_player_poll(ctx);
 
     SIMPLEQ_FOREACH(msg, &ctx->cmd_queue, entry)
     {
@@ -522,7 +562,7 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         return -EINVAL;
 
     char* at_sign = strchr(ctx->name, '@');
-    if (at_sign && !strncmp(at_sign, "Video", 5))
+    if (at_sign && !strncmp(at_sign, "@Video", 6))
         ctx->nb_streams = 2;
     else
         ctx->nb_streams = 1;
@@ -532,23 +572,10 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         return AVERROR(ENOMEM);
 
     for (i = 0; i < ctx->nb_streams; i++) {
-        AVCodecParameters* codecpar = ctx->format_ctx->streams[i]->codecpar;
         OutputStream* stream_out = &ctx->streams[i];
-
-        // step1: init data queue
-        if (codecpar->codec_type == AVMEDIA_TYPE_AUDIO  && ctx->audio_idx < 0)
-            ctx->audio_idx = i;
-        else if (codecpar->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video_idx < 0)
-            ctx->video_idx = i;
-        else
-            continue;
-
         stream_out->type = types[i];
-        stream_out->index = -1;
-        stream_out->nb_queue_max = MEDIA_PLAYER_DATA_QUEUE_SIZE;
-        ff_framequeue_init(&stream_out->queue, NULL);
 
-        // step2: find best stream by stream type
+        // step1: find best stream by stream type
         ret = av_find_best_stream(ctx->format_ctx, stream_out->type, -1, -1, NULL, 0);
         if (ret < 0) {
             if (ctx->nb_streams > 1 && stream_out->type == AVMEDIA_TYPE_AUDIO) {
@@ -560,7 +587,20 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
                 goto out;
             }
         }
+
         stream = ctx->format_ctx->streams[ret];
+        stream_out->index = ret;
+
+        // step2: init data queue
+        if (stream_out->type == AVMEDIA_TYPE_AUDIO  && ctx->audio_idx < 0)
+            ctx->audio_idx = i;
+        else if (stream_out->type == AVMEDIA_TYPE_VIDEO && ctx->video_idx < 0)
+            ctx->video_idx = i;
+        else
+            continue;
+
+        stream_out->nb_queue_max = MEDIA_PLAYER_DATA_QUEUE_SIZE;
+        ff_framequeue_init(&stream_out->queue, NULL);
 
         /* Use specify ch_layout if possible, follow guess_input_channel_layout() in ffmpeg.c */
         if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO &&
@@ -569,7 +609,7 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
                 stream->codecpar->ch_layout.nb_channels);
 
         // step3: using codecparam to create decoder
-        ret = media_player_open_decoder(ctx, &ctx->streams[i], stream->codecpar);
+        ret = media_player_open_decoder(ctx, stream_out, stream->codecpar);
         if (ret < 0)
             goto out;
 
@@ -583,19 +623,23 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         }
 
         // step4: init output stream info
-        stream_out->index = stream->index;
         stream_out->time_base = stream->time_base;
         stream_out->frame_rate = stream->r_frame_rate;
         stream_out->next_pts = AV_NOPTS_VALUE;
         stream_out->codec_ctx->pkt_timebase = stream->time_base;
 
-        if (codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        if (stream_out->type == AVMEDIA_TYPE_VIDEO) {
             char options[128] = {0};
             // these option is set by user
-            snprintf(options, sizeof(options), "format=%s:devname=%s:pix_fmt=%d",
-                     "fbdev", "/dev/fb0", AV_PIX_FMT_BGRA);
+            if (ctx->vout_type == MEDIA_VOUTPUT_FBDEV) {
+                snprintf(options, sizeof(options), "format=%s:devname=%s:pix_fmt=%d",
+                         "fbdev", "/dev/fb0", AV_PIX_FMT_BGRA);
+            } else {
+                snprintf(options, sizeof(options), "format=%s:server_path=%s:frame_count=%d:pix_fmt=%d",
+                         "vtun", "Vtun_Video1", 3, AV_PIX_FMT_BGRA);
+            }
 
-            ret = media_video_output_open(&ctx->video_output, MEDIA_VOUTPUT_FBDEV, options);
+            ret = media_video_output_open(&ctx->video_output, ctx->vout_type, options);
             if (ret < 0) {
                 MEDIA_ERR("Failed to open video_output\n");
                 goto out;
@@ -604,6 +648,10 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
             ctx->frame_duration = av_rescale(AV_TIME_BASE, stream_out->frame_rate.den,
                                              stream_out->frame_rate.num);
             ctx->max_latency = ctx->frame_duration;
+
+            media_player_poll_add(ctx, "video_output",
+                                  media_player_output_get_pollfds,
+                                  media_player_output_poll_available);
         }
     }
 
@@ -818,9 +866,15 @@ static void media_player_ctx_init(MediaPlayerContext* ctx)
     ctx->sync_mode = MEDIA_PLAYER_SYNC_MODE_SYSTEM;
     ctx->ts_base = AV_NOPTS_VALUE;
     ctx->lat_base = AV_NOPTS_VALUE;
+    ctx->vout_type = MEDIA_VOUTPUT_VTUN;
     SIMPLEQ_INIT(&ctx->cmd_queue);
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
+
+    ctx->poll_cnt = 0;
+    media_player_poll_add(ctx, "media_player",
+                          media_player_get_pollfd,
+                          media_player_poll_available);
 }
 
 static void media_player_ctx_release(MediaPlayerContext* ctx)
@@ -1177,26 +1231,27 @@ static void media_player_conn_close(MediaPlayerContext* ctx)
     media_parcel_deinit(&ctx->parcel);
 }
 
-static int media_player_poll_available(MediaPlayerContext* ctx)
+static int media_player_get_pollfd(MediaPlayerContext* ctx, struct pollfd* fds, int count)
+{
+    int nfd = 0;
+
+    if (!fds || count < 1)
+        return -EINVAL;
+
+    fds[nfd].fd = ctx->tran_fd;
+    fds[nfd].events = POLLIN;
+    fds[nfd].revents = 0;
+    nfd++;
+    return nfd;
+}
+
+static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* fds)
 {
     int ret = -EINVAL;
     uint32_t code;
     media_parcel ack;
-    struct pollfd fds[1];
-    struct pollfd* fd = &fds[0];
-    fds[0].fd = ctx->tran_fd;
-    fds[0].events = POLLIN;
-    fds[0].revents = 0;
 
-    ret = poll(fds, 1, 2);
-    if (ret == -1) {
-        return ret;
-    } else if (ret == 0) {
-        MEDIA_DEBUG("poll timeout\n");
-        return ret;
-    }
-
-    if (fd->revents & POLLERR)
+    if (fds->revents & POLLERR)
         goto out;
 
     while (1) {
@@ -1232,15 +1287,49 @@ static int media_player_poll_available(MediaPlayerContext* ctx)
         ctx->offset = 0;
     }
 
-    if (((fd->revents & POLLIN) && ret == -EPIPE) || (fd->revents & POLLHUP))
+    if (((fds->revents & POLLIN) && ret == -EPIPE) || (fds->revents & POLLHUP))
         goto out;
 
     return 0;
 
 out:
-    MEDIA_DEBUG("fd:%d revent:%d\n", fd->fd, (int)fd->revents);
+    MEDIA_DEBUG("fds:%d revent:%d\n", fds->fd, (int)fds->revents);
     media_player_conn_close(ctx);
     return 0;
+}
+
+static void media_player_poll(MediaPlayerContext* ctx)
+{
+    int ret, i, n;
+    for (i = n = 0; i < ctx->poll_cnt; i++) {
+        if (!ctx->poll[i].get_pollfds)
+            continue;
+
+        ret = ctx->poll[i].get_pollfds(ctx, &ctx->fds[n], MEDIA_PLAYER_MAX_POLLFDS - n);
+        if (ret < 0) {
+            MEDIA_ERR("get pollfd failed %d\n", ret);
+            continue;
+        }
+
+        while (ret--)
+            ctx->idx[n++] = i;
+    }
+
+    if (n < 1)
+        return;
+
+    poll(ctx->fds, n, 2);
+
+    for (i = 0; i < n; i++) {
+        if (!ctx->fds[i].revents)
+            continue;
+
+        ret = ctx->poll[ctx->idx[i]].poll_available(ctx, &ctx->fds[i]);
+        if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
+            MEDIA_ERR("%s poll_available failed %d\n",
+                      ctx->poll[ctx->idx[i]].name, ret);
+    }
+
 }
 
 static MediaPlayerContext* media_player_get_available_session(MediaPlayerPriv* priv)
@@ -1350,17 +1439,15 @@ static void* media_player_thread(void* arg)
     int ret = 0;
 
     while (1) {
-        pthread_mutex_lock(&ctx->mutex);
-        ret = media_player_poll_available(ctx);
-        if (ret < 0)
-            MEDIA_ERR("poll available failed %d\n", ret);
+        media_player_poll(ctx);
+
         if ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
             SIMPLEQ_REMOVE_HEAD(&ctx->cmd_queue, entry);
-            pthread_mutex_unlock(&ctx->mutex);
             if (media_player_proc_cmd(ctx, msg))
                 exit = true;
-        } else if (ctx->state == MEDIA_PLAYER_STATE_STARTED) {
-            pthread_mutex_unlock(&ctx->mutex);
+        }
+
+        if (ctx->state == MEDIA_PLAYER_STATE_STARTED) {
             if (media_player_is_need_process(ctx))
                 exit = media_player_proc_dat(ctx);
 
@@ -1383,12 +1470,11 @@ static void* media_player_thread(void* arg)
                               pts, ts, diff);
                 }
             }
-        } else if (exit) {
+        }
+
+        if (exit) {
             ctx->state = MEDIA_PLAYER_STATE_IDLE;
-            pthread_mutex_unlock(&ctx->mutex);
             break;
-        } else {
-            pthread_mutex_unlock(&ctx->mutex);
         }
     }
 

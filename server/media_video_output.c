@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <poll.h>
 
 #include "media_common.h"
 #include "media_video_output.h"
@@ -33,6 +34,7 @@
 #include "libavutil/imgutils.h"
 #include "libavutil/pixdesc.h"
 #include "libswscale/swscale.h"
+#include "libavdevice/avdevice.h"
 
 /****************************************************************************
  * Private Types
@@ -234,6 +236,25 @@ static int media_video_output_stop(MediaVOutputContext* ctx)
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+int media_video_output_get_pollfd(MediaVOutputContext* ctx, struct pollfd* fds, int count)
+{
+    int ret = 0;
+    int n = 0;
+    ret = avdevice_app_to_dev_control_message(ctx->fmt_ctx,
+                                              AV_APP_TO_DEV_GET_POLLFD,
+                                              fds, (count - n) * sizeof(struct pollfd));
+    if (ret > 0)
+        n += ret;
+    return n;
+}
+
+int media_video_output_poll_available(MediaVOutputContext* ctx, struct pollfd* fds)
+{
+    return avdevice_app_to_dev_control_message(ctx->fmt_ctx,
+                                               AV_APP_TO_DEV_POLL_AVAILABLE,
+                                               fds, sizeof(struct pollfd));
+}
 
 int media_video_output_write_frame(MediaVOutputContext* ctx, AVFrame* frame)
 {
