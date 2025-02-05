@@ -84,7 +84,7 @@ typedef struct {
 
 /* uv interface cb function */
 static void audio_get_duration_cb(void* cookie, int ret, unsigned duration);
-static void audio_get_position_cb(void* cookie, int ret, unsigned position);
+static void audio_media_player_query_cb(void* cookie, int ret, void* object);
 static void audio_session_close_cb(void* cookie, int ret);
 static void audio_player_close_cb(void* cookie, int ret);
 static void audio_timer_close_cb(uv_handle_t* handle);
@@ -145,6 +145,7 @@ void system_audio_onCreate(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
         goto cleanup;
     }
 
+    obj->state = MEDIA_STATE_OPENED;
     if (media_uv_player_listen(obj->player, audio_player_event_callback) < 0) {
         FEATURE_LOG_ERROR("%s::%s(), player listen failed\n", file_tag, __FUNCTION__);
         goto cleanup;
@@ -266,7 +267,7 @@ static void timeupdate_timer_cb(uv_timer_t* handle)
         return;
 
     if (obj->state == MEDIA_STATE_STARTED)
-        media_uv_player_get_position(obj->player, audio_get_position_cb, obj);
+        media_uv_player_query(obj->player, audio_media_player_query_cb, obj);
 }
 
 static void update_duration(AudioObject* obj)
@@ -424,7 +425,6 @@ static void audio_open_cb(void* cookie, int ret)
         return;
     }
 
-    obj->state = MEDIA_STATE_OPENED;
     return;
 }
 
@@ -470,27 +470,33 @@ static void audio_start_cb(void* cookie, int ret)
     }
 }
 
-static void audio_get_position_cb(void* cookie, int ret, unsigned position)
+static void audio_media_player_query_cb(void* cookie, int ret, void* object)
 {
-    FEATURE_LOG_INFO("%s::%s(),ret:%d, position:%d\n", file_tag, __FUNCTION__, ret, position);
-
+    const media_metadata_t* cdata = (const media_metadata_t*)object;
     media_metadata_t data = { 0 };
     AudioObject* obj;
 
     obj = (AudioObject*)cookie;
+
     if (!obj)
         return;
 
+    FEATURE_LOG_INFO("%s::%s(),volume:%d position:%u duration:%d\n", file_tag, __FUNCTION__, cdata->volume, cdata->position, cdata->duration);
+
     if (ret >= 0) {
-        obj->currentTime = position / 1000;
+        obj->currentTime = cdata->position / 1000;
+        obj->duration = cdata->duration / 1000;
         obj->percent = (obj->currentTime * 100.0) / obj->duration;
+        obj->volume = cdata->volume / 10.0;
     }
 
     if (FeatureCheckCallbackId(obj->event.ontimeupdate.feature, obj->event.ontimeupdate.callbackId))
         FeatureInvokeCallback(obj->event.ontimeupdate.feature, obj->event.ontimeupdate.callbackId);
 
-    data.flags = MEDIA_METAFLAG_POSITION;
-    data.position = position;
+    data.flags = MEDIA_METAFLAG_VOLUME | MEDIA_METAFLAG_POSITION | MEDIA_METAFLAG_DURATION;
+    data.volume = cdata->volume;
+    data.position = cdata->position;
+    data.duration = cdata->duration;
     if (media_uv_session_update(obj->session, &data, NULL, NULL) < 0) {
         FEATURE_LOG_ERROR("%s::%s()media session update fail, ret:%d.\n", file_tag, __FUNCTION__, ret);
         if (FeatureCheckCallbackId(obj->event.onerror.feature, obj->event.onerror.callbackId))
