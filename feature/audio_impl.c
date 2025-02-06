@@ -343,6 +343,7 @@ static void audio_player_event_callback(void* cookie, int event, int ret, const 
         break;
 
     case MEDIA_EVENT_STARTED:
+        obj->state = MEDIA_STATE_STARTED;
         if (FeatureCheckCallbackId(obj->event.onplay.feature, obj->event.onplay.callbackId))
             FeatureInvokeCallback(obj->event.onplay.feature, obj->event.onplay.callbackId);
         update_duration(obj);
@@ -352,6 +353,7 @@ static void audio_player_event_callback(void* cookie, int event, int ret, const 
         break;
 
     case MEDIA_EVENT_PAUSED:
+        obj->state = MEDIA_STATE_PAUSED;
         uv_timer_stop(&obj->timer);
         if (FeatureCheckCallbackId(obj->event.onpause.feature, obj->event.onpause.callbackId))
             FeatureInvokeCallback(obj->event.onpause.feature, obj->event.onpause.callbackId);
@@ -360,6 +362,7 @@ static void audio_player_event_callback(void* cookie, int event, int ret, const 
         break;
 
     case MEDIA_EVENT_STOPPED:
+        obj->state = MEDIA_STATE_STOPPED;
         uv_timer_stop(&obj->timer);
         if (FeatureCheckCallbackId(obj->event.onstop.feature, obj->event.onstop.callbackId))
             FeatureInvokeCallback(obj->event.onstop.feature, obj->event.onstop.callbackId);
