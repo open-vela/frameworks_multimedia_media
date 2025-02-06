@@ -24,11 +24,14 @@
 #include <debug.h>
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
+#include <sys/timerfd.h>
+#include <time.h>
 
 #include "focus_stack.h"
 #include "media_common.h"
@@ -65,22 +68,43 @@
  * interaction is the core arbitrate of the media focus play result.
  */
 
+typedef struct media_focus_request_s media_focus_request_t;
+typedef SIMPLEQ_ENTRY(media_focus_request_s) media_focus_request_entry;
+typedef SIMPLEQ_HEAD(media_focus_request_q, media_focus_request_s) media_focus_request_q;
+
 typedef struct media_focus_cell {
     int pro_inter;
     int pas_inter;
 } media_focus_cell;
+
+struct media_focus_request_s {
+    media_focus_request_entry entry;
+    struct media_focus* focus;
+    void* cookie;
+    char name[64];
+    char cmd[64];
+    int req_id;
+};
 
 typedef struct media_focus {
     int num;
     void* stack;
     char* streams;
     media_focus_cell* matrix;
+    int timer_fd;
+    void* timer_cookie;
+    media_focus_request_q req_q;
+    int sequence; // sequence number for focus notify
+    int notify_count; // number of notifications sent
+    int reply_count; // number of times a reply was received
 } media_focus;
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
+static int media_focus_handler_l(media_focus* focus, void* cookie, const char* name, const char* cmd,
+    int arg, char* res, int res_len);
 // reformat string with removing space and change line symbol
 static char* media_focus_reformat(char* str)
 {
@@ -355,7 +379,46 @@ static int media_focus_focus_id_insert(void* x, app_focus_id* new_focus_id)
         MEDIA_ERR("inter media request failed\n");
         return -EINVAL;
     }
+
     return 0;
+}
+
+static int media_focus_create_timer(media_focus* focus)
+{
+    focus->timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+    if (focus->timer_fd == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int media_focus_update_timer(media_focus* focus, int64_t time, void* cookie)
+{
+    struct itimerspec its = { 0 };
+
+    if (focus->timer_fd < 0)
+        return -EINVAL;
+
+    focus->timer_cookie = cookie;
+
+    if (time) {
+        its.it_value.tv_sec = time / 1000;
+        its.it_value.tv_nsec = (time % 1000) * 1000000;
+    }
+
+    return timerfd_settime(focus->timer_fd, 0, &its, NULL);
+}
+
+static int media_focus_destroy_timer(media_focus* focus)
+{
+    int ret = 0;
+    if (focus->timer_fd > 0) {
+        ret = close(focus->timer_fd);
+        focus->timer_fd = -1;
+        focus->timer_cookie = NULL;
+    }
+
+    return ret;
 }
 
 static void* media_focus_request_(
@@ -502,9 +565,113 @@ static int media_focus_abandon_(media_focus* focus, void* handle)
     return ret;
 }
 
-void media_focus_notify_cb(int suggestion, void* cookie)
+static void media_focus_notify_cb(int suggestion, void* cookie)
 {
-    media_stub_notify_event(cookie, suggestion, 0, NULL);
+    media_focus* focus;
+
+    focus = media_get_focus();
+    media_focus_request_t* req = (media_focus_request_t*)SIMPLEQ_FIRST(&focus->req_q);
+    if (req == NULL) {
+        return;
+    }
+    media_stub_notify_event(cookie, suggestion, req->req_id, NULL);
+}
+
+static void media_focus_queue_pop(media_focus* focus)
+{
+    if (!SIMPLEQ_EMPTY(&focus->req_q)) {
+        media_focus_request_t* req = (media_focus_request_t*)SIMPLEQ_FIRST(&focus->req_q);
+        SIMPLEQ_REMOVE_HEAD(&focus->req_q, entry);
+        free(req);
+    }
+}
+
+static int media_focus_send_suggestion(media_focus* focus, int suggestion, void* cookie)
+{
+    media_parcel event;
+    int ret = 0;
+
+    media_parcel_init(&event);
+    media_parcel_append_printf(&event, "%i%s", suggestion, NULL);
+    ret = media_stub_reply(cookie, &event);
+    media_parcel_deinit(&event);
+
+    media_focus_update_timer(focus, 0, NULL);
+
+    focus->notify_count = 0;
+    focus->reply_count = 0;
+    media_focus_queue_pop(focus);
+
+    if (!SIMPLEQ_EMPTY(&focus->req_q)) {
+        media_focus_request_t* req = (media_focus_request_t*)SIMPLEQ_FIRST(&focus->req_q);
+        media_focus_handler_l(req->focus, req->cookie, req->name, req->cmd, req->req_id, NULL, 0);
+    }
+
+    return ret;
+}
+
+static void media_focus_queue_clear(media_focus* focus)
+{
+    while (!SIMPLEQ_EMPTY(&focus->req_q)) {
+        media_focus_queue_pop(focus);
+    }
+}
+
+static int media_focus_handler_l(media_focus* focus, void* cookie, const char* name, const char* cmd, int arg,
+    char* res, int res_len)
+{
+    media_focus* priv = focus;
+    int initial_suggestion;
+    void* focus_handle;
+    int ret;
+
+    if (!strcmp(cmd, "ping")) { /* To find focus stack. */
+        return 0;
+    } else if (!strcmp(cmd, "request")) {
+        focus_handle = media_focus_request_(priv, &initial_suggestion,
+            name, media_focus_notify_cb, cookie);
+        if (!focus_handle)
+            initial_suggestion = -EPERM;
+        else
+            media_server_set_data(cookie, focus_handle);
+
+        if (app_focus_stack_size(priv->stack) > 1 && initial_suggestion == MEDIA_FOCUS_PLAY) {
+            focus->notify_count = app_focus_stack_size(focus->stack) - 1;
+            media_focus_update_timer(focus, CONFIG_MEDIA_FOCUS_SUGGESTION_TIME_OUT, cookie);
+            return MEDIA_ERROR_DELAY_ACK;
+        }
+
+        media_focus_send_suggestion(focus, initial_suggestion, cookie);
+        return MEDIA_ERROR_DELAY_ACK;
+    } else if (!strcmp(cmd, "abandon")) {
+        focus_handle = media_server_get_data(cookie);
+        media_stub_notify_finalize(&cookie);
+        ret = media_focus_abandon_(priv, focus_handle);
+        media_focus_queue_pop(priv);
+        return ret;
+    } else if (!strcmp(cmd, "dump")) {
+        media_focus_debug_stack_display();
+        return 0;
+    } else if (!strcmp(cmd, "peek")) {
+        app_focus_id top;
+
+        ret = app_focus_stack_top(priv->stack, &top);
+        if (ret >= 0)
+            ret = snprintf(res, res_len, "%s", priv->streams + top.focus_level * STREAM_TYPE_LEN);
+
+        return ret;
+    } else if (!strcmp(cmd, "reply")) {
+        media_focus_request_t* req = (media_focus_request_t*)SIMPLEQ_FIRST(&priv->req_q);
+        if (req && req->req_id == arg) {
+            priv->reply_count++;
+        }
+        if (req && priv->reply_count >= priv->notify_count)
+            return media_focus_send_suggestion(priv, MEDIA_FOCUS_PLAY, req->cookie);
+        else
+            return 0;
+    }
+
+    return -ENOSYS;
 }
 
 /****************************************************************************
@@ -516,6 +683,8 @@ static int media_focus_uninit(media_plugin_t* plugin)
     media_focus* focus = plugin->priv;
 
     if (focus) {
+        media_focus_destroy_timer(focus);
+        media_focus_queue_clear(focus);
         free(focus->stack);
         free(focus->streams);
         free(focus->matrix);
@@ -544,6 +713,10 @@ static int media_focus_init(media_plugin_t* ctx)
     if (buf == NULL)
         goto err;
     buf[MAX_LEN - 1] = '\0';
+
+    SIMPLEQ_INIT(&focus->req_q);
+
+    media_focus_create_timer(focus);
 
     while (fgets(buf, MAX_LEN - 1, fp) != NULL) {
 
@@ -598,6 +771,38 @@ out:
     return ret;
 }
 
+static int media_focus_get_pollfds(struct media_plugin_t* ctx, struct pollfd* fds, void** cookies, int count)
+{
+    media_focus* priv = ctx->priv;
+    int nfd = 0;
+
+    if (!fds || count < 1)
+        return -EINVAL;
+
+    if (priv->timer_fd > 0) {
+        fds[0].fd = priv->timer_fd;
+        fds[0].events = POLLIN;
+        cookies[0] = NULL;
+        nfd = 1;
+    }
+
+    return nfd;
+}
+
+static int media_focus_poll_available(struct media_plugin_t* ctx, struct pollfd* fd, void* cookies)
+{
+    media_focus* priv = ctx->priv;
+
+    if (!fd)
+        return -EINVAL;
+
+    if (fd->fd == priv->timer_fd) {
+        media_focus_send_suggestion(priv, MEDIA_FOCUS_PLAY, priv->timer_cookie);
+    }
+
+    return 0;
+}
+
 void media_focus_debug_stack_display(void)
 {
     media_focus* focus;
@@ -620,42 +825,64 @@ int media_focus_debug_stack_return(app_focus_id* p_focus_list, int num)
     return app_focus_stack_return(focus->stack, p_focus_list, num);
 }
 
+static int media_focus_create_request(media_focus* focus, void* cookie, const char* name, const char* cmd, media_focus_request_t** out_req)
+{
+    media_focus* priv = focus;
+    media_focus_request_t* req;
+
+    req = zalloc(sizeof(media_focus_request_t));
+    if (req == NULL) {
+        MEDIA_ERR("no mem for creating req\n");
+        return -ENOMEM;
+    }
+
+    req->focus = focus;
+    req->cookie = cookie;
+
+    if (name)
+        strlcpy(req->name, name, sizeof(req->name));
+    if (cmd)
+        strlcpy(req->cmd, cmd, sizeof(req->cmd));
+
+    req->req_id = priv->sequence;
+    priv->sequence = (priv->sequence + 1) & INT_MAX;
+
+    *out_req = req;
+    return 0;
+}
+
 static int media_focus_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* name,
     const char* cmd, const char* args, int flags, char* res, int res_len)
 {
     media_focus* priv = ctx->priv;
-    int initial_suggestion;
-    void* focus_handle;
-    int ret;
+    int arg = 0;
 
-    if (!strcmp(cmd, "ping")) { /* To find focus stack. */
-        return 0;
-    } else if (!strcmp(cmd, "request")) {
-        focus_handle = media_focus_request_(priv, &initial_suggestion,
-            name, media_focus_notify_cb, conn);
-        if (!focus_handle)
-            return -EPERM;
+    if (args)
+        arg = atoi(args);
 
-        media_server_set_data(conn, focus_handle);
-        return initial_suggestion;
-    } else if (!strcmp(cmd, "abandon")) {
-        focus_handle = media_server_get_data(conn);
-        media_stub_notify_finalize((void**)&conn);
-        return media_focus_abandon_(priv, focus_handle);
-    } else if (!strcmp(cmd, "dump")) {
-        media_focus_debug_stack_display();
-        return 0;
-    } else if (!strcmp(cmd, "peek")) {
-        app_focus_id top;
+    if (!strcmp(cmd, "request") || !strcmp(cmd, "abandon")) {
+        media_focus_request_t* tmp;
+        media_focus_request_t* req = NULL;
+        int count = 0;
+        int ret = 0;
 
-        ret = app_focus_stack_top(priv->stack, &top);
-        if (ret >= 0)
-            ret = snprintf(res, res_len, "%s", priv->streams + top.focus_level * STREAM_TYPE_LEN);
+        SIMPLEQ_FOREACH(tmp, &priv->req_q, entry)
+        {
+            count++;
+        }
 
-        return ret;
-    }
+        ret = media_focus_create_request(priv, conn, name, cmd, &req);
+        if (ret < 0)
+            return ret;
 
-    return -ENOSYS;
+        SIMPLEQ_INSERT_TAIL(&priv->req_q, req, entry);
+
+        if (count <= 0)
+            return media_focus_handler_l(priv, conn, name, cmd, arg, res, res_len);
+
+        return MEDIA_ERROR_DELAY_ACK;
+    } else
+        return media_focus_handler_l(priv, conn, name, cmd, arg, res, res_len);
 }
 
 media_plugin_t media_focus_plugin = {
@@ -663,8 +890,8 @@ media_plugin_t media_focus_plugin = {
     .priv_size = sizeof(media_focus),
     .priv = NULL,
     .init = media_focus_init,
-    .get = NULL,
-    .available = NULL,
+    .get = media_focus_get_pollfds,
+    .available = media_focus_poll_available,
     .run_once = NULL,
     .uninit = media_focus_uninit,
     .process_command = media_focus_handler,

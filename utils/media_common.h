@@ -48,6 +48,14 @@
 #define MEDIA_ID_SESSION 5
 #define MEDIA_ID_FOCUS 6
 
+/* Error code. */
+/**
+ * @brief Error code for delay ack.
+ * After receiving the MEDIA_PARCEL_SEND_ACK message, the server asynchronously
+ * returns a response after processing it
+ */
+#define MEDIA_ERROR_DELAY_ACK -10000
+
 /* Debug log definition. */
 #define MEDIA_LOG(level, fmt, args...) \
     syslog(level, "[media][%s:%d] " fmt, __func__, __LINE__, ##args)
