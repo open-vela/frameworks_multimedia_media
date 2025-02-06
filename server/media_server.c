@@ -156,8 +156,11 @@ static int media_server_receive(struct media_server_priv* priv, struct pollfd* f
 
         case MEDIA_PARCEL_SEND_ACK:
             media_parcel_init(&ack);
-            media_stub_onreceive(conn, &conn->parcel, &ack);
-            ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
+            ret = media_stub_onreceive(conn, &conn->parcel, &ack);
+            if (ret != MEDIA_ERROR_DELAY_ACK)
+                ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
+            else
+                ret = 0;
             media_parcel_deinit(&ack);
             break;
 
@@ -406,6 +409,26 @@ int media_server_notify(void* handle, void* cookie, media_parcel* parcel)
     if (conn->notify_fd > 0)
         ret = media_parcel_send(parcel, conn->notify_fd,
             MEDIA_PARCEL_SEND, MSG_DONTWAIT);
+
+    pthread_mutex_unlock(&conn->mutex);
+
+    return ret;
+}
+
+int media_server_reply(void* handle, void* cookie, media_parcel* parcel)
+{
+    struct media_server_priv* priv = handle;
+    struct media_server_conn* conn = cookie;
+    int ret = -EINVAL;
+
+    if (priv == NULL || conn == NULL)
+        return ret;
+
+    pthread_mutex_lock(&conn->mutex);
+
+    if (conn->tran_fd > 0)
+        ret = media_parcel_send(parcel, conn->tran_fd,
+            MEDIA_PARCEL_REPLY, MSG_DONTWAIT);
 
     pthread_mutex_unlock(&conn->mutex);
 

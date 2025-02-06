@@ -61,11 +61,15 @@ static inline int media_plugin_command(MediadPlugin* plugin, struct media_server
     return -ENOSYS;
 }
 
-void media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media_parcel* out)
+int media_stub_reply(void* cookie, media_parcel* parcel)
+{
+    return media_server_reply(media_get_server(), cookie, parcel);
+}
+
+int media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media_parcel* out)
 {
     const char *target = NULL, *cmd = NULL, *arg = NULL;
-    int32_t len = 0, flags = 0, id = 0, size = 0, ret = 0;
-    const void* data = NULL;
+    int32_t len = 0, flags = 0, id = 0, ret = 0;
     char* response = NULL;
 
     media_parcel_read_int32(in, &id);
