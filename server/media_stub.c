@@ -61,10 +61,15 @@ static inline int media_plugin_command(media_plugin_t* plugin, struct media_serv
     return -ENOSYS;
 }
 
-void media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media_parcel* out)
+int media_stub_reply(void* cookie, media_parcel* parcel)
+{
+    return media_server_reply(media_get_server(), cookie, parcel);
+}
+
+int media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media_parcel* out)
 {
     const char *target = NULL, *cmd = NULL, *arg = NULL;
-    int32_t len = 0, flags = 0, id = 0, ret;
+    int32_t len = 0, flags = 0, id = 0, ret = 0;
     char* response = NULL;
 
     media_parcel_read_int32(in, &id);
@@ -82,11 +87,11 @@ void media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, medi
 
 #ifdef CONFIG_MEDIA_FOCUS
     case MEDIA_ID_FOCUS:
-        media_parcel_read_scanf(in, "%s%s%i", &target, &cmd, &len);
+        media_parcel_read_scanf(in, "%s%s%s%i", &target, &cmd, &arg, &len);
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_plugin_command(media_plugin_get("media_focus"), conn, target, cmd, NULL, 0, response, len);
+        ret = media_plugin_command(media_plugin_get("media_focus"), conn, target, cmd, arg, 0, response, len);
         break;
 #endif
 
@@ -135,7 +140,7 @@ void media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, medi
         break;
     }
 
-    if (out)
+    if (out && ret != MEDIA_ERROR_DELAY_ACK)
         media_parcel_append_printf(out, "%i%s", ret, response);
 
     if (ret < 0) {
@@ -145,6 +150,8 @@ void media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, medi
     }
 
     free(response);
+
+    return ret;
 }
 
 int media_stub_set_stream_status(const char* name, bool active)
