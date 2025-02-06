@@ -726,7 +726,7 @@ void system_audio_set_src(void* feature, union AppendData append_data, FtString 
             FEATURE_LOG_ERROR("Type part is too long or empty");
             return;
         }
-        const char* vaild_types[] = { "cache", "file", "mass", "tmp" };
+        const char* vaild_types[] = { "cache", "file", "mass", "tmp", "files" };
         const size_t vaild_types_count = sizeof(vaild_types) / sizeof(vaild_types[0]);
 
         int type_valid = 0;
