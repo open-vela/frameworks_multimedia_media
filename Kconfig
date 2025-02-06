@@ -84,6 +84,10 @@ config MEDIA_FOCUS_STACK_DEPTH
 	int "Media focus configurable stack size"
 	default 8
 
+config MEDIA_FOCUS_SUGGESTION_TIME_OUT
+	int "Media focus configurable suggestion time out with ms"
+	default 1000
+
 endif # MEDIA_FOCUS
 
 endif # MEDIA_SERVER

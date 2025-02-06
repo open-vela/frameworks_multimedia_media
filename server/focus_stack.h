@@ -53,6 +53,22 @@ typedef void (*app_focus_change_callback)(
  ****************************************************************************/
 
 /****************************************************************************
+ * Name: app_focus_stack_size
+ *
+ * Description:
+ *   This function get stack size.
+ *
+ * Input Parameters:
+ *   s       - pointer of app focus stack
+ *
+ * Returned Value:
+ *   Return app focus stack size.
+ *
+ ****************************************************************************/
+
+int app_focus_stack_size(void* x);
+
+/****************************************************************************
  * Name: app_focus_stack_top
  *
  * Description:

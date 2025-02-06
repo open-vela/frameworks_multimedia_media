@@ -50,7 +50,8 @@ struct media_parcel;
 struct media_server_conn;
 void media_stub_notify_finalize(void** cookie);
 void media_stub_notify_event(void* cookie, int event, int result, const char* extra);
-void media_stub_onreceive(struct media_server_conn* conn, struct media_parcel* in, struct media_parcel* out);
+int media_stub_reply(void* cookie, media_parcel* parcel);
+int media_stub_onreceive(struct media_server_conn* conn, struct media_parcel* in, struct media_parcel* out);
 
 int media_stub_set_stream_status(const char* name, bool active);
 int media_stub_get_stream_name(const char* stream, char* name, int len);
@@ -60,6 +61,7 @@ int media_stub_process_command(const char* target, const char* cmd, const char* 
  * Server Functions
  ****************************************************************************/
 int media_server_notify(void* handle, void* cookie, media_parcel* parcel);
+int media_server_reply(void* handle, void* cookie, media_parcel* parcel);
 void media_server_finalize(void* handle, void* cookie);
 
 void media_server_set_data(void* cookie, void* data);

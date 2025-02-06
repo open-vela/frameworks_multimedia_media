@@ -66,12 +66,6 @@ static int app_focus_stack_is_empty(app_focus_stack* s)
     return s->cur_size == 0;
 }
 
-// get current app focus stack size
-static int app_focus_stack_size(app_focus_stack* s)
-{
-    return s->cur_size;
-}
-
 // listener function for dealing with focus state change
 static void app_focus_stack_change_callback(app_focus_stack* s,
     struct app_focus_id* cur_focus_id,
@@ -110,6 +104,12 @@ static int app_focus_stack_thread_is_alive(app_focus_id* value)
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+int app_focus_stack_size(void* x)
+{
+    app_focus_stack* s = (app_focus_stack*)x;
+    return s->cur_size;
+}
 
 int app_focus_stack_top(void* x, app_focus_id* value)
 {
