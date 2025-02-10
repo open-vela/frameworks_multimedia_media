@@ -72,7 +72,8 @@ if(CONFIG_MEDIA)
   endif()
 
   if(CONFIG_LIB_FFMPEG)
-    list(APPEND SERVER_SRCS server/media_graph.c server/media_session.c)
+    list(APPEND SERVER_SRCS server/media_graph.c server/media_session.c
+                            server/media_player.c server/media_recorder.c)
     list(APPEND INCDIR ${CMAKE_BINARY_DIR}/apps/external/ffmpeg)
     list(APPEND INCDIR ${NUTTX_APPS_DIR}/external/ffmpeg/ffmpeg)
   endif()
