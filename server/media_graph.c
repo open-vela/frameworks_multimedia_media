@@ -104,6 +104,9 @@ static void media_trace_end(void* avcl, const char* fmt, va_list vl)
 static void media_graph_log_callback(void* avcl, int level,
     const char* fmt, va_list vl)
 {
+    if (level > av_log_get_level())
+        return;
+
     switch (level) {
     case AV_LOG_PANIC:
         level = LOG_EMERG;
