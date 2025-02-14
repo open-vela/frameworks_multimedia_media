@@ -35,7 +35,7 @@
 #include <string.h>
 #include <unistd.h>
 #ifdef CONFIG_AUDIOUTILS_ALSA_LIB
-#include <asoundlib.h>
+#include <alsa/asoundlib.h>
 #endif
 #ifdef CONFIG_LIBUV_EXTENSION
 #include <uv.h>
