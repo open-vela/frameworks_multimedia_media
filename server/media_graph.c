@@ -37,6 +37,7 @@
 #include <libavutil/pixfmt.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/samplefmt.h>
+#include <libavutil/channel_layout.h>
 
 #include <assert.h>
 #include <fcntl.h>
@@ -757,31 +758,16 @@ MediadPlugin media_graph_plugin = {
  * Public Functions
  ****************************************************************************/
 
-int media_graph_stream_set_options(MediaGraphStream* ctx, const char* options)
-{
-    MediaGraphPriv *priv = media_graph_plugin.priv;
-    int ret;
-
-    if (!ctx)
-        return -EINVAL;
-
-    ret = avfilter_process_command(ctx->src, "set_options", options, NULL, 0, 0);
-    if (ret < 0)
-        MEDIA_ERR("%s set_options failed ret:%d\n", ctx->src->name, ret);
-
-    media_graph_try_touch(priv);
-
-    return ret;
-}
-
 int media_graph_stream_open(MediaGraphStream** pctx,
                             const char* stream_type,
-                            int (*event_cb)(void* udata, int evt, int64_t args),
-                            void* udata)
+                            int format, int sample_rate, int channels,
+                            int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
 {
     MediaGraphPriv *priv = media_graph_plugin.priv;
+    AVChannelLayout ch_layout = {0};
+    char layout_str[32] = {0};
     MediaGraphStream *ctx;
-    char msg[32] = { 0 };
+    char msg[128] = { 0 };
     int ret;
 
     ctx = av_calloc(1, sizeof(*ctx));
@@ -795,16 +781,26 @@ int media_graph_stream_open(MediaGraphStream** pctx,
         goto fail;
     }
 
-    snprintf(msg, sizeof(msg), "%p %p", event_cb, udata);
+    snprintf(msg, sizeof(msg), "%p %p", on_event_cb, udata);
     ret = avfilter_process_command(ctx->src, "link", msg, (char *)&ctx->link_handle, sizeof(void **), 0);
     if (ret < 0) {
         MEDIA_ERR("%s link failed ret:%d\n", ctx->src->name, ret);
         goto fail;
     }
 
+    av_channel_layout_default(&ch_layout, channels);
+    ret = av_channel_layout_describe(&ch_layout, layout_str, sizeof(layout_str));
+    if (ret < 0)
+        MEDIA_ERR("Failed to describe channel layout: %s\n", av_err2str(ret));
+
+    snprintf(msg, sizeof(msg), "format=%d:sample_rate=%d:ch_layout=%s",
+            format, sample_rate, layout_str);
+    ret = avfilter_process_command(ctx->src, "set_options", msg, NULL, 0, 0);
+    if (ret < 0)
+        MEDIA_ERR("%s set_options failed ret:%d\n", ctx->src->name, ret);
+
     media_graph_try_touch(priv);
     *pctx = ctx;
-
     return 0;
 fail:
     av_free(ctx);

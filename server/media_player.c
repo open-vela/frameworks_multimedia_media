@@ -573,7 +573,7 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         stream_out->codec_ctx->pkt_timebase = stream->time_base;
 
         if (stream_out->codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
-            ret = media_graph_stream_open(&ctx->audio_output ,ctx->name ,
+            ret = media_graph_stream_open(&ctx->audio_output , ctx->name, -1, 0, 0,
                                           media_player_on_event_cb, ctx);
             if (ret < 0) {
                 MEDIA_ERR("media_graph_stream_open failed.\n");
@@ -607,7 +607,6 @@ static void media_player_close_demuxer(MediaPlayerContext* ctx)
 {
     OutputStream* stream;
     int i;
-
 
     if (ctx->format_opt)
         av_dict_free(&ctx->format_opt);
@@ -843,7 +842,6 @@ static int media_player_close(MediaPlayerContext* ctx)
     return 0;
 }
 
-
 static int media_player_pause(MediaPlayerContext* ctx)
 {
     int ret = AVERROR(EPERM);
@@ -894,8 +892,8 @@ static int media_player_start(MediaPlayerContext* ctx)
     }
 
     if (ctx->audio_idx >= 0 && !ctx->audio_output) {
-        ret = media_graph_stream_open(&ctx->audio_output ,ctx->name ,
-                                       media_player_on_event_cb, ctx);
+        ret = media_graph_stream_open(&ctx->audio_output , ctx->name, -1, 0, 0,
+                                          media_player_on_event_cb, ctx);
         if (ret < 0) {
             MEDIA_ERR("media_graph_stream_open failed.\n");
             ret = AVERROR(EINVAL);

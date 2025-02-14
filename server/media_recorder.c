@@ -677,21 +677,47 @@ static int media_recorder_close(MediaRecorderContext* ctx)
 
 static int media_recorder_start(MediaRecorderContext* ctx)
 {
+    AVDictionaryEntry* tag;
     int ret = AVERROR(EPERM);
+    int sample_rate;
+    int sample_fmt;
+    int channels;
 
     if (ctx->state != MEDIA_RECORDER_STATE_PREPARED && ctx->state != MEDIA_RECORDER_STATE_PAUSED)
         goto out;
 
-    ret = 0;
-    ctx->state = MEDIA_RECORDER_STATE_STARTED;
-
     if (!ctx->audio_input) {
+
+        if ((tag = av_dict_get(ctx->format_opt, "sample_rate", NULL, 0)))
+            sample_rate = strtol(tag->value, NULL, 0);
+        else {
+            MEDIA_ERR("sample_rate not found in format options.\n");
+            return AVERROR(EINVAL);
+        }
+
+        if ((tag = av_dict_get(ctx->format_opt, "sample_fmt", NULL, 0)))
+            sample_fmt = strtol(tag->value, NULL, 0);
+        else {
+            MEDIA_ERR("sample_fmt not found in format options.\n");
+            return AVERROR(EINVAL);
+        }
+
+        if ((tag = av_dict_get(ctx->format_opt, "channels", NULL, 0)))
+            channels = strtol(tag->value, NULL, 0);
+        else {
+            MEDIA_ERR("channels not found in format options.\n");
+            return AVERROR(EINVAL);
+        }
+
         ret = media_graph_stream_open(&ctx->audio_input, ctx->name,
-                                       media_recorder_on_event_cb, ctx);
+                                      sample_fmt, sample_rate, channels,
+                                      media_recorder_on_event_cb, ctx);
         if (ret < 0)
             MEDIA_ERR("media_graph_stream_open failed, ret %d.\n", ret);
-        else
+        else {
             MEDIA_INFO("media_graph_stream_open success.\n");
+            ctx->state = MEDIA_RECORDER_STATE_STARTED;
+        }
         return ret;
     }
 

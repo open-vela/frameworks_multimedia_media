@@ -45,8 +45,8 @@ typedef struct MediaGraphStream MediaGraphStream;
 
 int media_graph_stream_open(MediaGraphStream** pctx,
                             const char* stream_type,
-                            int (*event_cb)(void* udata, int evt, int64_t args),
-                            void* udata);
+                            int format, int sample_rate, int channels,
+                            int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata);
 /*
  * Release a audio stream.
  * @ctx: [in,out] audio stream context
@@ -55,15 +55,5 @@ int media_graph_stream_open(MediaGraphStream** pctx,
  * Note that it must also be called during pause. Get it again after resume.
  */
 int media_graph_stream_close(MediaGraphStream** pctx);
-
-/*
- * Set options for a audio stream.
- * @ctx: [in,out] audio stream context
- * @options: options string eg. "sample_fmt=1:ch_layout=stereo:sample_rate=48000"
- * @return: 0 on success, negative value on error
- *
- */
-
-int media_graph_stream_set_options(MediaGraphStream* ctx, const char* options);
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_GRAPH_H */
