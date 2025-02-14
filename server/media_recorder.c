@@ -469,12 +469,13 @@ static int media_recorder_init_stream(MediaRecorderContext* ctx)
 static int media_recorder_on_event_cb(void *udata, int evt, int64_t args)
 {
     MediaRecorderContext* ctx = (MediaRecorderContext*)udata;
+    AVFrame* in_frame = (AVFrame*)(uintptr_t)args;
     AVFrame* frame;
 
-    MEDIA_DEBUG("audio input event: %d", evt);
-
-    AVFrame* in_frame = (AVFrame*)(uintptr_t)args;
     frame = av_frame_clone(in_frame);
+    if (!frame)
+        return AVERROR(ENOMEM);
+
     media_recorder_queue_push(ctx, ctx->audio_idx, frame);
 
     return 0;
@@ -562,10 +563,13 @@ static int media_recorder_proc_dat(MediaRecorderContext* ctx)
         frame->pts -= ctx->streams[i].sync_pts;
         frame->pict_type = AV_PICTURE_TYPE_NONE;
 
-        /* user request stop, send frame which linesize = 0 */
-        if (!frame->linesize[0])
+        /* user request stop, flush code which data = 0 */
+        if (!frame->data[0]){
+            MEDIA_INFO("reveice empty frame\n");
             av_frame_free(&frame);
-        else if (ctx->state == MEDIA_RECORDER_STATE_PAUSED) {
+            avcodec_flush_buffers(ctx->streams[i].enc_ctx);
+            return 0;
+        } else if (ctx->state == MEDIA_RECORDER_STATE_PAUSED) {
             if (ctx->streams[i].type == AVMEDIA_TYPE_AUDIO)
                 ctx->streams[i].sync_pts += frame->nb_samples;
             else
