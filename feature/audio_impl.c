@@ -561,7 +561,7 @@ void system_audio_wrap_play(FeatureInstanceHandle feature, union AppendData appe
         obj->state = MEDIA_STATE_PREPARED;
         /* for the scenario where the user seek before playback */
         if (obj->currentTime)
-            media_uv_player_seek(obj->player, obj->currentTime, NULL, NULL);
+            media_uv_player_seek(obj->player, obj->currentTime * 1000, NULL, NULL);
     }
 
     ret = media_uv_player_start_auto(obj->player, MEDIA_SCENARIO_MUSIC, audio_start_cb, obj);
@@ -795,7 +795,7 @@ void system_audio_set_currentTime(void* feature, union AppendData append_data, F
     if (!obj || !obj->player)
         return;
 
-    media_uv_player_seek(obj->player, currentTime, NULL, NULL);
+    media_uv_player_seek(obj->player, currentTime * 1000, NULL, NULL);
     obj->currentTime = currentTime;
 }
 
