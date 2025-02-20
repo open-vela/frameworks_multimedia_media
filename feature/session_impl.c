@@ -133,6 +133,7 @@ static void set_event_callback(void* user_data, int event, int ret, const char* 
 
     if (FeatureInstanceIsDetached(session->instance)) {
         FEATURE_LOG_ERROR("%s::%s(), FeatureInstanceIsDetached, FeatureInstanceHandle: %p\n", file_tag, __FUNCTION__, session->instance);
+        return;
     }
 
     if (FeatureCheckCallbackId(session->interface, session->onstatuschange)) {
