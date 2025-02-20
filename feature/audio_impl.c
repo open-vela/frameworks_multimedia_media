@@ -169,12 +169,21 @@ cleanup:
 
 void system_audio_onRequired(FeatureRuntimeContext ctx, FeatureInstanceHandle handle)
 {
-    FEATURE_LOG_DEBUG("%s::%s(), FeatureInstanceHandle: %p\n", file_tag, __FUNCTION__, handle);
+    FEATURE_LOG_INFO("%s::%s(), FeatureInstanceHandle: %p\n", file_tag, __FUNCTION__, handle);
 }
 
 void system_audio_onDetached(FeatureRuntimeContext ctx, FeatureInstanceHandle handle)
 {
-    FEATURE_LOG_DEBUG("%s::%s(), FeatureInstanceHandle: %p\n", file_tag, __FUNCTION__, handle);
+    AudioObject* obj;
+
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(handle));
+    if (!obj)
+        return;
+
+    FEATURE_LOG_INFO("%s::%s(), FeatureInstanceHandle: %p\n", file_tag, __FUNCTION__, handle);
+    if (obj->event.ontimeupdate.feature == handle) {
+        obj->event.ontimeupdate.feature = NULL;
+    }
 }
 
 void system_audio_onDestroy(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
