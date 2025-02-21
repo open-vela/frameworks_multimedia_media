@@ -34,9 +34,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#ifdef CONFIG_AUDIOUTILS_ALSA_LIB
-#include <alsa/asoundlib.h>
-#endif
 #ifdef CONFIG_LIBUV_EXTENSION
 #include <uv.h>
 #include <uv_async_queue.h>
@@ -155,19 +152,6 @@
         return mediatool_cmd_##func##_exec(mediatool, a1, a2, a3, a4, a5, a6, a7, a8);                                      \
     }                                                                                                                       \
     static int mediatool_cmd_##func##_exec(mediatool_t* mediatool, t1 a1, t2 a2, t3 a3, t4 a4, t5 a5, t6 a6, t7 a7, t8 a8)
-
-#ifdef CONFIG_AUDIOUTILS_ALSA_LIB
-typedef struct {
-    char* file_path;
-    snd_pcm_t* handle;
-    int bytes_per_frame;
-    int sample_rate;
-} thread_alsa_t;
-
-int alsapause = 0;
-static pthread_mutex_t alsapause_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t alsapause_cond = PTHREAD_COND_INITIALIZER;
-#endif
 
 /****************************************************************************
  * Type Declarations
@@ -2088,182 +2072,6 @@ static int mediatool_cmd_help(const mediatool_cmd_t cmds[])
 
     return 0;
 }
-#ifdef CONFIG_AUDIOUTILS_ALSA_LIB
-static void* mediatool_alsa_thread(void* arg)
-{
-    thread_alsa_t* priv = arg;
-    char* buffer;
-    int rc, size;
-    FILE* pcm_file;
-
-    snd_pcm_uframes_t frames = priv->sample_rate / 1000 * 25;
-    size = frames * priv->bytes_per_frame;
-
-    buffer = (char*)malloc(size);
-    if (!buffer) {
-        printf("unable to allocate memory in thread\n");
-        goto fail3;
-    }
-
-    pcm_file = fopen(priv->file_path, "rb");
-    if (!pcm_file) {
-        printf("unable to open %s\n err:%s", priv->file_path, strerror(errno));
-        goto fail2;
-    }
-
-    while (!feof(pcm_file)) {
-        rc = fread(buffer, 1, size, pcm_file);
-        if (rc == 0) {
-            if (feof(pcm_file)) {
-                printf("End of file reached\n");
-                break;
-            }
-            if (ferror(pcm_file)) {
-                printf("Error reading from file\n");
-                goto fail1;
-            }
-        }
-
-        int frames_to_write = rc / priv->bytes_per_frame;
-        int offset = 0;
-        int retries = 0;
-        const int max_retries = 5;
-
-        while (frames_to_write > 0) {
-            pthread_mutex_lock(&alsapause_mutex);
-            if (alsapause) {
-                pthread_cond_wait(&alsapause_cond, &alsapause_mutex);
-            }
-            pthread_mutex_unlock(&alsapause_mutex);
-
-            rc = snd_pcm_writei(priv->handle, buffer + offset, frames_to_write);
-            if (rc == -EAGAIN) {
-                continue;
-            } else if (rc == -EPIPE) {
-                printf("underrun occurred\n");
-                snd_pcm_prepare(priv->handle);
-            } else if (rc == -ESTRPIPE) {
-                while ((rc = snd_pcm_resume(priv->handle)) == -EAGAIN) {
-                    sleep(1);
-                }
-                if (rc < 0) {
-                    snd_pcm_prepare(priv->handle);
-                }
-            } else if (rc < 0) {
-                printf("error from writei: %s\n", snd_strerror(rc));
-                break;
-            } else if (rc == 0) {
-                printf("No frames were written, retrying...\n");
-                if (++retries > max_retries) {
-                    printf("Max retries reached, exiting...\n");
-                    break;
-                }
-                continue;
-            } else {
-                frames_to_write -= rc;
-                offset += rc * priv->bytes_per_frame;
-                retries = 0;
-            }
-        }
-    }
-
-    snd_pcm_drain(priv->handle);
-    snd_pcm_close(priv->handle);
-fail1:
-    fclose(pcm_file);
-fail2:
-    free(buffer);
-fail3:
-    free(priv->file_path);
-    free(priv);
-    return NULL;
-}
-
-CMD4(alsa, string_t, device, string_t, path, string_t, option, int, volume)
-{
-    int dir, rc;
-    snd_pcm_t* handle;
-    snd_pcm_hw_params_t* params;
-    snd_pcm_format_t format = SND_PCM_FORMAT_S16_LE;
-
-    pthread_t thread;
-
-    int channels = atoi(strtok(option, ":"));
-    int bits_per_sample = atoi(strtok(NULL, ":"));
-    unsigned int sample_rate = (unsigned int)strtoul(strtok(NULL, ":"), NULL, 10);
-
-    int bytes_per_frame = bits_per_sample / 8 * channels;
-
-    if (bits_per_sample == 16) {
-        format = SND_PCM_FORMAT_S16_LE;
-    } else {
-        format = SND_PCM_FORMAT_S32_LE;
-    }
-
-    if (volume <= 0 && volume > 100)
-        volume = 100;
-
-    if (access(path, F_OK) != 0) {
-        printf("file not exist\n");
-        return 0;
-    }
-
-    rc = snd_pcm_open(&handle, device, SND_PCM_STREAM_PLAYBACK, 0);
-    if (rc < 0) {
-        printf("unable to open pcm device: %s\n", snd_strerror(rc));
-        return 0;
-    }
-
-    snd_pcm_hw_params_alloca(&params);
-    snd_pcm_hw_params_any(handle, params);
-    snd_pcm_hw_params_set_access(handle, params, SND_PCM_ACCESS_RW_INTERLEAVED);
-    snd_pcm_hw_params_set_format(handle, params, format);
-    snd_pcm_hw_params_set_channels(handle, params, channels);
-    snd_pcm_hw_params_set_rate_near(handle, params, &sample_rate, &dir);
-
-    snd_pcm_hw_params_set_period_time(handle, params, 20 * 1000, dir);
-    snd_pcm_hw_params_set_periods(handle, params, 4, dir);
-
-    snd_pcm_set_volume(handle, volume);
-
-    rc = snd_pcm_hw_params(handle, params);
-    if (rc < 0) {
-        printf("unable to set hw parameters: %s\n", snd_strerror(rc));
-        return 0;
-    }
-
-    thread_alsa_t* priv = (thread_alsa_t*)malloc(sizeof(thread_alsa_t));
-    if (!priv) {
-        printf("malloc alsa priv failed\n");
-        return 0;
-    }
-    priv->file_path = strdup(path);
-    priv->handle = handle;
-    priv->bytes_per_frame = bytes_per_frame;
-    priv->sample_rate = sample_rate;
-
-    rc = pthread_create(&thread, NULL, mediatool_alsa_thread, priv);
-    if (rc >= 0)
-        printf("alsa pthread_create successfully\n");
-
-    return 0;
-}
-
-CMD1(alsapause, int, enable)
-{
-    pthread_mutex_lock(&alsapause_mutex);
-    alsapause = enable;
-    if (!alsapause) {
-        pthread_cond_broadcast(&alsapause_cond);
-    }
-    pthread_mutex_unlock(&alsapause_mutex);
-
-    printf("alsa tool %s\n", enable ? "pause" : "resume");
-
-    return 0;
-}
-
-#endif /* CONFIG_AUDIOUTILS_ALSA_LIB */
 
 #ifdef CONFIG_LIBUV_EXTENSION
 CMD1(uv_player_open, string_t, stream_type)
@@ -2600,14 +2408,6 @@ static const mediatool_cmd_t g_mediatool_cmds[] = {
     { "abandon",
         mediatool_cmd_close,
         "Abandon media focus(abandon ID)" },
-#ifdef CONFIG_AUDIOUTILS_ALSA_LIB
-    { "alsa",
-        mediatool_cmd_alsa,
-        "Alsa lib (alsa DEVICE PCMFILE CHANNEL:SAMPLEBIT:RATE VOLUME)" },
-    { "alsapause",
-        mediatool_cmd_alsapause,
-        "Pause alsa play (alsapause 1/0) 1 pause, 0 resume" },
-#endif
 #ifdef CONFIG_LIBUV_EXTENSION
     { "uv_open",
         mediatool_cmd_uv_player_open,
