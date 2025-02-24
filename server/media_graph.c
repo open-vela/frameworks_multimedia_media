@@ -759,7 +759,7 @@ MediadPlugin media_graph_plugin = {
  ****************************************************************************/
 
 int media_graph_stream_open(MediaGraphStream** pctx,
-                            const char* stream_type,
+                            const char* stream,
                             int format, int sample_rate, int channels,
                             int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
 {
@@ -767,6 +767,7 @@ int media_graph_stream_open(MediaGraphStream** pctx,
     AVChannelLayout ch_layout = {0};
     char layout_str[32] = {0};
     MediaGraphStream *ctx;
+    char stream_name[64] = { 0 };
     char msg[128] = { 0 };
     int ret;
 
@@ -774,9 +775,13 @@ int media_graph_stream_open(MediaGraphStream** pctx,
     if (!ctx)
         return -ENOMEM;
 
-    ctx->src = avfilter_graph_get_filter(priv->graph, stream_type);
+    ret = media_stub_get_stream_name(stream, stream_name, sizeof(stream_name));
+    if (ret >= 0)
+        stream = stream_name;
+
+    ctx->src = avfilter_graph_get_filter(priv->graph, stream);
     if (!ctx->src) {
-        MEDIA_ERR("buffersrc:%s not found\n", stream_type);
+        MEDIA_ERR("%s stream is not found\n", ret >= 0 ? stream_name : stream);
         ret = -EINVAL;
         goto fail;
     }
