@@ -572,13 +572,7 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         stream_out->next_pts = AV_NOPTS_VALUE;
         stream_out->codec_ctx->pkt_timebase = stream->time_base;
 
-        if (stream_out->codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
-            ret = media_graph_stream_open(&ctx->audio_output , ctx->name, -1, 0, 0,
-                                          media_player_on_event_cb, ctx);
-            if (ret < 0) {
-                MEDIA_ERR("media_graph_stream_open failed.\n");
-            }
-        } else if (codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        if (codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
             char options[128] = {0};
             // these option is set by user
             snprintf(options, sizeof(options), "format=%s:devname=%s:pix_fmt=%d",
