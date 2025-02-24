@@ -486,7 +486,7 @@ static void audio_media_player_query_cb(void* cookie, int ret, void* object)
 
     FEATURE_LOG_INFO("%s::%s(),volume:%d position:%u duration:%d\n", file_tag, __FUNCTION__, cdata->volume, cdata->position, cdata->duration);
 
-    if (ret >= 0) {
+    if (ret >= 0 && obj->state == MEDIA_STATE_STARTED) {
         obj->currentTime = cdata->position / 1000;
         obj->duration = cdata->duration / 1000;
         obj->percent = (obj->currentTime * 100.0) / obj->duration;
