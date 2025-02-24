@@ -1051,6 +1051,8 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
         ret = media_player_send_cmd(ctx, MEDIA_PLAYER_CMD_SET_LOOP, arg, strlen(arg) + 1);
     } else if (!strcmp(cmd, "set_options") && arg) {
         ret = media_player_send_cmd(ctx, MEDIA_PLAYER_CMD_SET_OPTIONS, arg, strlen(arg) + 1);
+    } else if (!strcmp(cmd, "get_duration")) {
+        snprintf(res, res_len, "%d", ctx->duration_ms);
     } else {
         MEDIA_ERR("unknown cmd: %s.\n", cmd);
         return AVERROR(EINVAL);
