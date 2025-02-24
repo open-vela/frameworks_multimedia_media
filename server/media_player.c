@@ -62,7 +62,7 @@
 #define MEDIA_PLAYER_CMD_QUEUE_MAX 16
 #define MEDIA_PLAYER_DATA_QUEUE_SIZE 4
 
-#define MEDIA_PLAYER_SLIENCE_FRAME_DURATION 20
+#define MEDIA_PLAYER_SILENCE_FRAME_DURATION 20
 
 /****************************************************************************
  * Private Types
@@ -172,7 +172,7 @@ static AVFrame* media_player_queue_pop(MediaPlayerContext* ctx, int idx);
  * Private Functions
  ****************************************************************************/
 
-static AVFrame* media_player_generate_slience_frame(MediaPlayerContext* ctx)
+static AVFrame* media_player_generate_silence_frame(MediaPlayerContext* ctx)
 {
     AVFrame* frame = av_frame_alloc();
     if (frame) {
@@ -180,18 +180,18 @@ static AVFrame* media_player_generate_slience_frame(MediaPlayerContext* ctx)
         frame->format = ctx->streams[ctx->audio_idx].codec_ctx->sample_fmt;
         frame->ch_layout = ctx->streams[ctx->audio_idx].codec_ctx->ch_layout;
         frame->nb_samples = frame->sample_rate * av_get_bytes_per_sample(frame->format) *
-                            MEDIA_PLAYER_SLIENCE_FRAME_DURATION / 1000;
+                            MEDIA_PLAYER_SILENCE_FRAME_DURATION / 1000;
 
         if (av_frame_get_buffer(frame, 0) < 0) {
             av_frame_free(&frame);
-            MEDIA_ERR("av_frame_get_buffer failed for slience frame.");
+            MEDIA_ERR("av_frame_get_buffer failed for silence frame.");
             return NULL;
         }
 
         av_samples_set_silence((uint8_t**)frame->extended_data, 0, frame->nb_samples,
                                frame->ch_layout.nb_channels, frame->format);
     } else {
-        MEDIA_ERR("av_frame_alloc failed for slience frame.");
+        MEDIA_ERR("av_frame_alloc failed for silence frame.");
     }
 
     return frame;
@@ -206,7 +206,7 @@ static int media_player_on_event_cb(void *udata, int evt, int64_t args)
 
     frame = media_player_queue_pop(ctx, ctx->audio_idx);
     if (!frame)
-        frame = media_player_generate_slience_frame(ctx);
+        frame = media_player_generate_silence_frame(ctx);
     if (frame) {
         AVFrame* out_frame = (AVFrame*)(uintptr_t)args;
         av_frame_move_ref(out_frame, frame);
