@@ -55,22 +55,6 @@ if(CONFIG_MEDIA)
     list(APPEND SERVER_SRCS server/media_focus.c server/focus_stack.c)
   endif()
 
-  if(CONFIG_MEDIA_SERVER)
-    set(DAEMON_SRCS server/media_daemon.c server/media_stub.c
-                    server/media_server.c server/media_plugin.c)
-    nuttx_add_application(
-      NAME
-      ${CONFIG_MEDIA_SERVER_PROGNAME}
-      SRCS
-      ${DAEMON_SRCS}
-      STACKSIZE
-      ${CONFIG_MEDIA_SERVER_STACKSIZE}
-      PRIORITY
-      ${CONFIG_MEDIA_SERVER_PRIORITY}
-      INCLUDE_DIRECTORIES
-      ${INCDIR})
-  endif()
-
   if(CONFIG_LIB_FFMPEG)
     list(APPEND SERVER_SRCS server/media_graph.c server/media_session.c
                             server/media_player.c server/media_recorder.c
@@ -85,8 +69,20 @@ if(CONFIG_MEDIA)
     list(APPEND INCDIR ${NUTTX_APPS_DIR}/frameworks/system/utils/include)
   endif()
 
-  if(CONFIG_MEDIA_TRIGGER)
-    list(APPEND SERVER_SRCS server/media_trigger.c)
+  if(CONFIG_MEDIA_SERVER)
+    set(DAEMON_SRCS server/media_daemon.c server/media_stub.c
+                    server/media_server.c server/media_plugin.c)
+    nuttx_add_application(
+      NAME
+      ${CONFIG_MEDIA_SERVER_PROGNAME}
+      SRCS
+      ${DAEMON_SRCS}
+      STACKSIZE
+      ${CONFIG_MEDIA_SERVER_STACKSIZE}
+      PRIORITY
+      ${CONFIG_MEDIA_SERVER_PRIORITY}
+      INCLUDE_DIRECTORIES
+      ${INCDIR})
   endif()
 
   if(CONFIG_MEDIA_TOOL)
