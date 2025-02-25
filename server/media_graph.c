@@ -742,6 +742,37 @@ static void media_graph_try_touch(MediaGraphPriv *priv)
     }
 }
 
+static int media_graph_stream_unlink(AVFilterContext *ctx, AVFilterLink *link)
+{
+    AVFilterLink *cur_link;
+    int ret, i;
+
+    if (!ctx || !link)
+        return AVERROR(EINVAL);
+
+    if (!ctx->nb_inputs) {
+        ret = avfilter_process_command(ctx, "unlink", (char*)link, 0, 0, 0);
+        if (ret < 0)
+            return ret;
+
+        MEDIA_INFO("unlink filter %s success.", ctx->name);
+        return 0;
+    }
+
+    for (i = 0; i < ctx->nb_inputs; i++) {
+        cur_link = ctx->inputs[i];
+        if (cur_link && avfilter_link_is_active(cur_link)) {
+            ret = media_graph_stream_unlink(cur_link->src, cur_link);
+            if (ret < 0) {
+                MEDIA_ERR("unlink failed for filter %s: %d.", ctx->name, ret);
+                return ret;
+            }
+        }
+    }
+
+    return 0;
+}
+
 MediadPlugin media_graph_plugin = {
     .name = "media_graph",
     .priv_size = sizeof(MediaGraphPriv),
@@ -818,12 +849,17 @@ int media_graph_stream_close(MediaGraphStream** pctx)
     MediaGraphStream *ctx = *pctx;
     int ret;
 
-    if (!pctx || !ctx)
+    if (!pctx || !ctx || !ctx->src)
         return -EINVAL;
 
     ret = avfilter_process_command(ctx->src, "unlink", (char *)ctx->link_handle, NULL, 0, 0);
+
+    if (ctx->src->nb_inputs)
+        /* unlink and trigger pcmxc send empty frame flush record pipe*/
+        ret = media_graph_stream_unlink(ctx->src, ctx->src->inputs[0]);
+
     if (ret < 0)
-        MEDIA_ERR("%s unlink failed ret:%d\n", ctx->src->name, ret);
+        MEDIA_ERR("unlink %s failed: %d\n", ctx->src->name, ret);
 
     media_graph_try_touch(priv);
     av_free(ctx);
