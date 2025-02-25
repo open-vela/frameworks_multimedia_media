@@ -1056,6 +1056,8 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
         snprintf(res, res_len, "%d", ctx->duration_ms);
     } else if (!strcmp(cmd, "get_position")) {
         snprintf(res, res_len, "%d", ctx->current_ms);
+    } else if (!strcmp(cmd, "get_playing")) {
+        snprintf(res, res_len, "%d", ctx->state == MEDIA_PLAYER_STATE_STARTED);
     } else {
         MEDIA_ERR("unknown cmd: %s.\n", cmd);
         return AVERROR(EINVAL);
