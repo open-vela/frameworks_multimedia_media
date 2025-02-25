@@ -860,12 +860,12 @@ static int media_player_stop(MediaPlayerContext* ctx)
 
     media_player_clear_queue(ctx, MEDIA_PLAYER_DATA_QUEUE_IDX);
 
-    media_player_close_demuxer(ctx);
-
     pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_output)
         media_graph_stream_close(&ctx->audio_output);
     pthread_mutex_unlock(&ctx->mutex);
+
+    media_player_close_demuxer(ctx);
 
     ctx->pending_stop = 0;
     ctx->state = MEDIA_PLAYER_STATE_STOPPED;
