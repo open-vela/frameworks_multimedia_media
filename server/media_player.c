@@ -989,6 +989,7 @@ static int media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
             ctx->pending_stop = pending_stop;
             break;
         }
+        media_player_stop(ctx);
         media_player_close(ctx);
         exit = true;
         break;
