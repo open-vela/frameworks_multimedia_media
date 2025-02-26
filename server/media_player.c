@@ -868,6 +868,8 @@ static int media_player_stop(MediaPlayerContext* ctx)
     media_player_close_demuxer(ctx);
 
     ctx->pending_stop = 0;
+    ctx->audio_idx = -1;
+    ctx->video_idx = -1;
     ctx->state = MEDIA_PLAYER_STATE_STOPPED;
 
     media_player_event_cb(ctx, MEDIA_EVENT_STOPPED, 0, NULL);
