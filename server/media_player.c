@@ -1433,6 +1433,7 @@ static int media_player_uninit(MediadPlugin* handle)
 static int media_player_handler(MediadPlugin* handle, struct media_server_conn* conn, const char* target, const char* cmd, const char* arg, int flags, char* res, int res_len)
 {
     MediaPlayerPriv* priv = handle->priv;
+    char stream_name[64] = { 0 };
     int ret = 0;
 
     MEDIA_INFO("cmd: %s, arg %s, target %s.\n", cmd, arg ? arg : "NULL", target ? target : "NULL");
@@ -1440,6 +1441,14 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
     pthread_mutex_lock(&priv->mutex);
 
     if (!strcmp(cmd, "open")) {
+        ret = media_stub_get_stream_name(arg, stream_name, sizeof(stream_name));
+        if (ret >= 0)
+            arg = stream_name;
+        else {
+            MEDIA_ERR("get stream name failed %d\n", ret);
+            goto out;
+        }
+
         MediaPlayerContext* ctx = media_player_get_available_session(priv);
         if (!ctx) {
             MEDIA_ERR("player open failed...\n");
