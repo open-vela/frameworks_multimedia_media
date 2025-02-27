@@ -293,7 +293,7 @@ static int media_player_read_frame(MediaPlayerContext* ctx)
     ret = av_read_frame(ctx->format_ctx, &pkt);
     if (ret == AVERROR_EOF) {
         /* EOF -> set all decoders for flushing */
-        for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
+        for (i = 0; i < ctx->nb_streams; i++) {
             if (media_player_stream_inactive(ctx, i))
                 continue;
 
@@ -309,7 +309,7 @@ static int media_player_read_frame(MediaPlayerContext* ctx)
         return ret;
 
     /* send the packet to its decoder, if any */
-    for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
+    for (i = 0; i < ctx->nb_streams; i++) {
         if (!media_player_stream_inactive(ctx, i) && pkt.stream_index == ctx->streams[i].index) {
             if (!ctx->offload)
                 ret = avcodec_send_packet(ctx->streams[i].codec_ctx, &pkt);
@@ -399,7 +399,7 @@ static int media_player_dec_frames(MediaPlayerContext* ctx)
     AVFrame* frame;
     int ret, i;
 
-    for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
+    for (i = 0; i < ctx->nb_streams; i++) {
         if (media_player_stream_inactive(ctx, i))
             continue;
 
@@ -510,21 +510,30 @@ out:
 
 static int media_player_init_stream(MediaPlayerContext* ctx)
 {
-    int i, ret;
+    AVStream *stream;
+    int i, ret = 2;
+
+    enum AVMediaType types[] = {
+        AVMEDIA_TYPE_AUDIO,
+        AVMEDIA_TYPE_VIDEO,
+    };
 
     if (!ctx->format_ctx || ctx->format_ctx->nb_streams <= 0)
         return -EINVAL;
 
-    ctx->streams = av_calloc(ctx->format_ctx->nb_streams, sizeof(OutputStream));
+    char* at_sign = strchr(ctx->name, '@');
+    if (at_sign && !strncmp(at_sign, "Video", 5))
+        ctx->nb_streams = 2;
+    else
+        ctx->nb_streams = 1;
+
+    ctx->streams = av_calloc(ctx->nb_streams, sizeof(OutputStream));
     if (!ctx->streams)
         return AVERROR(ENOMEM);
 
-    ctx->nb_streams = ctx->format_ctx->nb_streams;
-
-    for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
+    for (i = 0; i < ctx->nb_streams; i++) {
         AVCodecParameters* codecpar = ctx->format_ctx->streams[i]->codecpar;
         OutputStream* stream_out = &ctx->streams[i];
-        AVStream* stream = ctx->format_ctx->streams[i];
 
         // step1: init data queue
         if (codecpar->codec_type == AVMEDIA_TYPE_AUDIO  && ctx->audio_idx < 0)
@@ -534,16 +543,24 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         else
             continue;
 
+        stream_out->type = types[i];
+        stream_out->index = -1;
         stream_out->nb_queue_max = MEDIA_PLAYER_DATA_QUEUE_SIZE;
-        stream_out->type = codecpar->codec_type;
         ff_framequeue_init(&stream_out->queue, NULL);
 
         // step2: find best stream by stream type
-        ret = av_find_best_stream(ctx->format_ctx, stream->codecpar->codec_type, -1, -1, NULL, 0);
+        ret = av_find_best_stream(ctx->format_ctx, stream_out->type, -1, -1, NULL, 0);
         if (ret < 0) {
-            MEDIA_ERR("Failed to find best stream ret %d %s.\n", ret, av_err2str(ret));
-            goto out;
+            if (ctx->nb_streams > 1 && stream_out->type == AVMEDIA_TYPE_AUDIO) {
+                stream_out->index = -1;
+                ctx->nb_streams = 1;
+                continue;
+            } else {
+                MEDIA_ERR("Failed to find best stream ret %d, %s.\n", ret, av_err2str(ret));
+                goto out;
+            }
         }
+        stream = ctx->format_ctx->streams[ret];
 
         /* Use specify ch_layout if possible, follow guess_input_channel_layout() in ffmpeg.c */
         if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO &&
@@ -606,7 +623,7 @@ static void media_player_close_demuxer(MediaPlayerContext* ctx)
         av_dict_free(&ctx->format_opt);
 
     if (ctx->format_ctx) {
-        for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
+        for (i = 0; i < ctx->nb_streams; i++) {
             if (media_player_stream_inactive(ctx, i))
                 continue;
 
@@ -1471,7 +1488,7 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
 
         strncpy(ctx->name, arg, sizeof(ctx->name));
 
-        MEDIA_INFO("open player success...\n");
+        MEDIA_INFO("open %s success...\n", ctx->name);
     } else if (!strcmp(cmd, "dump")) {
         media_player_dump(priv);
     }
