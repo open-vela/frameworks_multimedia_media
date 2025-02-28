@@ -67,7 +67,6 @@ struct media_server_priv {
 #if CONFIG_MEDIA_SERVER_PORT >= 0
     int inet_fd;
 #endif
-    media_server_onreceive onreceive;
     struct media_server_conn conns[MEDIA_SERVER_MAXCONN];
 };
 
@@ -150,12 +149,12 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
         code = media_parcel_get_code(&conn->parcel);
         switch (code) {
         case MEDIA_PARCEL_SEND:
-            priv->onreceive(conn, &conn->parcel, NULL);
+            media_stub_onreceive(conn, &conn->parcel, NULL);
             break;
 
         case MEDIA_PARCEL_SEND_ACK:
             media_parcel_init(&ack);
-            priv->onreceive(conn, &conn->parcel, &ack);
+            media_stub_onreceive(conn, &conn->parcel, &ack);
             ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
             media_parcel_deinit(&ack);
             break;
@@ -297,13 +296,10 @@ static int media_server_listen(struct media_server_priv* priv, int family)
  * Public Functions
  ****************************************************************************/
 
-void* media_server_create(void* cb)
+void* media_server_create(void* params)
 {
     struct media_server_priv* priv;
     int ret1 = -1, ret2 = -1, ret3 = -1;
-
-    if (cb == NULL)
-        return NULL;
 
     priv = zalloc(sizeof(struct media_server_priv));
     if (priv == NULL)
@@ -318,7 +314,7 @@ void* media_server_create(void* cb)
         media_server_destroy(priv);
         return NULL;
     }
-    priv->onreceive = cb;
+
     return priv;
 }
 
