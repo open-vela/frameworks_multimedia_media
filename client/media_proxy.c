@@ -160,7 +160,7 @@ static void* media_proxy_listen_thread(void* pvarg)
             break;
 
         code = media_parcel_get_code(&parcel);
-        if (code != MEDIA_PARCEL_NOTIFY)
+        if (code != MEDIA_PARCEL_SEND)
             break;
 
         priv->event_cb(priv->event_cookie, &parcel);
