@@ -414,7 +414,7 @@ int media_server_notify(void* handle, void* cookie, media_parcel* parcel)
 
     if (conn->notify_fd > 0)
         ret = media_parcel_send(parcel, conn->notify_fd,
-            MEDIA_PARCEL_NOTIFY, MSG_DONTWAIT);
+            MEDIA_PARCEL_SEND, MSG_DONTWAIT);
 
     pthread_mutex_unlock(&conn->mutex);
 

@@ -36,7 +36,6 @@ extern "C" {
 #define MEDIA_PARCEL_SEND_ACK 2
 #define MEDIA_PARCEL_REPLY 3
 #define MEDIA_PARCEL_CREATE_NOTIFY 4
-#define MEDIA_PARCEL_NOTIFY 5
 
 typedef struct {
     uint32_t code;
