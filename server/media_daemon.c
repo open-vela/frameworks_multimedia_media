@@ -124,7 +124,7 @@ static MediaPoll g_media[] = {
     {
         "media_server",
         NULL,
-        media_stub_onreceive,
+        NULL,
         media_server_create,
         media_server_get_pollfds,
         media_server_poll_available,

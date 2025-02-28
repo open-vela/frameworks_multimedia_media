@@ -62,8 +62,6 @@ int media_stub_process_command(const char* target,
  * Server Functions
  ****************************************************************************/
 
-typedef void (*media_server_onreceive)(void* cookie,
-    media_parcel* in, media_parcel* out);
 void* media_server_create(void* cb);
 int media_server_destroy(void* handle);
 
