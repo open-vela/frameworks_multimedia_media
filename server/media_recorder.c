@@ -116,7 +116,7 @@ typedef struct MediaRecorderContext {
     int state;
     int audio_idx;
     int video_idx;
-     char name[16];
+    char name[16];
     uint32_t nb_streams;                  /* total stream count */
     pthread_mutex_t mutex;
     OutputStream* streams;                /* output stream */
@@ -511,9 +511,30 @@ static void media_recorder_clean(MediaRecorderContext* ctx)
     }
 }
 
+static int media_recorder_interrupt(void* opaque)
+{
+    MediaRecorderContext* ctx = opaque;
+    RecorderCmd* msg;
+    int interrupt = 0;
+
+    pthread_mutex_lock(&ctx->mutex);
+
+    SIMPLEQ_FOREACH(msg, &ctx->cmd_queue, entry)
+    {
+        if (msg->cmd >= MEDIA_RECORDER_CMD_STOP) {
+            interrupt = 1;
+            break;
+        }
+    }
+
+    pthread_mutex_unlock(&ctx->mutex);
+    return interrupt;
+}
+
 static int media_recorder_open_muxer(MediaRecorderContext* ctx, const char* filename)
 {
     AVDictionary* dict = NULL;
+    AVIOInterruptCB cb;
     int ret;
 
     ret = avformat_alloc_output_context2(&ctx->format_ctx, ctx->format, NULL, filename);
@@ -534,7 +555,10 @@ static int media_recorder_open_muxer(MediaRecorderContext* ctx, const char* file
     }
     pthread_mutex_unlock(&ctx->mutex);
 
-    ret = avio_open2(&ctx->format_ctx->pb, filename, AVIO_FLAG_WRITE, NULL, &dict);
+    cb.callback = media_recorder_interrupt;
+    cb.opaque   = ctx;
+
+    ret = avio_open2(&ctx->format_ctx->pb, filename, AVIO_FLAG_WRITE, &cb, &dict);
     av_dict_free(&dict);
     if (ret < 0)
         goto out;
