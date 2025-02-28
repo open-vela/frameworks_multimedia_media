@@ -854,7 +854,7 @@ static int media_player_notify_event(MediaPlayerContext* ctx, int event, int res
     media_parcel_append_printf(&notify, "%i%i%s", event, result, extra);
 
     if (ctx->notify_fd > 0)
-        ret = media_parcel_send(&notify, ctx->notify_fd, MEDIA_PARCEL_NOTIFY, MSG_DONTWAIT);
+        ret = media_parcel_send(&notify, ctx->notify_fd, MEDIA_PARCEL_SEND, MSG_DONTWAIT);
 
     media_parcel_deinit(&notify);
     return ret;

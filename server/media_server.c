@@ -435,26 +435,6 @@ int media_server_reply(void* handle, void* cookie, media_parcel* parcel)
     return ret;
 }
 
-int media_server_reply(void* handle, void* cookie, media_parcel* parcel)
-{
-    struct media_server_priv* priv = handle;
-    struct media_server_conn* conn = cookie;
-    int ret = -EINVAL;
-
-    if (priv == NULL || conn == NULL)
-        return ret;
-
-    pthread_mutex_lock(&conn->mutex);
-
-    if (conn->tran_fd > 0)
-        ret = media_parcel_send(parcel, conn->tran_fd,
-            MEDIA_PARCEL_REPLY, MSG_DONTWAIT);
-
-    pthread_mutex_unlock(&conn->mutex);
-
-    return ret;
-}
-
 void media_server_finalize(void* handle, void* cookie)
 {
     struct media_server_priv* priv = handle;
