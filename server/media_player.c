@@ -227,9 +227,9 @@ static int media_player_loop(MediaPlayerContext* ctx)
 {
     int ret = AVERROR_EOF;
 
-    if (ctx->loop_count > 0) {
+    if (ctx->loop_count) {
         ret = media_player_seek(ctx, 0, false);
-        ctx->loop_count -= 1;
+        ctx->loop_count -= ctx->loop_count > 0;
     }
 
     return ret;
