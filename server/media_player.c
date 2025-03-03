@@ -471,11 +471,15 @@ static int media_player_interrupt(void* opaque)
     MediaPlayerContext* ctx = opaque;
     PlayerCmd* msg;
     int interrupt = 0;
+    struct pollfd fds[1];
+    struct pollfd* fd = &fds[0];
+    fds[0].fd         = ctx->tran_fd;
+    fds[0].events     = POLLIN;
+    fds[0].revents    = 0;
 
     pthread_mutex_lock(&ctx->mutex);
 
-    // TODO: only poll ctrl_fd
-    media_player_poll(ctx);
+    media_player_poll_available(ctx, fd);
 
     SIMPLEQ_FOREACH(msg, &ctx->cmd_queue, entry)
     {
@@ -1290,7 +1294,7 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
     if (((fds->revents & POLLIN) && ret == -EPIPE) || (fds->revents & POLLHUP))
         goto out;
 
-    return 0;
+    return ret;
 
 out:
     MEDIA_DEBUG("fds:%d revent:%d\n", fds->fd, (int)fds->revents);

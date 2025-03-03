@@ -137,6 +137,7 @@ typedef struct MediaRecorderPriv {
  * Function declaration
  ****************************************************************************/
 static int media_recorder_queue_push(MediaRecorderContext* ctx, int idx, AVFrame* frame);
+static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollfd* fd);
 
 /****************************************************************************
  * Private Functions
@@ -516,8 +517,15 @@ static int media_recorder_interrupt(void* opaque)
     MediaRecorderContext* ctx = opaque;
     RecorderCmd* msg;
     int interrupt = 0;
+    struct pollfd fds[1];
+    struct pollfd* fd = &fds[0];
+    fds[0].fd         = ctx->tran_fd;
+    fds[0].events     = POLLIN;
+    fds[0].revents    = 0;
 
     pthread_mutex_lock(&ctx->mutex);
+
+    media_recorder_poll_available(ctx, fd);
 
     SIMPLEQ_FOREACH(msg, &ctx->cmd_queue, entry)
     {
@@ -1006,24 +1014,11 @@ static void media_recorder_conn_close(MediaRecorderContext* ctx)
     media_parcel_deinit(&ctx->parcel);
 }
 
-static int media_recorder_poll_available(MediaRecorderContext* ctx)
+static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollfd* fd)
 {
     int ret = -EINVAL;
     uint32_t code;
     media_parcel ack;
-    struct pollfd fds[1];
-    struct pollfd* fd = &fds[0];
-    fds[0].fd         = ctx->tran_fd;
-    fds[0].events     = POLLIN;
-    fds[0].revents    = 0;
-
-    ret = poll(fds, 1, 10);
-    if (ret == -1) {
-        return ret;
-    } else if (ret == 0) {
-        MEDIA_DEBUG("poll timeout\n");
-        return ret;
-    }
 
     if (fd->revents & POLLERR)
         goto out;
@@ -1064,7 +1059,7 @@ static int media_recorder_poll_available(MediaRecorderContext* ctx)
     if (((fd->revents & POLLIN) && ret == -EPIPE) || (fd->revents & POLLHUP))
         goto out;
 
-    return 0;
+    return ret;
 
 out:
     MEDIA_DEBUG("fd:%d revent:%d\n", fd->fd, (int)fd->revents);
@@ -1120,18 +1115,34 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
     av_bprint_finalize(&buf, NULL);
 }
 
+static void media_recorder_poll(MediaRecorderContext* ctx)
+{
+    struct pollfd fds[1];
+    struct pollfd* fd = &fds[0];
+    fds[0].fd         = ctx->tran_fd;
+    fds[0].events     = POLLIN;
+    fds[0].revents    = 0;
+    int ret;
+
+    ret = poll(fds, 1, 2);
+    if (ret == -1) {
+        MEDIA_ERR("poll failed err=%d\n", -errno);
+    } else if (ret == 0)
+        MEDIA_DEBUG("poll timeout\n");
+
+    ret = media_recorder_poll_available(ctx, fd);
+    if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
+        MEDIA_ERR("poll_available failed %d\n", ret);
+}
+
 static void* media_recorder_thread(void* arg)
 {
     MediaRecorderContext* ctx = (MediaRecorderContext*)arg;
     int exit = false;
     RecorderCmd* msg;
-    int ret = 0;
 
     while (1) {
-        pthread_mutex_lock(&ctx->mutex);
-        ret = media_recorder_poll_available(ctx);
-        if (ret < 0)
-            MEDIA_ERR("poll available failed %d\n", ret);
+        media_recorder_poll(ctx);
         if ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
             SIMPLEQ_REMOVE_HEAD(&ctx->cmd_queue, entry);
             pthread_mutex_unlock(&ctx->mutex);
