@@ -841,7 +841,7 @@ static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush)
     if (ret < 0)
         goto end;
 
-    for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
+    for (i = 0; i < ctx->nb_streams; i++) {
         if (media_player_stream_inactive(ctx, i))
             continue;
 
