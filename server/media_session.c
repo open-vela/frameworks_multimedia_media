@@ -52,6 +52,7 @@
 #include <sys/queue.h>
 
 #include "media_metadata.h"
+#include "media_plugin.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -251,33 +252,26 @@ void media_session_controllee_unregister(MediaSessionPriv* priv,
  * Public Functions
  ****************************************************************************/
 
-void* media_session_create(void* param)
+static int media_session_init(media_plugin_t* ctx)
 {
-    MediaSessionPriv* priv;
-
-    priv = zalloc(sizeof(MediaSessionPriv));
-    if (!priv)
-        return NULL;
+    MediaSessionPriv* priv = ctx->priv;
 
     TAILQ_INIT(&priv->controllers);
     TAILQ_INIT(&priv->controllees);
-    return priv;
-}
-
-int media_session_destroy(void* session)
-{
-    MediaSessionPriv* priv = session;
-
-    free(priv);
     return 0;
 }
 
-int media_session_handler(void* session, void* cookie, const char* target,
-    const char* cmd, const char* arg, char* res, int res_len)
+static int media_session_destroy(media_plugin_t* ctx)
 {
-    MediaControllerPriv* controller = media_server_get_data(cookie);
-    MediaControlleePriv* controllee = media_server_get_data(cookie);
-    MediaSessionPriv* priv = session;
+    return 0;
+}
+
+static int media_session_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* target,
+    const char* cmd, const char* arg, int flags, char* res, int res_len)
+{
+    MediaControllerPriv* controller = media_server_get_data(conn);
+    MediaControlleePriv* controllee = media_server_get_data(conn);
+    MediaSessionPriv* priv = ctx->priv;
     int event, result;
 
     /* Controllee methods. */
@@ -285,11 +279,11 @@ int media_session_handler(void* session, void* cookie, const char* target,
         return 0;
 
     if (!strcmp(cmd, "register")) {
-        controllee = media_session_controllee_register(priv, cookie);
+        controllee = media_session_controllee_register(priv, conn);
         if (!controllee)
             return -ENOMEM;
 
-        media_server_set_data(cookie, controllee);
+        media_server_set_data(conn, controllee);
         return 0;
     }
 
@@ -314,11 +308,11 @@ int media_session_handler(void* session, void* cookie, const char* target,
 
     /* Controller methods. */
     if (!strcmp(cmd, "open")) {
-        controller = media_session_controller_open(priv, cookie);
+        controller = media_session_controller_open(priv, conn);
         if (!controller)
             return -ENOMEM;
 
-        media_server_set_data(cookie, controller);
+        media_server_set_data(conn, controller);
         return 0;
     }
 
@@ -339,3 +333,15 @@ int media_session_handler(void* session, void* cookie, const char* target,
 
     return -EINVAL;
 }
+
+media_plugin_t media_session_plugin = {
+    .name = "media_session",
+    .priv_size = sizeof(MediaSessionPriv),
+    .priv = NULL,
+    .init = media_session_init,
+    .get = NULL,
+    .available = NULL,
+    .run_once = NULL,
+    .uninit = media_session_destroy,
+    .process_command = media_session_handler,
+};

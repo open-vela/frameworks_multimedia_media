@@ -57,7 +57,7 @@ if(CONFIG_MEDIA)
 
   if(CONFIG_MEDIA_SERVER)
     set(DAEMON_SRCS server/media_daemon.c server/media_stub.c
-                    server/media_server.c)
+                    server/media_server.c server/media_plugin.c)
     nuttx_add_application(
       NAME
       ${CONFIG_MEDIA_SERVER_PROGNAME}

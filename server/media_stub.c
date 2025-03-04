@@ -27,6 +27,7 @@
 #include <string.h>
 
 #include "media_common.h"
+#include "media_plugin.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -52,7 +53,15 @@ void media_stub_notify_event(void* cookie, int event,
     media_parcel_deinit(&notify);
 }
 
-void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
+static inline int media_plugin_command(media_plugin_t* plugin, struct media_server_conn* conn, const char* target,
+    const char* cmd, const char* arg, int flags, char* res, int res_len)
+{
+    if (plugin->process_command)
+        return plugin->process_command(plugin, conn, target, cmd, arg, flags, res, res_len);
+    return -ENOSYS;
+}
+
+void media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media_parcel* out)
 {
     const char *target = NULL, *cmd = NULL, *arg = NULL;
     int32_t len = 0, flags = 0, id = 0, ret;
@@ -67,7 +76,7 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_policy_handler(media_get_policy(), cookie, target, cmd, arg, flags, response, len);
+        ret = media_plugin_command(media_plugin_get("media_policy"), conn, target, cmd, arg, flags, response, len);
         break;
 #endif
 
@@ -77,7 +86,7 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_focus_handler(media_get_focus(), cookie, target, cmd, response, len);
+        ret = media_plugin_command(media_plugin_get("media_focus"), conn, target, cmd, NULL, 0, response, len);
         break;
 #endif
 
@@ -87,7 +96,7 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_graph_handler(media_get_graph(), target, cmd, arg, response, len);
+        ret = media_graph_handler(media_plugin_get("media_graph"), NULL, target, cmd, arg, 0, response, len);
         break;
 
     case MEDIA_ID_PLAYER:
@@ -95,7 +104,7 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_player_handler(media_get_graph(), cookie, target, cmd, arg, response, len);
+        ret = media_plugin_command(media_plugin_get("media_graph"), conn, target, cmd, arg, 1, response, len);
         break;
 
     case MEDIA_ID_RECORDER:
@@ -103,7 +112,7 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_recorder_handler(media_get_graph(), cookie, target, cmd, arg, response, len);
+        ret = media_plugin_command(media_plugin_get("media_graph"), conn, target, cmd, arg, 0, response, len);
         break;
 
     case MEDIA_ID_SESSION:
@@ -111,7 +120,7 @@ void media_stub_onreceive(void* cookie, media_parcel* in, media_parcel* out)
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_session_handler(media_get_session(), cookie, target, cmd, arg, response, len);
+        ret = media_plugin_command(media_plugin_get("media_session"), conn, target, cmd, arg, 0, response, len);
         break;
 
 #endif // CONFIG_LIB_FFMPEG
@@ -144,7 +153,7 @@ int media_stub_set_stream_status(const char* name, bool active)
     const char* cmd = active ? "include" : "exclude";
 
     name = strchr(name, '@') + 1;
-    return media_policy_handler(media_get_policy(), NULL, "ActiveStreams", cmd, name, 1, NULL, 0);
+    return media_plugin_command(media_plugin_get("media_policy"), NULL, "ActiveStreams", cmd, name, 1, NULL, 0);
 #else
     return -ENOSYS;
 #endif
@@ -153,7 +162,7 @@ int media_stub_set_stream_status(const char* name, bool active)
 int media_stub_get_stream_name(const char* stream, char* name, int len)
 {
 #ifdef CONFIG_LIB_PFW
-    return media_policy_handler(media_get_policy(), NULL, stream, "get_string", NULL, 0, name, len);
+    return media_plugin_command(media_plugin_get("media_policy"), NULL, stream, "get_string", NULL, 0, name, len);
 #else
     return -ENOSYS;
 #endif
@@ -163,7 +172,7 @@ int media_stub_process_command(const char* target,
     const char* cmd, const char* arg)
 {
 #ifdef CONFIG_LIB_FFMPEG
-    return media_graph_handler(media_get_graph(), target, cmd, arg, NULL, 0);
+    return media_graph_handler(media_plugin_get("media_graph"), NULL, target, cmd, arg, 0, NULL, 0);
 #else
     return -ENOSYS;
 #endif
