@@ -42,11 +42,6 @@
 typedef struct MediaVOutputContext {
     AVFormatContext*    fmt_ctx;
     struct SwsContext*  sws_ctx;
-    MediaVOutputType    type;
-
-    const char*         format;         /**< output dev format, eg: fbdev */
-    const char*         devname;        /**< output dev name, eg: /dev/fb0 */
-    const char*         options;        /**< output dev options, eg: "format=fbdev:width=640:height=480" */
 
     enum AVPixelFormat  pix_fmt;        /**< output pixel format*/
     int                 width;          /**< output frame width */
@@ -59,62 +54,6 @@ typedef struct MediaVOutputContext {
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
-static int media_video_output_parse_options(MediaVOutputContext* ctx, AVDictionary* options)
-{
-    AVDictionaryEntry *tag;
-    char *endptr;
-
-    if (!options)
-        return -EINVAL;
-
-    /* required params */
-    if ((tag = av_dict_get(options, "format", NULL, 0))) {
-        ctx->format = strdup(tag->value);
-    } else {
-        MEDIA_ERR("No format find in options.\n");
-        return -EINVAL;
-    }
-
-    if (ctx->type == MEDIA_VOUTPUT_FBDEV) {
-        if ((tag = av_dict_get(options, "devname", NULL, 0))) {
-            ctx->devname = strdup(tag->value);
-        } else {
-            MEDIA_ERR("No devname find in options.\n");
-            return -EINVAL;
-        }
-    }
-
-    /* optional params */
-    if ((tag = av_dict_get(options, "width", NULL, 0))) {
-        endptr = NULL;
-        ctx->width = strtol(tag->value, &endptr, 0);
-        if (*endptr != '\0') {
-            MEDIA_ERR("Invalid width: %s\n", tag->value);
-            return -EINVAL;
-        }
-    }
-
-    if ((tag = av_dict_get(options, "height", NULL, 0))) {
-        endptr = NULL;
-        ctx->height = strtol(tag->value, &endptr, 0);
-        if (*endptr != '\0') {
-            MEDIA_ERR("Invalid height: %s\n", tag->value);
-            return -EINVAL;
-        }
-    }
-
-    if ((tag = av_dict_get(options, "pix_fmt", NULL, 0))) {
-        endptr = NULL;
-        ctx->pix_fmt = strtol(tag->value, &endptr, 0);
-        if (*endptr != '\0') {
-            MEDIA_ERR("Invalid pix_fmt: %s\n", tag->value);
-            return -EINVAL;
-        }
-    }
-
-    return 0;
-}
 
 static int media_video_output_scale(MediaVOutputContext* ctx, AVFrame* frame, AVFrame* dst_frame)
 {
@@ -300,9 +239,13 @@ err:
     return ret;
 }
 
-int media_video_output_open(MediaVOutputContext** pctx, MediaVOutputType type, const char* options)
+int media_video_output_open(MediaVOutputContext** pctx, AVDictionary* options)
 {
-    AVDictionary* format_opt = NULL;
+    AVDictionary* tmp_options = NULL;
+    AVDictionaryEntry* tag;
+    char* devname;
+    char* format;
+    char* endptr;
     AVStream* st;
     int ret;
 
@@ -312,20 +255,33 @@ int media_video_output_open(MediaVOutputContext** pctx, MediaVOutputType type, c
         return -ENOMEM;
     }
 
-    ctx->type = type;
+    av_dict_copy(&tmp_options, options, 0);
 
-    av_dict_parse_string(&format_opt, options, "=", ":", 0);
-
-    ret = media_video_output_parse_options(ctx, format_opt);
-    if (ret < 0) {
-        MEDIA_ERR("Failed to parse options: %s\n", options);
+    if ((tag = av_dict_get(tmp_options, "format", NULL, 0))) {
+        format = tag->value;
+    } else {
+        MEDIA_ERR("No format find in tmp_options.\n");
+        ret = -EINVAL;
         goto err;
     }
 
-    ret = avformat_alloc_output_context2(&ctx->fmt_ctx, NULL,
-                                         ctx->format, ctx->devname);
+    if ((tag = av_dict_get(tmp_options, "devname", NULL, 0))) {
+        devname = tag->value;
+    }
+
+    if ((tag = av_dict_get(tmp_options, "pix_fmt", NULL, 0))) {
+        endptr = NULL;
+        ctx->pix_fmt = strtol(tag->value, &endptr, 0);
+        if (*endptr != '\0') {
+            MEDIA_ERR("Invalid pix_fmt: %s\n", tag->value);
+            ret = -EINVAL;
+            goto err;
+        }
+    }
+
+    ret = avformat_alloc_output_context2(&ctx->fmt_ctx, NULL, format, devname);
     if (ret < 0) {
-        MEDIA_ERR("Failed to open %s: %s\n", ctx->devname, av_err2str(ret));
+        MEDIA_ERR("Failed to open %s: %s\n", devname, av_err2str(ret));
         goto err;
     }
 
@@ -339,8 +295,10 @@ int media_video_output_open(MediaVOutputContext** pctx, MediaVOutputType type, c
         goto err;
     }
 
-    if ((ret = avformat_init_output(ctx->fmt_ctx, &format_opt)) < 0)
+    if ((ret = avformat_init_output(ctx->fmt_ctx, &tmp_options)) < 0)
         goto err;
+
+    av_dict_free(&tmp_options);
 
     *pctx = ctx;
 
@@ -350,6 +308,7 @@ err:
     if (ctx->fmt_ctx)
         avformat_free_context(ctx->fmt_ctx);
 
+    av_dict_free(&tmp_options);
     av_free(ctx);
     return ret;
 }

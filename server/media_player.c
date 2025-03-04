@@ -166,7 +166,6 @@ typedef struct MediaPlayerContext {
     enum MediaPlayerSyncMode sync_mode;
 
     /* audio or video output */
-    MediaVOutputType     vout_type;
     MediaGraphStream*    audio_output;
     MediaVOutputContext* video_output;
 } MediaPlayerContext;
@@ -633,17 +632,7 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         stream_out->codec_ctx->pkt_timebase = stream->time_base;
 
         if (stream_out->type == AVMEDIA_TYPE_VIDEO) {
-            char options[128] = {0};
-            // these option is set by user
-            if (ctx->vout_type == MEDIA_VOUTPUT_FBDEV) {
-                snprintf(options, sizeof(options), "format=%s:devname=%s:pix_fmt=%d",
-                         "fbdev", "/dev/fb0", AV_PIX_FMT_BGRA);
-            } else {
-                snprintf(options, sizeof(options), "format=%s:server_path=%s:frame_count=%d:pix_fmt=%d",
-                         "vtun", "Vtun_Video1", 3, AV_PIX_FMT_BGRA);
-            }
-
-            ret = media_video_output_open(&ctx->video_output, ctx->vout_type, options);
+            ret = media_video_output_open(&ctx->video_output, ctx->format_opt);
             if (ret < 0) {
                 MEDIA_ERR("Failed to open video_output\n");
                 goto out;
@@ -870,7 +859,6 @@ static void media_player_ctx_init(MediaPlayerContext* ctx)
     ctx->sync_mode = MEDIA_PLAYER_SYNC_MODE_SYSTEM;
     ctx->ts_base = AV_NOPTS_VALUE;
     ctx->lat_base = AV_NOPTS_VALUE;
-    ctx->vout_type = MEDIA_VOUTPUT_VTUN;
     SIMPLEQ_INIT(&ctx->cmd_queue);
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
@@ -906,6 +894,9 @@ static int media_player_close(MediaPlayerContext* ctx)
 
     if (ctx->video_output)
         media_video_output_close(&ctx->video_output);
+
+    if (ctx->global_opts)
+        av_dict_free(&ctx->global_opts);
 
     av_freep(&ctx->streams);
     return 0;
@@ -1541,17 +1532,18 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
 {
     MediaPlayerPriv* priv = handle->priv;
     char stream_name[64] = { 0 };
+    char option_name[64] = { 0 };
+    char options[256] = { 0 };
     int ret = 0;
 
-    MEDIA_INFO("cmd: %s, arg %s, target %s.\n", cmd, arg ? arg : "NULL", target ? target : "NULL");
+    MEDIA_INFO("cmd: %s, arg %s, target %s.\n",
+               cmd, arg ? arg : "NULL", target ? target : "NULL");
 
     pthread_mutex_lock(&priv->mutex);
 
     if (!strcmp(cmd, "open")) {
         ret = media_stub_get_stream_name(arg, stream_name, sizeof(stream_name));
-        if (ret >= 0)
-            arg = stream_name;
-        else {
+        if (ret < 0) {
             MEDIA_ERR("get stream name failed %d\n", ret);
             goto out;
         }
@@ -1572,17 +1564,25 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
 
         media_server_clean_conn(conn);
 
-        ret = media_player_open(ctx, arg);
+        // get globle options
+        snprintf(option_name, sizeof(option_name), "%sParams", arg);
+        ret = media_stub_get_stream_name(option_name, options, sizeof(options));
+        if (ret == 0 && strlen(options) != 0) {
+            ret = av_dict_parse_string(&ctx->global_opts, options, "=", ":", 0);
+            if (ret < 0) {
+                MEDIA_ERR("parse global options failed %d\n", ret);
+                goto out;
+            }
+        }
+
+        ret = media_player_open(ctx, stream_name);
         if (ret < 0)
             goto out;
-
-        strncpy(ctx->name, arg, sizeof(ctx->name));
 
         MEDIA_INFO("open %s success...\n", ctx->name);
     } else if (!strcmp(cmd, "dump")) {
         media_player_dump(priv);
     }
-
 
 out:
     pthread_mutex_unlock(&priv->mutex);

@@ -25,6 +25,7 @@
  * Included Files
  ****************************************************************************/
 #include "libavutil/frame.h"
+#include "libavutil/dict.h"
 
 /****************************************************************************
  * Public Functions
@@ -37,7 +38,6 @@
  * The context object will be returned via the pctx parameter and will be used for subsequent operations.
  *
  * @param pctx A pointer to a pointer to MediaVOutputContext.
- * @param type The type of the video output device, specified by the MediaVOutputType enumeration.
  * @param options Configuration options for the video output device, passed as a string.
  *        eg: "format=fbdev:devname=/dev/fb0:width=640:height=480"
  * @return Returns 0 on success, or a negative error code on failure.
@@ -45,12 +45,7 @@
 
 typedef struct MediaVOutputContext MediaVOutputContext;
 
-typedef enum MediaVOutputType {
-    MEDIA_VOUTPUT_FBDEV = 0,
-    MEDIA_VOUTPUT_VTUN,
-} MediaVOutputType;
-
-int media_video_output_open(MediaVOutputContext** pctx, MediaVOutputType type, const char* options);
+int media_video_output_open(MediaVOutputContext** pctx, AVDictionary* options);
 
 /**
  * @brief Close the video output device
