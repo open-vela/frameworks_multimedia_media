@@ -58,7 +58,7 @@ ifneq ($(CONFIG_MEDIA_FOCUS),)
 endif
 
 ifneq ($(CONFIG_MEDIA_SERVER),)
-  CSRCS    += server/media_stub.c server/media_server.c
+  CSRCS    += server/media_stub.c server/media_server.c server/media_plugin.c
   MAINSRC   = server/media_daemon.c
   PROGNAME  = $(CONFIG_MEDIA_SERVER_PROGNAME)
   PRIORITY  = $(CONFIG_MEDIA_SERVER_PRIORITY)

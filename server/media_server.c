@@ -33,6 +33,7 @@
 #include <sys/un.h>
 
 #include "media_common.h"
+#include "media_plugin.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -128,9 +129,8 @@ static void media_server_conn_close(struct media_server_conn* conn)
     media_parcel_deinit(&conn->parcel);
 }
 
-static int media_server_receive(void* handle, struct pollfd* fd, struct media_server_conn* conn)
+static int media_server_receive(struct media_server_priv* priv, struct pollfd* fd, struct media_server_conn* conn)
 {
-    struct media_server_priv* priv = handle;
     media_parcel ack;
     uint32_t code;
     int ret;
@@ -154,8 +154,11 @@ static int media_server_receive(void* handle, struct pollfd* fd, struct media_se
 
         case MEDIA_PARCEL_SEND_ACK:
             media_parcel_init(&ack);
-            media_stub_onreceive(conn, &conn->parcel, &ack);
-            ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
+            ret = media_stub_onreceive(conn, &conn->parcel, &ack);
+            if (ret != MEDIA_ERROR_DELAY_ACK)
+                ret = media_parcel_send(&ack, fd->fd, MEDIA_PARCEL_REPLY, 0);
+            else
+                ret = 0;
             media_parcel_deinit(&ack);
             break;
 
@@ -217,9 +220,8 @@ static bool media_server_conn_init(struct media_server_conn* conn, int fd)
     return available;
 }
 
-static int media_server_accept(void* handle, struct pollfd* fd)
+static int media_server_accept(struct media_server_priv* priv, struct pollfd* fd)
 {
-    struct media_server_priv* priv = handle;
     int new_fd;
     int i;
 
@@ -295,32 +297,26 @@ static int media_server_listen(struct media_server_priv* priv, int family)
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
-void* media_server_create(void* params)
+static int media_server_init(media_plugin_t* ctx)
 {
-    struct media_server_priv* priv;
+    struct media_server_priv* priv = ctx->priv;
     int ret1 = -1, ret2 = -1, ret3 = -1;
-
-    priv = zalloc(sizeof(struct media_server_priv));
-    if (priv == NULL)
-        return NULL;
 
     ret1 = media_server_listen(priv, PF_LOCAL);
     ret2 = media_server_listen(priv, AF_RPMSG);
 #if CONFIG_MEDIA_SERVER_PORT >= 0
     ret3 = media_server_listen(priv, AF_INET);
 #endif
-    if (ret1 < 0 && ret2 < 0 && ret3 < 0) {
-        media_server_destroy(priv);
-        return NULL;
-    }
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+    if (ret1 < 0 && ret2 < 0 && ret3 < 0)
+        return MIN(MIN(ret1, ret2), ret3);
 
-    return priv;
+    return 0;
 }
 
-int media_server_destroy(void* handle)
+static int media_server_uinit(media_plugin_t* ctx)
 {
-    struct media_server_priv* priv = handle;
+    struct media_server_priv* priv = ctx->priv;
     int i;
 
     if (priv == NULL)
@@ -342,13 +338,12 @@ int media_server_destroy(void* handle)
             close(priv->conns[i].notify_fd);
     }
 
-    free(priv);
     return 0;
 }
 
-int media_server_get_pollfds(void* handle, struct pollfd* fds, void** conns, int count)
+static int media_server_get_pollfds(media_plugin_t* ctx, struct pollfd* fds, void** conns, int count)
 {
-    struct media_server_priv* priv = handle;
+    struct media_server_priv* priv = ctx->priv;
     int i = 0;
     int j;
 
@@ -386,15 +381,16 @@ int media_server_get_pollfds(void* handle, struct pollfd* fds, void** conns, int
     return i;
 }
 
-int media_server_poll_available(void* handle, struct pollfd* fd, void* conn)
+static int media_server_poll_available(media_plugin_t* ctx, struct pollfd* fd, void* conn)
 {
+    struct media_server_priv* priv = ctx->priv;
     if (fd == NULL)
         return -EINVAL;
 
     if (conn)
-        return media_server_receive(handle, fd, conn);
+        return media_server_receive(priv, fd, conn);
     else
-        return media_server_accept(handle, fd);
+        return media_server_accept(priv, fd);
 }
 
 int media_server_notify(void* handle, void* cookie, media_parcel* parcel)
@@ -411,6 +407,26 @@ int media_server_notify(void* handle, void* cookie, media_parcel* parcel)
     if (conn->notify_fd > 0)
         ret = media_parcel_send(parcel, conn->notify_fd,
             MEDIA_PARCEL_SEND, MSG_DONTWAIT);
+
+    pthread_mutex_unlock(&conn->mutex);
+
+    return ret;
+}
+
+int media_server_reply(void* handle, void* cookie, media_parcel* parcel)
+{
+    struct media_server_priv* priv = handle;
+    struct media_server_conn* conn = cookie;
+    int ret = -EINVAL;
+
+    if (priv == NULL || conn == NULL)
+        return ret;
+
+    pthread_mutex_lock(&conn->mutex);
+
+    if (conn->tran_fd > 0)
+        ret = media_parcel_send(parcel, conn->tran_fd,
+            MEDIA_PARCEL_REPLY, MSG_DONTWAIT);
 
     pthread_mutex_unlock(&conn->mutex);
 
@@ -450,4 +466,20 @@ void* media_server_get_data(void* cookie)
     struct media_server_conn* conn = cookie;
 
     return conn ? conn->data : NULL;
+}
+
+media_plugin_t media_server_plugin = {
+    .name = "media_server",
+    .priv_size = sizeof(struct media_server_priv),
+    .priv = NULL,
+    .init = media_server_init,
+    .get = media_server_get_pollfds,
+    .available = media_server_poll_available,
+    .run_once = NULL,
+    .uninit = media_server_uinit,
+};
+
+void* media_get_server(void)
+{
+    return media_server_plugin.priv;
 }
