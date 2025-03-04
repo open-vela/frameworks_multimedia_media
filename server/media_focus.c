@@ -32,6 +32,7 @@
 
 #include "focus_stack.h"
 #include "media_common.h"
+#include "media_plugin.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -510,33 +511,33 @@ void media_focus_notify_cb(int suggestion, void* cookie)
  * Public Functions
  ****************************************************************************/
 
-int media_focus_destroy(void* handle)
+static int media_focus_uninit(media_plugin_t* plugin)
 {
-    media_focus* focus = handle;
+    media_focus* focus = plugin->priv;
 
     if (focus) {
         free(focus->stack);
         free(focus->streams);
         free(focus->matrix);
-        free(focus);
     }
 
     return 0;
 }
 
-void* media_focus_create(void* file)
+static int media_focus_init(media_plugin_t* ctx)
 {
+    const char* file = CONFIG_MEDIA_SERVER_CONFIG_PATH "media_focus.conf";
     FILE* fp;
     char* buf = NULL;
     int ret = 0;
     int index = 0;
     int shift_index = 0;
-    media_focus* focus = NULL;
+    media_focus* focus = ctx->priv;
 
     fp = fopen(file, "re");
     if (fp == NULL) {
         MEDIA_ERR("no such interaction matrix file\n");
-        return NULL;
+        return -errno;
     }
 
     buf = malloc(MAX_LEN * sizeof(char));
@@ -594,12 +595,11 @@ void* media_focus_create(void* file)
     goto out;
 
 err:
-    media_focus_destroy(focus);
-    focus = NULL;
+    ret = -ENOMEM;
 out:
     fclose(fp);
     free(buf);
-    return focus;
+    return ret;
 }
 
 void media_focus_debug_stack_display(void)
@@ -624,10 +624,10 @@ int media_focus_debug_stack_return(media_focus_id* p_focus_list, int num)
     return app_focus_stack_return(focus->stack, (app_focus_id*)p_focus_list, num);
 }
 
-int media_focus_handler(void* focus, void* cookie, const char* name, const char* cmd,
-    char* res, int res_len)
+static int media_focus_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* name,
+    const char* cmd, const char* args, int flags, char* res, int res_len)
 {
-    media_focus* priv = focus;
+    media_focus* priv = ctx->priv;
     int initial_suggestion;
     void* focus_handle;
     int ret;
@@ -636,15 +636,15 @@ int media_focus_handler(void* focus, void* cookie, const char* name, const char*
         return 0;
     } else if (!strcmp(cmd, "request")) {
         focus_handle = media_focus_request_(priv, &initial_suggestion,
-            name, media_focus_notify_cb, cookie);
+            name, media_focus_notify_cb, conn);
         if (!focus_handle)
             return -EPERM;
 
-        media_server_set_data(cookie, focus_handle);
+        media_server_set_data(conn, focus_handle);
         return initial_suggestion;
     } else if (!strcmp(cmd, "abandon")) {
-        focus_handle = media_server_get_data(cookie);
-        media_stub_notify_finalize(&cookie);
+        focus_handle = media_server_get_data(conn);
+        media_stub_notify_finalize((void**)&conn);
         return media_focus_abandon_(priv, focus_handle);
     } else if (!strcmp(cmd, "dump")) {
         media_focus_debug_stack_display();
@@ -660,4 +660,21 @@ int media_focus_handler(void* focus, void* cookie, const char* name, const char*
     }
 
     return -ENOSYS;
+}
+
+media_plugin_t media_focus_plugin = {
+    .name = "media_focus",
+    .priv_size = sizeof(media_focus),
+    .priv = NULL,
+    .init = media_focus_init,
+    .get = NULL,
+    .available = NULL,
+    .run_once = NULL,
+    .uninit = media_focus_uninit,
+    .process_command = media_focus_handler,
+};
+
+void* media_get_focus(void)
+{
+    return media_focus_plugin.priv;
 }

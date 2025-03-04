@@ -37,105 +37,51 @@ extern "C" {
  ****************************************************************************/
 
 void* media_get_focus(void);
-void* media_get_graph(void);
-void* media_get_policy(void);
-void* media_get_session(void);
 void* media_get_server(void);
+
+typedef struct media_plugin_t media_plugin_t;
+media_plugin_t* media_plugin_get(const char* name);
 
 /****************************************************************************
  * Stub Functions
  ****************************************************************************/
 
 struct media_parcel;
+struct media_server_conn;
 void media_stub_notify_finalize(void** cookie);
-void media_stub_notify_event(void* cookie, int event,
-    int result, const char* extra);
-void media_stub_onreceive(void* cookie,
-    struct media_parcel* in, struct media_parcel* out);
+void media_stub_notify_event(void* cookie, int event, int result, const char* extra);
+void media_stub_onreceive(struct media_server_conn* conn, struct media_parcel* in, struct media_parcel* out);
 
 int media_stub_set_stream_status(const char* name, bool active);
 int media_stub_get_stream_name(const char* stream, char* name, int len);
-int media_stub_process_command(const char* target,
-    const char* cmd, const char* arg);
+int media_stub_process_command(const char* target, const char* cmd, const char* arg);
 
 /****************************************************************************
  * Server Functions
  ****************************************************************************/
-
-void* media_server_create(void* cb);
-int media_server_destroy(void* handle);
-
-int media_server_get_pollfds(void* handle, struct pollfd* fds,
-    void** conns, int count);
-int media_server_poll_available(void* handle, struct pollfd* fd, void* conn);
-
 int media_server_notify(void* handle, void* cookie, media_parcel* parcel);
 void media_server_finalize(void* handle, void* cookie);
 
 void media_server_set_data(void* cookie, void* data);
 void* media_server_get_data(void* cookie);
+int media_graph_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* target,
+    const char* cmd, const char* arg, int flags, char* res, int res_len);
 
 /****************************************************************************
  * Focus Functions
  ****************************************************************************/
-
-typedef struct media_focus_id {
-    int client_id;
-    int stream_type;
-    unsigned int thread_id;
-    int focus_state;
-    media_focus_callback callback_method;
-    void* callback_argv;
-} media_focus_id;
-
-void* media_focus_create(void* file);
-int media_focus_destroy(void* focus);
-int media_focus_handler(void* focus, void* cookie, const char* name,
-    const char* cmd, char* res, int res_len);
+typedef struct media_focus_id media_focus_id;
 
 void media_focus_debug_stack_display(void);
 int media_focus_debug_stack_return(media_focus_id* focus_list, int num);
 
 /****************************************************************************
- * Graph Functions
- ****************************************************************************/
-
-void* media_graph_create(void* file);
-int media_graph_destroy(void* graph);
-int media_graph_get_pollfds(void* graph, struct pollfd* fds,
-    void** cookies, int count);
-int media_graph_poll_available(void* graph, struct pollfd* fd, void* cookie);
-int media_graph_run_once(void* graph);
-int media_graph_handler(void* graph, const char* target,
-    const char* cmd, const char* arg, char* res, int res_len);
-
-int media_player_handler(void* graph, void* cookie, const char* target,
-    const char* cmd, const char* arg, char* res, int res_len);
-int media_recorder_handler(void* graph, void* cookie, const char* target,
-    const char* cmd, const char* arg, char* res, int res_len);
-
-/****************************************************************************
- * Session Functions
- ****************************************************************************/
-
-void* media_session_create(void* file);
-int media_session_destroy(void* session);
-int media_session_handler(void* session, void* cookie, const char* target,
-    const char* cmd, const char* arg, char* res, int res_len);
-
-/****************************************************************************
  * Policy Functions
  ****************************************************************************/
 
-void* media_policy_create(void* file);
-int media_policy_destroy(void* policy);
-int media_policy_handler(void* policy, void* cookie, const char* name, const char* cmd,
-    const char* value, int apply, char* res, int res_len);
-
 int media_policy_get_stream_name(const char* stream, char* name, int len);
 int media_policy_set_stream_status(const char* name, bool active);
-void media_policy_process_command(const char* target, const char* cmd,
-    const char* arg);
+void media_policy_process_command(const char* target, const char* cmd, const char* arg);
 
 #ifdef __cplusplus
 }

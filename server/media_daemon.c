@@ -30,6 +30,7 @@
 #include <unistd.h>
 
 #include "media_common.h"
+#include "media_plugin.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -49,101 +50,46 @@ typedef struct MediaPriv {
     void* ctx[MAX_POLLFDS];
 } MediaPriv;
 
-typedef void* (*media_create)(void* param);
-typedef int (*media_get_pollfds)(void* handle, struct pollfd* fds,
-    void** cookies, int count);
-typedef int (*media_poll_available)(void* handle, struct pollfd* fds,
-    void* cookies);
-typedef int (*media_run_once)(void* handle);
-typedef int (*media_destroy)(void* handle);
-
-typedef struct MediaPoll {
-    const char* name;
-    void* handle;
-    void* param;
-    media_create create;
-    media_get_pollfds get;
-    media_poll_available available;
-    media_run_once run_once;
-    media_destroy destroy;
-} MediaPoll;
-
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
-static MediaPoll g_media[] = {
 #ifdef CONFIG_MEDIA_FOCUS
-    {
-        "media_focus",
-        NULL,
-        CONFIG_MEDIA_SERVER_CONFIG_PATH "media_focus.conf",
-        media_focus_create,
-        NULL,
-        NULL,
-        NULL,
-        media_focus_destroy,
-    },
+extern media_plugin_t media_focus_plugin;
 #endif
 #ifdef CONFIG_LIB_FFMPEG
-    {
-        "media_graph",
-        NULL,
-        CONFIG_MEDIA_SERVER_CONFIG_PATH "graph.conf",
-        media_graph_create,
-        media_graph_get_pollfds,
-        media_graph_poll_available,
-        media_graph_run_once,
-        media_graph_destroy,
-    },
-    {
-        "media_session",
-        NULL,
-        NULL,
-        media_session_create,
-        NULL,
-        NULL,
-        NULL,
-        media_session_destroy,
-    },
+extern media_plugin_t media_graph_plugin;
+extern media_plugin_t media_session_plugin;
 #endif
 #ifdef CONFIG_LIB_PFW
-    {
-        "media_policy",
-        NULL,
-        (const char*[]) {
-            CONFIG_MEDIA_SERVER_CONFIG_PATH "criteria.txt",
-            CONFIG_MEDIA_SERVER_CONFIG_PATH "settings.pfw" },
-        media_policy_create,
-        NULL,
-        NULL,
-        NULL,
-        media_policy_destroy,
-    },
+extern media_plugin_t media_policy_plugin;
 #endif
-    {
-        "media_server",
-        NULL,
-        NULL,
-        media_server_create,
-        media_server_get_pollfds,
-        media_server_poll_available,
-        NULL,
-        media_server_destroy,
-    },
+extern media_plugin_t media_server_plugin;
+
+media_plugin_t* g_media[] = {
+#ifdef CONFIG_MEDIA_FOCUS
+    &media_focus_plugin,
+#endif
+#ifdef CONFIG_LIB_FFMPEG
+    &media_graph_plugin,
+    &media_session_plugin,
+#endif
+#ifdef CONFIG_LIB_PFW
+    &media_policy_plugin,
+#endif
+    &media_server_plugin,
 };
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-static void* media_get_handle(const char* name)
+media_plugin_t* media_plugin_get(const char* name)
 {
     int i;
 
     for (i = 0; i < ARRAY_SIZE(g_media); i++) {
-        if (!strcmp(name, g_media[i].name))
-            return g_media[i].handle;
+        if (!strcmp(name, g_media[i]->name))
+            return g_media[i];
     }
 
     return NULL;
@@ -153,58 +99,31 @@ static void* media_get_handle(const char* name)
  * Public Functions
  ****************************************************************************/
 
-void* media_get_focus(void)
-{
-    return media_get_handle("media_focus");
-}
-
-void* media_get_graph(void)
-{
-    return media_get_handle("media_graph");
-}
-
-void* media_get_policy(void)
-{
-    return media_get_handle("media_policy");
-}
-
-void* media_get_session(void)
-{
-    return media_get_handle("media_session");
-}
-
-void* media_get_server(void)
-{
-    return media_get_handle("media_server");
-}
-
 int main(int argc, char* argv[])
 {
     MediaPriv* priv;
     int ret, n, i;
 
-    priv = malloc(sizeof(MediaPriv));
+    priv = zalloc(sizeof(MediaPriv));
     if (!priv)
         return -ENOMEM;
 
     for (i = 0; i < ARRAY_SIZE(g_media); i++) {
-        g_media[i].handle = g_media[i].create(g_media[i].param);
-        if (!g_media[i].handle) {
-            free(priv);
-            MEDIA_ERR("%s create failed\n", g_media[i].name);
-            return -EINVAL;
+        ret = mediad_plugin_init(g_media[i]);
+        if (ret < 0) {
+            MEDIA_ERR("%s create failed ret:%d\n", g_media[i]->name, ret);
+            goto out;
         }
     }
 
     while (1) {
         for (n = i = 0; i < ARRAY_SIZE(g_media); i++) {
-            if (!g_media[i].get)
+            if (!g_media[i]->get)
                 continue;
 
-            ret = g_media[i].get(g_media[i].handle, &priv->fds[n],
-                &priv->ctx[n], MAX_POLLFDS - n);
+            ret = g_media[i]->get(g_media[i], &priv->fds[n], &priv->ctx[n], MAX_POLLFDS - n);
             if (ret < 0) {
-                MEDIA_ERR("%s get_pollfds failed %d\n", g_media[i].name, ret);
+                MEDIA_ERR("%s get_pollfds failed %d\n", g_media[i]->name, ret);
                 continue;
             }
 
@@ -220,25 +139,26 @@ int main(int argc, char* argv[])
             if (!priv->fds[i].revents)
                 continue;
 
-            ret = g_media[priv->idx[i]].available(g_media[priv->idx[i]].handle,
+            ret = g_media[priv->idx[i]]->available(g_media[priv->idx[i]],
                 &priv->fds[i], priv->ctx[i]);
             if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
-                MEDIA_ERR("%s poll_available failed %d\n",
-                    g_media[priv->idx[i]].name, ret);
+                MEDIA_ERR("%s poll_available failed %d\n", g_media[priv->idx[i]]->name, ret);
         }
 
         for (i = 0; i < ARRAY_SIZE(g_media); i++) {
-            if (!g_media[i].run_once)
+            if (!g_media[i]->run_once)
                 continue;
 
-            ret = g_media[i].run_once(g_media[i].handle);
+            ret = g_media[i]->run_once(g_media[i]);
             if (ret < 0)
-                MEDIA_ERR("%s run_once failed %d\n", g_media[i].name, ret);
+                MEDIA_ERR("%s run_once failed %d\n", g_media[i]->name, ret);
         }
     }
 
+out:
+    MEDIA_INFO("media daemon exit\n");
     for (i = 0; i < ARRAY_SIZE(g_media); i++)
-        g_media[i].destroy(g_media[i].handle);
+        mediad_plugin_uinit(g_media[i]);
 
     free(priv);
     return 0;

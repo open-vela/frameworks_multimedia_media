@@ -35,6 +35,7 @@
 #include <sys/ioctl.h>
 
 #include "media_common.h"
+#include "media_plugin.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -42,6 +43,7 @@
  ****************************************************************************/
 
 #define MEDIA_PERSIST "persist.media."
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /****************************************************************************
  * Private Functions Prototype
@@ -53,20 +55,14 @@ static void pfw_set_parameter_callback(void* cookie, const char* params);
 /****************************************************************************
  * Private Data
  ****************************************************************************/
+typedef struct pfw_system_s pfw_system_t;
 
 typedef struct MediaPolicyPriv {
     struct work_s work; /* Used for save kvdb */
     char key[64];
     int value;
+    pfw_system_t* policy;
 } MediaPolicyPriv;
-
-static pfw_plugin_def_t g_media_policy_plugins[] = {
-    { "FFmpegCommand", NULL, pfw_ffmpeg_command_callback },
-    { "SetParameter", NULL, pfw_set_parameter_callback }
-};
-
-static const size_t g_media_policy_nb_plugins = sizeof(g_media_policy_plugins)
-    / sizeof(g_media_policy_plugins[0]);
 
 /****************************************************************************
  * Private Functions
@@ -148,15 +144,6 @@ out:
     free(str);
 }
 
-static void pfw_cookie_release_cb(void* cookie)
-{
-    MediaPolicyPriv* priv = cookie;
-
-    if (priv) {
-        free(priv);
-    }
-}
-
 static void pfw_load_criterion_cb(void* cookie, const char* name, int32_t* state)
 {
     if (!strncmp(name, MEDIA_PERSIST, strlen(MEDIA_PERSIST)))
@@ -183,9 +170,11 @@ static void media_policy_notify_cb(void* cookie, int number, char* literal)
  * Public Functions
  ****************************************************************************/
 
-int media_policy_handler(void* policy, void* cookie, const char* name, const char* cmd,
-    const char* value, int apply, char* res, int res_len)
+static int media_policy_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* name,
+    const char* cmd, const char* value, int apply, char* res, int res_len)
 {
+    MediaPolicyPriv* priv = ctx->priv;
+    pfw_system_t* policy = priv->policy;
     int ret = -ENOSYS, tmp[2];
     void* handle;
     char* dump;
@@ -195,15 +184,15 @@ int media_policy_handler(void* policy, void* cookie, const char* name, const cha
     } else if (!strcmp(cmd, "ping")) {
         return 0;
     } else if (!strcmp(cmd, "subscribe")) {
-        handle = pfw_subscribe(policy, name, media_policy_notify_cb, cookie);
+        handle = pfw_subscribe(policy, name, media_policy_notify_cb, conn);
         if (!handle)
             return -EINVAL;
-        media_server_set_data(cookie, handle);
+        media_server_set_data(conn, handle);
         return 0;
     } else if (!strcmp(cmd, "unsubscribe")) {
-        handle = media_server_get_data(cookie);
+        handle = media_server_get_data(conn);
         pfw_unsubscribe(policy, handle);
-        media_stub_notify_finalize(&cookie);
+        media_stub_notify_finalize((void**)&conn);
         return 0;
     } else if (!strcmp(cmd, "set_int")) {
         ret = pfw_setint(policy, name, atoi(value));
@@ -263,30 +252,50 @@ int media_policy_handler(void* policy, void* cookie, const char* name, const cha
     return 0;
 }
 
-int media_policy_destroy(void* policy)
+static int media_policy_uninit(media_plugin_t* ctx)
 {
-    pfw_destroy(policy, pfw_cookie_release_cb);
+    MediaPolicyPriv* priv = ctx->priv;
+
+    if (priv->policy) {
+        pfw_destroy(priv->policy, NULL);
+        priv->policy = NULL;
+    }
+
     return 0;
 }
 
-void* media_policy_create(void* params)
+static int media_policy_init(media_plugin_t* ctx)
 {
-    const char** paths = params;
-    MediaPolicyPriv* priv;
-    void* policy;
+    const char* paths[] = {
+        CONFIG_MEDIA_SERVER_CONFIG_PATH "criteria.txt",
+        CONFIG_MEDIA_SERVER_CONFIG_PATH "settings.pfw"
+    };
+    const pfw_plugin_def_t media_policy_plugins[] = {
+        { "FFmpegCommand", NULL, pfw_ffmpeg_command_callback },
+        { "SetParameter", NULL, pfw_set_parameter_callback }
+    };
+    MediaPolicyPriv* priv = ctx->priv;
+    pfw_system_t* policy;
 
-    if (!params)
-        return NULL;
-
-    priv = zalloc(sizeof(MediaPolicyPriv));
-    if (!priv)
-        return NULL;
-
-    policy = pfw_create(paths[0], paths[1], g_media_policy_plugins,
-        g_media_policy_nb_plugins, pfw_load_criterion_cb, pfw_save_criterion_cb, (void*)priv);
+    policy = pfw_create(paths[0], paths[1], media_policy_plugins,
+        ARRAY_SIZE(media_policy_plugins), pfw_load_criterion_cb, pfw_save_criterion_cb, (void*)priv);
     if (!policy)
-        return NULL;
+        return -ENOMEM;
 
     pfw_apply(policy);
-    return policy;
+    priv->policy = policy;
+
+    return 0;
 }
+
+media_plugin_t media_policy_plugin = {
+    .name = "media_policy",
+    .priv_size = sizeof(MediaPolicyPriv),
+    .priv = NULL,
+    .init = media_policy_init,
+    .get = NULL,
+    .available = NULL,
+    .run_once = NULL,
+    .uninit = media_policy_uninit,
+    .process_command = media_policy_handler,
+};

@@ -41,6 +41,7 @@
 #include <unistd.h>
 
 #include "media_common.h"
+#include "media_plugin.h"
 #include "media_server.h"
 
 /****************************************************************************
@@ -433,22 +434,22 @@ err:
     return ret;
 }
 
-static int media_common_handler(MediaGraphPriv* priv, void* cookie,
-    const char* target, const char* cmd, const char* arg,
-    char* res, int res_len, bool player)
+static int media_common_handler(media_plugin_t* pctx, struct media_server_conn* conn,
+    const char* target, const char* cmd, const char* arg, int player, char* res, int res_len)
 {
-    MediaFilterPriv* ctx = media_server_get_data(cookie);
+    MediaGraphPriv* priv = pctx->priv;
+    MediaFilterPriv* ctx = media_server_get_data(conn);
     AVFilterContext* filter = NULL;
     char url[PATH_MAX];
     int pending;
     int ret = 0;
 
     if (!strcmp(cmd, "open")) {
-        ret = media_common_open(priv, arg, cookie, player, &ctx);
+        ret = media_common_open(priv, arg, conn, player, &ctx);
         if (ret < 0)
             return ret;
 
-        media_server_set_data(cookie, ctx);
+        media_server_set_data(conn, ctx);
         return 0;
     }
 
@@ -493,18 +494,17 @@ static int media_common_handler(MediaGraphPriv* priv, void* cookie,
  * Public Functions
  ****************************************************************************/
 
-void* media_graph_create(void* file)
+static int media_graph_init(media_plugin_t* ctx)
 {
-    MediaGraphPriv* priv;
+    char* file = CONFIG_MEDIA_SERVER_CONFIG_PATH "graph.conf";
+    MediaGraphPriv* priv = ctx->priv;
     int ret;
 
-    priv = malloc(sizeof(MediaGraphPriv));
-    if (!priv)
-        return NULL;
-
     priv->fd = eventfd(0, EFD_CLOEXEC);
-    if (priv->fd < 0)
+    if (priv->fd < 0) {
+        ret = -errno;
         goto err;
+    }
 
     ret = fs_getfilep(priv->fd, &priv->filep);
     if (ret < 0)
@@ -518,33 +518,35 @@ void* media_graph_create(void* file)
     priv->cmdhead = NULL;
     priv->cmdtail = NULL;
 
-    return priv;
+    return 0;
 err:
     if (priv->fd > 0)
         close(priv->fd);
-    free(priv);
-    return NULL;
+
+    return ret;
 }
 
-int media_graph_destroy(void* graph)
+static int media_graph_uninit(media_plugin_t* ctx)
 {
-    MediaGraphPriv* priv = graph;
+    MediaGraphPriv* priv = ctx->priv;
     int ret;
+
+    if (!priv)
+        return -EINVAL;
 
     do {
         ret = media_graph_dequeue_command(priv, false);
     } while (ret >= 0);
 
     avfilter_graph_free(&priv->graph);
-    free(priv);
 
     return 0;
 }
 
-int media_graph_get_pollfds(void* graph, struct pollfd* fds,
+static int media_graph_get_pollfds(media_plugin_t* ctx, struct pollfd* fds,
     void** cookies, int count)
 {
-    MediaGraphPriv* priv = graph;
+    MediaGraphPriv* priv = ctx->priv;
     int ret, nfd, i;
 
     if (!fds || count < 2)
@@ -574,9 +576,9 @@ int media_graph_get_pollfds(void* graph, struct pollfd* fds,
     return nfd;
 }
 
-int media_graph_poll_available(void* graph, struct pollfd* fd, void* cookie)
+static int media_graph_poll_available(media_plugin_t* ctx, struct pollfd* fd, void* cookie)
 {
-    MediaGraphPriv* priv = graph;
+    MediaGraphPriv* priv = ctx->priv;
     eventfd_t unuse;
 
     if (!fd)
@@ -592,9 +594,9 @@ int media_graph_poll_available(void* graph, struct pollfd* fd, void* cookie)
     return 0;
 }
 
-int media_graph_run_once(void* graph)
+static int media_graph_run_once(media_plugin_t* ctx)
 {
-    MediaGraphPriv* priv = graph;
+    MediaGraphPriv* priv = ctx->priv;
     int ret;
 
     ret = ff_filter_graph_run_all(priv->graph);
@@ -608,10 +610,10 @@ int media_graph_run_once(void* graph)
     return ret == -EAGAIN ? 0 : ret;
 }
 
-int media_graph_handler(void* graph, const char* target, const char* cmd,
-    const char* arg, char* res, int res_len)
+int media_graph_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* target,
+    const char* cmd, const char* arg, int flags, char* res, int res_len)
 {
-    MediaGraphPriv* priv = graph;
+    MediaGraphPriv* priv = ctx->priv;
     int i, ret = 0;
     char* dump;
 
@@ -652,14 +654,14 @@ int media_graph_handler(void* graph, const char* target, const char* cmd,
     return 0;
 }
 
-int media_player_handler(void* graph, void* cookie, const char* target, const char* cmd,
-    const char* arg, char* res, int res_len)
-{
-    return media_common_handler(graph, cookie, target, cmd, arg, res, res_len, true);
-}
-
-int media_recorder_handler(void* graph, void* cookie, const char* target, const char* cmd,
-    const char* arg, char* res, int res_len)
-{
-    return media_common_handler(graph, cookie, target, cmd, arg, res, res_len, false);
-}
+media_plugin_t media_graph_plugin = {
+    .name = "media_graph",
+    .priv_size = sizeof(MediaGraphPriv),
+    .priv = NULL,
+    .init = media_graph_init,
+    .get = media_graph_get_pollfds,
+    .available = media_graph_poll_available,
+    .run_once = media_graph_run_once,
+    .uninit = media_graph_uninit,
+    .process_command = media_common_handler,
+};
