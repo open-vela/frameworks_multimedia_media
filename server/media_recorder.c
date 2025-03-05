@@ -599,8 +599,6 @@ static int media_recorder_proc_dat(MediaRecorderContext* ctx)
         if (!frame->data[0]){
             MEDIA_INFO("reveice empty frame\n");
             av_frame_free(&frame);
-            avcodec_flush_buffers(ctx->streams[i].enc_ctx);
-            return 0;
         } else if (ctx->state == MEDIA_RECORDER_STATE_PAUSED) {
             if (ctx->streams[i].type == AVMEDIA_TYPE_AUDIO)
                 ctx->streams[i].sync_pts += frame->nb_samples;
