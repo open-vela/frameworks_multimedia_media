@@ -192,7 +192,7 @@ void* media_uv_focus_request(void* loop, const char* name,
     priv->on_suggest = on_suggest;
     priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_focus_connect_cb, priv);
-    if (!priv->cookie) {
+    if (!priv->proxy) {
         media_uv_focus_release_cb(priv, 0);
         return NULL;
     }
