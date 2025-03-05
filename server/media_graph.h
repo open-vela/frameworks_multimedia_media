@@ -56,4 +56,13 @@ int media_graph_stream_open(MediaGraphStream** pctx,
  */
 int media_graph_stream_close(MediaGraphStream** pctx);
 
+/*
+ * Set stream parameter.
+ * @ctx: [in,out] audio stream context
+ * @param: parameter key
+ * @value: parameter value
+ * @return: 0 on success, negative value on error
+ */
+int media_graph_stream_set_parameter(MediaGraphStream** pctx, const char* param, const char* value);
+
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_GRAPH_H */

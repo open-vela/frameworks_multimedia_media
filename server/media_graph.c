@@ -866,3 +866,21 @@ int media_graph_stream_close(MediaGraphStream** pctx)
     *pctx = NULL;
     return ret;
 }
+
+int media_graph_stream_set_parameter(MediaGraphStream** pctx, const char* param, const char* value)
+{
+    MediaGraphStream *ctx = *pctx;
+    char msg[128];
+    int ret;
+
+    if (!ctx || !param || !value)
+        return -EINVAL;
+
+    snprintf(msg, sizeof(msg), "%p %s %s", ctx->link_handle, param, value);
+
+    ret = avfilter_process_command(ctx->src, "set_parameter", msg, NULL, 0, 0);
+    if (ret < 0)
+        MEDIA_ERR("%s set_parameter failed ret:%d\n", ctx->src->name, ret);
+
+    return ret;
+}

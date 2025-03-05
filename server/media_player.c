@@ -991,6 +991,21 @@ out:
     return 0;
 }
 
+static int media_player_set_volume(MediaPlayerContext* ctx, const char* volume)
+{
+    int ret;
+
+    if (ctx->audio_output) {
+        ret = media_graph_stream_set_parameter(&ctx->audio_output , "volume", volume);
+        if (ret < 0) {
+            MEDIA_ERR("media_player_set_volume [%s]failed.\n", volume);
+            return ret;
+        }
+    }
+
+    return 0;
+}
+
 static int media_player_send_cmd(MediaPlayerContext* ctx, const int cmd, const void* data, size_t size)
 {
     PlayerCmd *msg, *tmp;
@@ -1130,6 +1145,8 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
         snprintf(res, res_len, "%d", ctx->current_ms);
     } else if (!strcmp(cmd, "get_playing")) {
         snprintf(res, res_len, "%d", ctx->state == MEDIA_PLAYER_STATE_STARTED);
+    } else if (!strcmp(cmd, "volume")) {
+        ret = media_player_set_volume(ctx, arg);
     } else if (!res && !res_len) {
         return media_stub_process_command(target, cmd, arg);
     } else {
