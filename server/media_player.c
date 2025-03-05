@@ -992,19 +992,21 @@ out:
     return 0;
 }
 
-static int media_player_set_volume(MediaPlayerContext* ctx, const char* volume)
+static int media_player_volume(MediaPlayerContext* ctx, const char* args, char *res, int res_len)
 {
-    int ret;
+    int ret = -EINVAL;
 
     if (ctx->audio_output) {
-        ret = media_graph_stream_set_parameter(&ctx->audio_output , "volume", volume);
-        if (ret < 0) {
-            MEDIA_ERR("media_player_set_volume [%s]failed.\n", volume);
-            return ret;
-        }
-    }
+        if (args)
+            ret = media_graph_stream_set_parameter(&ctx->audio_output , "volume", args);
+        else if (res && res_len)
+            ret = media_graph_stream_get_parameter(&ctx->audio_output , "volume", res, res_len);
+        if (ret < 0)
+            MEDIA_ERR("media_player_volume failed.\n");
+    } else
+        MEDIA_ERR("audio_output is NULL.\n");
 
-    return 0;
+    return ret;
 }
 
 static int media_player_send_cmd(MediaPlayerContext* ctx, const int cmd, const void* data, size_t size)
@@ -1146,8 +1148,10 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
         snprintf(res, res_len, "%d", ctx->current_ms);
     } else if (!strcmp(cmd, "get_playing")) {
         snprintf(res, res_len, "%d", ctx->state == MEDIA_PLAYER_STATE_STARTED);
+    } else if (!strcmp(cmd, "get_volume")) {
+        ret = media_player_volume(ctx, NULL, res, res_len);
     } else if (!strcmp(cmd, "volume")) {
-        ret = media_player_set_volume(ctx, arg);
+        ret = media_player_volume(ctx, arg, res, res_len);
     } else if (!res && !res_len) {
         return media_stub_process_command(target, cmd, arg);
     } else {
