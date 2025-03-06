@@ -266,7 +266,7 @@ static int media_player_loop(MediaPlayerContext* ctx)
     int ret = AVERROR_EOF;
 
     if (ctx->loop_count) {
-        ret = media_player_seek(ctx, 0, false);
+        ret = media_player_seek(ctx, 0, true);
         ctx->loop_count -= ctx->loop_count > 0;
     }
 
@@ -418,11 +418,13 @@ static int media_player_dec_frame(MediaPlayerContext* ctx, int idx, AVFrame** of
         return ret;
     }
 
-    if (frame->pts == AV_NOPTS_VALUE && ctx->streams[idx].next_pts != AV_NOPTS_VALUE)
-        frame->pts = ctx->streams[idx].next_pts;
+    if (ctx->streams[idx].codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
+        if (frame->pts == AV_NOPTS_VALUE && ctx->streams[idx].next_pts != AV_NOPTS_VALUE)
+            frame->pts = ctx->streams[idx].next_pts;
 
-    if (frame->pts != AV_NOPTS_VALUE)
-        ctx->streams[idx].next_pts = frame->pts + frame->nb_samples;
+        if (frame->pts != AV_NOPTS_VALUE)
+            ctx->streams[idx].next_pts = frame->pts + frame->nb_samples;
+    }
 
     frame->time_base = ctx->streams[idx].time_base;
     ctx->current_ms  = frame->pts * av_q2d(ctx->streams[idx].time_base) * 1000;
