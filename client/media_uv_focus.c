@@ -190,6 +190,9 @@ static void media_uv_focus_request_cb(void* cookie, int ret)
 {
     MediaFocusPriv* priv = cookie;
 
+    if (priv->on_abandon)
+        return;
+
     MEDIA_INFO("%s:%p suggest:%d\n", priv->name, priv, ret);
     media_uv_focus_on_suggest(priv, ret);
 }
