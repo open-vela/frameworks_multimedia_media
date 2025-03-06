@@ -142,7 +142,7 @@ typedef struct MediaPlayerContext {
     uint32_t            nb_streams;
     uint32_t            current_ms;     /** < current timestamp of the decoded frame */
     uint32_t            duration_ms;    /** < duration of whole stream */
-    char                name[16];
+    char                name[64];
     pthread_mutex_t     mutex;
     char*               protocol_map;
     struct PlayerCmdQueue cmd_queue;
@@ -1585,7 +1585,7 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
 
         media_server_clean_conn(conn);
 
-        // get globle options
+        // get global options in criteria.txt
         snprintf(option_name, sizeof(option_name), "%sParams", arg);
         ret = media_stub_get_stream_name(option_name, options, sizeof(options));
         if (ret == 0 && strlen(options) != 0) {

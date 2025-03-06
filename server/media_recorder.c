@@ -116,7 +116,7 @@ typedef struct MediaRecorderContext {
     int state;
     int audio_idx;
     int video_idx;
-    char name[16];
+    char name[64];
     uint32_t nb_streams;                  /* total stream count */
     pthread_mutex_t mutex;
     OutputStream* streams;                /* output stream */
@@ -1218,13 +1218,21 @@ static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn
                                   int flags, char* res, int res_len)
 {
     MediaRecorderPriv* priv = handle->priv;
+    char stream_name[64] = { 0 };
     int ret;
 
-    MEDIA_INFO("cmd: %s, arg %s, target %s.\n", cmd, arg ? arg : "NULL", target ? target : "NULL");
+    MEDIA_INFO("cmd: %s, arg %s, target %s.\n",
+               cmd, arg ? arg : "NULL", target ? target : "NULL");
 
     pthread_mutex_lock(&priv->mutex);
 
     if (!strcmp(cmd, "open")) {
+        ret = media_stub_get_stream_name(arg, stream_name, sizeof(stream_name));
+        if (ret < 0) {
+            MEDIA_ERR("get stream name failed %d\n", ret);
+            goto out;
+        }
+
         MediaRecorderContext* ctx = media_recorder_get_available_session(priv);
         if (!ctx) {
             MEDIA_ERR("recorder open failed...\n");
@@ -1241,11 +1249,9 @@ static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn
 
         media_server_clean_conn(conn);
 
-        ret = media_recorder_open(ctx, arg);
+        ret = media_recorder_open(ctx, stream_name);
         if (ret < 0)
             goto out;
-
-        strncpy(ctx->name, arg, sizeof(ctx->name));
 
         MEDIA_INFO("open recorder success...\n");
     } else if (!strcmp(cmd, "dump")) {
