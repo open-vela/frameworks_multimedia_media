@@ -106,26 +106,27 @@ typedef struct OutputStream {
 } OutputStream;
 
 typedef struct MediaRecorderContext {
-    int tran_fd;
-    int notify_fd;
-    uint32_t offset;
-    media_parcel parcel;
+    /* communication with media client */
+    int                     tran_fd;
+    int                     notify_fd;
+    uint32_t                offset;
+    media_parcel            parcel;
 
-    int event;
-    int cmd_max;
-    int state;
-    int audio_idx;
-    int video_idx;
-    char name[64];
-    uint32_t nb_streams;                  /* total stream count */
-    pthread_mutex_t mutex;
-    OutputStream* streams;                /* output stream */
-    AVDictionary* format_opt;             /* format options */
-    AVFormatContext* format_ctx;          /* output format context */
-    const AVOutputFormat* format;         /* output format */
+    int                     event;
+    int                     cmd_max;
+    int                     state;
+    int                     audio_idx;
+    int                     video_idx;
+    char                    name[64];
+    uint32_t                nb_streams;     /* total stream count */
+    pthread_mutex_t         mutex;
+    OutputStream*           streams;        /* output stream */
+    AVDictionary*           format_opt;     /* format options */
+    AVFormatContext*        format_ctx;     /* output format context */
+    const AVOutputFormat*   format;         /* output format */
     struct RecorderCmdQueue cmd_queue;
 
-    MediaGraphStream* audio_input;
+    MediaGraphStream*       audio_input;
 } MediaRecorderContext;
 
 typedef struct MediaRecorderPriv {
@@ -315,23 +316,122 @@ out:
 
 static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 {
-    int sample_rate, sample_fmt, channels;
+    int ret, i, num_sample_fmts, num_samplerates, num_ch_layouts;
     int width, height, bitrate = -1, vbr = -1, level = -1;
+    int sample_rate, sample_fmt, channels;
+    const enum AVSampleFormat *sample_fmts = NULL;
+    const AVChannelLayout *ch_layouts = NULL;
+    const int *supported_samplerates = NULL;
     AVDictionary* dict = NULL;
     AVDictionaryEntry* tag;
-    AVStream* stream;
     const AVCodec* enc;
-    int ret;
+    AVStream* stream;
 
-    // step1: init option params for encoder
-    if ((tag = av_dict_get(ctx->format_opt, "sample_rate", NULL, 0)))
-        sample_rate = strtol(tag->value, NULL, 0);
+    if (ctx->streams[idx].type == AVMEDIA_TYPE_AUDIO) {
+        tag = av_dict_get(ctx->format_opt, "audio_codec", NULL, 0);
+        if (tag)
+            enc = avcodec_find_encoder(atoi(tag->value));
+        else
+            enc = avcodec_find_encoder(ctx->format_ctx->oformat->audio_codec);
+    } else {
+        tag = av_dict_get(ctx->format_opt, "video_codec", NULL, 0);
+        if (tag)
+            enc = avcodec_find_encoder(atoi(tag->value));
+        else
+            enc = avcodec_find_encoder(ctx->format_ctx->oformat->video_codec);
+    }
 
-    if ((tag = av_dict_get(ctx->format_opt, "sample_fmt", NULL, 0)))
+    if (!enc) {
+        MEDIA_ERR("don't find match encoder\n");
+        return AVERROR(EINVAL);
+    }
+
+    // get audio sample_format
+    ret = avcodec_get_supported_config(NULL, enc, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0,
+                                       (const void**)&sample_fmts, &num_sample_fmts);
+    if (ret < 0) {
+        MEDIA_ERR("get supported sample_format config failed\n");
+        return ret;
+    }
+
+    if ((tag = av_dict_get(ctx->format_opt, "sample_fmt", NULL, 0))) {
         sample_fmt = strtol(tag->value, NULL, 0);
+        for (i = 0; i < num_sample_fmts; i++) {
+            if (sample_fmt == sample_fmts[i])
+                break;
+        }
 
-    if ((tag = av_dict_get(ctx->format_opt, "channels", NULL, 0)))
+        if (i == num_sample_fmts && num_sample_fmts != 0) {
+            MEDIA_ERR("sample format %d is not supported by the encoder (%s) \n",
+                      sample_fmt, enc->name);
+            return AVERROR(EINVAL);
+        }
+    } else {
+        if (num_sample_fmts)
+            sample_fmt = sample_fmts[0];
+        else {
+            MEDIA_ERR("need to specify the sample_fmt \n");
+            return AVERROR(EINVAL);
+        }
+    }
+
+    // get audio sample_rate
+    ret = avcodec_get_supported_config(NULL, enc, AV_CODEC_CONFIG_SAMPLE_RATE, 0,
+                                       (const void**)&supported_samplerates, &num_samplerates);
+    if (ret < 0) {
+        MEDIA_ERR("get supported sample_rate config failed\n");
+        return ret;
+    }
+
+    if ((tag = av_dict_get(ctx->format_opt, "sample_rate", NULL, 0))) {
+        sample_rate = strtol(tag->value, NULL, 0);
+        for (i = 0; i < num_samplerates; i++) {
+            if (sample_rate == supported_samplerates[i])
+                break;
+        }
+
+        if (i == num_samplerates && num_samplerates != 0) {
+            MEDIA_ERR("sample rate %d is not supported by the encoder (%s) \n",
+                      sample_rate, enc->name);
+            return AVERROR(EINVAL);
+        }
+    } else {
+        if (num_samplerates)
+            sample_rate = supported_samplerates[0];
+        else {
+            MEDIA_ERR("need to specify the sample_rate \n");
+            return AVERROR(EINVAL);
+        }
+    }
+
+    // get audio channel_layout
+    ret = avcodec_get_supported_config(NULL, enc, AV_CODEC_CONFIG_CHANNEL_LAYOUT, 0,
+                                       (const void**)&ch_layouts, &num_ch_layouts);
+    if (ret < 0) {
+        MEDIA_ERR("get supported channel layout config failed\n");
+        return ret;
+    }
+
+    if ((tag = av_dict_get(ctx->format_opt, "channels", NULL, 0))) {
         channels = strtol(tag->value, NULL, 0);
+        for (i = 0; i < num_ch_layouts; i++) {
+            if (channels == ch_layouts[i].nb_channels)
+                break;
+        }
+
+        if (i == num_ch_layouts && num_ch_layouts != 0) {
+            MEDIA_ERR("channel %d is not supported by the encoder (%s) \n",
+                      channels, enc->name);
+            return AVERROR(EINVAL);
+        }
+    } else {
+        if (num_ch_layouts)
+            channels = ch_layouts[i].nb_channels;
+        else {
+            MEDIA_ERR("need to specify the channel layout \n");
+            return AVERROR(EINVAL);
+        }
+    }
 
     if ((tag = av_dict_get(ctx->format_opt, "width", NULL, 0)))
         width = strtol(tag->value, NULL, 0);
@@ -347,28 +447,6 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 
     if ((tag = av_dict_get(ctx->format_opt, "level", NULL, 0)))
         level = strtol(tag->value, NULL, 0);
-
-    // step2: create encoder
-    if (ctx->streams[idx].type == AVMEDIA_TYPE_AUDIO) {
-        tag = av_dict_get(ctx->format_opt, "audio_codec", NULL, 0);
-        if (tag) {
-            enc = avcodec_find_encoder(atoi(tag->value));
-        } else {
-            enc = avcodec_find_encoder(ctx->format_ctx->oformat->audio_codec);
-        }
-    } else {
-        tag = av_dict_get(ctx->format_opt, "video_codec", NULL, 0);
-        if (tag) {
-            enc = avcodec_find_encoder(atoi(tag->value));
-        } else {
-            enc = avcodec_find_encoder(ctx->format_ctx->oformat->video_codec);
-        }
-    }
-
-    if (!enc) {
-        av_log(NULL, AV_LOG_INFO, "not find enc\n");
-        return AVERROR(EINVAL);
-    }
 
     ctx->streams[idx].enc_ctx = avcodec_alloc_context3(enc);
     if (!ctx->streams[idx].enc_ctx) {
@@ -407,7 +485,6 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
     if (ret < 0)
         goto out;
 
-    // step3: create stream
     stream = avformat_new_stream(ctx->format_ctx, NULL);
     if (!stream) {
         ret = AVERROR(ENOMEM);
@@ -711,40 +788,30 @@ static int media_recorder_close(MediaRecorderContext* ctx)
 
 static int media_recorder_start(MediaRecorderContext* ctx)
 {
-    AVDictionaryEntry* tag;
     int ret = AVERROR(EPERM);
-    int sample_rate;
-    int sample_fmt;
-    int channels;
+    int i;
 
-    if (ctx->state != MEDIA_RECORDER_STATE_PREPARED && ctx->state != MEDIA_RECORDER_STATE_PAUSED)
+    if (ctx->state != MEDIA_RECORDER_STATE_PREPARED &&
+        ctx->state != MEDIA_RECORDER_STATE_PAUSED)
         goto out;
 
+    if (ctx->state == MEDIA_RECORDER_STATE_PREPARED) {
+        for (i = 0; i < ctx->nb_streams; i++) {
+            ret = media_recorder_open_encoder(ctx, i);
+            if (ret < 0)
+                goto out;
+        }
+
+        ret = avformat_write_header(ctx->format_ctx, NULL);
+        if (ret < 0)
+            goto out;
+    }
+
     if (!ctx->audio_input) {
-
-        if ((tag = av_dict_get(ctx->format_opt, "sample_rate", NULL, 0)))
-            sample_rate = strtol(tag->value, NULL, 0);
-        else {
-            MEDIA_ERR("sample_rate not found in format options.\n");
-            return AVERROR(EINVAL);
-        }
-
-        if ((tag = av_dict_get(ctx->format_opt, "sample_fmt", NULL, 0)))
-            sample_fmt = strtol(tag->value, NULL, 0);
-        else {
-            MEDIA_ERR("sample_fmt not found in format options.\n");
-            return AVERROR(EINVAL);
-        }
-
-        if ((tag = av_dict_get(ctx->format_opt, "channels", NULL, 0)))
-            channels = strtol(tag->value, NULL, 0);
-        else {
-            MEDIA_ERR("channels not found in format options.\n");
-            return AVERROR(EINVAL);
-        }
-
         ret = media_graph_stream_open(&ctx->audio_input, ctx->name,
-                                      sample_fmt, sample_rate, channels,
+                                      ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
+                                      ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
+                                      ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
                                       media_recorder_on_event_cb, ctx);
         if (ret < 0)
             MEDIA_ERR("media_graph_stream_open failed, ret %d.\n", ret);
@@ -752,7 +819,6 @@ static int media_recorder_start(MediaRecorderContext* ctx)
             MEDIA_INFO("media_graph_stream_open success.\n");
             ctx->state = MEDIA_RECORDER_STATE_STARTED;
         }
-        return ret;
     }
 
 out:
@@ -765,7 +831,6 @@ static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filenam
     int ret = AVERROR(EPERM);
     AVDictionaryEntry* tag;
     char* format = NULL;
-    int i;
 
     if (ctx->state != MEDIA_RECORDER_STATE_STOPPED)
         goto out;
@@ -781,16 +846,6 @@ static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filenam
     }
 
     ret = media_recorder_open_muxer(ctx, filename);
-    if (ret < 0)
-        goto out;
-
-    for (i = 0; i < ctx->nb_streams; i++) {
-        ret = media_recorder_open_encoder(ctx, i);
-        if (ret < 0)
-            goto out;
-    }
-
-    ret = avformat_write_header(ctx->format_ctx, NULL);
     if (ret < 0)
         goto out;
 
