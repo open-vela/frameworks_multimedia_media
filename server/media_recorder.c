@@ -318,10 +318,11 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 {
     int ret, i, num_sample_fmts, num_samplerates, num_ch_layouts;
     int width, height, bitrate = -1, vbr = -1, level = -1;
-    int sample_rate, sample_fmt, channels;
     const enum AVSampleFormat *sample_fmts = NULL;
     const AVChannelLayout *ch_layouts = NULL;
     const int *supported_samplerates = NULL;
+    int sample_rate, sample_fmt;
+    AVChannelLayout ch_layout;
     AVDictionary* dict = NULL;
     AVDictionaryEntry* tag;
     const AVCodec* enc;
@@ -412,21 +413,25 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
         return ret;
     }
 
-    if ((tag = av_dict_get(ctx->format_opt, "channels", NULL, 0))) {
-        channels = strtol(tag->value, NULL, 0);
+    if ((tag = av_dict_get(ctx->format_opt, "ch_layout", NULL, 0))) {
+        if (av_channel_layout_from_string(&ch_layout, tag->value) < 0) {
+            MEDIA_ERR("invalid channel layout %s\n", tag->value);
+            return AVERROR(EINVAL);
+        }
+
         for (i = 0; i < num_ch_layouts; i++) {
-            if (channels == ch_layouts[i].nb_channels)
+            if (av_channel_layout_compare(&ch_layouts[i], &ch_layout) == 0)
                 break;
         }
 
         if (i == num_ch_layouts && num_ch_layouts != 0) {
             MEDIA_ERR("channel %d is not supported by the encoder (%s) \n",
-                      channels, enc->name);
+                      ch_layout.nb_channels, enc->name);
             return AVERROR(EINVAL);
         }
     } else {
         if (num_ch_layouts)
-            channels = ch_layouts[i].nb_channels;
+            ch_layout = ch_layouts[i];
         else {
             MEDIA_ERR("need to specify the channel layout \n");
             return AVERROR(EINVAL);
@@ -456,7 +461,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
     if (ctx->streams[idx].type == AVMEDIA_TYPE_AUDIO) {
         ctx->streams[idx].enc_ctx->sample_fmt  = sample_fmt;
         ctx->streams[idx].enc_ctx->sample_rate = sample_rate;
-        av_channel_layout_default(&ctx->streams[idx].enc_ctx->ch_layout, channels);
+        ctx->streams[idx].enc_ctx->ch_layout = ch_layout;
         ctx->streams[idx].enc_ctx->time_base = (AVRational) { 1, sample_rate };
     } else {
         ctx->streams[idx].enc_ctx->width  = width;
