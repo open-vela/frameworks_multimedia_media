@@ -899,10 +899,6 @@ static int media_recorder_proc_cmd(MediaRecorderContext* ctx, RecorderCmd* msg)
     case MEDIA_RECORDER_CMD_SET_EVENT:
         break;
 
-    case MEDIA_RECORDER_CMD_SET_OPTIONS:
-        av_dict_parse_string(&ctx->format_opt, msg->data, "=", ":", 0);
-        break;
-
     case MEDIA_RECORDER_CMD_PREPARE:
         media_recorder_prepare(ctx, msg->data);
         break;
@@ -932,7 +928,7 @@ static int media_recorder_proc_cmd(MediaRecorderContext* ctx, RecorderCmd* msg)
 }
 
 int media_recorder_process_cmd(MediaRecorderContext* ctx, const char* target,
-                               const char* cmd, const char* arg,char* res, int res_len)
+                               const char* cmd, const char* arg, char* res, int res_len)
 {
     char url[PATH_MAX];
     int ret = 0;
@@ -973,7 +969,12 @@ int media_recorder_process_cmd(MediaRecorderContext* ctx, const char* target,
     } else if (!strcmp(cmd, "pause")) {
         ret = media_recorder_send_cmd(ctx, MEDIA_RECORDER_CMD_PAUSE, NULL, 0);
     } else if (!strcmp(cmd, "set_options") && arg) {
-        ret = media_recorder_send_cmd(ctx, MEDIA_RECORDER_CMD_SET_OPTIONS, arg, strlen(arg) + 1);
+        if (!arg)
+            return AVERROR(EINVAL);
+
+        pthread_mutex_lock(&ctx->mutex);
+        ret = av_dict_parse_string(&ctx->format_opt, arg, "=", ":", 0);
+        pthread_mutex_unlock(&ctx->mutex);
     } else {
         MEDIA_ERR("unknown cmd: %s.\n", cmd);
         return AVERROR(EINVAL);
