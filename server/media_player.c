@@ -946,7 +946,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
 
 static int media_player_start(MediaPlayerContext* ctx)
 {
-    AVCodecParameters *par = ctx->format_ctx->streams[ctx->audio_idx]->codecpar;
+    AVCodecParameters *par;
     int ret = 0;
 
     if (ctx->state != MEDIA_PLAYER_STATE_PREPARED &&
@@ -957,6 +957,7 @@ static int media_player_start(MediaPlayerContext* ctx)
     }
 
     if (ctx->audio_idx >= 0 && !ctx->audio_output) {
+        par = ctx->format_ctx->streams[ctx->audio_idx]->codecpar;
         ret = media_graph_stream_open(
             &ctx->audio_output, ctx->name, par->format, par->sample_rate,
             par->ch_layout.nb_channels, media_player_on_event_cb, ctx);
