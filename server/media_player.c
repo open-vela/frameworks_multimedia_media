@@ -58,10 +58,10 @@
 #define MEDIA_PLAYER_CMD_QUEUE_IDX  (1 << 0)
 #define MEDIA_PLAYER_DATA_QUEUE_IDX (1 << 1)
 
-#define MEDIA_PLAYER_MAX_CNT 10
-#define MEDIA_PLAYER_CMD_QUEUE_MAX 16
-#define MEDIA_PLAYER_DATA_QUEUE_SIZE 4
-#define MEDIA_PLAYER_MAX_POLLFDS 4
+#define MEDIA_PLAYER_MAX_CNT            10
+#define MEDIA_PLAYER_CMD_QUEUE_MAX      16
+#define MEDIA_PLAYER_DATA_QUEUE_SIZE    4
+#define MEDIA_PLAYER_MAX_POLLFDS        4
 
 #define MEDIA_PLAYER_SILENCE_FRAME_DURATION 20
 
@@ -99,21 +99,21 @@ enum MediaPlayerCmd {
 
 typedef struct PlayerCmd {
     SIMPLEQ_ENTRY(PlayerCmd) entry;
-    int cmd;
-    char data[0];
+    int                      cmd;
+    char                     data[0];
 } PlayerCmd;
 
 SIMPLEQ_HEAD(PlayerCmdQueue, PlayerCmd);
 
 typedef struct OutputStream {
-    enum AVMediaType type;
-    int index;
-    int nb_queue_max;
-    AVCodecContext* codec_ctx;
-    FFFrameQueue queue;
-    AVRational time_base;
-    AVRational frame_rate;
-    int64_t next_pts;
+    int                 index;
+    int                 nb_queue_max;
+    int64_t             next_pts;
+    enum AVMediaType    type;
+    AVCodecContext*     codec_ctx;
+    FFFrameQueue        queue;
+    AVRational          time_base;
+    AVRational          frame_rate;
 } OutputStream;
 
 typedef struct MediaPlayerContext MediaPlayerContext;
@@ -139,6 +139,7 @@ typedef struct MediaPlayerContext {
     int                 pending_stop;
     int                 audio_idx;
     int                 video_idx;
+    int                 live_stream;    /** < default is false, when set to true, avsync is disabled */
     uint32_t            nb_streams;
     uint32_t            current_ms;     /** < current timestamp of the decoded frame */
     uint32_t            duration_ms;    /** < duration of whole stream */
@@ -189,6 +190,25 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+static void media_player_set_avsync_mode(MediaPlayerContext* ctx)
+{
+    AVDictionaryEntry* tag;
+
+    if (ctx->video_idx == -1)
+        return;
+
+    if (ctx->audio_idx != -1)
+        ctx->sync_mode = MEDIA_PLAYER_SYNC_MODE_AUDIO;
+    else
+        ctx->sync_mode = MEDIA_PLAYER_SYNC_MODE_SYSTEM;
+
+    if ((tag = av_dict_get(ctx->format_opt, "live_stream", NULL, 0))) {
+        ctx->live_stream = strtol(tag->value, NULL, 0);
+        if (ctx->live_stream)
+            ctx->sync_mode = MEDIA_PLAYER_SYNC_MODE_BYPASS;
+    }
+}
 
 static int media_player_output_get_pollfds(MediaPlayerContext* ctx, struct pollfd* fds, int count)
 {
@@ -289,6 +309,10 @@ static int media_player_queue_cnt(MediaPlayerContext* ctx, int idx)
 
 static inline int media_player_is_need_process(MediaPlayerContext* ctx)
 {
+    if (ctx->state >= MEDIA_PLAYER_STATE_STOPPED)
+        return 0;
+
+    /* As long as one data queue less than nb_queue_max, continue read */
     return ((ctx->audio_idx != -1 &&
             (media_player_queue_cnt(ctx, ctx->audio_idx) <
              ctx->streams[ctx->audio_idx].nb_queue_max)) ||
@@ -353,7 +377,6 @@ static int media_player_read_frame(MediaPlayerContext* ctx)
                 ret = avcodec_send_packet(ctx->streams[i].codec_ctx, &pkt);
             else //todo
                 MEDIA_ERR("don't support offload play\n");
-
             break;
         }
     }
@@ -685,9 +708,9 @@ static void media_player_close_demuxer(MediaPlayerContext* ctx)
 static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filename)
 {
     const AVInputFormat* iformat = NULL;
-    char* name;
     uint32_t seek_point = 0;
     AVDictionaryEntry* tag;
+    char* name;
     int ret;
 
     if ((tag = av_dict_get(ctx->format_opt, "format", NULL, 0))) {
@@ -967,6 +990,8 @@ static int media_player_start(MediaPlayerContext* ctx)
             goto error;
         }
     }
+
+    media_player_set_avsync_mode(ctx);
 
     ctx->state = MEDIA_PLAYER_STATE_STARTED;
     ctx->ts_base = AV_NOPTS_VALUE;
@@ -1404,6 +1429,8 @@ static void media_player_get_timestamp(MediaPlayerContext* ctx, int64_t *ts, int
     switch (ctx->sync_mode) {
     case MEDIA_PLAYER_SYNC_MODE_AUDIO:
         // TODO: get audio timestamp and latency
+        *lat = 0;
+        *ts = av_gettime_relative();
         break;
     case MEDIA_PLAYER_SYNC_MODE_SYSTEM:
         *lat = 0;
@@ -1454,48 +1481,53 @@ static void* media_player_thread(void* arg)
     MediaPlayerContext* ctx = (MediaPlayerContext*)arg;
     MEDIA_INFO("create player thread.\n");
     int64_t pts, ts, latency;
-    int exit = false;
-    int diff;
     PlayerCmd* msg;
-    int ret = 0;
+    AVFrame* frame;
+    int diff;
 
     while (1) {
+        /* monitor all fd events of the player and handle them. */
         media_player_poll(ctx);
 
+        /* process the commands in the cmd queue sequentially.
+         * if a close command is received to exit, break this loop. */
         if ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
             SIMPLEQ_REMOVE_HEAD(&ctx->cmd_queue, entry);
             if (media_player_proc_cmd(ctx, msg))
-                exit = true;
+                break;
         }
 
-        if (ctx->state == MEDIA_PLAYER_STATE_STARTED) {
-            if (media_player_is_need_process(ctx))
-                exit = media_player_proc_dat(ctx);
+        /* read packets and decode, then push them into data queue.
+         * if true is returned (only in pending_stop), break this loop. */
+        if (media_player_is_need_process(ctx) &&
+            media_player_proc_dat(ctx))
+            break;
 
-            if (media_player_queue_cnt(ctx, ctx->video_idx) > 0) {
-                AVFrame* frame = media_player_queue_peek(ctx, ctx->video_idx);
-                media_player_get_timestamp(ctx, &ts, &latency);
+        /* do avsync for the video stream. */
+        if (ctx->state == MEDIA_PLAYER_STATE_STARTED &&
+            media_player_queue_cnt(ctx, ctx->video_idx) > 0) {
+            media_player_get_timestamp(ctx, &ts, &latency);
+            if (ts != AV_NOPTS_VALUE) {
+                frame = media_player_queue_peek(ctx, ctx->video_idx);
                 pts = av_rescale_q(frame->pts, frame->time_base, AV_TIME_BASE_Q);
                 diff = media_player_sync_video(ctx, pts, ts, latency);
                 if (diff >= 0) {
                     if (diff > 0)
                         usleep(diff);
                     frame = media_player_queue_pop(ctx, ctx->video_idx);
-                    ret = media_video_output_write_frame(ctx->video_output, frame);
-                    if (ret < 0)
-                        MEDIA_ERR("video_output write frame failed %d\n", ret);
+                    if (media_video_output_write_frame(ctx->video_output, frame) < 0)
+                        MEDIA_ERR("video_output write frame failed.\n");
                 } else {
                     frame = media_player_queue_pop(ctx, ctx->video_idx);
                     av_frame_free(&frame);
                     MEDIA_ERR("drop frame pts:%"PRId64" ts:%"PRId64" diff:%d\n",
-                              pts, ts, diff);
+                               pts, ts, diff);
                 }
+            } else {
+                frame = media_player_queue_pop(ctx, ctx->video_idx);
+                if (media_video_output_write_frame(ctx->video_output, frame) < 0)
+                    MEDIA_ERR("video_output write frame failed.\n");
             }
-        }
-
-        if (exit) {
-            ctx->state = MEDIA_PLAYER_STATE_IDLE;
-            break;
         }
     }
 
