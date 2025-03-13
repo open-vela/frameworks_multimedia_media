@@ -608,7 +608,6 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         if (ret < 0) {
             if (ctx->nb_streams > 1 && stream_out->type == AVMEDIA_TYPE_AUDIO) {
                 stream_out->index = -1;
-                ctx->nb_streams = 1;
                 continue;
             } else {
                 MEDIA_ERR("Failed to find best stream ret %d, %s.\n", ret, av_err2str(ret));
