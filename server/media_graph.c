@@ -397,6 +397,69 @@ static int media_graph_config(AVFilterContext *ctx, int format, int sample_rate,
     MEDIA_INFO("media_graph_config success. fmt:%d, rate:%d, ch:%d\n", format, sample_rate, channels);
     return 0;
 }
+
+void media_graph_cale_input_status(AVFilterLink *link, int *active)
+{
+    AVFilterContext *ctx = link->src;
+    int i;
+
+    if (ctx->nb_inputs == 0) {
+        *active += avfilter_link_is_active(link);
+        return;
+    }
+
+    for (i = 0; i < ctx->nb_inputs; i++)
+        media_graph_cale_input_status(ctx->inputs[i], active);
+}
+
+bool media_graph_check_sink_status(AVFilterContext *ctx)
+{
+    int active = 0;
+
+    if (!avfilter_link_is_active(ctx->inputs[0]))
+        return false;
+
+    media_graph_cale_input_status(ctx->inputs[0], &active);
+
+    if (active == 0)
+        return true;
+
+    return false;
+}
+
+bool media_graph_has_pending_status(AVFilterContext *ctx)
+{
+    AVFilterLink *slink[MAX_LINKS];
+    AVFilterLink *elink[MAX_LINKS];
+    int index = 0;
+    int ret;
+    int i;
+
+    if (ctx->nb_inputs == 0) { // src filter
+        ret = media_graph_find_active_link(slink, &index, ctx, NULL);
+        if (ret < 0)
+          return ret;
+
+        /* find all end point */
+        for (i = 0; i < index; i++)
+            media_graph_find_elink(&elink[i], slink[i]);
+    } else if (ctx->nb_outputs == 0) { // sink filter
+        elink[0] = ctx->inputs[0];
+        index = 1;
+    } else {
+        av_log(ctx, AV_LOG_ERROR, "%s invalid filter: %s\n", __func__, ctx->name);
+        return false;
+    }
+
+    for (i = 0; i < index; i++) {
+        ret = media_graph_check_sink_status(elink[i]->dst);
+        if (ret == true)
+            return ret;
+    }
+
+    return false;
+}
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -480,17 +543,13 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
     int channels;
     int format;
     int ret = 0;
-    //TODO We should check if the graph has pending status by inlink is_activate
-    // if (media_graph_has_pending_status(priv->graph))
-    //     return ret;
+
     pthread_mutex_lock(&priv->qlock);
     if (TAILQ_EMPTY(&priv->cmdq)) {
-        pthread_mutex_unlock(&priv->qlock);
-        return -EAGAIN;
+        ret = -EAGAIN;
+        goto exit;
     }
     cmd = TAILQ_FIRST(&priv->cmdq);
-    TAILQ_REMOVE(&priv->cmdq, cmd, entries);
-    pthread_mutex_unlock(&priv->qlock);
     if (process) {
             av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
                 cmd->filter->name, cmd->cmd, cmd->arg ? cmd->arg : "_");
@@ -498,6 +557,11 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
             if (!strcmp(cmd->cmd, "link")) {
                 ret = sscanf(cmd->arg, "%*p %*p fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels);
                 if (ret == 3) {
+                    if (media_graph_has_pending_status(cmd->filter)) {
+                        ret = -EAGAIN;
+                        goto exit;
+                    }
+
                     ret = media_graph_config(cmd->filter, format, sample_rate, channels);
                     if (ret < 0)
                         MEDIA_ERR("media_graph_config Failed: %d\n", ret);
@@ -506,12 +570,21 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
             ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
                 cmd->res, 0, cmd->flags);
     }
+
+    TAILQ_REMOVE(&priv->cmdq, cmd, entries);
+    pthread_mutex_unlock(&priv->qlock);
+
     free(cmd->cmd);
     if (!(cmd->flags & FLAG_ARG_PRECOPIED) && cmd->arg)
         free(cmd->arg);
     if (!(cmd->flags & FLAG_RES_PRECOPIED) && cmd->res)
         free(cmd->res);
     free(cmd);
+
+    return 0;
+
+exit:
+    pthread_mutex_unlock(&priv->qlock);
     return ret;
 }
 static int media_graph_uninit(MediadPlugin *ctx)
