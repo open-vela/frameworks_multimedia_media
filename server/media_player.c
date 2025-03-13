@@ -147,6 +147,7 @@ typedef struct MediaPlayerContext {
     pthread_mutex_t     mutex;
     char*               protocol_map;
     struct PlayerCmdQueue cmd_queue;
+    float               volume;
 
     AVDictionary*       format_opt;
     AVDictionary*       global_opts;
@@ -883,6 +884,7 @@ static void media_player_ctx_init(MediaPlayerContext* ctx)
     ctx->sync_mode = MEDIA_PLAYER_SYNC_MODE_SYSTEM;
     ctx->ts_base = AV_NOPTS_VALUE;
     ctx->lat_base = AV_NOPTS_VALUE;
+    ctx->volume = 1.0;
     SIMPLEQ_INIT(&ctx->cmd_queue);
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
@@ -969,6 +971,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
 static int media_player_start(MediaPlayerContext* ctx)
 {
     AVCodecParameters *par;
+    char volume_str[16];
     int ret = 0;
 
     if (ctx->state != MEDIA_PLAYER_STATE_PREPARED &&
@@ -991,6 +994,14 @@ static int media_player_start(MediaPlayerContext* ctx)
     }
 
     media_player_set_avsync_mode(ctx);
+
+    snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
+    ret = media_graph_stream_set_parameter(&ctx->audio_output , "volume", volume_str);
+
+    if (ret < 0) {
+        MEDIA_ERR("media_graph_stream_set_parameter failed.\n");
+        goto error;
+    }
 
     ctx->state = MEDIA_PLAYER_STATE_STARTED;
     ctx->ts_base = AV_NOPTS_VALUE;
@@ -1021,14 +1032,26 @@ static int media_player_volume(MediaPlayerContext* ctx, const char* args, char *
     int ret = -EINVAL;
 
     if (ctx->audio_output) {
-        if (args)
+        if (args) {
             ret = media_graph_stream_set_parameter(&ctx->audio_output , "volume", args);
-        else if (res && res_len)
+            sscanf(args, "%f", &ctx->volume);
+        }
+        else if (res && res_len) {
             ret = media_graph_stream_get_parameter(&ctx->audio_output , "volume", res, res_len);
+            sscanf(res, "%f", &ctx->volume);
+        }
         if (ret < 0)
             MEDIA_ERR("media_player_volume failed.\n");
-    } else
-        MEDIA_ERR("audio_output is NULL.\n");
+    } else {
+        MEDIA_INFO("audio_output is NULL.\n");
+        if (args) {
+            sscanf(args, "%f", &ctx->volume);
+            ret = 0;
+        } else if (res && res_len) {
+            snprintf(res, res_len, "vol:%f", ctx->volume);
+            ret = 0;
+        }
+    }
 
     return ret;
 }
