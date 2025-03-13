@@ -47,6 +47,7 @@
 #define MEDIA_ID_RECORDER 4
 #define MEDIA_ID_SESSION 5
 #define MEDIA_ID_FOCUS 6
+#define MEDIA_ID_TRIGGER 7
 
 /* Error code. */
 /**

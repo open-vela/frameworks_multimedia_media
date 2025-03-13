@@ -87,6 +87,8 @@ const char* media_id_get_name(int id)
         return "session";
     case MEDIA_ID_FOCUS:
         return "focus";
+    case MEDIA_ID_TRIGGER:
+        return "trigger";
     default:
         return "none";
     }

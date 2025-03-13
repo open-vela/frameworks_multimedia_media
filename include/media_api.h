@@ -31,6 +31,7 @@
 #include <media_policy.h>
 #include <media_recorder.h>
 #include <media_session.h>
+#include <media_trigger.h>
 #include <media_utils.h>
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_API_H */
