@@ -191,6 +191,12 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
  * Private Functions
  ****************************************************************************/
 
+static int media_player_is_queue_empty(MediaPlayerContext* ctx)
+{
+    return media_player_queue_cnt(ctx, ctx->audio_idx) == 0 &&
+           media_player_queue_cnt(ctx, ctx->video_idx) == 0;
+}
+
 static void media_player_set_avsync_mode(MediaPlayerContext* ctx)
 {
     AVDictionaryEntry* tag;
@@ -830,8 +836,10 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
     else if (ret == AVERROR_EOF)
         ret = 0;
 
-    ctx->state = MEDIA_PLAYER_STATE_COMPLETED;
-    media_player_event_cb(ctx, MEDIA_EVENT_COMPLETED, ret, NULL);
+    if (media_player_is_queue_empty(ctx)) {
+        ctx->state = MEDIA_PLAYER_STATE_COMPLETED;
+        media_player_event_cb(ctx, MEDIA_EVENT_COMPLETED, ret, NULL);
+    }
 
     if (!ctx->pending_stop)
         return false;
