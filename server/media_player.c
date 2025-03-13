@@ -172,7 +172,6 @@ typedef struct MediaPlayerContext {
 } MediaPlayerContext;
 
 typedef struct MediaPlayerPriv {
-    pthread_mutex_t mutex;
     MediaPlayerContext ctxs[MEDIA_PLAYER_MAX_CNT];
 } MediaPlayerPriv;
 
@@ -1569,20 +1568,11 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
 
 static int media_player_init(MediadPlugin* handle)
 {
-    MediaPlayerPriv* priv = handle->priv;
-
-    pthread_mutex_init(&priv->mutex, NULL);
-    /* TODO: add parse player config, like global options for different stream. */
-
     return 0;
 }
 
 static int media_player_uninit(MediadPlugin* handle)
 {
-    MediaPlayerPriv* priv = handle->priv;
-
-    pthread_mutex_destroy(&priv->mutex);
-
     return 0;
 }
 
@@ -1597,27 +1587,23 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
     MEDIA_INFO("cmd: %s, arg %s, target %s.\n",
                cmd, arg ? arg : "NULL", target ? target : "NULL");
 
-    pthread_mutex_lock(&priv->mutex);
-
     if (!strcmp(cmd, "open")) {
         ret = media_stub_get_stream_name(arg, stream_name, sizeof(stream_name));
         if (ret < 0) {
             MEDIA_ERR("get stream name failed %d\n", ret);
-            goto out;
+            return ret;
         }
 
         MediaPlayerContext* ctx = media_player_get_available_session(priv);
         if (!ctx) {
             MEDIA_ERR("player open failed...\n");
-            ret = -ENOMEM;
-            goto out;
+            return -ENOMEM;
         }
 
         ctx->tran_fd = media_server_get_tran_fd(conn);
         if (ctx->tran_fd < 0) {
             MEDIA_ERR("player get tran fd failed...\n");
-            ret = -EINVAL;
-            goto out;
+            return -EINVAL;
         }
 
         media_server_clean_conn(conn);
@@ -1629,23 +1615,20 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
             ret = av_dict_parse_string(&ctx->global_opts, options, "=", ":", 0);
             if (ret < 0) {
                 MEDIA_ERR("parse global options failed %d\n", ret);
-                goto out;
+                return ret;
             }
         }
 
         ret = media_player_open(ctx, stream_name);
         if (ret < 0)
-            goto out;
+            return ret;
 
         MEDIA_INFO("open %s success...\n", ctx->name);
     } else if (!strcmp(cmd, "dump")) {
         media_player_dump(priv);
     }
 
-out:
-    pthread_mutex_unlock(&priv->mutex);
-
-    return ret;
+    return 0;
 }
 
 MediadPlugin media_player_plugin = {
