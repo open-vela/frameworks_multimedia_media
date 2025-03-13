@@ -406,6 +406,16 @@ int media_proxy_once(void* handle, const char* target, const char* cmd,
             target, cmd, arg, res_len);
         break;
 
+    case MEDIA_ID_TRIGGER:
+        ret = media_parcel_append_printf(&in, "%i%s%s%i%i", priv->type,
+            cmd, arg, apply, res_len);
+        if (ret < 0)
+            goto out;
+
+        if (target)
+            ret = media_parcel_append(&in, target, apply);
+        break;
+
     default:
         goto out;
     }

@@ -666,3 +666,58 @@ int media_recorder_finish_picture(void* handle)
 {
     return media_recorder_close(handle);
 }
+
+void* media_trigger_open(const char* params)
+{
+    return media_open(MEDIA_ID_TRIGGER, params);
+}
+
+int media_trigger_set_event_callback(void* handle, void* cookie, media_event_callback event_cb)
+{
+    return media_set_event_cb(handle, cookie, event_cb);
+}
+
+int media_trigger_load_sound_model(void* handle, void* model, size_t size)
+{
+    if (!handle || !model || size <= 0)
+        return -EINVAL;
+
+    return media_proxy_once(handle, model, "load", NULL, size, NULL, 0);
+}
+
+int media_trigger_start_recognition(void* handle)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_proxy_once(handle, NULL, "start", NULL, 0, NULL, 0);
+}
+
+int media_trigger_stop_recognition(void* handle)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_proxy_once(handle, NULL, "stop", NULL, 0, NULL, 0);
+}
+
+int media_trigger_unload_sound_model(void* handle)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_proxy_once(handle, NULL, "unload", NULL, 0, NULL, 0);
+}
+
+int media_trigger_close(void* handle)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_close(handle, 0);
+}
+
+int media_trigger_get_property(char* property, int len)
+{
+    return media_proxy(MEDIA_ID_TRIGGER, NULL, NULL, "get_property", NULL, 0, property, len);
+}
