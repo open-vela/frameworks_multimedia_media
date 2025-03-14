@@ -134,6 +134,7 @@ typedef struct MediaPlayerContext {
     int                 event;
     int                 cmd_max;
     int                 state;
+    int                 exit;
     int                 loop_count;
     int                 offload;
     int                 pending_stop;
@@ -190,6 +191,11 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+static inline int media_player_is_exit(MediaPlayerContext* ctx)
+{
+    return ctx->exit && ctx->audio_idx == -1 && ctx->video_idx == -1;
+}
 
 static int media_player_is_queue_empty(MediaPlayerContext* ctx)
 {
@@ -268,6 +274,12 @@ static int media_player_on_event_cb(void *udata, int evt, int64_t args)
 
     MEDIA_DEBUG("audio audio_output event: %d", evt);
 
+    if (evt < 0) {
+        MEDIA_INFO("received unlink event form audio_output.");
+        ctx->audio_idx = -1;
+        return 0;
+    }
+
     frame = media_player_queue_pop(ctx, ctx->audio_idx);
     if (!frame)
         frame = media_player_generate_silence_frame(ctx);
@@ -313,7 +325,7 @@ static int media_player_queue_cnt(MediaPlayerContext* ctx, int idx)
     return count;
 }
 
-static inline int media_player_is_need_process(MediaPlayerContext* ctx)
+static inline int media_player_dat_available(MediaPlayerContext* ctx)
 {
     if (ctx->state >= MEDIA_PLAYER_STATE_STOPPED)
         return 0;
@@ -331,6 +343,9 @@ static AVFrame *media_player_queue_pop(MediaPlayerContext* ctx, int idx)
 {
     AVFrame *frame = NULL;
 
+    if (idx < 0)
+        return NULL;
+
     pthread_mutex_lock(&ctx->mutex);
     if (ff_framequeue_queued_frames(&ctx->streams[idx].queue)) {
         frame = ff_framequeue_take(&ctx->streams[idx].queue);
@@ -342,6 +357,9 @@ static AVFrame *media_player_queue_pop(MediaPlayerContext* ctx, int idx)
 static AVFrame *media_player_queue_peek(MediaPlayerContext* ctx, int idx)
 {
     AVFrame *frame = NULL;
+
+    if (idx < 0)
+        return NULL;
 
     pthread_mutex_lock(&ctx->mutex);
     if (ff_framequeue_queued_frames(&ctx->streams[idx].queue)) {
@@ -507,8 +525,6 @@ static int media_player_interrupt(void* opaque)
     fds[0].events     = POLLIN;
     fds[0].revents    = 0;
 
-    pthread_mutex_lock(&ctx->mutex);
-
     media_player_poll_available(ctx, fd);
 
     SIMPLEQ_FOREACH(msg, &ctx->cmd_queue, entry)
@@ -519,7 +535,6 @@ static int media_player_interrupt(void* opaque)
         }
     }
 
-    pthread_mutex_unlock(&ctx->mutex);
     return interrupt;
 }
 
@@ -815,7 +830,7 @@ static void media_player_event_cb(MediaPlayerContext* ctx, int event, int result
         media_player_notify_event(ctx, event, result, extra);
 }
 
-static int media_player_proc_dat(MediaPlayerContext* ctx)
+static void media_player_proc_dat(MediaPlayerContext* ctx)
 {
     int ret;
     ret = media_player_dec_frames(ctx);
@@ -832,7 +847,7 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
     }
 
     if (ret >= 0 || ret == AVERROR_EXIT)
-        return false;
+        return;
     else if (ret == AVERROR_EOF)
         ret = 0;
 
@@ -842,10 +857,9 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
     }
 
     if (!ctx->pending_stop)
-        return false;
+        return;
 
     media_player_stop(ctx);
-    return true;
 }
 
 static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush)
@@ -907,6 +921,7 @@ static void media_player_ctx_release(MediaPlayerContext* ctx)
     ctx->state = MEDIA_PLAYER_STATE_IDLE;
     ctx->audio_idx      = -1;
     ctx->video_idx      = -1;
+    ctx->exit           = 0;
     ctx->loop_count     = 0;
     ctx->nb_streams     = 0;
     ctx->offload        = 0;
@@ -917,10 +932,9 @@ static void media_player_ctx_release(MediaPlayerContext* ctx)
     pthread_mutex_destroy(&ctx->mutex);
 }
 
-static int media_player_close(MediaPlayerContext* ctx)
+static void media_player_close(MediaPlayerContext* ctx)
 {
     int i;
-
     for (i = 0; i < ctx->nb_streams; i++) {
         ff_framequeue_free(&ctx->streams[i].queue);
     }
@@ -932,7 +946,6 @@ static int media_player_close(MediaPlayerContext* ctx)
         av_dict_free(&ctx->global_opts);
 
     av_freep(&ctx->streams);
-    return 0;
 }
 
 static int media_player_pause(MediaPlayerContext* ctx)
@@ -967,7 +980,6 @@ static int media_player_stop(MediaPlayerContext* ctx)
     media_player_close_demuxer(ctx);
 
     ctx->pending_stop = 0;
-    ctx->audio_idx = -1;
     ctx->video_idx = -1;
     ctx->state = MEDIA_PLAYER_STATE_STOPPED;
 
@@ -1078,8 +1090,6 @@ static int media_player_send_cmd(MediaPlayerContext* ctx, const int cmd, const v
     if (data && size)
         memcpy(msg->data, data, size);
 
-    pthread_mutex_lock(&ctx->mutex);
-
     SIMPLEQ_FOREACH(tmp, &ctx->cmd_queue, entry) cnt++;
     if (cnt >= ctx->cmd_max && msg->cmd < MEDIA_PLAYER_CMD_STOP) {
         pthread_mutex_unlock(&ctx->mutex);
@@ -1089,15 +1099,13 @@ static int media_player_send_cmd(MediaPlayerContext* ctx, const int cmd, const v
     }
 
     SIMPLEQ_INSERT_TAIL(&ctx->cmd_queue, msg, entry);
-    pthread_mutex_unlock(&ctx->mutex);
 
     return 0;
 }
 
-static int media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
+static void media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
 {
     uint32_t time, pending_stop;
-    int exit = false;
 
     switch (msg->cmd) {
     case MEDIA_PLAYER_CMD_SET_EVENT:
@@ -1132,11 +1140,12 @@ static int media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
         pending_stop = strtoul(msg->data, NULL, 0);
         if (pending_stop && ctx->state < MEDIA_PLAYER_STATE_STOPPED) {
             ctx->pending_stop = pending_stop;
+            ctx->exit = 1;
             break;
         }
+
         media_player_stop(ctx);
-        media_player_close(ctx);
-        exit = true;
+        ctx->exit = 1;
         break;
     case MEDIA_PLAYER_CMD_STOP:
     case MEDIA_PLAYER_CMD_RESET:
@@ -1147,7 +1156,6 @@ static int media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
     }
 
     av_freep(&msg);
-    return exit;
 }
 
 int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const char* cmd, const char* arg, char* res, int res_len)
@@ -1506,60 +1514,62 @@ static int media_player_sync_video(MediaPlayerContext *ctx, int64_t pts, int64_t
     return 0;
 }
 
+static void media_player_proc_avsync(MediaPlayerContext *ctx)
+{
+    int64_t pts, ts, latency;
+    AVFrame* frame;
+    int diff;
+
+    media_player_get_timestamp(ctx, &ts, &latency);
+    if (ts != AV_NOPTS_VALUE) {
+        frame = media_player_queue_peek(ctx, ctx->video_idx);
+        pts = av_rescale_q(frame->pts, frame->time_base, AV_TIME_BASE_Q);
+        diff = media_player_sync_video(ctx, pts, ts, latency);
+        if (diff >= 0) {
+            if (diff > 0)
+                usleep(diff);
+            frame = media_player_queue_pop(ctx, ctx->video_idx);
+            if (media_video_output_write_frame(ctx->video_output, frame) < 0)
+                MEDIA_ERR("video_output write frame failed.\n");
+        } else {
+            frame = media_player_queue_pop(ctx, ctx->video_idx);
+            av_frame_free(&frame);
+            MEDIA_ERR("drop frame pts:%"PRId64" ts:%"PRId64" diff:%d\n",
+                        pts, ts, diff);
+        }
+    } else {
+        frame = media_player_queue_pop(ctx, ctx->video_idx);
+        if (media_video_output_write_frame(ctx->video_output, frame) < 0)
+            MEDIA_ERR("video_output write frame failed.\n");
+    }
+}
+
 static void* media_player_thread(void* arg)
 {
     MediaPlayerContext* ctx = (MediaPlayerContext*)arg;
     MEDIA_INFO("create player thread.\n");
-    int64_t pts, ts, latency;
     PlayerCmd* msg;
-    AVFrame* frame;
-    int diff;
 
     while (1) {
-        /* monitor all fd events of the player and handle them. */
-        media_player_poll(ctx);
-
-        /* process the commands in the cmd queue sequentially.
-         * if a close command is received to exit, break this loop. */
-        if ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
-            SIMPLEQ_REMOVE_HEAD(&ctx->cmd_queue, entry);
-            if (media_player_proc_cmd(ctx, msg))
-                break;
-        }
-
-        /* read packets and decode, then push them into data queue.
-         * if true is returned (only in pending_stop), break this loop. */
-        if (media_player_is_need_process(ctx) &&
-            media_player_proc_dat(ctx))
+        if (media_player_is_exit(ctx))
             break;
 
-        /* do avsync for the video stream. */
-        if (ctx->state == MEDIA_PLAYER_STATE_STARTED &&
-            media_player_queue_cnt(ctx, ctx->video_idx) > 0) {
-            media_player_get_timestamp(ctx, &ts, &latency);
-            if (ts != AV_NOPTS_VALUE) {
-                frame = media_player_queue_peek(ctx, ctx->video_idx);
-                pts = av_rescale_q(frame->pts, frame->time_base, AV_TIME_BASE_Q);
-                diff = media_player_sync_video(ctx, pts, ts, latency);
-                if (diff >= 0) {
-                    if (diff > 0)
-                        usleep(diff);
-                    frame = media_player_queue_pop(ctx, ctx->video_idx);
-                    if (media_video_output_write_frame(ctx->video_output, frame) < 0)
-                        MEDIA_ERR("video_output write frame failed.\n");
-                } else {
-                    frame = media_player_queue_pop(ctx, ctx->video_idx);
-                    av_frame_free(&frame);
-                    MEDIA_ERR("drop frame pts:%"PRId64" ts:%"PRId64" diff:%d\n",
-                               pts, ts, diff);
-                }
-            } else {
-                frame = media_player_queue_pop(ctx, ctx->video_idx);
-                if (media_video_output_write_frame(ctx->video_output, frame) < 0)
-                    MEDIA_ERR("video_output write frame failed.\n");
-            }
+        media_player_poll(ctx);
+
+        if ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
+            SIMPLEQ_REMOVE_HEAD(&ctx->cmd_queue, entry);
+            media_player_proc_cmd(ctx, msg);
         }
+
+        if (media_player_dat_available(ctx))
+            media_player_proc_dat(ctx);
+
+        if (ctx->state == MEDIA_PLAYER_STATE_STARTED &&
+            media_player_queue_cnt(ctx, ctx->video_idx) > 0)
+            media_player_proc_avsync(ctx);
     }
+
+    media_player_close(ctx);
 
     media_player_ctx_release(ctx);
 
