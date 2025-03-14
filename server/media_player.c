@@ -978,7 +978,6 @@ static int media_player_stop(MediaPlayerContext* ctx)
 static int media_player_start(MediaPlayerContext* ctx)
 {
     AVCodecParameters *par;
-    char volume_str[16];
     int ret = 0;
 
     if (ctx->state != MEDIA_PLAYER_STATE_PREPARED &&
@@ -1002,12 +1001,14 @@ static int media_player_start(MediaPlayerContext* ctx)
 
     media_player_set_avsync_mode(ctx);
 
-    snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
-    ret = media_graph_stream_set_parameter(&ctx->audio_output , "volume", volume_str);
-
-    if (ret < 0) {
-        MEDIA_ERR("media_graph_stream_set_parameter failed.\n");
-        goto error;
+    if (ctx->audio_output) {
+        char volume_str[16] = {0};
+        snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
+        ret = media_graph_stream_set_parameter(&ctx->audio_output , "volume", volume_str);
+        if (ret < 0) {
+            MEDIA_ERR("media_graph_stream_set_parameter failed.\n");
+            goto error;
+        }
     }
 
     ctx->state = MEDIA_PLAYER_STATE_STARTED;
