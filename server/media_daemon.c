@@ -63,6 +63,9 @@ extern media_plugin_t media_session_plugin;
 #ifdef CONFIG_LIB_PFW
 extern media_plugin_t media_policy_plugin;
 #endif
+#ifdef CONFIG_MEDIA_TRIGGER
+extern media_plugin_t media_trigger_plugin;
+#endif
 extern media_plugin_t media_server_plugin;
 
 media_plugin_t* g_media[] = {
@@ -75,6 +78,9 @@ media_plugin_t* g_media[] = {
 #endif
 #ifdef CONFIG_LIB_PFW
     &media_policy_plugin,
+#endif
+#ifdef CONFIG_MEDIA_TRIGGER
+    &media_trigger_plugin,
 #endif
     &media_server_plugin,
 };

@@ -117,4 +117,24 @@ config MEDIA_PROXY_LISTEN_PRIORITY
 
 endif # MEDIA
 
+config MEDIA_TRIGGER
+	bool "Enable media trigger server"
+	default n
+
+if MEDIA_TRIGGER
+
+config MEDIA_TRIGGER_PRIORITY
+	int "Media trigger priority"
+	default 100
+
+config MEDIA_TRIGGER_STACKSIZE
+	int "Media trigger stack size"
+	default 10240
+
+config MEDIA_TRIGGER_MAX_MODEL_NUM
+	int "Media trigger max model num support"
+	default 10
+
+endif # MEDIA TRIGGER
+
 osource "$APPSDIR/frameworks/multimedia/media/pfw/Kconfig"

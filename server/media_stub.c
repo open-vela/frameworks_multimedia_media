@@ -69,7 +69,8 @@ int media_stub_reply(void* cookie, media_parcel* parcel)
 int media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media_parcel* out)
 {
     const char *target = NULL, *cmd = NULL, *arg = NULL;
-    int32_t len = 0, flags = 0, id = 0, ret = 0;
+    int32_t len = 0, flags = 0, id = 0, size = 0, ret = 0;
+    const void* data = NULL;
     char* response = NULL;
 
     media_parcel_read_int32(in, &id);
@@ -130,11 +131,26 @@ int media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media
 
 #endif // CONFIG_LIB_FFMPEG
 
+#ifdef CONFIG_MEDIA_TRIGGER
+    case MEDIA_ID_TRIGGER:
+        media_parcel_read_scanf(in, "%s%s%i%i", &cmd, &arg, &size, &len);
+        if (len > 0)
+            response = zalloc(len);
+
+        if (size > 0)
+            data = media_parcel_read(in, size);
+
+        ret = media_plugin_command(media_plugin_get("media_trigger"), conn, cmd, arg, data, size, response, len);
+        break;
+#endif
+
     default:
         (void)target;
         (void)cmd;
         (void)arg;
+        (void)data;
         (void)len;
+        (void)size;
         (void)flags;
         ret = -ENOSYS;
         break;

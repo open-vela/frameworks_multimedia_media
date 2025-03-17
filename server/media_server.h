@@ -38,6 +38,9 @@ extern "C" {
 
 void* media_get_focus(void);
 void* media_get_server(void);
+#ifdef CONFIG_MEDIA_TRIGGER
+void* media_get_trigger(void);
+#endif
 
 typedef struct media_plugin_t media_plugin_t;
 media_plugin_t* media_plugin_get(const char* name);
@@ -63,6 +66,9 @@ int media_stub_process_command(const char* target, const char* cmd, const char* 
 int media_server_notify(void* handle, void* cookie, media_parcel* parcel);
 int media_server_reply(void* handle, void* cookie, media_parcel* parcel);
 void media_server_finalize(void* handle, void* cookie);
+
+int media_server_get_tran_fd(void* cookie);
+void media_server_clean_conn(void* cookie);
 
 void media_server_set_data(void* cookie, void* data);
 void* media_server_get_data(void* cookie);
