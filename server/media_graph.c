@@ -365,6 +365,10 @@ static int media_graph_pick_formats(AVFilterLink *slink, AVFilterLink *elink, in
         goto pick_values;
     }
 
+    ret = media_graph_query_formats(elink->dst);
+    if (ret < 0)
+        return ret;
+
     cfg = &elink->outcfg;
 
     for (i = 0; i < cfg->formats->nb_formats; i++) {
@@ -434,12 +438,6 @@ static int media_graph_config_link(AVFilterLink *slink, int format, int sample_r
     int ret;
 
     media_graph_find_elink(&elink, slink);
-
-    if (is_player) {
-        ret = media_graph_query_formats(elink->dst);
-        if (ret < 0)
-          return ret;
-    }
 
     ret = media_graph_pick_formats(slink, elink, format, sample_rate, channels, is_player);
     if (ret < 0)
