@@ -455,6 +455,21 @@ void media_server_finalize(void* handle, void* cookie)
     pthread_mutex_unlock(&conn->mutex);
 }
 
+int media_server_get_tran_fd(void* cookie)
+{
+    struct media_server_conn* conn = cookie;
+
+    return conn ? conn->tran_fd : -1;
+}
+
+void media_server_clean_conn(void* cookie)
+{
+    struct media_server_conn* conn = cookie;
+    conn->tran_fd = -EPERM;
+    conn->offset = 0;
+    media_parcel_deinit(&conn->parcel);
+}
+
 void media_server_set_data(void* cookie, void* data)
 {
     struct media_server_conn* conn = cookie;

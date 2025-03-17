@@ -80,6 +80,12 @@ ifneq ($(CONFIG_LIB_PFW),)
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/multimedia/media/pfw/include
 endif
 
+ifneq ($(CONFIG_MEDIA_TRIGGER),)
+   CSRCS     += server/media_trigger.c
+   PRIORITY  += $(CONFIG_MEDIA_TRIGGER_PRIORITY)
+   STACKSIZE += $(CONFIG_MEDIA_TRIGGER_STACKSIZE)
+endif
+
 ifneq ($(CONFIG_MEDIA_TOOL),)
   MAINSRC   += media_tool.c
   PROGNAME  += mediatool

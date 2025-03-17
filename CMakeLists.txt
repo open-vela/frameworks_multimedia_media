@@ -83,6 +83,10 @@ if(CONFIG_MEDIA)
     list(APPEND INCDIR ${NUTTX_APPS_DIR}/frameworks/system/utils/include)
   endif()
 
+  if(CONFIG_MEDIA_TRIGGER)
+    list(APPEND SERVER_SRCS server/media_trigger.c)
+  endif()
+
   if(CONFIG_MEDIA_TOOL)
     nuttx_add_application(
       NAME
