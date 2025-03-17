@@ -86,6 +86,10 @@ if(CONFIG_MEDIA)
       ${INCDIR})
   endif()
 
+  if(CONFIG_MEDIA_TRIGGER)
+    list(APPEND SERVER_SRCS server/media_trigger.c)
+  endif()
+
   if(CONFIG_MEDIA_TOOL)
     nuttx_add_application(
       NAME

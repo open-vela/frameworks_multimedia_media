@@ -38,6 +38,9 @@ extern "C" {
 
 void* media_get_focus(void);
 void* media_get_server(void);
+#ifdef CONFIG_MEDIA_TRIGGER
+void* media_get_trigger(void);
+#endif
 
 typedef struct MediadPlugin MediadPlugin;
 MediadPlugin* media_plugin_get(const char* name);

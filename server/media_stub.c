@@ -69,7 +69,8 @@ int media_stub_reply(void* cookie, media_parcel* parcel)
 int media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media_parcel* out)
 {
     const char *target = NULL, *cmd = NULL, *arg = NULL;
-    int32_t len = 0, flags = 0, id = 0, ret = 0;
+    int32_t len = 0, flags = 0, id = 0, size = 0, ret = 0;
+    const void* data = NULL;
     char* response = NULL;
 
     media_parcel_read_int32(in, &id);

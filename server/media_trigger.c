@@ -129,7 +129,7 @@ static int media_trigger_start_recorder(MediaTriggerContext* ctx, const char* op
 {
     int ret;
 
-    ctx->handle = media_recorder_open("cap");
+    ctx->handle = media_recorder_open("Capture");
     if (!ctx->handle) {
         MEDIA_ERR("Recorder: open failed. \n");
         return -EINVAL;
@@ -478,7 +478,7 @@ static int media_trigger_open(MediaTriggerContext* ctx)
     return 0;
 }
 
-static int media_trigger_handler(struct media_plugin_t* plugin, struct media_server_conn* conn, const char* cmd, const char* arg,
+static int media_trigger_handler(struct MediadPlugin* plugin, struct media_server_conn* conn, const char* cmd, const char* arg,
     const char* data, int size, char* res, int res_len)
 {
     MediaTriggerContext* ctx = NULL;
@@ -509,7 +509,7 @@ static int media_trigger_handler(struct media_plugin_t* plugin, struct media_ser
     return 0;
 }
 
-media_plugin_t media_trigger_plugin = {
+MediadPlugin media_trigger_plugin = {
     .name = "media_trigger",
     .priv_size = sizeof(MediaTriggerContext),
     .priv = NULL,

@@ -66,6 +66,9 @@ extern MediadPlugin media_recorder_plugin;
 extern MediadPlugin media_policy_plugin;
 #endif
 extern MediadPlugin media_server_plugin;
+#ifdef CONFIG_MEDIA_TRIGGER
+extern MediadPlugin media_trigger_plugin;
+#endif
 
 MediadPlugin* g_media[] = {
 #ifdef CONFIG_MEDIA_FOCUS
