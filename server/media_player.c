@@ -276,7 +276,8 @@ static int media_player_on_event_cb(void *udata, int evt, int64_t args)
 
     if (evt < 0) {
         MEDIA_INFO("received unlink event form audio_output.");
-        ctx->audio_idx = -1;
+        if (ctx->state != MEDIA_PLAYER_STATE_PAUSED)
+            ctx->audio_idx = -1;
         return 0;
     }
 

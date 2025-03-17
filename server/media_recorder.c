@@ -573,7 +573,8 @@ static int media_recorder_on_event_cb(void *udata, int evt, int64_t args)
 
     if (evt < 0) {
         MEDIA_INFO("received unlink event form audio_input.\n");
-        ctx->audio_idx = -1;
+        if (ctx->state != MEDIA_RECORDER_STATE_PAUSED)
+            ctx->audio_idx = -1;
         return 0;
     }
 
@@ -590,7 +591,7 @@ static void media_recorder_close_muxer(MediaRecorderContext* ctx)
 {
     int i;
 
-    for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
+    for (i = 0; i < ctx->nb_streams; i++) {
         avcodec_free_context(&ctx->streams[i].enc_ctx);
         ctx->streams[i].sync_pts = 0;
     }
