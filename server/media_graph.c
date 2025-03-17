@@ -60,7 +60,6 @@
 
 typedef struct MediaGraphPriv {
     AVFilterGraph* graph;
-    struct file* filep;
     int fd;
     pid_t tid;
     void* pollfts[MAX_POLL_FILTERS];
@@ -125,7 +124,7 @@ static void media_graph_filter_ready(AVFilterContext* ctx)
     eventfd_t val = 1;
 
     if (priv->tid != gettid())
-        file_write(priv->filep, &val, sizeof(eventfd_t));
+        write(priv->fd, &val, sizeof(eventfd_t));
 }
 
 static void media_graph_log_callback(void* avcl, int level,
@@ -505,10 +504,6 @@ static int media_graph_init(media_plugin_t* ctx)
         ret = -errno;
         goto err;
     }
-
-    ret = fs_getfilep(priv->fd, &priv->filep);
-    if (ret < 0)
-        goto err;
 
     ret = media_graph_load(priv, file);
     if (ret < 0)
