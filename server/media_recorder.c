@@ -330,6 +330,24 @@ out:
     return ret;
 }
 
+static enum AVCodecID media_recorder_find_encoder_id(const char *name, enum AVMediaType type)
+{
+    const AVCodecDescriptor *desc;
+    const AVCodec *codec;
+
+    codec = avcodec_find_encoder_by_name(name);
+
+    if (!codec && (desc = avcodec_descriptor_get_by_name(name)))
+        codec = avcodec_find_encoder(desc->id);
+
+    if (!codec || codec->type != type) {
+        MEDIA_ERR("cannot find proper codec for %s.", name);
+        return AV_CODEC_ID_NONE;
+    }
+
+    return codec->id;
+}
+
 static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 {
     int ret, i, num_sample_fmts, num_samplerates, num_ch_layouts;
@@ -347,13 +365,13 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
     if (ctx->streams[idx].type == AVMEDIA_TYPE_AUDIO) {
         tag = av_dict_get(ctx->format_opt, "audio_codec", NULL, 0);
         if (tag)
-            enc = avcodec_find_encoder(atoi(tag->value));
+            enc = avcodec_find_encoder(media_recorder_find_encoder_id(tag->value, AVMEDIA_TYPE_AUDIO));
         else
             enc = avcodec_find_encoder(ctx->format_ctx->oformat->audio_codec);
     } else {
         tag = av_dict_get(ctx->format_opt, "video_codec", NULL, 0);
         if (tag)
-            enc = avcodec_find_encoder(atoi(tag->value));
+            enc = avcodec_find_encoder(media_recorder_find_encoder_id(tag->value, AVMEDIA_TYPE_VIDEO));
         else
             enc = avcodec_find_encoder(ctx->format_ctx->oformat->video_codec);
     }
