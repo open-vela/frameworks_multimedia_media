@@ -169,7 +169,7 @@ typedef struct MediaPlayerContext {
     enum MediaPlayerSyncMode sync_mode;
 
     /* audio or video output */
-    MediaGraphStream*    audio_output;
+    MediaGraphAudio*    audio_output;
     MediaVOutputContext* video_output;
 } MediaPlayerContext;
 
@@ -959,7 +959,7 @@ static int media_player_pause(MediaPlayerContext* ctx)
     }
     pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_output)
-        media_graph_stream_close(&ctx->audio_output);
+        media_graph_audio_close(&ctx->audio_output);
     pthread_mutex_unlock(&ctx->mutex);
 
     media_player_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
@@ -975,7 +975,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
 
     pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_output)
-        media_graph_stream_close(&ctx->audio_output);
+        media_graph_audio_close(&ctx->audio_output);
     pthread_mutex_unlock(&ctx->mutex);
 
     media_player_close_demuxer(ctx);
@@ -1001,11 +1001,11 @@ static int media_player_start(MediaPlayerContext* ctx)
 
     if (ctx->audio_idx >= 0 && !ctx->audio_output) {
         AVCodecContext* codec_ctx = ctx->streams[ctx->audio_idx].codec_ctx;
-        ret = media_graph_stream_open(&ctx->audio_output, ctx->name,
+        ret = media_graph_audio_open(&ctx->audio_output, ctx->name,
             codec_ctx->sample_fmt, codec_ctx->sample_rate,
             codec_ctx->ch_layout.nb_channels, media_player_on_event_cb, ctx);
         if (ret < 0) {
-            MEDIA_ERR("media_graph_stream_open failed.\n");
+            MEDIA_ERR("media_graph_audio_open failed.\n");
             ret = AVERROR(EINVAL);
             goto error;
         }
@@ -1016,9 +1016,9 @@ static int media_player_start(MediaPlayerContext* ctx)
     if (ctx->audio_output) {
         char volume_str[16] = {0};
         snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
-        ret = media_graph_stream_set_parameter(&ctx->audio_output , "volume", volume_str);
+        ret = media_graph_audio_set_parameter(&ctx->audio_output , "volume", volume_str);
         if (ret < 0) {
-            MEDIA_ERR("media_graph_stream_set_parameter failed.\n");
+            MEDIA_ERR("media_graph_audio_set_parameter failed.\n");
             goto error;
         }
     }
@@ -1053,11 +1053,11 @@ static int media_player_volume(MediaPlayerContext* ctx, const char* args, char *
 
     if (ctx->audio_output) {
         if (args) {
-            ret = media_graph_stream_set_parameter(&ctx->audio_output , "volume", args);
+            ret = media_graph_audio_set_parameter(&ctx->audio_output , "volume", args);
             sscanf(args, "%f", &ctx->volume);
         }
         else if (res && res_len) {
-            ret = media_graph_stream_get_parameter(&ctx->audio_output , "volume", res, res_len);
+            ret = media_graph_audio_get_parameter(&ctx->audio_output , "volume", res, res_len);
             sscanf(res, "%f", &ctx->volume);
         }
         if (ret < 0)

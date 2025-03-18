@@ -96,10 +96,10 @@ typedef struct MediaFilterPriv {
     bool event;
 } MediaFilterPriv;
 
-typedef struct MediaGraphStream {
+typedef struct MediaGraphAudio {
     AVFilterContext *src;
     void *link_handle;
-} MediaGraphStream;
+} MediaGraphAudio;
 
 /****************************************************************************
  * Private Data
@@ -1027,13 +1027,13 @@ MediadPlugin media_graph_plugin = {
  * Public Functions
  ****************************************************************************/
 
-int media_graph_stream_open(MediaGraphStream** pctx,
-                            const char* stream,
-                            int format, int sample_rate, int channels,
-                            int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
+int media_graph_audio_open(MediaGraphAudio** pctx,
+                           const char* stream,
+                           int format, int sample_rate, int channels,
+                           int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
 {
     MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphStream *ctx;
+    MediaGraphAudio *ctx;
     char stream_name[64] = { 0 };
     char msg[128] = { 0 };
     int ret;
@@ -1077,10 +1077,10 @@ fail:
     return ret;
 }
 
-int media_graph_stream_close(MediaGraphStream** pctx)
+int media_graph_audio_close(MediaGraphAudio** pctx)
 {
     MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphStream *ctx = *pctx;
+    MediaGraphAudio *ctx = *pctx;
     int ret;
 
     if (!pctx || !ctx || !ctx->src)
@@ -1101,10 +1101,10 @@ int media_graph_stream_close(MediaGraphStream** pctx)
     return ret;
 }
 
-int media_graph_stream_set_parameter(MediaGraphStream** pctx, const char* param, const char* value)
+int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, const char* value)
 {
     MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphStream *ctx = *pctx;
+    MediaGraphAudio *ctx = *pctx;
     char msg[128];
     int ret;
 
@@ -1120,10 +1120,10 @@ int media_graph_stream_set_parameter(MediaGraphStream** pctx, const char* param,
     return ret;
 }
 
-int media_graph_stream_get_parameter(MediaGraphStream** pctx, const char* key, char *res, int res_len)
+int media_graph_audio_get_parameter(MediaGraphAudio** pctx, const char* key, char *res, int res_len)
 {
     MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphStream *ctx = *pctx;
+    MediaGraphAudio *ctx = *pctx;
     char msg[128];
     int ret;
 

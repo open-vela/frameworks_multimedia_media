@@ -127,7 +127,7 @@ typedef struct MediaRecorderContext {
     const AVOutputFormat*   format;         /* output format */
     struct RecorderCmdQueue cmd_queue;
 
-    MediaGraphStream*       audio_input;
+    MediaGraphAudio*       audio_input;
 } MediaRecorderContext;
 
 typedef struct MediaRecorderPriv {
@@ -781,7 +781,7 @@ static int media_recorder_pause(MediaRecorderContext* ctx)
 
     pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_input)
-        media_graph_stream_close(&ctx->audio_input);
+        media_graph_audio_close(&ctx->audio_input);
     pthread_mutex_unlock(&ctx->mutex);
 
     media_recorder_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
@@ -796,7 +796,7 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
 
     pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_input)
-        media_graph_stream_close(&ctx->audio_input);
+        media_graph_audio_close(&ctx->audio_input);
     pthread_mutex_unlock(&ctx->mutex);
 
     if (ctx->state == MEDIA_RECORDER_STATE_PREPARED || ctx->state == MEDIA_RECORDER_STATE_COMPLETED)
@@ -847,16 +847,16 @@ static int media_recorder_start(MediaRecorderContext* ctx)
     }
 
     if (!ctx->audio_input) {
-        ret = media_graph_stream_open(&ctx->audio_input, ctx->name,
-                                      ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
-                                      ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
-                                      ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
-                                      media_recorder_on_event_cb, ctx);
+        ret = media_graph_audio_open(&ctx->audio_input, ctx->name,
+                                     ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
+                                     ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
+                                     ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
+                                     media_recorder_on_event_cb, ctx);
         if (ret < 0) {
-            MEDIA_ERR("media_graph_stream_open failed, ret %d.\n", ret);
+            MEDIA_ERR("media_graph_audio_open failed, ret %d.\n", ret);
             goto out;
         } else
-            MEDIA_INFO("media_graph_stream_open success.\n");
+            MEDIA_INFO("media_graph_audio_open success.\n");
     }
 
     ctx->state = MEDIA_RECORDER_STATE_STARTED;

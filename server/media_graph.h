@@ -41,12 +41,12 @@
  *      @evt: event type
  *      @args: event arguments
  */
-typedef struct MediaGraphStream MediaGraphStream;
+typedef struct MediaGraphAudio MediaGraphAudio;
 
-int media_graph_stream_open(MediaGraphStream** pctx,
-                            const char* stream_type,
-                            int format, int sample_rate, int channels,
-                            int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata);
+int media_graph_audio_open(MediaGraphAudio** pctx,
+                           const char* stream_type,
+                           int format, int sample_rate, int channels,
+                           int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata);
 /*
  * Release a audio stream.
  * @ctx: [in,out] audio stream context
@@ -54,7 +54,7 @@ int media_graph_stream_open(MediaGraphStream** pctx,
  *
  * Note that it must also be called during pause. Get it again after resume.
  */
-int media_graph_stream_close(MediaGraphStream** pctx);
+int media_graph_audio_close(MediaGraphAudio** pctx);
 
 /*
  * Set stream parameter.
@@ -63,7 +63,7 @@ int media_graph_stream_close(MediaGraphStream** pctx);
  * @value: [in] parameter value
  * @return: 0 on success, negative value on error
  */
-int media_graph_stream_set_parameter(MediaGraphStream** pctx, const char* param, const char* value);
+int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, const char* value);
 
 /*
  * Get stream parameter value.
@@ -73,6 +73,6 @@ int media_graph_stream_set_parameter(MediaGraphStream** pctx, const char* param,
  * @res_len: [in] parameter value length
  * @return: 0 on success, negative value on error
  */
-int media_graph_stream_get_parameter(MediaGraphStream** pctx, const char* key, char* res, int res_len);
+int media_graph_audio_get_parameter(MediaGraphAudio** pctx, const char* key, char* res, int res_len);
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_GRAPH_H */
