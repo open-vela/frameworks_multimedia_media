@@ -147,7 +147,7 @@ static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollf
 
 static inline int media_recorder_is_exit(MediaRecorderContext* ctx)
 {
-    return ctx->exit && ctx->audio_idx == -1 && ctx->video_idx == -1;;
+    return ctx->exit && (!ctx->audio_input || ctx->audio_idx == -1);
 }
 
 static void media_recorder_notify_finalize(MediaRecorderContext* ctx)
@@ -631,7 +631,7 @@ static void media_recorder_clean(MediaRecorderContext* ctx)
     if (ctx->state != MEDIA_RECORDER_STATE_STOPPED) {
         media_recorder_close_muxer(ctx);
         ctx->state = MEDIA_RECORDER_STATE_STOPPED;
-        media_recorder_notify_event(ctx, MEDIA_EVENT_STOPPED, 0, NULL);
+        media_recorder_event_cb(ctx, MEDIA_EVENT_STOPPED, 0, NULL);
     }
 }
 
@@ -740,8 +740,8 @@ out:
 
     media_recorder_clear_queue(ctx, MEDIA_RECORDER_DATA_QUEUE_IDX);
     ctx->state = MEDIA_RECORDER_STATE_COMPLETED;
-    media_recorder_notify_event(ctx, MEDIA_EVENT_COMPLETED,
-                                ret == AVERROR_EOF ? 0 : ret, NULL);
+    media_recorder_event_cb(ctx, MEDIA_EVENT_COMPLETED,
+                            ret == AVERROR_EOF ? 0 : ret, NULL);
     media_recorder_clean(ctx);
     return ret;
 }
@@ -852,13 +852,14 @@ static int media_recorder_start(MediaRecorderContext* ctx)
                                       ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
                                       ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
                                       media_recorder_on_event_cb, ctx);
-        if (ret < 0)
+        if (ret < 0) {
             MEDIA_ERR("media_graph_stream_open failed, ret %d.\n", ret);
-        else {
+            goto out;
+        } else
             MEDIA_INFO("media_graph_stream_open success.\n");
-            ctx->state = MEDIA_RECORDER_STATE_STARTED;
-        }
     }
+
+    ctx->state = MEDIA_RECORDER_STATE_STARTED;
 
 out:
     media_recorder_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);

@@ -194,7 +194,7 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
 
 static inline int media_player_is_exit(MediaPlayerContext* ctx)
 {
-    return ctx->exit && ctx->audio_idx == -1 && ctx->video_idx == -1;
+    return ctx->exit && (!ctx->audio_output || ctx->audio_idx == -1);
 }
 
 static int media_player_is_queue_empty(MediaPlayerContext* ctx)
