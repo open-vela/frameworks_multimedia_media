@@ -545,10 +545,6 @@ static int media_focus_init(media_plugin_t* ctx)
         goto err;
     buf[MAX_LEN - 1] = '\0';
 
-    focus = zalloc(sizeof(media_focus));
-    if (focus == NULL)
-        goto err;
-
     while (fgets(buf, MAX_LEN - 1, fp) != NULL) {
 
         // step 1: remove line and change line symbol from the buf reader result
