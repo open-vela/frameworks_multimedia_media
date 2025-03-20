@@ -609,7 +609,7 @@ void media_focus_debug_stack_display(void)
     app_focus_stack_display(focus->stack);
 }
 
-int media_focus_debug_stack_return(media_focus_id* p_focus_list, int num)
+int media_focus_debug_stack_return(app_focus_id* p_focus_list, int num)
 {
     media_focus* focus;
 
@@ -617,7 +617,7 @@ int media_focus_debug_stack_return(media_focus_id* p_focus_list, int num)
     if (!focus)
         return -EINVAL;
 
-    return app_focus_stack_return(focus->stack, (app_focus_id*)p_focus_list, num);
+    return app_focus_stack_return(focus->stack, p_focus_list, num);
 }
 
 static int media_focus_handler(media_plugin_t* ctx, struct media_server_conn* conn, const char* name,
