@@ -70,10 +70,10 @@ int media_graph_handler(media_plugin_t* ctx, struct media_server_conn* conn, con
 /****************************************************************************
  * Focus Functions
  ****************************************************************************/
-typedef struct media_focus_id media_focus_id;
+typedef struct app_focus_id app_focus_id;
 
 void media_focus_debug_stack_display(void);
-int media_focus_debug_stack_return(media_focus_id* focus_list, int num);
+int media_focus_debug_stack_return(app_focus_id* focus_list, int num);
 
 /****************************************************************************
  * Policy Functions
