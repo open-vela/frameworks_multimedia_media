@@ -270,7 +270,7 @@ static int media_policy_init(media_plugin_t* ctx)
         CONFIG_MEDIA_SERVER_CONFIG_PATH "criteria.txt",
         CONFIG_MEDIA_SERVER_CONFIG_PATH "settings.pfw"
     };
-    const pfw_plugin_def_t media_policy_plugins[] = {
+    pfw_plugin_def_t media_policy_plugins[] = {
         { "FFmpegCommand", NULL, pfw_ffmpeg_command_callback },
         { "SetParameter", NULL, pfw_set_parameter_callback }
     };
