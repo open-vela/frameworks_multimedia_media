@@ -21,34 +21,34 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <poll.h>
 
 #include "media_common.h"
 #include "media_video_output.h"
 
 #include "libavcodec/avcodec.h"
+#include "libavdevice/avdevice.h"
 #include "libavformat/avformat.h"
 #include "libavutil/imgutils.h"
 #include "libavutil/pixdesc.h"
 #include "libswscale/swscale.h"
-#include "libavdevice/avdevice.h"
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
 typedef struct MediaVOutputContext {
-    AVFormatContext*    fmt_ctx;
-    struct SwsContext*  sws_ctx;
+    AVFormatContext* fmt_ctx;
+    struct SwsContext* sws_ctx;
 
-    enum AVPixelFormat  pix_fmt;        /**< output pixel format*/
-    int                 width;          /**< output frame width */
-    int                 height;         /**< output frame width */
+    enum AVPixelFormat pix_fmt; /**< output pixel format*/
+    int width; /**< output frame width */
+    int height; /**< output frame width */
 
-    int                 started;
-    int                 brescale;
+    int started;
+    int brescale;
 } MediaVOutputContext;
 
 /****************************************************************************
@@ -74,8 +74,8 @@ static int media_video_output_scale(MediaVOutputContext* ctx, AVFrame* frame, AV
     }
 
     ret = sws_scale(ctx->sws_ctx, (const uint8_t* const*)frame->data,
-                    frame->linesize, 0, frame->height,
-                    dst_frame->data, dst_frame->linesize);
+        frame->linesize, 0, frame->height,
+        dst_frame->data, dst_frame->linesize);
     if (ret < 0) {
         MEDIA_ERR("Failed to scale frame\n");
         goto err;
@@ -90,8 +90,8 @@ err:
 static int media_video_output_scale_init(MediaVOutputContext* ctx, AVFrame* frame)
 {
     ctx->sws_ctx = sws_getContext(frame->width, frame->height, frame->format,
-                                  ctx->width, ctx->height, ctx->pix_fmt,
-                                  SWS_BILINEAR, NULL, NULL, NULL);
+        ctx->width, ctx->height, ctx->pix_fmt,
+        SWS_BILINEAR, NULL, NULL, NULL);
     if (!ctx->sws_ctx) {
         MEDIA_ERR("Failed to allocate sws context\n");
         return AVERROR(EINVAL);
@@ -109,7 +109,7 @@ static void media_video_output_scale_uninit(MediaVOutputContext* ctx)
 }
 
 static int media_video_output_control_message(struct AVFormatContext* s, int type,
-                                              void* data, size_t data_size)
+    void* data, size_t data_size)
 {
     MEDIA_INFO("VOutput control message: type = %d\n", type);
     return 0;
@@ -147,9 +147,7 @@ static int media_video_output_start(MediaVOutputContext* ctx, AVFrame* frame)
         return ret;
     }
 
-    if (frame->width != ctx->width ||
-        frame->height != ctx->height||
-        frame->format != ctx->pix_fmt) {
+    if (frame->width != ctx->width || frame->height != ctx->height || frame->format != ctx->pix_fmt) {
         ret = media_video_output_scale_init(ctx, frame);
         if (ret < 0) {
             MEDIA_ERR("Failed to init scale %d.\n", ret);
@@ -181,8 +179,8 @@ int media_video_output_get_pollfd(MediaVOutputContext* ctx, struct pollfd* fds, 
     int ret = 0;
     int n = 0;
     ret = avdevice_app_to_dev_control_message(ctx->fmt_ctx,
-                                              AV_APP_TO_DEV_GET_POLLFD,
-                                              fds, (count - n) * sizeof(struct pollfd));
+        AV_APP_TO_DEV_GET_POLLFD,
+        fds, (count - n) * sizeof(struct pollfd));
     if (ret > 0)
         n += ret;
     return n;
@@ -191,8 +189,8 @@ int media_video_output_get_pollfd(MediaVOutputContext* ctx, struct pollfd* fds, 
 int media_video_output_poll_available(MediaVOutputContext* ctx, struct pollfd* fds)
 {
     return avdevice_app_to_dev_control_message(ctx->fmt_ctx,
-                                               AV_APP_TO_DEV_POLL_AVAILABLE,
-                                               fds, sizeof(struct pollfd));
+        AV_APP_TO_DEV_POLL_AVAILABLE,
+        fds, sizeof(struct pollfd));
 }
 
 int media_video_output_write_frame(MediaVOutputContext* ctx, AVFrame* frame)

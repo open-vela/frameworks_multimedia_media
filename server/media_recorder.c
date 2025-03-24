@@ -54,11 +54,11 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MEDIA_RECORDER_CMD_QUEUE_IDX  (1 << 0)
+#define MEDIA_RECORDER_CMD_QUEUE_IDX (1 << 0)
 #define MEDIA_RECORDER_DATA_QUEUE_IDX (1 << 1)
 
-#define MEDIA_RECORDER_MAX_CNT         10
-#define MEDIA_RECORDER_CMD_QUEUE_MAX   16
+#define MEDIA_RECORDER_MAX_CNT 10
+#define MEDIA_RECORDER_CMD_QUEUE_MAX 16
 #define MEDIA_RECORDER_DATA_QUEUE_SIZE 4
 
 /****************************************************************************
@@ -107,27 +107,27 @@ typedef struct OutputStream {
 
 typedef struct MediaRecorderContext {
     /* communication with media client */
-    int                     tran_fd;
-    int                     notify_fd;
-    uint32_t                offset;
-    media_parcel            parcel;
+    int tran_fd;
+    int notify_fd;
+    uint32_t offset;
+    media_parcel parcel;
 
-    int                     event;
-    int                     cmd_max;
-    int                     state;
-    int                     exit;
-    int                     audio_idx;
-    int                     video_idx;
-    char                    name[64];
-    uint32_t                nb_streams;     /* total stream count */
-    pthread_mutex_t         mutex;
-    OutputStream*           streams;        /* output stream */
-    AVDictionary*           format_opt;     /* format options */
-    AVFormatContext*        format_ctx;     /* output format context */
-    const AVOutputFormat*   format;         /* output format */
+    int event;
+    int cmd_max;
+    int state;
+    int exit;
+    int audio_idx;
+    int video_idx;
+    char name[64];
+    uint32_t nb_streams; /* total stream count */
+    pthread_mutex_t mutex;
+    OutputStream* streams; /* output stream */
+    AVDictionary* format_opt; /* format options */
+    AVFormatContext* format_ctx; /* output format context */
+    const AVOutputFormat* format; /* output format */
     struct RecorderCmdQueue cmd_queue;
 
-    MediaGraphAudio*       audio_input;
+    MediaGraphAudio* audio_input;
 } MediaRecorderContext;
 
 typedef struct MediaRecorderPriv {
@@ -155,12 +155,12 @@ static void media_recorder_notify_finalize(MediaRecorderContext* ctx)
     if (ctx->notify_fd > 0) {
         close(ctx->notify_fd);
         ctx->notify_fd = 0;
-        ctx->offset    = 0;
+        ctx->offset = 0;
     }
 }
 
 static int media_recorder_notify_event(MediaRecorderContext* ctx, int event,
-                                       int result, const char* extra)
+    int result, const char* extra)
 {
     media_parcel notify;
     int ret = -EINVAL;
@@ -175,7 +175,7 @@ static int media_recorder_notify_event(MediaRecorderContext* ctx, int event,
 }
 
 static void media_recorder_event_cb(MediaRecorderContext* ctx, int event,
-                                    int result, const char* extra)
+    int result, const char* extra)
 {
     if (ctx->event)
         media_recorder_notify_event(ctx, event, result, extra);
@@ -199,8 +199,7 @@ static bool media_recorder_dat_valid(MediaRecorderContext* ctx)
 {
     int i;
 
-    if (ctx->state != MEDIA_RECORDER_STATE_STARTED &&
-        ctx->state != MEDIA_RECORDER_STATE_PAUSED)
+    if (ctx->state != MEDIA_RECORDER_STATE_STARTED && ctx->state != MEDIA_RECORDER_STATE_PAUSED)
         return false;
 
     for (i = 0; i < ctx->nb_streams; i++) {
@@ -330,10 +329,10 @@ out:
     return ret;
 }
 
-static enum AVCodecID media_recorder_find_encoder_id(const char *name, enum AVMediaType type)
+static enum AVCodecID media_recorder_find_encoder_id(const char* name, enum AVMediaType type)
 {
-    const AVCodecDescriptor *desc;
-    const AVCodec *codec;
+    const AVCodecDescriptor* desc;
+    const AVCodec* codec;
 
     codec = avcodec_find_encoder_by_name(name);
 
@@ -352,9 +351,9 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 {
     int ret, i, num_sample_fmts, num_samplerates, num_ch_layouts;
     int width, height, bitrate = -1, vbr = -1, level = -1;
-    const enum AVSampleFormat *sample_fmts = NULL;
-    const AVChannelLayout *ch_layouts = NULL;
-    const int *supported_samplerates = NULL;
+    const enum AVSampleFormat* sample_fmts = NULL;
+    const AVChannelLayout* ch_layouts = NULL;
+    const int* supported_samplerates = NULL;
     int sample_rate, sample_fmt;
     AVChannelLayout ch_layout;
     AVDictionary* dict = NULL;
@@ -383,7 +382,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 
     // get audio sample_format
     ret = avcodec_get_supported_config(NULL, enc, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0,
-                                       (const void**)&sample_fmts, &num_sample_fmts);
+        (const void**)&sample_fmts, &num_sample_fmts);
     if (ret < 0) {
         MEDIA_ERR("get supported sample_format config failed\n");
         return ret;
@@ -398,7 +397,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 
         if (i == num_sample_fmts && num_sample_fmts != 0) {
             MEDIA_ERR("sample format %d is not supported by the encoder (%s) \n",
-                      sample_fmt, enc->name);
+                sample_fmt, enc->name);
             return AVERROR(EINVAL);
         }
     } else {
@@ -412,7 +411,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 
     // get audio sample_rate
     ret = avcodec_get_supported_config(NULL, enc, AV_CODEC_CONFIG_SAMPLE_RATE, 0,
-                                       (const void**)&supported_samplerates, &num_samplerates);
+        (const void**)&supported_samplerates, &num_samplerates);
     if (ret < 0) {
         MEDIA_ERR("get supported sample_rate config failed\n");
         return ret;
@@ -427,7 +426,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 
         if (i == num_samplerates && num_samplerates != 0) {
             MEDIA_ERR("sample rate %d is not supported by the encoder (%s) \n",
-                      sample_rate, enc->name);
+                sample_rate, enc->name);
             return AVERROR(EINVAL);
         }
     } else {
@@ -441,7 +440,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 
     // get audio channel_layout
     ret = avcodec_get_supported_config(NULL, enc, AV_CODEC_CONFIG_CHANNEL_LAYOUT, 0,
-                                       (const void**)&ch_layouts, &num_ch_layouts);
+        (const void**)&ch_layouts, &num_ch_layouts);
     if (ret < 0) {
         MEDIA_ERR("get supported channel layout config failed\n");
         return ret;
@@ -460,7 +459,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 
         if (i == num_ch_layouts && num_ch_layouts != 0) {
             MEDIA_ERR("channel %d is not supported by the encoder (%s) \n",
-                      ch_layout.nb_channels, enc->name);
+                ch_layout.nb_channels, enc->name);
             return AVERROR(EINVAL);
         }
     } else {
@@ -493,12 +492,12 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
     }
 
     if (ctx->streams[idx].type == AVMEDIA_TYPE_AUDIO) {
-        ctx->streams[idx].enc_ctx->sample_fmt  = sample_fmt;
+        ctx->streams[idx].enc_ctx->sample_fmt = sample_fmt;
         ctx->streams[idx].enc_ctx->sample_rate = sample_rate;
         ctx->streams[idx].enc_ctx->ch_layout = ch_layout;
         ctx->streams[idx].enc_ctx->time_base = (AVRational) { 1, sample_rate };
     } else {
-        ctx->streams[idx].enc_ctx->width  = width;
+        ctx->streams[idx].enc_ctx->width = width;
         ctx->streams[idx].enc_ctx->height = height;
     }
 
@@ -552,17 +551,17 @@ static int media_recorder_init_stream(MediaRecorderContext* ctx)
     // init output stream by stream type.
     // a: only audio, v: only video, others: audio and video
     if (ctx->name[0] == 'a') {
-        stream_cnt     = 1;
-        types[0]       = AVMEDIA_TYPE_AUDIO;
+        stream_cnt = 1;
+        types[0] = AVMEDIA_TYPE_AUDIO;
         ctx->audio_idx = 0;
     } else if (ctx->name[0] == 'v') {
-        stream_cnt     = 1;
-        types[0]       = AVMEDIA_TYPE_VIDEO;
+        stream_cnt = 1;
+        types[0] = AVMEDIA_TYPE_VIDEO;
         ctx->video_idx = 0;
     } else {
-        stream_cnt     = 2;
-        types[0]       = AVMEDIA_TYPE_AUDIO;
-        types[1]       = AVMEDIA_TYPE_VIDEO;
+        stream_cnt = 2;
+        types[0] = AVMEDIA_TYPE_AUDIO;
+        types[1] = AVMEDIA_TYPE_VIDEO;
         ctx->audio_idx = 0;
         ctx->video_idx = 1;
     }
@@ -573,7 +572,7 @@ static int media_recorder_init_stream(MediaRecorderContext* ctx)
 
     for (i = 0; i < stream_cnt; i++) {
         ctx->streams[i].index = i;
-        ctx->streams[i].type  = types[i];
+        ctx->streams[i].type = types[i];
         ff_framequeue_init(&ctx->streams[i].queue, NULL);
         ctx->streams[i].nb_queue_max = MEDIA_RECORDER_DATA_QUEUE_SIZE;
     }
@@ -583,7 +582,7 @@ static int media_recorder_init_stream(MediaRecorderContext* ctx)
     return 0;
 }
 
-static int media_recorder_on_event_cb(void *udata, int evt, int64_t args)
+static int media_recorder_on_event_cb(void* udata, int evt, int64_t args)
 {
     MediaRecorderContext* ctx = (MediaRecorderContext*)udata;
     AVFrame* in_frame = (AVFrame*)(uintptr_t)args;
@@ -642,9 +641,9 @@ static int media_recorder_interrupt(void* opaque)
     int interrupt = 0;
     struct pollfd fds[1];
     struct pollfd* fd = &fds[0];
-    fds[0].fd         = ctx->tran_fd;
-    fds[0].events     = POLLIN;
-    fds[0].revents    = 0;
+    fds[0].fd = ctx->tran_fd;
+    fds[0].events = POLLIN;
+    fds[0].revents = 0;
 
     media_recorder_poll_available(ctx, fd);
 
@@ -681,7 +680,7 @@ static int media_recorder_open_muxer(MediaRecorderContext* ctx, const char* file
     }
 
     cb.callback = media_recorder_interrupt;
-    cb.opaque   = ctx;
+    cb.opaque = ctx;
 
     ret = avio_open2(&ctx->format_ctx->pb, filename, AVIO_FLAG_WRITE, &cb, &dict);
     av_dict_free(&dict);
@@ -713,14 +712,14 @@ static int media_recorder_proc_dat(MediaRecorderContext* ctx)
         frame->pict_type = AV_PICTURE_TYPE_NONE;
 
         /* user request stop, flush code which data = 0 */
-        if (!frame->data[0]){
+        if (!frame->data[0]) {
             MEDIA_INFO("reveice empty frame\n");
             av_frame_free(&frame);
         } else if (ctx->state == MEDIA_RECORDER_STATE_PAUSED) {
             if (ctx->streams[i].type == AVMEDIA_TYPE_AUDIO)
                 ctx->streams[i].sync_pts += frame->nb_samples;
             else
-                ctx->streams[i].sync_pts ++;
+                ctx->streams[i].sync_pts++;
             av_frame_free(&frame);
             continue;
         }
@@ -741,7 +740,7 @@ out:
     media_recorder_clear_queue(ctx, MEDIA_RECORDER_DATA_QUEUE_IDX);
     ctx->state = MEDIA_RECORDER_STATE_COMPLETED;
     media_recorder_event_cb(ctx, MEDIA_EVENT_COMPLETED,
-                            ret == AVERROR_EOF ? 0 : ret, NULL);
+        ret == AVERROR_EOF ? 0 : ret, NULL);
     media_recorder_clean(ctx);
     return ret;
 }
@@ -830,8 +829,7 @@ static int media_recorder_start(MediaRecorderContext* ctx)
     int ret = AVERROR(EPERM);
     int i;
 
-    if (ctx->state != MEDIA_RECORDER_STATE_PREPARED &&
-        ctx->state != MEDIA_RECORDER_STATE_PAUSED)
+    if (ctx->state != MEDIA_RECORDER_STATE_PREPARED && ctx->state != MEDIA_RECORDER_STATE_PAUSED)
         goto out;
 
     if (ctx->state == MEDIA_RECORDER_STATE_PREPARED) {
@@ -848,10 +846,10 @@ static int media_recorder_start(MediaRecorderContext* ctx)
 
     if (!ctx->audio_input) {
         ret = media_graph_audio_open(&ctx->audio_input, ctx->name,
-                                     ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
-                                     ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
-                                     ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
-                                     media_recorder_on_event_cb, ctx);
+            ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
+            ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
+            ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
+            media_recorder_on_event_cb, ctx);
         if (ret < 0) {
             MEDIA_ERR("media_graph_audio_open failed, ret %d.\n", ret);
             goto out;
@@ -956,7 +954,7 @@ static void media_recorder_proc_cmd(MediaRecorderContext* ctx, RecorderCmd* msg)
 }
 
 int media_recorder_process_cmd(MediaRecorderContext* ctx, const char* target,
-                               const char* cmd, const char* arg, char* res, int res_len)
+    const char* cmd, const char* arg, char* res, int res_len)
 {
     char url[PATH_MAX];
     int ret = 0;
@@ -1064,18 +1062,18 @@ static int media_recorder_create_notify(MediaRecorderContext* ctx, media_parcel*
         return -EINVAL;
 
     if (strcmp(cpu, CONFIG_RPMSG_LOCAL_CPUNAME)) {
-        family               = AF_RPMSG;
+        family = AF_RPMSG;
         rpmsg_addr.rp_family = AF_RPMSG;
         strlcpy(rpmsg_addr.rp_name, key, RPMSG_SOCKET_NAME_SIZE);
         strlcpy(rpmsg_addr.rp_cpu, cpu, RPMSG_SOCKET_CPU_SIZE);
         addr = (struct sockaddr*)&rpmsg_addr;
-        len  = sizeof(struct sockaddr_rpmsg);
+        len = sizeof(struct sockaddr_rpmsg);
     } else {
-        family                = PF_LOCAL;
+        family = PF_LOCAL;
         local_addr.sun_family = AF_LOCAL;
         strlcpy(local_addr.sun_path, key, UNIX_PATH_MAX);
         addr = (struct sockaddr*)&local_addr;
-        len  = sizeof(struct sockaddr_un);
+        len = sizeof(struct sockaddr_un);
     }
 
     fd = socket(family, SOCK_STREAM | SOCK_CLOEXEC, 0);
@@ -1095,7 +1093,7 @@ static void media_recorder_conn_close(MediaRecorderContext* ctx)
 {
     close(ctx->tran_fd);
     ctx->tran_fd = -EPERM;
-    ctx->offset  = 0;
+    ctx->offset = 0;
     media_parcel_deinit(&ctx->parcel);
 }
 
@@ -1181,19 +1179,19 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
         av_bprintf(&buf, "recorder[%d, %s] state:%d", i, ctx->name, ctx->state);
         if (ctx->audio_idx >= 0)
             av_bprintf(&buf, ", a: %d %s %" PRId64 " %d %d %d",
-                       ctx->audio_idx,
-                       avcodec_get_name(ctx->streams[ctx->audio_idx].enc_ctx->codec_id),
-                       ctx->streams[ctx->audio_idx].enc_ctx->bit_rate,
-                       ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
-                       ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
-                       media_recorder_queue_cnt(ctx, ctx->audio_idx));
+                ctx->audio_idx,
+                avcodec_get_name(ctx->streams[ctx->audio_idx].enc_ctx->codec_id),
+                ctx->streams[ctx->audio_idx].enc_ctx->bit_rate,
+                ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
+                ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
+                media_recorder_queue_cnt(ctx, ctx->audio_idx));
         if (ctx->video_idx >= 0)
             av_bprintf(&buf, ", v: %d %s %d %d %d",
-                       ctx->video_idx,
-                       avcodec_get_name(ctx->streams[ctx->video_idx].enc_ctx->codec_id),
-                       ctx->streams[ctx->audio_idx].enc_ctx->width,
-                       ctx->streams[ctx->audio_idx].enc_ctx->height,
-                       media_recorder_queue_cnt(ctx, ctx->video_idx));
+                ctx->video_idx,
+                avcodec_get_name(ctx->streams[ctx->video_idx].enc_ctx->codec_id),
+                ctx->streams[ctx->audio_idx].enc_ctx->width,
+                ctx->streams[ctx->audio_idx].enc_ctx->height,
+                media_recorder_queue_cnt(ctx, ctx->video_idx));
     }
     av_bprintf(&buf, "\n--------------recorder dump end---------------\n");
     MEDIA_INFO("%s\n", buf.str);
@@ -1204,9 +1202,9 @@ static void media_recorder_poll(MediaRecorderContext* ctx)
 {
     struct pollfd fds[1];
     struct pollfd* fd = &fds[0];
-    fds[0].fd         = ctx->tran_fd;
-    fds[0].events     = POLLIN;
-    fds[0].revents    = 0;
+    fds[0].fd = ctx->tran_fd;
+    fds[0].events = POLLIN;
+    fds[0].revents = 0;
     int ret;
 
     ret = poll(fds, 1, 2);
@@ -1237,8 +1235,7 @@ static void* media_recorder_thread(void* arg)
             media_recorder_proc_cmd(ctx, msg);
         }
 
-        if (media_recorder_dat_valid(ctx) &&
-            media_recorder_proc_dat(ctx) == AVERROR_EOF) {
+        if (media_recorder_dat_valid(ctx) && media_recorder_proc_dat(ctx) == AVERROR_EOF) {
             ctx->exit = 1;
         }
     }
@@ -1300,15 +1297,15 @@ static int media_recorder_uninit(MediadPlugin* handle)
 }
 
 static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn* conn,
-                                  const char* target, const char* cmd, const char* arg,
-                                  int flags, char* res, int res_len)
+    const char* target, const char* cmd, const char* arg,
+    int flags, char* res, int res_len)
 {
     MediaRecorderPriv* priv = handle->priv;
     char stream_name[64] = { 0 };
     int ret;
 
     MEDIA_INFO("cmd: %s, arg %s, target %s.\n",
-               cmd, arg ? arg : "NULL", target ? target : "NULL");
+        cmd, arg ? arg : "NULL", target ? target : "NULL");
 
     pthread_mutex_lock(&priv->mutex);
 
@@ -1351,13 +1348,13 @@ out:
 }
 
 MediadPlugin media_recorder_plugin = {
-    .name            = "media_recorder",
-    .priv_size       = sizeof(struct MediaRecorderPriv),
-    .priv            = NULL,
-    .init            = media_recorder_init,
-    .get             = NULL,
-    .available       = NULL,
-    .run_once        = NULL,
-    .uninit          = media_recorder_uninit,
+    .name = "media_recorder",
+    .priv_size = sizeof(struct MediaRecorderPriv),
+    .priv = NULL,
+    .init = media_recorder_init,
+    .get = NULL,
+    .available = NULL,
+    .run_once = NULL,
+    .uninit = media_recorder_uninit,
     .process_command = media_recorder_handler,
 };

@@ -296,7 +296,7 @@ static int media_server_listen(struct media_server_priv* priv, int family)
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-static int media_server_init(MediadPlugin *ctx)
+static int media_server_init(MediadPlugin* ctx)
 {
     struct media_server_priv* priv = ctx->priv;
     int ret;
@@ -316,9 +316,9 @@ static int media_server_init(MediadPlugin *ctx)
     return 0;
 }
 
-static int media_server_uinit(MediadPlugin *ctx)
+static int media_server_uinit(MediadPlugin* ctx)
 {
-    struct media_server_priv *priv = ctx->priv;
+    struct media_server_priv* priv = ctx->priv;
     int i;
 
     if (priv == NULL)
@@ -343,7 +343,7 @@ static int media_server_uinit(MediadPlugin *ctx)
     return 0;
 }
 
-static int media_server_get_pollfds(MediadPlugin *ctx, struct pollfd *fds, void **conns, int count)
+static int media_server_get_pollfds(MediadPlugin* ctx, struct pollfd* fds, void** conns, int count)
 {
     struct media_server_priv* priv = ctx->priv;
     int i = 0;
@@ -383,7 +383,7 @@ static int media_server_get_pollfds(MediadPlugin *ctx, struct pollfd *fds, void 
     return i;
 }
 
-static int media_server_poll_available(MediadPlugin *ctx, struct pollfd *fd, void *conn)
+static int media_server_poll_available(MediadPlugin* ctx, struct pollfd* fd, void* conn)
 {
     struct media_server_priv* priv = ctx->priv;
     if (fd == NULL)
@@ -496,7 +496,7 @@ MediadPlugin media_server_plugin = {
     .uninit = media_server_uinit,
 };
 
-void* media_get_server(void)
+void* media_get_server()
 {
     return media_server_plugin.priv;
 }

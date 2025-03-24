@@ -254,7 +254,7 @@ void media_session_controllee_unregister(MediaSessionPriv* priv,
 
 static int media_session_init(MediadPlugin* ctx)
 {
-    MediaSessionPriv* priv = ctx->priv;;
+    MediaSessionPriv* priv = ctx->priv;
 
     TAILQ_INIT(&priv->controllers);
     TAILQ_INIT(&priv->controllees);
@@ -266,8 +266,8 @@ static int media_session_destroy(MediadPlugin* ctx)
     return 0;
 }
 
-static int media_session_handler(MediadPlugin *ctx, struct media_server_conn *conn, const char *target,
-    const char *cmd, const char *arg, int flags, char *res, int res_len)
+static int media_session_handler(MediadPlugin* ctx, struct media_server_conn* conn, const char* target,
+    const char* cmd, const char* arg, int flags, char* res, int res_len)
 {
     MediaControllerPriv* controller = media_server_get_data(conn);
     MediaControlleePriv* controllee = media_server_get_data(conn);
@@ -334,7 +334,7 @@ static int media_session_handler(MediadPlugin *ctx, struct media_server_conn *co
     return -EINVAL;
 }
 
-media_plugin_t media_session_plugin = {
+MediadPlugin media_session_plugin = {
     .name = "media_session",
     .priv_size = sizeof(MediaSessionPriv),
     .priv = NULL,

@@ -53,15 +53,15 @@ void media_stub_notify_event(void* cookie, int event,
     media_parcel_deinit(&notify);
 }
 
-static inline int media_plugin_command(MediadPlugin *plugin, struct media_server_conn *conn, const char *target,
-    const char *cmd, const char *arg, int flags, char *res, int res_len)
+static inline int media_plugin_command(MediadPlugin* plugin, struct media_server_conn* conn, const char* target,
+    const char* cmd, const char* arg, int flags, char* res, int res_len)
 {
     if (plugin->process_command)
         return plugin->process_command(plugin, conn, target, cmd, arg, flags, res, res_len);
     return -ENOSYS;
 }
 
-void media_stub_onreceive(struct media_server_conn *conn, media_parcel *in, media_parcel *out)
+void media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media_parcel* out)
 {
     const char *target = NULL, *cmd = NULL, *arg = NULL;
     int32_t len = 0, flags = 0, id = 0, size = 0, ret = 0;
@@ -97,7 +97,7 @@ void media_stub_onreceive(struct media_server_conn *conn, media_parcel *in, medi
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_graph_handler(media_plugin_get("media_graph"), NULL, target, cmd, arg, 0, response, len);
+        ret = media_plugin_command(media_plugin_get("media_graph"), NULL, target, cmd, arg, 0, response, len);
         break;
 
     case MEDIA_ID_PLAYER:
@@ -190,7 +190,7 @@ int media_stub_process_command(const char* target,
     const char* cmd, const char* arg)
 {
 #ifdef CONFIG_LIB_FFMPEG
-    return media_graph_handler(media_plugin_get("media_graph"), NULL, target, cmd, arg, 0, NULL, 0);
+    return media_plugin_command(media_plugin_get("media_graph"), NULL, target, cmd, arg, 0, NULL, 0);
 #else
     return -ENOSYS;
 #endif

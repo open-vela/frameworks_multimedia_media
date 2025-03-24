@@ -1,4 +1,3 @@
-
 /****************************************************************************
  * frameworks/media/server/media_graph.c
  *
@@ -33,12 +32,12 @@
 #include <libavfilter/filters.h>
 #include <libavfilter/formats.h>
 #include <libavutil/bprint.h>
+#include <libavutil/channel_layout.h>
 #include <libavutil/mem.h>
 #include <libavutil/opt.h>
-#include <libavutil/pixfmt.h>
 #include <libavutil/pixdesc.h>
+#include <libavutil/pixfmt.h>
 #include <libavutil/samplefmt.h>
-#include <libavutil/channel_layout.h>
 
 #include <assert.h>
 #include <fcntl.h>
@@ -48,10 +47,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "media_plugin.h"
 #include "media_common.h"
-#include "media_server.h"
 #include "media_graph.h"
+#include "media_plugin.h"
+#include "media_server.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -69,13 +68,14 @@
  ****************************************************************************/
 
 typedef struct MediaCommand {
-    AVFilterContext           *filter;
-    char                      *cmd;
-    char                      *arg;
-    char                      *res;
-    int                       flags;
+    AVFilterContext* filter;
+    char* cmd;
+    char* arg;
+    char* res;
+    int flags;
 
-    TAILQ_ENTRY(MediaCommand) entries;
+    TAILQ_ENTRY(MediaCommand)
+    entries;
 } MediaCommand;
 
 typedef struct MediaGraphPriv {
@@ -86,7 +86,8 @@ typedef struct MediaGraphPriv {
     void* pollfts[MAX_POLL_FILTERS];
     int pollftn;
 
-    TAILQ_HEAD(, MediaCommand) cmdq;
+    TAILQ_HEAD(, MediaCommand)
+    cmdq;
     pthread_mutex_t qlock;
 } MediaGraphPriv;
 
@@ -97,8 +98,8 @@ typedef struct MediaFilterPriv {
 } MediaFilterPriv;
 
 typedef struct MediaGraphAudio {
-    AVFilterContext *src;
-    void *link_handle;
+    AVFilterContext* src;
+    void* link_handle;
 } MediaGraphAudio;
 
 /****************************************************************************
@@ -233,7 +234,7 @@ out:
     return ret;
 }
 
-static int media_graph_query_formats(AVFilterContext *ctx)
+static int media_graph_query_formats(AVFilterContext* ctx)
 {
     int ret;
 
@@ -241,7 +242,7 @@ static int media_graph_query_formats(AVFilterContext *ctx)
         if ((ret = ctx->filter->formats.query_func(ctx)) < 0) {
             if (ret != AVERROR(EAGAIN))
                 av_log(ctx, AV_LOG_ERROR, "Query format failed for '%s': %s\n",
-                       ctx->name, av_err2str(ret));
+                    ctx->name, av_err2str(ret));
             return ret;
         }
     } else if (ctx->filter->formats_state == FF_FILTER_FORMATS_QUERY_FUNC2) {
@@ -258,7 +259,7 @@ static int media_graph_query_formats(AVFilterContext *ctx)
             cfg_in = ctx->nb_inputs ? cfg_in_stack : NULL;
 
         for (unsigned i = 0; i < ctx->nb_inputs; i++) {
-            AVFilterLink *l = ctx->inputs[i];
+            AVFilterLink* l = ctx->inputs[i];
             cfg_in[i] = &l->outcfg;
         }
 
@@ -273,7 +274,7 @@ static int media_graph_query_formats(AVFilterContext *ctx)
             cfg_out = ctx->nb_outputs ? cfg_out_stack : NULL;
 
         for (unsigned i = 0; i < ctx->nb_outputs; i++) {
-            AVFilterLink *l = ctx->outputs[i];
+            AVFilterLink* l = ctx->outputs[i];
             cfg_out[i] = &l->incfg;
         }
 
@@ -283,7 +284,7 @@ static int media_graph_query_formats(AVFilterContext *ctx)
         if (ret < 0) {
             if (ret != AVERROR(EAGAIN))
                 av_log(ctx, AV_LOG_ERROR, "Query format failed for '%s': %s\n",
-                       ctx->name, av_err2str(ret));
+                    ctx->name, av_err2str(ret));
             return ret;
         }
     }
@@ -291,9 +292,9 @@ static int media_graph_query_formats(AVFilterContext *ctx)
     return 0;
 }
 
-static void media_graph_find_elink(AVFilterLink **elink, AVFilterLink *slink)
+static void media_graph_find_elink(AVFilterLink** elink, AVFilterLink* slink)
 {
-    AVFilterContext *filter = slink->dst;
+    AVFilterContext* filter = slink->dst;
 
     if (filter->nb_outputs == 0) {
         *elink = slink;
@@ -303,13 +304,13 @@ static void media_graph_find_elink(AVFilterLink **elink, AVFilterLink *slink)
     return media_graph_find_elink(elink, filter->outputs[0]);
 }
 
-static int media_graph_find_active_link(AVFilterLink *slink[], int *index, AVFilterContext *filter, AVFilterLink *elink)
+static int media_graph_find_active_link(AVFilterLink* slink[], int* index, AVFilterContext* filter, AVFilterLink* elink)
 {
-    int *map[MAX_LINKS];
+    int* map[MAX_LINKS];
     int ret;
     int i;
 
-    ret = av_opt_get_array(filter, "map_array", AV_OPT_SEARCH_CHILDREN, 0 , filter->nb_outputs, AV_OPT_TYPE_INT, map);
+    ret = av_opt_get_array(filter, "map_array", AV_OPT_SEARCH_CHILDREN, 0, filter->nb_outputs, AV_OPT_TYPE_INT, map);
     if (ret < 0)
         return ret;
 
@@ -320,9 +321,9 @@ static int media_graph_find_active_link(AVFilterLink *slink[], int *index, AVFil
     return 0;
 }
 
-static int media_graph_find_slink(AVFilterLink *slink[], int *index, AVFilterLink *elink)
+static int media_graph_find_slink(AVFilterLink* slink[], int* index, AVFilterLink* elink)
 {
-    AVFilterContext *filter = elink->src;
+    AVFilterContext* filter = elink->src;
     int ret;
     int i;
 
@@ -340,10 +341,10 @@ static int media_graph_find_slink(AVFilterLink *slink[], int *index, AVFilterLin
     return 0;
 }
 
-static int media_graph_pick_formats(AVFilterLink *slink, AVFilterLink *elink, int format, int sample_rate, int channels, bool is_player)
+static int media_graph_pick_formats(AVFilterLink* slink, AVFilterLink* elink, int format, int sample_rate, int channels, bool is_player)
 {
-    AVFilterFormatsConfig *cfg;
-    AVChannelLayout *ch = NULL;
+    AVFilterFormatsConfig* cfg;
+    AVChannelLayout* ch = NULL;
     AVChannelLayout layout;
     int rate = -1;
     int fmt = -1;
@@ -373,9 +374,9 @@ static int media_graph_pick_formats(AVFilterLink *slink, AVFilterLink *elink, in
 
     for (i = 0; i < cfg->formats->nb_formats; i++) {
         if (cfg->formats->formats[i] == format) {
-                fmt = format;
-                break;
-            }
+            fmt = format;
+            break;
+        }
     }
 
     if (fmt == -1)
@@ -390,7 +391,6 @@ static int media_graph_pick_formats(AVFilterLink *slink, AVFilterLink *elink, in
 
     if (rate == -1)
         rate = cfg->samplerates->formats[0];
-
 
     for (i = 0; i < cfg->channel_layouts->nb_channel_layouts; i++) {
         if (cfg->channel_layouts->channel_layouts[i].nb_channels == channels) {
@@ -410,9 +410,9 @@ pick_values:
     return ret;
 }
 
-static int media_graph_set_formats_recursive(AVFilterLink *slink, AVFilterLink *elink)
+static int media_graph_set_formats_recursive(AVFilterLink* slink, AVFilterLink* elink)
 {
-    AVFilterLink *nlink;
+    AVFilterLink* nlink;
     int ret;
 
     nlink = slink->dst->outputs[0];
@@ -432,9 +432,9 @@ static int media_graph_set_formats_recursive(AVFilterLink *slink, AVFilterLink *
     return media_graph_set_formats_recursive(nlink, elink);
 }
 
-static int media_graph_config_link(AVFilterLink *slink, int format, int sample_rate, int channels, bool is_player)
+static int media_graph_config_link(AVFilterLink* slink, int format, int sample_rate, int channels, bool is_player)
 {
-    AVFilterLink *elink;
+    AVFilterLink* elink;
     int ret;
 
     media_graph_find_elink(&elink, slink);
@@ -450,9 +450,9 @@ static int media_graph_config_link(AVFilterLink *slink, int format, int sample_r
     return 0;
 }
 
-static int media_graph_config(AVFilterContext *ctx, int format, int sample_rate, int channels)
+static int media_graph_config(AVFilterContext* ctx, int format, int sample_rate, int channels)
 {
-    AVFilterLink *slink[MAX_LINKS];
+    AVFilterLink* slink[MAX_LINKS];
     int index = 0;
     int ret;
     int i;
@@ -460,30 +460,29 @@ static int media_graph_config(AVFilterContext *ctx, int format, int sample_rate,
     if (ctx->nb_inputs == 0) { // src filter
         ret = media_graph_find_active_link(slink, &index, ctx, NULL);
         if (ret < 0)
-          return ret;
+            return ret;
     } else if (ctx->nb_outputs == 0) { // sink filter
         ret = media_graph_find_slink(slink, &index, ctx->inputs[0]);
         if (ret < 0)
-          return ret;
+            return ret;
     } else {
         av_log(ctx, AV_LOG_ERROR, "%s invalid filter: %s\n", __func__, ctx->name);
         return -EINVAL;
     }
 
-    for (i = 0; i < index; i++)
-      {
+    for (i = 0; i < index; i++) {
         ret = media_graph_config_link(slink[i], format, sample_rate, channels, ctx->nb_inputs == 0);
         if (ret < 0)
-          return ret;
-      }
+            return ret;
+    }
 
     MEDIA_INFO("media_graph_config success. fmt:%d, rate:%d, ch:%d\n", format, sample_rate, channels);
     return 0;
 }
 
-void media_graph_cale_input_status(AVFilterLink *link, int *active)
+void media_graph_cale_input_status(AVFilterLink* link, int* active)
 {
-    AVFilterContext *ctx = link->src;
+    AVFilterContext* ctx = link->src;
     int i;
 
     if (ctx->nb_inputs == 0) {
@@ -495,7 +494,7 @@ void media_graph_cale_input_status(AVFilterLink *link, int *active)
         media_graph_cale_input_status(ctx->inputs[i], active);
 }
 
-bool media_graph_check_sink_status(AVFilterContext *ctx)
+bool media_graph_check_sink_status(AVFilterContext* ctx)
 {
     int active = 0;
 
@@ -510,10 +509,10 @@ bool media_graph_check_sink_status(AVFilterContext *ctx)
     return false;
 }
 
-bool media_graph_has_pending_status(AVFilterContext *ctx)
+bool media_graph_has_pending_status(AVFilterContext* ctx)
 {
-    AVFilterLink *slink[MAX_LINKS];
-    AVFilterLink *elink[MAX_LINKS];
+    AVFilterLink* slink[MAX_LINKS];
+    AVFilterLink* elink[MAX_LINKS];
     int index = 0;
     int ret;
     int i;
@@ -521,7 +520,7 @@ bool media_graph_has_pending_status(AVFilterContext *ctx)
     if (ctx->nb_inputs == 0) { // src filter
         ret = media_graph_find_active_link(slink, &index, ctx, NULL);
         if (ret < 0)
-          return ret;
+            return ret;
 
         /* find all end point */
         for (i = 0; i < index; i++)
@@ -543,7 +542,7 @@ bool media_graph_has_pending_status(AVFilterContext *ctx)
     return false;
 }
 
-static inline bool media_graph_filter_is_tail(AVFilterContext *ctx)
+static inline bool media_graph_filter_is_tail(AVFilterContext* ctx)
 {
     return ctx && ctx->nb_outputs == 0;
 }
@@ -552,9 +551,9 @@ static inline bool media_graph_filter_is_tail(AVFilterContext *ctx)
  * Public Functions
  ****************************************************************************/
 
-static int media_graph_init(MediadPlugin *ctx)
+static int media_graph_init(MediadPlugin* ctx)
 {
-    char *file = CONFIG_MEDIA_SERVER_CONFIG_PATH "graph.conf";
+    char* file = CONFIG_MEDIA_SERVER_CONFIG_PATH "graph.conf";
     MediaGraphPriv* priv = ctx->priv;
     int ret;
 
@@ -588,7 +587,7 @@ err:
 static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filter,
     const char* cmd, const char* arg, char* res, int res_len, int flags)
 {
-    MediaCommand *newcmd;
+    MediaCommand* newcmd;
 
     if (flags & FLAG_FAST_PROC_CMD)
         return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
@@ -659,26 +658,26 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 
     cmd = TAILQ_FIRST(&priv->cmdq);
     if (process) {
-            av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
-                cmd->filter->name, cmd->cmd, cmd->arg ? cmd->arg : "_");
+        av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
+            cmd->filter->name, cmd->cmd, cmd->arg ? cmd->arg : "_");
 
-            /* do reconfig*/
-            if (!strcmp(cmd->cmd, "link")) {
-                ret = sscanf(cmd->arg, "%*p %*p fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels);
-                if (ret == 3) {
-                    if (media_graph_has_pending_status(cmd->filter)) {
-                        ret = -EAGAIN;
-                        goto exit;
-                    }
-
-                    ret = media_graph_config(cmd->filter, format, sample_rate, channels);
-                    if (ret < 0)
-                        MEDIA_ERR("media_graph_config Failed: %d\n", ret);
+        /* do reconfig*/
+        if (!strcmp(cmd->cmd, "link")) {
+            ret = sscanf(cmd->arg, "%*p %*p fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels);
+            if (ret == 3) {
+                if (media_graph_has_pending_status(cmd->filter)) {
+                    ret = -EAGAIN;
+                    goto exit;
                 }
-            }
 
-            ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
-                cmd->res, 0, cmd->flags);
+                ret = media_graph_config(cmd->filter, format, sample_rate, channels);
+                if (ret < 0)
+                    MEDIA_ERR("media_graph_config Failed: %d\n", ret);
+            }
+        }
+
+        ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
+            cmd->res, 0, cmd->flags);
     }
 
     TAILQ_REMOVE(&priv->cmdq, cmd, entries);
@@ -701,22 +700,22 @@ exit:
     return ret;
 }
 
-static int media_graph_uninit(MediadPlugin *ctx)
+static int media_graph_uninit(MediadPlugin* ctx)
 {
     MediaGraphPriv* priv = ctx->priv;
     int ret;
 
     do {
-       ret = media_graph_dequeue_command(priv, false);
-    } while(ret >= 0);
+        ret = media_graph_dequeue_command(priv, false);
+    } while (ret >= 0);
 
     avfilter_graph_free(&priv->graph);
 
     return 0;
 }
 
-static int media_graph_get_pollfds(MediadPlugin *ctx, struct pollfd *fds,
-    void **cookies, int count)
+static int media_graph_get_pollfds(MediadPlugin* ctx, struct pollfd* fds,
+    void** cookies, int count)
 {
     MediaGraphPriv* priv = ctx->priv;
     int ret, nfd, i;
@@ -748,7 +747,7 @@ static int media_graph_get_pollfds(MediadPlugin *ctx, struct pollfd *fds,
     return nfd;
 }
 
-static int media_graph_poll_available(MediadPlugin *ctx, struct pollfd *fd, void *cookie)
+static int media_graph_poll_available(MediadPlugin* ctx, struct pollfd* fd, void* cookie)
 {
     MediaGraphPriv* priv = ctx->priv;
     eventfd_t unuse;
@@ -766,7 +765,7 @@ static int media_graph_poll_available(MediadPlugin *ctx, struct pollfd *fd, void
     return 0;
 }
 
-static int media_graph_run_once(MediadPlugin *ctx)
+static int media_graph_run_once(MediadPlugin* ctx)
 {
     MediaGraphPriv* priv = ctx->priv;
     int ret;
@@ -790,11 +789,11 @@ static int media_graph_run_once(MediadPlugin *ctx)
     return 0;
 }
 
-static int media_graph_dump_link(AVBPrint *buf, AVFilterLink *link)
+static int media_graph_dump_link(AVBPrint* buf, AVFilterLink* link)
 {
-    const char *format;
+    const char* format;
     AVBPrint dummy_buffer;
-    FilterLinkInternal *li = ff_link_internal(link);
+    FilterLinkInternal* li = ff_link_internal(link);
 
     if (!buf) {
         buf = &dummy_buffer;
@@ -811,7 +810,7 @@ static int media_graph_dump_link(AVBPrint *buf, AVFilterLink *link)
 
     case AVMEDIA_TYPE_AUDIO:
         format = av_x_if_null(av_get_sample_fmt_name(link->format), "?");
-        av_bprintf(buf, "[%dHz %s: fifo:%d wt:%d icnt:%"PRId64" ocnt:%"PRId64" ",
+        av_bprintf(buf, "[%dHz %s: fifo:%d wt:%d icnt:%" PRId64 " ocnt:%" PRId64 " ",
             (int)link->sample_rate, format, (int)ff_framequeue_queued_frames(&li->fifo),
             li->frame_wanted_out, li->l.frame_count_in, li->l.frame_count_out);
         av_channel_layout_describe_bprint(&link->ch_layout, buf);
@@ -825,12 +824,12 @@ static int media_graph_dump_link(AVBPrint *buf, AVFilterLink *link)
     return buf->len;
 }
 
-static void media_graph_dump_to_buf(AVBPrint *buf, AVFilterGraph *graph)
+static void media_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
 {
     unsigned i, j, x, e;
 
     for (i = 0; i < graph->nb_filters; i++) {
-        AVFilterContext *filter = graph->filters[i];
+        AVFilterContext* filter = graph->filters[i];
         unsigned max_src_name = 0, max_dst_name = 0;
         unsigned max_in_name = 0, max_out_name = 0;
         unsigned max_in_fmt = 0, max_out_fmt = 0;
@@ -839,14 +838,14 @@ static void media_graph_dump_to_buf(AVBPrint *buf, AVFilterGraph *graph)
         unsigned ltype = strlen(filter->filter->name);
 
         for (j = 0; j < filter->nb_inputs; j++) {
-            AVFilterLink *l = filter->inputs[j];
+            AVFilterLink* l = filter->inputs[j];
             unsigned ln = strlen(l->src->name) + 1 + strlen(l->srcpad->name);
             max_src_name = FFMAX(max_src_name, ln);
             max_in_name = FFMAX(max_in_name, strlen(l->dstpad->name));
             max_in_fmt = FFMAX(max_in_fmt, media_graph_dump_link(NULL, l));
         }
         for (j = 0; j < filter->nb_outputs; j++) {
-            AVFilterLink *l = filter->outputs[j];
+            AVFilterLink* l = filter->outputs[j];
             unsigned ln = strlen(l->dst->name) + 1 + strlen(l->dstpad->name);
             max_dst_name = FFMAX(max_dst_name, ln);
             max_out_name = FFMAX(max_out_name, strlen(l->srcpad->name));
@@ -866,7 +865,7 @@ static void media_graph_dump_to_buf(AVBPrint *buf, AVFilterGraph *graph)
 
             /* Input link */
             if (in_no < filter->nb_inputs) {
-                AVFilterLink *l = filter->inputs[in_no];
+                AVFilterLink* l = filter->inputs[in_no];
                 e = buf->len + max_src_name + 2;
                 av_bprintf(buf, "%s:%s", l->src->name, l->srcpad->name);
                 av_bprint_chars(buf, '-', e - buf->len);
@@ -894,7 +893,7 @@ static void media_graph_dump_to_buf(AVBPrint *buf, AVFilterGraph *graph)
 
             /* Output link */
             if (out_no < filter->nb_outputs) {
-                AVFilterLink *l = filter->outputs[out_no];
+                AVFilterLink* l = filter->outputs[out_no];
                 unsigned ln = strlen(l->dst->name) + 1 + strlen(l->dstpad->name);
                 e = buf->len + max_out_name + 2;
                 av_bprintf(buf, "%s", l->srcpad->name);
@@ -914,10 +913,10 @@ static void media_graph_dump_to_buf(AVBPrint *buf, AVFilterGraph *graph)
     }
 }
 
-static char *media_graph_server_dump(AVFilterGraph *graph, const char *options)
+static char* media_graph_server_dump(AVFilterGraph* graph, const char* options)
 {
     AVBPrint buf;
-    char *dump;
+    char* dump;
 
     av_bprint_init(&buf, 0, AV_BPRINT_SIZE_COUNT_ONLY);
     media_graph_dump_to_buf(&buf, graph);
@@ -929,8 +928,8 @@ static char *media_graph_server_dump(AVFilterGraph *graph, const char *options)
     return dump;
 }
 
-static int media_graph_handler(MediadPlugin *ctx, struct media_server_conn *conn, const char *target, const char *cmd,
-    const char *arg, int flags, char *res, int res_len)
+static int media_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn, const char* target, const char* cmd,
+    const char* arg, int flags, char* res, int res_len)
 {
     MediaGraphPriv* priv = ctx->priv;
     int i, ret = 0;
@@ -979,7 +978,7 @@ static int media_graph_handler(MediadPlugin *ctx, struct media_server_conn *conn
     return 0;
 }
 
-static void media_graph_try_touch(MediaGraphPriv *priv)
+static void media_graph_try_touch(MediaGraphPriv* priv)
 {
     if (priv->tid != gettid()) {
         eventfd_t val = 1;
@@ -987,10 +986,10 @@ static void media_graph_try_touch(MediaGraphPriv *priv)
     }
 }
 
-static int media_graph_stream_notify_head(MediaGraphPriv *priv, AVFilterContext *ctx, char* cmd)
+static int media_graph_stream_notify_head(MediaGraphPriv* priv, AVFilterContext* ctx, char* cmd)
 {
-    AVFilterLink *slink[MAX_LINKS];
-    char msg[32] = {0};
+    AVFilterLink* slink[MAX_LINKS];
+    char msg[32] = { 0 };
     int index = 0;
     int ret;
     int i;
@@ -1028,12 +1027,12 @@ MediadPlugin media_graph_plugin = {
  ****************************************************************************/
 
 int media_graph_audio_open(MediaGraphAudio** pctx,
-                           const char* stream,
-                           int format, int sample_rate, int channels,
-                           int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
+    const char* stream,
+    int format, int sample_rate, int channels,
+    int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
 {
-    MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphAudio *ctx;
+    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphAudio* ctx;
     char stream_name[64] = { 0 };
     char msg[128] = { 0 };
     int ret;
@@ -1054,8 +1053,8 @@ int media_graph_audio_open(MediaGraphAudio** pctx,
     }
 
     snprintf(msg, sizeof(msg), "%p %p fmt=%d:rate=%d:ch=%d", on_event_cb,
-             udata, format, sample_rate, channels);
-    ret = media_graph_queue_command(priv, ctx->src, "link", msg, (char *)&ctx->link_handle, sizeof(void **), FLAG_RES_PRECOPIED);
+        udata, format, sample_rate, channels);
+    ret = media_graph_queue_command(priv, ctx->src, "link", msg, (char*)&ctx->link_handle, sizeof(void**), FLAG_RES_PRECOPIED);
     if (ret < 0) {
         MEDIA_ERR("%s link failed ret:%d\n", ctx->src->name, ret);
         goto fail;
@@ -1079,14 +1078,14 @@ fail:
 
 int media_graph_audio_close(MediaGraphAudio** pctx)
 {
-    MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphAudio *ctx = *pctx;
+    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphAudio* ctx = *pctx;
     int ret;
 
     if (!pctx || !ctx || !ctx->src)
         return -EINVAL;
 
-    ret = media_graph_queue_command(priv, ctx->src, "unlink", (char *)ctx->link_handle, NULL, 0, FLAG_ARG_PRECOPIED);
+    ret = media_graph_queue_command(priv, ctx->src, "unlink", (char*)ctx->link_handle, NULL, 0, FLAG_ARG_PRECOPIED);
 
     if (media_graph_filter_is_tail(ctx->src))
         /* unlink and trigger pcmxc send empty frame flush record pipe*/
@@ -1103,8 +1102,8 @@ int media_graph_audio_close(MediaGraphAudio** pctx)
 
 int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, const char* value)
 {
-    MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphAudio *ctx = *pctx;
+    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphAudio* ctx = *pctx;
     char msg[128];
     int ret;
 
@@ -1120,10 +1119,10 @@ int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, c
     return ret;
 }
 
-int media_graph_audio_get_parameter(MediaGraphAudio** pctx, const char* key, char *res, int res_len)
+int media_graph_audio_get_parameter(MediaGraphAudio** pctx, const char* key, char* res, int res_len)
 {
-    MediaGraphPriv *priv = media_graph_plugin.priv;
-    MediaGraphAudio *ctx = *pctx;
+    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphAudio* ctx = *pctx;
     char msg[128];
     int ret;
 
@@ -1138,4 +1137,3 @@ int media_graph_audio_get_parameter(MediaGraphAudio** pctx, const char* key, cha
 
     return ret;
 }
-

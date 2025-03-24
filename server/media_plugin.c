@@ -4,7 +4,7 @@
 
 #include "media_common.h"
 
-int mediad_plugin_init(MediadPlugin *plugin)
+int mediad_plugin_init(MediadPlugin* plugin)
 {
     int ret;
 
@@ -25,7 +25,7 @@ int mediad_plugin_init(MediadPlugin *plugin)
     return 0;
 }
 
-void mediad_plugin_uinit(MediadPlugin *plugin)
+void mediad_plugin_uinit(MediadPlugin* plugin)
 {
     if (plugin->uninit && plugin->priv) {
         plugin->uninit(plugin);
@@ -35,4 +35,3 @@ void mediad_plugin_uinit(MediadPlugin *plugin)
         av_freep(&plugin->priv);
     }
 }
-

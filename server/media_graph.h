@@ -44,9 +44,9 @@
 typedef struct MediaGraphAudio MediaGraphAudio;
 
 int media_graph_audio_open(MediaGraphAudio** pctx,
-                           const char* stream_type,
-                           int format, int sample_rate, int channels,
-                           int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata);
+    const char* stream_type,
+    int format, int sample_rate, int channels,
+    int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata);
 /*
  * Release a audio stream.
  * @ctx: [in,out] audio stream context

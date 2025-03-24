@@ -24,19 +24,19 @@ struct pollfd;
 struct media_server_conn;
 
 typedef struct MediadPlugin {
-    const char *name;
+    const char* name;
     int priv_size;
-    void *priv;
-    int (*init)(struct MediadPlugin *ctx);
-    int (*uninit)(struct MediadPlugin *ctx);
-    int (*get)(struct MediadPlugin *ctx, struct pollfd *fds, void **cookies, int count);
-    int (*available)(struct MediadPlugin *ctx, struct pollfd *fds, void *cookies);
-    int (*run_once)(struct MediadPlugin *ctx);
-    int (*process_command)(struct MediadPlugin *ctx, struct media_server_conn *conn, const char *target,
-        const char *cmd, const char *arg, int flags, char *res, int res_len);
+    void* priv;
+    int (*init)(struct MediadPlugin* ctx);
+    int (*uninit)(struct MediadPlugin* ctx);
+    int (*get)(struct MediadPlugin* ctx, struct pollfd* fds, void** cookies, int count);
+    int (*available)(struct MediadPlugin* ctx, struct pollfd* fds, void* cookies);
+    int (*run_once)(struct MediadPlugin* ctx);
+    int (*process_command)(struct MediadPlugin* ctx, struct media_server_conn* conn, const char* target,
+        const char* cmd, const char* arg, int flags, char* res, int res_len);
 } MediadPlugin;
 
-int mediad_plugin_init(MediadPlugin *ctx);
-void mediad_plugin_uinit(MediadPlugin *ctx);
+int mediad_plugin_init(MediadPlugin* ctx);
+void mediad_plugin_uinit(MediadPlugin* ctx);
 
 #endif // FRAMEWORKS_MEDIA_PLUGIN_H_

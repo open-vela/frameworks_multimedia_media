@@ -54,7 +54,7 @@ typedef struct MediaPriv {
  * Private Data
  ****************************************************************************/
 #ifdef CONFIG_MEDIA_FOCUS
-extern media_plugin_t media_focus_plugin;
+extern MediadPlugin media_focus_plugin;
 #endif
 #ifdef CONFIG_LIB_FFMPEG
 extern MediadPlugin media_graph_plugin;
@@ -63,12 +63,9 @@ extern MediadPlugin media_player_plugin;
 extern MediadPlugin media_recorder_plugin;
 #endif
 #ifdef CONFIG_LIB_PFW
-extern media_plugin_t media_policy_plugin;
+extern MediadPlugin media_policy_plugin;
 #endif
-#ifdef CONFIG_MEDIA_TRIGGER
-extern media_plugin_t media_trigger_plugin;
-#endif
-extern media_plugin_t media_server_plugin;
+extern MediadPlugin media_server_plugin;
 
 MediadPlugin* g_media[] = {
 #ifdef CONFIG_MEDIA_FOCUS
@@ -93,7 +90,7 @@ MediadPlugin* g_media[] = {
  * Private Functions
  ****************************************************************************/
 
-media_plugin_t* media_plugin_get(const char* name)
+MediadPlugin* media_plugin_get(const char* name)
 {
     int i;
 
