@@ -404,8 +404,9 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
         if (num_sample_fmts)
             sample_fmt = sample_fmts[0];
         else {
-            MEDIA_ERR("need to specify the sample_fmt \n");
-            return AVERROR(EINVAL);
+            sample_fmt = AV_SAMPLE_FMT_S16;
+            MEDIA_WARN("no specify the sample_fmt, use default value %s\n",
+                av_get_sample_fmt_name(sample_fmt));
         }
     }
 
@@ -433,8 +434,8 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
         if (num_samplerates)
             sample_rate = supported_samplerates[0];
         else {
-            MEDIA_ERR("need to specify the sample_rate \n");
-            return AVERROR(EINVAL);
+            sample_rate = 16000;
+            MEDIA_WARN("no specify the sample_rate, use default value %d\n", sample_rate);
         }
     }
 
@@ -466,8 +467,9 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
         if (num_ch_layouts)
             ch_layout = ch_layouts[i];
         else {
-            MEDIA_ERR("need to specify the channel layout \n");
-            return AVERROR(EINVAL);
+            av_channel_layout_default(&ch_layout, 1);
+            MEDIA_WARN("no specify the channel layout, use default value %d\n",
+                ch_layout.nb_channels);
         }
     }
 
