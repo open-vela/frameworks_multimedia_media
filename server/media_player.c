@@ -1594,16 +1594,6 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
     return 0;
 }
 
-static int media_player_init(MediadPlugin* handle)
-{
-    return 0;
-}
-
-static int media_player_uninit(MediadPlugin* handle)
-{
-    return 0;
-}
-
 static int media_player_handler(MediadPlugin* handle, struct media_server_conn* conn, const char* target, const char* cmd, const char* arg, int flags, char* res, int res_len)
 {
     MediaPlayerPriv* priv = handle->priv;
@@ -1663,10 +1653,10 @@ MediadPlugin media_player_plugin = {
     .name = "media_player",
     .priv_size = sizeof(struct MediaPlayerPriv),
     .priv = NULL,
-    .init = media_player_init,
+    .init = NULL,
     .get = NULL,
     .available = NULL,
     .run_once = NULL,
-    .uninit = media_player_uninit,
+    .uninit = NULL,
     .process_command = media_player_handler,
 };

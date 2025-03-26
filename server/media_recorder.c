@@ -131,14 +131,12 @@ typedef struct MediaRecorderContext {
 } MediaRecorderContext;
 
 typedef struct MediaRecorderPriv {
-    pthread_mutex_t mutex;
     MediaRecorderContext ctxs[MEDIA_RECORDER_MAX_CNT];
 } MediaRecorderPriv;
 
 /****************************************************************************
  * Function declaration
  ****************************************************************************/
-static int media_recorder_queue_push(MediaRecorderContext* ctx, int idx, AVFrame* frame);
 static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollfd* fd);
 
 /****************************************************************************
@@ -1280,24 +1278,6 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
     return 0;
 }
 
-static int media_recorder_init(MediadPlugin* handle)
-{
-    MediaRecorderPriv* priv = handle->priv;
-
-    pthread_mutex_init(&priv->mutex, NULL);
-
-    return 0;
-}
-
-static int media_recorder_uninit(MediadPlugin* handle)
-{
-    MediaRecorderPriv* priv = handle->priv;
-
-    pthread_mutex_destroy(&priv->mutex);
-
-    return 0;
-}
-
 static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn* conn,
     const char* target, const char* cmd, const char* arg,
     int flags, char* res, int res_len)
@@ -1309,54 +1289,47 @@ static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn
     MEDIA_INFO("cmd: %s, arg %s, target %s.\n",
         cmd, arg ? arg : "NULL", target ? target : "NULL");
 
-    pthread_mutex_lock(&priv->mutex);
-
     if (!strcmp(cmd, "open")) {
         ret = media_stub_get_stream_name(arg, stream_name, sizeof(stream_name));
         if (ret < 0) {
             MEDIA_ERR("get stream name failed %d\n", ret);
-            goto out;
+            return ret;
         }
 
         MediaRecorderContext* ctx = media_recorder_get_available_session(priv);
         if (!ctx) {
             MEDIA_ERR("recorder open failed...\n");
-            ret = -ENOMEM;
-            goto out;
+            return -ENOMEM;
         }
 
         ctx->tran_fd = media_server_get_tran_fd(conn);
         if (ctx->tran_fd < 0) {
             MEDIA_ERR("recorder get tran fd failed...\n");
-            ret = -EINVAL;
-            goto out;
+            return -EINVAL;
         }
 
         media_server_clean_conn(conn);
 
         ret = media_recorder_open(ctx, stream_name);
         if (ret < 0)
-            goto out;
+            return ret;
 
         MEDIA_INFO("open recorder success...\n");
     } else if (!strcmp(cmd, "dump")) {
         media_recorder_dump(priv);
     }
 
-out:
-    pthread_mutex_unlock(&priv->mutex);
-
-    return ret;
+    return 0;
 }
 
 MediadPlugin media_recorder_plugin = {
     .name = "media_recorder",
     .priv_size = sizeof(struct MediaRecorderPriv),
     .priv = NULL,
-    .init = media_recorder_init,
+    .init = NULL,
     .get = NULL,
     .available = NULL,
     .run_once = NULL,
-    .uninit = media_recorder_uninit,
+    .uninit = NULL,
     .process_command = media_recorder_handler,
 };
