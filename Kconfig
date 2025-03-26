@@ -73,6 +73,22 @@ config MEDIA_SERVER_PORT
 	int "Media server AF_INET listening port"
 	default -1
 
+config MEDIA_PLAYER_MAX_CNT
+	int "Media player max count"
+	default 10
+
+config MEDIA_PLAYER_CMD_QUEUE_SIZE
+	int "Media player cmd queue size"
+	default 16
+
+config MEDIA_PLAYER_DATA_QUEUE_SIZE
+	int "Media player data queue size"
+	default 4
+
+config MEDIA_PLAYER_MAX_POLLFDS
+	int "Media player max pollfds"
+	default 4
+
 config MEDIA_PLAYER_STACKSIZE
 	int "Media player stack size"
 	default 61440
@@ -80,6 +96,18 @@ config MEDIA_PLAYER_STACKSIZE
 config MEDIA_PLAYER_PRIORITY
 	int "Media player priority"
 	default 215
+
+config MEDIA_RECORDER_MAX_CNT
+	int "Media recorder max count"
+	default 10
+
+config MEDIA_RECORDER_CMD_QUEUE_SIZE
+	int "Media recorder cmd queue size"
+	default 16
+
+config MEDIA_RECORDER_DATA_QUEUE_SIZE
+	int "Media recorder data queue size"
+	default 4
 
 config MEDIA_RECORDER_STACKSIZE
 	int "Media recorder stack size"

@@ -57,10 +57,6 @@
 #define MEDIA_RECORDER_CMD_QUEUE_IDX (1 << 0)
 #define MEDIA_RECORDER_DATA_QUEUE_IDX (1 << 1)
 
-#define MEDIA_RECORDER_MAX_CNT 10
-#define MEDIA_RECORDER_CMD_QUEUE_MAX 16
-#define MEDIA_RECORDER_DATA_QUEUE_SIZE 4
-
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -131,7 +127,7 @@ typedef struct MediaRecorderContext {
 } MediaRecorderContext;
 
 typedef struct MediaRecorderPriv {
-    MediaRecorderContext ctxs[MEDIA_RECORDER_MAX_CNT];
+    MediaRecorderContext ctxs[CONFIG_MEDIA_RECORDER_MAX_CNT];
 } MediaRecorderPriv;
 
 /****************************************************************************
@@ -574,7 +570,7 @@ static int media_recorder_init_stream(MediaRecorderContext* ctx)
         ctx->streams[i].index = i;
         ctx->streams[i].type = types[i];
         ff_framequeue_init(&ctx->streams[i].queue, NULL);
-        ctx->streams[i].nb_queue_max = MEDIA_RECORDER_DATA_QUEUE_SIZE;
+        ctx->streams[i].nb_queue_max = CONFIG_MEDIA_RECORDER_DATA_QUEUE_SIZE;
     }
 
     ctx->nb_streams = stream_cnt;
@@ -748,7 +744,7 @@ out:
 static void media_recorder_ctx_init(MediaRecorderContext* ctx)
 {
     ctx->state = MEDIA_RECORDER_STATE_STOPPED;
-    ctx->cmd_max = MEDIA_RECORDER_CMD_QUEUE_MAX;
+    ctx->cmd_max = CONFIG_MEDIA_RECORDER_CMD_QUEUE_SIZE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
     ctx->exit = 0;
@@ -1155,7 +1151,7 @@ static MediaRecorderContext* media_recorder_get_available_session(MediaRecorderP
     MediaRecorderContext* ctx = NULL;
     int i;
 
-    for (i = 0; i < MEDIA_RECORDER_MAX_CNT; i++) {
+    for (i = 0; i < CONFIG_MEDIA_RECORDER_MAX_CNT; i++) {
         ctx = &priv->ctxs[i];
         if (ctx->state == MEDIA_RECORDER_STATE_IDLE)
             break;
@@ -1172,7 +1168,7 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
 
     av_bprint_init(&buf, 0, AV_BPRINT_SIZE_UNLIMITED);
     av_bprintf(&buf, "\n--------------recorder dump start-------------\n");
-    for (i = 0; i < MEDIA_RECORDER_MAX_CNT; i++) {
+    for (i = 0; i < CONFIG_MEDIA_RECORDER_MAX_CNT; i++) {
         ctx = &priv->ctxs[i];
         if (ctx->state == MEDIA_RECORDER_STATE_IDLE)
             continue;

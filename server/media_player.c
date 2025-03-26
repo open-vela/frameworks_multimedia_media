@@ -58,11 +58,6 @@
 #define MEDIA_PLAYER_CMD_QUEUE_IDX (1 << 0)
 #define MEDIA_PLAYER_DATA_QUEUE_IDX (1 << 1)
 
-#define MEDIA_PLAYER_MAX_CNT 10
-#define MEDIA_PLAYER_CMD_QUEUE_MAX 16
-#define MEDIA_PLAYER_DATA_QUEUE_SIZE 4
-#define MEDIA_PLAYER_MAX_POLLFDS 4
-
 #define MEDIA_PLAYER_SILENCE_FRAME_DURATION 20
 
 /****************************************************************************
@@ -158,9 +153,9 @@ typedef struct MediaPlayerContext {
 
     /* poll event */
     int poll_cnt;
-    int idx[MEDIA_PLAYER_MAX_POLLFDS];
-    struct pollfd fds[MEDIA_PLAYER_MAX_POLLFDS];
-    MediaPlayerPoll poll[MEDIA_PLAYER_MAX_POLLFDS];
+    int idx[CONFIG_MEDIA_PLAYER_MAX_POLLFDS];
+    struct pollfd fds[CONFIG_MEDIA_PLAYER_MAX_POLLFDS];
+    MediaPlayerPoll poll[CONFIG_MEDIA_PLAYER_MAX_POLLFDS];
 
     /* avsync parameters */
     int frame_duration; /** < frame duration in ms */
@@ -175,7 +170,7 @@ typedef struct MediaPlayerContext {
 } MediaPlayerContext;
 
 typedef struct MediaPlayerPriv {
-    MediaPlayerContext ctxs[MEDIA_PLAYER_MAX_CNT];
+    MediaPlayerContext ctxs[CONFIG_MEDIA_PLAYER_MAX_CNT];
 } MediaPlayerPriv;
 
 /****************************************************************************
@@ -641,7 +636,7 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         else
             continue;
 
-        stream_out->nb_queue_max = MEDIA_PLAYER_DATA_QUEUE_SIZE;
+        stream_out->nb_queue_max = CONFIG_MEDIA_PLAYER_DATA_QUEUE_SIZE;
         ff_framequeue_init(&stream_out->queue, NULL);
 
         /* Use specify ch_layout if possible, follow guess_input_channel_layout() in ffmpeg.c */
@@ -891,7 +886,7 @@ end:
 static void media_player_ctx_init(MediaPlayerContext* ctx)
 {
     ctx->state = MEDIA_PLAYER_STATE_STOPPED;
-    ctx->cmd_max = MEDIA_PLAYER_CMD_QUEUE_MAX;
+    ctx->cmd_max = CONFIG_MEDIA_PLAYER_CMD_QUEUE_SIZE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
     ctx->sync_mode = MEDIA_PLAYER_SYNC_MODE_SYSTEM;
@@ -1378,7 +1373,7 @@ static void media_player_poll(MediaPlayerContext* ctx)
         if (!ctx->poll[i].get_pollfds)
             continue;
 
-        ret = ctx->poll[i].get_pollfds(ctx, &ctx->fds[n], MEDIA_PLAYER_MAX_POLLFDS - n);
+        ret = ctx->poll[i].get_pollfds(ctx, &ctx->fds[n], CONFIG_MEDIA_PLAYER_MAX_POLLFDS - n);
         if (ret < 0) {
             MEDIA_ERR("get pollfd failed %d\n", ret);
             continue;
@@ -1409,7 +1404,7 @@ static MediaPlayerContext* media_player_get_available_session(MediaPlayerPriv* p
     MediaPlayerContext* ctx = NULL;
     int i;
 
-    for (i = 0; i < MEDIA_PLAYER_MAX_CNT; i++) {
+    for (i = 0; i < CONFIG_MEDIA_PLAYER_MAX_CNT; i++) {
         ctx = &priv->ctxs[i];
         if (ctx->state == MEDIA_PLAYER_STATE_IDLE)
             break;
@@ -1426,7 +1421,7 @@ static void media_player_dump(MediaPlayerPriv* priv)
 
     av_bprint_init(&buf, 0, AV_BPRINT_SIZE_UNLIMITED);
     av_bprintf(&buf, "\n--------------player dump start-------------\n");
-    for (i = 0; i < MEDIA_PLAYER_MAX_CNT; i++) {
+    for (i = 0; i < CONFIG_MEDIA_PLAYER_MAX_CNT; i++) {
         ctx = &priv->ctxs[i];
         if (ctx->state == MEDIA_PLAYER_STATE_IDLE)
             continue;
