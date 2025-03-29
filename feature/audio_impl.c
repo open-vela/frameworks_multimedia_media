@@ -977,12 +977,16 @@ FtString system_audio_get_streamType(void* feature, union AppendData append_data
 {
     FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
+    FtString src;
 
     obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return MEDIA_STREAM_MUSIC;
 
-    return obj->streamType;
+    src = (FtString)FeatureMalloc(MAX_STREAMTYPE_LEN + 1, FT_CHAR);
+    strncpy((char*)src, obj->streamType, MAX_STREAMTYPE_LEN);
+
+    return src;
 }
 
 /* event funciton*/
