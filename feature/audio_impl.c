@@ -31,6 +31,8 @@ static const char* file_tag = "[jidl_feature] audio_impl";
 
 #define APP_PATH_PREFIX "internal://"
 
+#define EPSILON 1e-6
+
 typedef enum {
     MEDIA_STATE_NONE,
     MEDIA_STATE_OPENING,
@@ -78,6 +80,7 @@ typedef struct {
     float duration;
     float percent;
     float volume;
+    float mutedvolume; /* Store volume before mute. */
     bool autoplay;
     bool loop;
 } AudioObject;
@@ -699,7 +702,7 @@ void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, union AppendD
     audiostate->autoplay = obj->autoplay;
     audiostate->loop = obj->loop;
     audiostate->volume = obj->volume;
-    audiostate->muted = obj->volume == 0;
+    audiostate->muted = obj->volume < EPSILON;
     audiostate->duration = obj->duration;
     audiostate->percent = obj->percent;
 
@@ -950,8 +953,24 @@ FtBool system_audio_get_muted(void* feature, union AppendData append_data)
 
 void system_audio_set_muted(void* feature, union AppendData append_data, FtBool muted)
 {
-    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
-    return system_audio_set_volume(feature, append_data, 0);
+    FEATURE_LOG_INFO("%s::%s(), muted: %d\n", file_tag, __FUNCTION__, muted);
+
+    AudioObject* obj;
+
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
+    if (!obj || !obj->player)
+        return;
+
+    if (muted) {
+        if (obj->volume > 0)
+            obj->mutedvolume = obj->volume;
+
+        system_audio_set_volume(feature, append_data, 0);
+        return;
+    }
+
+    if (obj->mutedvolume > 0)
+        system_audio_set_volume(feature, append_data, obj->mutedvolume);
 }
 
 FtString system_audio_get_streamType(void* feature, union AppendData append_data)
