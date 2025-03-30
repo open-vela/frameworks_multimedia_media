@@ -748,6 +748,11 @@ void system_audio_set_src(void* feature, union AppendData append_data, FtString 
     if (!obj || !src)
         return;
 
+    if (obj->state > MEDIA_STATE_PREPARED) {
+        FEATURE_LOG_WARN("player:%p already prepared, cannot set src.", obj->player);
+        return;
+    }
+
     pkg = FeatureGetPackageName(FeatureGetProtoHandle(feature));
     if (!pkg)
         return;
