@@ -57,6 +57,8 @@ typedef struct {
     CallbackInfo ondurationchange;
     CallbackInfo ontimeupdate;
     CallbackInfo onerror;
+    CallbackInfo onctrlplayprev;
+    CallbackInfo onctrlplaynext;
 } Event;
 
 typedef struct {
@@ -343,6 +345,16 @@ static void audio_session_event_callback(void* cookie, int event, int ret, const
 
     case MEDIA_EVENT_STOP:
         media_uv_player_stop(obj->player, NULL, NULL);
+        break;
+
+    case MEDIA_EVENT_PREV_SONG:
+        if (FeatureCheckCallbackId(obj->event.onctrlplayprev.feature, obj->event.onctrlplayprev.callbackId))
+            FeatureInvokeCallback(obj->event.onctrlplayprev.feature, obj->event.onctrlplayprev.callbackId);
+        break;
+
+    case MEDIA_EVENT_NEXT_SONG:
+        if (FeatureCheckCallbackId(obj->event.onctrlplaynext.feature, obj->event.onctrlplaynext.callbackId))
+            FeatureInvokeCallback(obj->event.onctrlplaynext.feature, obj->event.onctrlplaynext.callbackId);
         break;
 
     default:
@@ -1097,4 +1109,30 @@ void system_audio_set_onerror(void* feature, union AppendData append_data, FtCal
 
     obj->event.onerror.callbackId = onerror;
     obj->event.onerror.feature = feature;
+}
+
+void system_audio_set_onctrlplayprev(void* feature, AppendData append_data, FtCallbackId onctrlplayprev)
+{
+    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    AudioObject* obj;
+
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
+    if (!obj)
+        return;
+
+    obj->event.onctrlplayprev.callbackId = onctrlplayprev;
+    obj->event.onctrlplayprev.feature = feature;
+}
+
+void system_audio_set_onctrlplaynext(void* feature, AppendData append_data, FtCallbackId onctrlplaynext)
+{
+    FEATURE_LOG_DEBUG("%s::%s(),\n", file_tag, __FUNCTION__);
+    AudioObject* obj;
+
+    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
+    if (!obj)
+        return;
+
+    obj->event.onctrlplaynext.callbackId = onctrlplaynext;
+    obj->event.onctrlplaynext.feature = feature;
 }
