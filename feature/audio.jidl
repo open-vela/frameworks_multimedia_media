@@ -73,3 +73,5 @@ property on_event onended writeonly;
 property on_event ondurationchange writeonly;
 property on_event ontimeupdate writeonly;
 property on_event onerror writeonly;
+property on_event onctrlplayprev writeonly;
+property on_event onctrlplaynext writeonly;
