@@ -181,8 +181,35 @@ void system_audio_onDetached(FeatureRuntimeContext ctx, FeatureInstanceHandle ha
         return;
 
     FEATURE_LOG_INFO("%s::%s(), FeatureInstanceHandle: %p\n", file_tag, __FUNCTION__, handle);
+    if (obj->event.onplay.feature == handle) {
+        obj->event.onplay.feature = NULL;
+    }
+    if (obj->event.onpause.feature == handle) {
+        obj->event.onpause.feature = NULL;
+    }
+
+    if (obj->event.onstop.feature == handle) {
+        obj->event.onstop.feature = NULL;
+    }
+
+    if (obj->event.onloadeddata.feature == handle) {
+        obj->event.onloadeddata.feature = NULL;
+    }
+
+    if (obj->event.onended.feature == handle) {
+        obj->event.onended.feature = NULL;
+    }
+
+    if (obj->event.ondurationchange.feature == handle) {
+        obj->event.ondurationchange.feature = NULL;
+    }
+
     if (obj->event.ontimeupdate.feature == handle) {
         obj->event.ontimeupdate.feature = NULL;
+    }
+
+    if (obj->event.onerror.feature == handle) {
+        obj->event.onerror.feature = NULL;
     }
 }
 
