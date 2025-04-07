@@ -931,6 +931,11 @@ void system_audio_set_volume(void* feature, union AppendData append_data, FtFloa
     if (!obj || !obj->player)
         return;
 
+    if (volume < 0)
+        volume = 0;
+    else if (volume > 1)
+        volume = 1;
+
     manager = FeatureGetManagerHandleFromProto(obj->proto);
     loop = FeatureGetUVLoop(manager);
     media_uv_policy_set_stream_volume(loop, obj->streamType, volume * 10, NULL, NULL);
