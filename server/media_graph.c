@@ -63,6 +63,11 @@
 #define FLAG_RES_PRECOPIED (1 << 11)
 #define FLAG_FAST_PROC_CMD (1 << 12)
 
+#define MAX_LINKS 10
+
+#define ROUTE_OFF 0
+#define ROUTE_ON 1
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -158,6 +163,51 @@ static void media_graph_log_callback(void* avcl, int level,
     vsyslog(level, fmt, vl);
 }
 
+static int media_graph_config_pointers(AVFilterGraph* graph)
+{
+    FFFilterGraph* ffgraph = fffiltergraph(graph);
+    int sink_links_count = 0, n = 0;
+    FilterLinkInternal** sinks;
+    FilterLinkInternal* li;
+    AVFilterContext* f;
+    unsigned i, j;
+
+    for (i = 0; i < graph->nb_filters; i++) {
+        f = graph->filters[i];
+        for (j = 0; j < f->nb_inputs; j++) {
+            li = (FilterLinkInternal*)f->inputs[j];
+            li->age_index = -1;
+        }
+        for (j = 0; j < f->nb_outputs; j++) {
+            li = (FilterLinkInternal*)f->outputs[j];
+            li->age_index = -1;
+        }
+        if (!f->nb_outputs) {
+            if (f->nb_inputs > INT_MAX - sink_links_count)
+                return AVERROR(EINVAL);
+            sink_links_count += f->nb_inputs;
+        }
+    }
+    sinks = av_calloc(sink_links_count, sizeof(*sinks));
+    if (!sinks)
+        return AVERROR(ENOMEM);
+    for (i = 0; i < graph->nb_filters; i++) {
+        f = graph->filters[i];
+        if (!f->nb_outputs) {
+            for (j = 0; j < f->nb_inputs; j++) {
+                li = (FilterLinkInternal*)f->inputs[j];
+                sinks[n] = li;
+                sinks[n]->age_index = n;
+                n++;
+            }
+        }
+    }
+
+    ffgraph->sink_links = sinks;
+    ffgraph->sink_links_count = sink_links_count;
+    return 0;
+}
+
 /* When graph init is executed, this function needs
  * to be called to set link status to eof and to 0
  * when linking.
@@ -229,11 +279,9 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
 
     avfilter_graph_set_auto_convert(priv->graph, AVFILTER_AUTO_CONVERT_NONE);
 
-    ret = avfilter_graph_config(priv->graph, NULL);
-    if (ret < 0) {
-        MEDIA_ERR("%s, media graph config error\n", __func__);
+    ret = media_graph_config_pointers(priv->graph);
+    if (ret < 0)
         goto out;
-    }
 
     /* set the status of all links to AVERROR_EOF */
     media_graph_set_links_status(priv->graph, AVERROR_EOF);
@@ -355,6 +403,83 @@ err:
     return -ENOMEM;
 }
 
+static int media_graph_calc_active_inputs(MediaCommand* cmd, int map[MAX_LINKS], int* inputs_indexs)
+{
+    AVFilterContext* src_filter;
+    AVFilterLink* out_link;
+    int ret, i, j;
+    int count = 0;
+
+    for (i = 0; i < cmd->filter->nb_inputs; i++) {
+        src_filter = cmd->filter->inputs[i]->src;
+
+        ret = av_opt_get_array(src_filter, "map_array", AV_OPT_SEARCH_CHILDREN, 0, src_filter->nb_outputs, AV_OPT_TYPE_INT, map);
+        if (ret < 0)
+            return ret;
+
+        for (j = 0; j < src_filter->nb_outputs; j++) {
+            out_link = src_filter->outputs[j];
+            if (map[j] == ROUTE_ON && !strcmp(out_link->dst->name, cmd->filter->name))
+                inputs_indexs[count++] = i;
+        }
+    }
+
+    return count;
+}
+
+static void media_graph_config_links(AVFilterLink** links, int map[MAX_LINKS], int nb_links,
+    int format, int sample_rate, int channels, bool playback, int* inputs_indexs)
+{
+    FilterLinkInternal* li;
+    AVFilterLink* link;
+    int i;
+
+    for (i = 0; i < nb_links; i++) {
+        link = playback ? links[i] : links[inputs_indexs[i]];
+        if (playback && map[i] == ROUTE_OFF)
+            continue;
+
+        link->format = format;
+        link->sample_rate = sample_rate;
+        av_channel_layout_default(&link->ch_layout, channels);
+        link->time_base = (AVRational) { 1, sample_rate };
+
+        li = (FilterLinkInternal*)link;
+        li->status_in = 0;
+        li->status_out = 0;
+    }
+}
+
+static int media_graph_proc_link(MediaCommand* cmd)
+{
+    bool playback = (cmd->filter->nb_inputs == 0);
+    int nb_links = playback ? cmd->filter->nb_outputs : cmd->filter->nb_inputs;
+    AVFilterLink** links = playback ? cmd->filter->outputs : cmd->filter->inputs;
+    int inputs_indexs[MAX_LINKS] = { 0 };
+    int format, sample_rate, channels;
+    int map[MAX_LINKS] = { 0 };
+    int ret = 0;
+
+    if (sscanf(cmd->arg, "%*p %*p fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels) != 3) {
+        MEDIA_ERR("Invalid link args: %s\n", cmd->arg);
+        return -EINVAL;
+    }
+
+    if (playback) { // Playback
+        ret = av_opt_get_array(cmd->filter, "map_array", AV_OPT_SEARCH_CHILDREN, 0, cmd->filter->nb_outputs, AV_OPT_TYPE_INT, map);
+        if (ret < 0)
+            return ret;
+    } else { // Capture
+        nb_links = media_graph_calc_active_inputs(cmd, map, inputs_indexs);
+        if (nb_links < 0)
+            return nb_links;
+    }
+
+    media_graph_config_links(links, map, nb_links, format, sample_rate, channels, playback, inputs_indexs);
+
+    return ret;
+}
+
 static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 {
     MediaCommand* cmd;
@@ -370,6 +495,14 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
     if (process) {
         av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
             cmd->filter->name, cmd->cmd, cmd->arg ? cmd->arg : "_");
+
+        if (!strcmp(cmd->cmd, "link")) {
+            ret = media_graph_proc_link(cmd);
+            if (ret < 0) {
+                MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
+                goto exit;
+            }
+        }
 
         ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
             cmd->res, 0, cmd->flags);
@@ -388,7 +521,7 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 
     free(cmd);
 
-    return 0;
+    return ret;
 
 exit:
     pthread_mutex_unlock(&priv->qlock);
@@ -723,7 +856,8 @@ int media_graph_audio_open(MediaGraphAudio** pctx,
         goto fail;
     }
 
-    snprintf(msg, sizeof(msg), "%p %p", on_event_cb, udata);
+    snprintf(msg, sizeof(msg), "%p %p fmt=%d:rate=%d:ch=%d", on_event_cb,
+        udata, format, sample_rate, channels);
     ret = media_graph_queue_command(priv, ctx->src, "link", msg, (char*)&ctx->link_handle, sizeof(void**), FLAG_RES_PRECOPIED);
     if (ret < 0) {
         MEDIA_ERR("%s link failed ret:%d\n", ctx->src->name, ret);
