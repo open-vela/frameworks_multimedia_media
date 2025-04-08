@@ -58,7 +58,7 @@
 
 #define MAX_GRAPH_SIZE 4096
 #define MAX_POLL_FILTERS 32 
-#define MAX_LINKS 10
+
 #define FLAG_ARG_PRECOPIED (1 << 10)
 #define FLAG_RES_PRECOPIED (1 << 11)
 #define FLAG_FAST_PROC_CMD (1 << 12)
@@ -234,319 +234,6 @@ out:
     return ret;
 }
 
-static int media_graph_query_formats(AVFilterContext* ctx)
-{
-    int ret;
-
-    if (ctx->filter->formats_state == FF_FILTER_FORMATS_QUERY_FUNC) {
-        if ((ret = ctx->filter->formats.query_func(ctx)) < 0) {
-            if (ret != AVERROR(EAGAIN))
-                av_log(ctx, AV_LOG_ERROR, "Query format failed for '%s': %s\n",
-                    ctx->name, av_err2str(ret));
-            return ret;
-        }
-    } else if (ctx->filter->formats_state == FF_FILTER_FORMATS_QUERY_FUNC2) {
-        AVFilterFormatsConfig *cfg_in_stack[64], *cfg_out_stack[64];
-        AVFilterFormatsConfig **cfg_in_dyn = NULL, **cfg_out_dyn = NULL;
-        AVFilterFormatsConfig **cfg_in, **cfg_out;
-
-        if (ctx->nb_inputs > FF_ARRAY_ELEMS(cfg_in_stack)) {
-            cfg_in_dyn = av_malloc_array(ctx->nb_inputs, sizeof(*cfg_in_dyn));
-            if (!cfg_in_dyn)
-                return AVERROR(ENOMEM);
-            cfg_in = cfg_in_dyn;
-        } else
-            cfg_in = ctx->nb_inputs ? cfg_in_stack : NULL;
-
-        for (unsigned i = 0; i < ctx->nb_inputs; i++) {
-            AVFilterLink* l = ctx->inputs[i];
-            cfg_in[i] = &l->outcfg;
-        }
-
-        if (ctx->nb_outputs > FF_ARRAY_ELEMS(cfg_out_stack)) {
-            cfg_out_dyn = av_malloc_array(ctx->nb_outputs, sizeof(*cfg_out_dyn));
-            if (!cfg_out_dyn) {
-                av_freep(&cfg_in_dyn);
-                return AVERROR(ENOMEM);
-            }
-            cfg_out = cfg_out_dyn;
-        } else
-            cfg_out = ctx->nb_outputs ? cfg_out_stack : NULL;
-
-        for (unsigned i = 0; i < ctx->nb_outputs; i++) {
-            AVFilterLink* l = ctx->outputs[i];
-            cfg_out[i] = &l->incfg;
-        }
-
-        ret = ctx->filter->formats.query_func2(ctx, cfg_in, cfg_out);
-        av_freep(&cfg_in_dyn);
-        av_freep(&cfg_out_dyn);
-        if (ret < 0) {
-            if (ret != AVERROR(EAGAIN))
-                av_log(ctx, AV_LOG_ERROR, "Query format failed for '%s': %s\n",
-                    ctx->name, av_err2str(ret));
-            return ret;
-        }
-    }
-
-    return 0;
-}
-
-static void media_graph_find_elink(AVFilterLink** elink, AVFilterLink* slink)
-{
-    AVFilterContext* filter = slink->dst;
-
-    if (filter->nb_outputs == 0) {
-        *elink = slink;
-        return;
-    }
-
-    return media_graph_find_elink(elink, filter->outputs[0]);
-}
-
-static int media_graph_find_active_link(AVFilterLink* slink[], int* index, AVFilterContext* filter, AVFilterLink* elink)
-{
-    int* map[MAX_LINKS];
-    int ret;
-    int i;
-
-    ret = av_opt_get_array(filter, "map_array", AV_OPT_SEARCH_CHILDREN, 0, filter->nb_outputs, AV_OPT_TYPE_INT, map);
-    if (ret < 0)
-        return ret;
-
-    for (i = 0; i < filter->nb_outputs; i++)
-        if (map[i] == 0 && (elink == NULL || filter->outputs[i] == elink))
-            slink[(*index)++] = filter->outputs[i];
-
-    return 0;
-}
-
-static int media_graph_find_slink(AVFilterLink* slink[], int* index, AVFilterLink* elink)
-{
-    AVFilterContext* filter = elink->src;
-    int ret;
-    int i;
-
-    // src filter
-    if (filter->nb_inputs == 0) {
-        return media_graph_find_active_link(slink, index, filter, elink);
-    }
-
-    for (i = 0; i < filter->nb_inputs; i++) {
-        ret = media_graph_find_slink(slink, index, filter->inputs[i]);
-        if (ret < 0)
-            return ret;
-    }
-
-    return 0;
-}
-
-static int media_graph_pick_formats(AVFilterLink* slink, AVFilterLink* elink, int format, int sample_rate, int channels, bool is_player)
-{
-    AVFilterFormatsConfig* cfg;
-    AVChannelLayout* ch = NULL;
-    AVChannelLayout layout;
-    int rate = -1;
-    int fmt = -1;
-    int ret;
-    int i;
-
-    if (!is_player) {
-        fmt = format;
-        rate = sample_rate;
-        av_channel_layout_default(&layout, channels);
-        ch = &layout;
-        goto pick_values;
-    }
-
-    if (avfilter_link_is_active(elink)) {
-        fmt = elink->format;
-        rate = elink->sample_rate;
-        ch = &elink->ch_layout;
-        goto pick_values;
-    }
-
-    ret = media_graph_query_formats(elink->dst);
-    if (ret < 0)
-        return ret;
-
-    cfg = &elink->outcfg;
-
-    for (i = 0; i < cfg->formats->nb_formats; i++) {
-        if (cfg->formats->formats[i] == format) {
-            fmt = format;
-            break;
-        }
-    }
-
-    if (fmt == -1)
-        fmt = cfg->formats->formats[0];
-
-    for (i = 0; i < cfg->samplerates->nb_formats; i++) {
-        if (cfg->samplerates->formats[i] == sample_rate) {
-            rate = sample_rate;
-            break;
-        }
-    }
-
-    if (rate == -1)
-        rate = cfg->samplerates->formats[0];
-
-    for (i = 0; i < cfg->channel_layouts->nb_channel_layouts; i++) {
-        if (cfg->channel_layouts->channel_layouts[i].nb_channels == channels) {
-            ch = &cfg->channel_layouts->channel_layouts[i];
-            break;
-        }
-    }
-
-    if (ch == NULL)
-        ch = &cfg->channel_layouts->channel_layouts[0];
-
-pick_values:
-    slink->format = fmt;
-    slink->sample_rate = rate;
-    ret = av_channel_layout_copy(&slink->ch_layout, ch);
-
-    return ret;
-}
-
-static int media_graph_set_formats_recursive(AVFilterLink* slink, AVFilterLink* elink)
-{
-    AVFilterLink* nlink;
-    int ret;
-
-    nlink = slink->dst->outputs[0];
-
-    if (avfilter_link_is_active(nlink))
-        return 0;
-
-    nlink->format = slink->format;
-    nlink->sample_rate = slink->sample_rate;
-    ret = av_channel_layout_copy(&nlink->ch_layout, &slink->ch_layout);
-    if (ret < 0)
-        return ret;
-
-    if (nlink == elink)
-        return 0;
-
-    return media_graph_set_formats_recursive(nlink, elink);
-}
-
-static int media_graph_config_link(AVFilterLink* slink, int format, int sample_rate, int channels, bool is_player)
-{
-    AVFilterLink* elink;
-    int ret;
-
-    media_graph_find_elink(&elink, slink);
-
-    ret = media_graph_pick_formats(slink, elink, format, sample_rate, channels, is_player);
-    if (ret < 0)
-        return ret;
-
-    ret = media_graph_set_formats_recursive(slink, elink);
-    if (ret < 0)
-        return 0;
-
-    return 0;
-}
-
-static int media_graph_config(AVFilterContext* ctx, int format, int sample_rate, int channels)
-{
-    AVFilterLink* slink[MAX_LINKS];
-    int index = 0;
-    int ret;
-    int i;
-
-    if (ctx->nb_inputs == 0) { // src filter
-        ret = media_graph_find_active_link(slink, &index, ctx, NULL);
-        if (ret < 0)
-            return ret;
-    } else if (ctx->nb_outputs == 0) { // sink filter
-        ret = media_graph_find_slink(slink, &index, ctx->inputs[0]);
-        if (ret < 0)
-            return ret;
-    } else {
-        av_log(ctx, AV_LOG_ERROR, "%s invalid filter: %s\n", __func__, ctx->name);
-        return -EINVAL;
-    }
-
-    for (i = 0; i < index; i++) {
-        ret = media_graph_config_link(slink[i], format, sample_rate, channels, ctx->nb_inputs == 0);
-        if (ret < 0)
-            return ret;
-    }
-
-    MEDIA_INFO("media_graph_config success. fmt:%d, rate:%d, ch:%d\n", format, sample_rate, channels);
-    return 0;
-}
-
-void media_graph_cale_input_status(AVFilterLink* link, int* active)
-{
-    AVFilterContext* ctx = link->src;
-    int i;
-
-    if (ctx->nb_inputs == 0) {
-        *active += avfilter_link_is_active(link);
-        return;
-    }
-
-    for (i = 0; i < ctx->nb_inputs; i++)
-        media_graph_cale_input_status(ctx->inputs[i], active);
-}
-
-bool media_graph_check_sink_status(AVFilterContext* ctx)
-{
-    int active = 0;
-
-    if (!avfilter_link_is_active(ctx->inputs[0]))
-        return false;
-
-    media_graph_cale_input_status(ctx->inputs[0], &active);
-
-    if (active == 0)
-        return true;
-
-    return false;
-}
-
-bool media_graph_has_pending_status(AVFilterContext* ctx)
-{
-    AVFilterLink* slink[MAX_LINKS];
-    AVFilterLink* elink[MAX_LINKS];
-    int index = 0;
-    int ret;
-    int i;
-
-    if (ctx->nb_inputs == 0) { // src filter
-        ret = media_graph_find_active_link(slink, &index, ctx, NULL);
-        if (ret < 0)
-            return ret;
-
-        /* find all end point */
-        for (i = 0; i < index; i++)
-            media_graph_find_elink(&elink[i], slink[i]);
-    } else if (ctx->nb_outputs == 0) { // sink filter
-        elink[0] = ctx->inputs[0];
-        index = 1;
-    } else {
-        av_log(ctx, AV_LOG_ERROR, "%s invalid filter: %s\n", __func__, ctx->name);
-        return false;
-    }
-
-    for (i = 0; i < index; i++) {
-        ret = media_graph_check_sink_status(elink[i]->dst);
-        if (ret == true)
-            return ret;
-    }
-
-    return false;
-}
-
-static inline bool media_graph_filter_is_tail(AVFilterContext* ctx)
-{
-    return ctx && ctx->nb_outputs == 0;
-}
-
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -645,9 +332,6 @@ err:
 static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 {
     MediaCommand* cmd;
-    int sample_rate;
-    int channels;
-    int format;
     int ret = 0;
 
     pthread_mutex_lock(&priv->qlock);
@@ -660,21 +344,6 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
     if (process) {
         av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
             cmd->filter->name, cmd->cmd, cmd->arg ? cmd->arg : "_");
-
-        /* do reconfig*/
-        if (!strcmp(cmd->cmd, "link")) {
-            ret = sscanf(cmd->arg, "%*p %*p fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels);
-            if (ret == 3) {
-                if (media_graph_has_pending_status(cmd->filter)) {
-                    ret = -EAGAIN;
-                    goto exit;
-                }
-
-                ret = media_graph_config(cmd->filter, format, sample_rate, channels);
-                if (ret < 0)
-                    MEDIA_ERR("media_graph_config Failed: %d\n", ret);
-            }
-        }
 
         ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
             cmd->res, 0, cmd->flags);
@@ -986,30 +655,6 @@ static void media_graph_try_touch(MediaGraphPriv* priv)
     }
 }
 
-static int media_graph_stream_notify_head(MediaGraphPriv* priv, AVFilterContext* ctx, char* cmd)
-{
-    AVFilterLink* slink[MAX_LINKS];
-    char msg[32] = { 0 };
-    int index = 0;
-    int ret;
-    int i;
-
-    ret = media_graph_find_slink(slink, &index, ctx->inputs[0]);
-    if (ret < 0)
-        return ret;
-
-    for (i = 0; i < index; i++) {
-        snprintf(msg, sizeof(msg), "%p", slink[i]);
-        ret = media_graph_queue_command(priv, slink[i]->src, cmd, msg, NULL, 0, 0);
-        if (ret < 0)
-            return ret;
-
-        MEDIA_INFO("notify \"%s\" to filter %s success.", cmd, slink[i]->src->name);
-    }
-
-    return 0;
-}
-
 MediadPlugin media_graph_plugin = {
     .name = "media_graph",
     .priv_size = sizeof(MediaGraphPriv),
@@ -1032,9 +677,9 @@ int media_graph_audio_open(MediaGraphAudio** pctx,
     int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
-    MediaGraphAudio* ctx;
     char stream_name[64] = { 0 };
     char msg[128] = { 0 };
+    MediaGraphAudio* ctx;
     int ret;
 
     ctx = av_calloc(1, sizeof(*ctx));
@@ -1052,20 +697,11 @@ int media_graph_audio_open(MediaGraphAudio** pctx,
         goto fail;
     }
 
-    snprintf(msg, sizeof(msg), "%p %p fmt=%d:rate=%d:ch=%d", on_event_cb,
-        udata, format, sample_rate, channels);
+    snprintf(msg, sizeof(msg), "%p %p", on_event_cb, udata);
     ret = media_graph_queue_command(priv, ctx->src, "link", msg, (char*)&ctx->link_handle, sizeof(void**), FLAG_RES_PRECOPIED);
     if (ret < 0) {
         MEDIA_ERR("%s link failed ret:%d\n", ctx->src->name, ret);
         goto fail;
-    }
-
-    if (media_graph_filter_is_tail(ctx->src)) {
-        ret = media_graph_stream_notify_head(priv, ctx->src, "link");
-        if (ret < 0) {
-            MEDIA_ERR("notify \"link\" to %s stream head failed: %d\n", ctx->src->name, ret);
-            goto fail;
-        }
     }
 
     media_graph_try_touch(priv);
@@ -1086,11 +722,6 @@ int media_graph_audio_close(MediaGraphAudio** pctx)
         return -EINVAL;
 
     ret = media_graph_queue_command(priv, ctx->src, "unlink", (char*)ctx->link_handle, NULL, 0, FLAG_ARG_PRECOPIED);
-
-    if (media_graph_filter_is_tail(ctx->src))
-        /* unlink and trigger pcmxc send empty frame flush record pipe*/
-        ret = media_graph_stream_notify_head(priv, ctx->src, "unlink");
-
     if (ret < 0)
         MEDIA_ERR("unlink %s failed: %d\n", ctx->src->name, ret);
 
