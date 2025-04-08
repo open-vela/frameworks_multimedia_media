@@ -699,7 +699,7 @@ void system_audio_wrap_getPlayState(FeatureInstanceHandle feature, union AppendD
     audiostate->autoplay = obj->autoplay;
     audiostate->loop = obj->loop;
     audiostate->volume = obj->volume;
-    audiostate->mute = obj->volume == 0;
+    audiostate->muted = obj->volume == 0;
     audiostate->duration = obj->duration;
     audiostate->percent = obj->percent;
 
