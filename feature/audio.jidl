@@ -28,7 +28,7 @@ struct AudioState {
     boolean autoplay;
     boolean loop;
     float volume;
-    boolean mute;
+    boolean muted;
     float duration;
     float percent;
 };
