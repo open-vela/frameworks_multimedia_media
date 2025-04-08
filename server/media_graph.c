@@ -158,6 +158,29 @@ static void media_graph_log_callback(void* avcl, int level,
     vsyslog(level, fmt, vl);
 }
 
+/* When graph init is executed, this function needs
+ * to be called to set link status to eof and to 0
+ * when linking.
+ */
+static void media_graph_set_links_status(AVFilterGraph* graph, int status)
+{
+    AVFilterContext* filt;
+    int i, j;
+
+    for (i = 0; i < graph->nb_filters; i++) {
+        filt = graph->filters[i];
+
+        if (filt->nb_inputs == 0) {
+            for (j = 0; j < filt->nb_outputs; j++) {
+                AVFilterLink* outlink = filt->outputs[j];
+                FilterLinkInternal* li = (FilterLinkInternal*)outlink;
+                li->status_in = status;
+                li->status_out = status;
+            }
+        }
+    }
+}
+
 static int media_graph_load(MediaGraphPriv* priv, char* conf)
 {
     char graph_desc[MAX_GRAPH_SIZE];
@@ -211,6 +234,9 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
         MEDIA_ERR("%s, media graph config error\n", __func__);
         goto out;
     }
+
+    /* set the status of all links to AVERROR_EOF */
+    media_graph_set_links_status(priv->graph, AVERROR_EOF);
 
     priv->graph->opaque = priv;
 
