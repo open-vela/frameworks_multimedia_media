@@ -567,6 +567,10 @@ static int media_player_open_decoder(MediaPlayerContext* ctx, OutputStream* stre
         goto out;
     }
 
+    AVDictionaryEntry* tag = NULL;
+    if ((tag = av_dict_get(ctx->format_opt, "request_sample_fmt", NULL, 0)))
+        stream->codec_ctx->request_sample_fmt = av_get_sample_fmt(tag->value);
+
     ret = avcodec_parameters_to_context(stream->codec_ctx, codecpar);
     if (ret < 0)
         goto out;
