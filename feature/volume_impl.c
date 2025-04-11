@@ -92,10 +92,7 @@ static void finish_callback(int status, FeatureInstanceHandle feature, const cha
     system_volume_GetRet* volumeRet, VolumeHandle* handle)
 {
     if ((status == 0) && (FeatureCheckCallbackId(handle->feature, handle->success))) {
-        if (volumeRet == NULL)
-            FeatureInvokeCallback(feature, handle->success, "success");
-        else
-            FeatureInvokeCallback(handle->feature, handle->success, volumeRet);
+        FeatureInvokeCallback(handle->feature, handle->success, volumeRet);
         FeatureRemoveCallback(feature, handle->success);
     } else if (FeatureCheckCallbackId(feature, handle->fail)) {
         FeatureInvokeCallback(feature, handle->fail, msg, status);
@@ -116,7 +113,12 @@ static void volume_set_cb(void* arg, int ret)
 
     VolumeHandle* handle = (VolumeHandle*)(arg);
     FEATURE_LOG_INFO("[volume_set_cb:%d] ret=%d", handle->op, ret);
-    finish_callback(ret, handle->feature, "volume_set_cb failed", NULL, handle);
+    if (ret >= 0) {
+        system_volume_GetRet* volumeRet = system_volumeMallocGetRet();
+        volumeRet->value = handle->value;
+        finish_callback(0, handle->feature, "success", volumeRet, handle);
+    } else
+        finish_callback(ret, handle->feature, "volume_set_cb failed", NULL, handle);
 }
 
 static void volume_get_cb(void* arg, int ret, int value)
