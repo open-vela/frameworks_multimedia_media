@@ -262,6 +262,11 @@ static void audio_close(AudioObject* obj)
     if (!obj)
         return;
 
+    if (!obj->player && !obj->session) {
+        free(obj);
+        return;
+    }
+
     ret = media_uv_player_close(obj->player, 0, audio_player_close_cb);
     if (ret < 0) {
         FEATURE_LOG_ERROR("player:%p close, ret:%d\n", obj->player, ret);
@@ -474,6 +479,15 @@ static void audio_open_cb(void* cookie, int ret)
         FEATURE_LOG_ERROR("player:%p open failed, ret:%d\n", obj->player, ret);
         if (FeatureCheckCallbackId(obj->event.onerror.feature, obj->event.onerror.callbackId))
             FeatureInvokeCallback(obj->event.onerror.feature, obj->event.onerror.callbackId);
+        if (obj->player) {
+            media_uv_player_close(obj->player, 0, NULL);
+            obj->player = NULL;
+        }
+        if (obj->session) {
+            media_uv_session_unregister(obj->session, NULL);
+            obj->session = NULL;
+        }
+
         return;
     }
 
