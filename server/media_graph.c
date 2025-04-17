@@ -440,6 +440,10 @@ static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
         }
 
         return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
+    } else if (!strcmp(cmd, "sample_rate")) {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "cmd=%s:arg=%s", cmd, arg);
+        return avfilter_process_command(filter, "set_parameter", msg, res, res_len, flags);
     }
 
     newcmd = media_graph_create_command(cmd, arg, res, filter, flags);
