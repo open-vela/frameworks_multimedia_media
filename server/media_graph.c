@@ -89,6 +89,7 @@ typedef struct MediaGraphPriv {
     int fd;
     void* pollfts[MAX_POLL_FILTERS];
     int pollftn;
+    pid_t tid;
 
     TAILQ_HEAD(, MediaCommand)
     cmdq;
@@ -331,6 +332,8 @@ static int media_graph_init(MediadPlugin* ctx)
     if (ret < 0)
         goto err;
 
+    priv->tid = gettid();
+
     TAILQ_INIT(&priv->cmdq);
     pthread_mutex_init(&priv->qlock, NULL);
 
@@ -542,12 +545,6 @@ static int media_graph_format_transfer(MediaCommand* cmd)
     return ret;
 }
 
-static void media_graph_try_touch(MediaGraphPriv* priv)
-{
-    eventfd_t val = 1;
-    file_write(priv->filep, &val, sizeof(val));
-}
-
 static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 {
     MediaCommand* cmd;
@@ -570,9 +567,6 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
                 MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
                 goto exit;
             }
-
-            if (!strcmp(cmd->cmd, "map"))
-                media_graph_try_touch(priv);
         }
 
         if (!(cmd->flags & FLAG_FAST_PROC_CMD))
@@ -877,6 +871,14 @@ static int media_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn
     }
 
     return 0;
+}
+
+static void media_graph_try_touch(MediaGraphPriv* priv)
+{
+    if (priv->tid != gettid()) {
+        eventfd_t val = 1;
+        file_write(priv->filep, &val, sizeof(val));
+    }
 }
 
 MediadPlugin media_graph_plugin = {
