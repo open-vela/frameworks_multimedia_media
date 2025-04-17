@@ -440,6 +440,10 @@ static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
         }
 
         return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
+    } else if (!strcmp(cmd, "volume")) {
+        char msg[32];
+        snprintf(msg, sizeof(msg), "stream_volume=%s", arg);
+        return avfilter_process_command(filter, "set_parameter", msg, res, res_len, flags);
     } else if (!strcmp(cmd, "sample_rate")) {
         char msg[128];
         snprintf(msg, sizeof(msg), "%s=%s", cmd, arg);
@@ -972,7 +976,7 @@ int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, c
     if (!ctx || !param || !value)
         return -EINVAL;
 
-    snprintf(msg, sizeof(msg), "%p %s %s", ctx->link_handle, param, value);
+    snprintf(msg, sizeof(msg), "%s=%s", param, value);
 
     ret = media_graph_queue_command(priv, ctx->src, "set_parameter", msg, NULL, 0, 0);
     if (ret < 0)
