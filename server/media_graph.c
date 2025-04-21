@@ -90,6 +90,7 @@ typedef struct MediaGraphPriv {
     void* pollfts[MAX_POLL_FILTERS];
     int pollftn;
     pid_t tid;
+    int* filter_states;
 
     TAILQ_HEAD(, MediaCommand)
     cmdq;
@@ -333,14 +334,21 @@ static int media_graph_init(MediadPlugin* ctx)
         goto err;
 
     priv->tid = gettid();
+    priv->filter_states = av_mallocz(priv->graph->nb_filters * sizeof(int));
+    if (!priv->filter_states) {
+        ret = -ENOMEM;
+        goto err;
+    }
 
     TAILQ_INIT(&priv->cmdq);
     pthread_mutex_init(&priv->qlock, NULL);
 
     return 0;
 err:
-    if (priv->fd > 0)
+    if (priv->fd > 0) {
         close(priv->fd);
+        priv->fd = -1;
+    }
 
     return ret;
 }
@@ -612,6 +620,7 @@ static int media_graph_uninit(MediadPlugin* ctx)
     } while (ret >= 0);
 
     avfilter_graph_free(&priv->graph);
+    av_freep(&priv->filter_states);
 
     return 0;
 }
@@ -905,14 +914,11 @@ MediadPlugin media_graph_plugin = {
  * Public Functions
  ****************************************************************************/
 
-int media_graph_audio_open(MediaGraphAudio** pctx,
-    const char* stream,
-    int format, int sample_rate, int channels,
-    int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
+int media_graph_audio_open(MediaGraphAudio** pctx, const char* stream)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
+    AVFilterGraph* graph = priv->graph;
     char stream_name[64] = { 0 };
-    char msg[128] = { 0 };
     MediaGraphAudio* ctx;
     int ret;
 
@@ -924,30 +930,54 @@ int media_graph_audio_open(MediaGraphAudio** pctx,
     if (ret >= 0)
         stream = stream_name;
 
-    ctx->src = avfilter_graph_get_filter(priv->graph, stream);
+    pthread_mutex_lock(&priv->qlock);
+    for (int i = 0; i < graph->nb_filters; i++) {
+        if (graph->filters[i]->name && !priv->filter_states[i] && !strncmp(stream, graph->filters[i]->name, strlen(stream))) {
+            priv->filter_states[i] = 1;
+            ctx->src = graph->filters[i];
+            break;
+        }
+    }
+    pthread_mutex_unlock(&priv->qlock);
+
     if (!ctx->src) {
         MEDIA_ERR("%s stream is not found\n", ret >= 0 ? stream_name : stream);
         ret = -EINVAL;
         goto fail;
     }
 
-    snprintf(msg, sizeof(msg), "%p %p fmt=%d:rate=%d:ch=%d", on_event_cb,
-        udata, format, sample_rate, channels);
-    ret = media_graph_queue_command(priv, ctx->src, "link", msg, (char*)&ctx->link_handle, sizeof(void**), FLAG_RES_PRECOPIED);
-    if (ret < 0) {
-        MEDIA_ERR("%s link failed ret:%d\n", ctx->src->name, ret);
-        goto fail;
-    }
-
-    media_graph_try_touch(priv);
     *pctx = ctx;
     return 0;
+
 fail:
     av_free(ctx);
     return ret;
 }
 
-int media_graph_audio_close(MediaGraphAudio** pctx)
+int media_graph_audio_start(MediaGraphAudio** pctx, int format, int sample_rate, int channels,
+    int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
+{
+    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphAudio* ctx = *pctx;
+    char msg[128] = { 0 };
+    int ret;
+
+    if (!pctx || !ctx || !ctx->src)
+        return -EINVAL;
+
+    snprintf(msg, sizeof(msg), "%p %p fmt=%d:rate=%d:ch=%d", on_event_cb,
+        udata, format, sample_rate, channels);
+    ret = media_graph_queue_command(priv, ctx->src, "link", msg, (char*)&ctx->link_handle, sizeof(void**), FLAG_RES_PRECOPIED);
+    if (ret < 0) {
+        MEDIA_ERR("%s link failed ret:%d\n", ctx->src->name, ret);
+        return ret;
+    }
+
+    media_graph_try_touch(priv);
+    return 0;
+}
+
+int media_graph_audio_stop(MediaGraphAudio** pctx)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
     MediaGraphAudio* ctx = *pctx;
@@ -961,9 +991,30 @@ int media_graph_audio_close(MediaGraphAudio** pctx)
         MEDIA_ERR("unlink %s failed: %d\n", ctx->src->name, ret);
 
     media_graph_try_touch(priv);
+    return ret;
+}
+
+int media_graph_audio_close(MediaGraphAudio** pctx)
+{
+    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphAudio* ctx = *pctx;
+
+    if (!pctx || !ctx)
+        return -EINVAL;
+
+    pthread_mutex_lock(&priv->qlock);
+    for (int i = 0; i < priv->graph->nb_filters; i++) {
+        AVFilterContext* filter = priv->graph->filters[i];
+        if (filter == ctx->src) {
+            priv->filter_states[i] = 0;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&priv->qlock);
+
     av_free(ctx);
     *pctx = NULL;
-    return ret;
+    return 0;
 }
 
 int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, const char* value)

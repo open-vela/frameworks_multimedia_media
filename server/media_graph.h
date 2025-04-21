@@ -43,10 +43,35 @@
  */
 typedef struct MediaGraphAudio MediaGraphAudio;
 
-int media_graph_audio_open(MediaGraphAudio** pctx,
-    const char* stream_type,
-    int format, int sample_rate, int channels,
+int media_graph_audio_open(MediaGraphAudio** pctx, const char* stream_type);
+
+/*
+ * Start a audio stream.
+ * @ctx: [in,out] audio stream context
+ * @format: audio format, eg. AV_SAMPLE_FMT_S16
+ * @sample_rate: sample rate
+ * @channels: number of channels
+ * @on_event_cb: callback function
+ * @udata: on_event_cb user data
+ * @return: 0 on success, negative value on error
+ *
+ * on_event_cb: callback function
+ *      @udata: user data
+ *      @evt: event type
+ *      @args: event arguments
+ */
+int media_graph_audio_start(MediaGraphAudio** pctx, int format, int sample_rate, int channels,
     int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata);
+
+/*
+ * Stop a audio stream.
+ * @ctx: [in,out] audio stream context
+ * @return: 0 on success, negative value on error
+ *
+ * Note that it must also be called during pause. Get it again after resume.
+ */
+int media_graph_audio_stop(MediaGraphAudio** pctx);
+
 /*
  * Release a audio stream.
  * @ctx: [in,out] audio stream context

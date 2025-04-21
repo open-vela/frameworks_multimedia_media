@@ -930,6 +930,9 @@ static void media_player_close(MediaPlayerContext* ctx)
         ff_framequeue_free(&ctx->streams[i].queue);
     }
 
+    if (ctx->audio_output)
+        media_graph_audio_close(&ctx->audio_output);
+
     if (ctx->video_output)
         media_video_output_close(&ctx->video_output);
 
@@ -949,7 +952,7 @@ static int media_player_pause(MediaPlayerContext* ctx)
     }
     pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_output)
-        media_graph_audio_close(&ctx->audio_output);
+        media_graph_audio_stop(&ctx->audio_output);
     pthread_mutex_unlock(&ctx->mutex);
 
     media_player_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
@@ -965,7 +968,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
 
     pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_output)
-        media_graph_audio_close(&ctx->audio_output);
+        media_graph_audio_stop(&ctx->audio_output);
     pthread_mutex_unlock(&ctx->mutex);
 
     media_player_close_demuxer(ctx);
@@ -986,14 +989,13 @@ static int media_player_start(MediaPlayerContext* ctx)
         ret = AVERROR(EPERM);
         goto error;
     }
-
-    if (ctx->audio_idx >= 0 && !ctx->audio_output) {
+    if (ctx->audio_idx >= 0) {
         AVCodecContext* codec_ctx = ctx->streams[ctx->audio_idx].codec_ctx;
-        ret = media_graph_audio_open(&ctx->audio_output, ctx->name,
+        ret = media_graph_audio_start(&ctx->audio_output,
             codec_ctx->sample_fmt, codec_ctx->sample_rate,
             codec_ctx->ch_layout.nb_channels, media_player_on_event_cb, ctx);
         if (ret < 0) {
-            MEDIA_ERR("media_graph_audio_open failed.\n");
+            MEDIA_ERR("media_graph_audio_start failed.\n");
             ret = AVERROR(EINVAL);
             goto error;
         }
@@ -1604,6 +1606,13 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
     strlcpy(ctx->name, name, sizeof(ctx->name));
 
     media_player_ctx_init(ctx);
+
+    media_graph_audio_open(&ctx->audio_output, ctx->name);
+    if (ctx->audio_output == NULL) {
+        MEDIA_ERR("open audio output failed\n");
+        ctx->state = MEDIA_PLAYER_STATE_IDLE;
+        return -EINVAL;
+    }
 
     pthread_attr_init(&attr);
     pthread_attr_setstacksize(&attr, CONFIG_MEDIA_PLAYER_STACKSIZE);
