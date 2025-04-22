@@ -1035,6 +1035,32 @@ out:
     return 0;
 }
 
+static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_len)
+{
+    int64_t latency = 0;
+    int pad, i, nb_frames;
+
+    for (pad = 0; pad < ctx->nb_streams; pad++) {
+        if (ctx->streams[pad].codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
+            break;
+    }
+
+    if (pad == ctx->nb_streams)
+        return AVERROR(EINVAL);
+
+    nb_frames = media_player_queue_cnt(ctx, pad);
+    for (i = 0; i < nb_frames; i++) {
+        AVFrame* frame = ff_framequeue_peek(&ctx->streams[pad].queue, i);
+        if (frame) {
+            latency += av_rescale_q(frame->duration, ctx->streams[pad].time_base, AV_TIME_BASE_Q);
+        }
+    }
+
+    snprintf(res, res_len, "%lld", latency);
+
+    return 0;
+}
+
 static int media_player_volume(MediaPlayerContext* ctx, const char* args, char* res, int res_len)
 {
     int ret = -EINVAL;
@@ -1203,6 +1229,8 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
         ret = media_player_volume(ctx, NULL, res, res_len);
     } else if (!strcmp(cmd, "volume")) {
         ret = media_player_volume(ctx, arg, res, res_len);
+    } else if (!strcmp(cmd, "get_latency")) {
+        return media_player_get_latency(ctx, res, res_len);
     } else if (!res && !res_len) {
         return media_stub_process_command(target, cmd, arg);
     } else {
