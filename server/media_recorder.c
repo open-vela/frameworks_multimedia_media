@@ -538,6 +538,17 @@ out:
     return ret;
 }
 
+static void media_recorder_release_stream(MediaRecorderContext* ctx)
+{
+    int i;
+
+    for (i = 0; i < ctx->nb_streams; i++) {
+        ff_framequeue_free(&ctx->streams[i].queue);
+    }
+
+    av_freep(&ctx->streams);
+}
+
 static int media_recorder_init_stream(MediaRecorderContext* ctx)
 {
     int stream_cnt;
@@ -561,6 +572,8 @@ static int media_recorder_init_stream(MediaRecorderContext* ctx)
         ctx->audio_idx = 0;
         ctx->video_idx = 1;
     }
+
+    media_recorder_release_stream(ctx);
 
     ctx->streams = av_calloc(stream_cnt, sizeof(OutputStream));
     if (!ctx->streams)
@@ -805,21 +818,6 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
 
 out:
     media_recorder_clean(ctx);
-    return 0;
-}
-
-static int media_recorder_close(MediaRecorderContext* ctx)
-{
-    int i;
-
-    for (i = 0; i < ctx->nb_streams; i++) {
-        ff_framequeue_free(&ctx->streams[i].queue);
-    }
-
-    if (ctx->audio_input)
-        media_graph_audio_close(&ctx->audio_input);
-
-    av_freep(&ctx->streams);
     return 0;
 }
 
@@ -1239,7 +1237,7 @@ static void* media_recorder_thread(void* arg)
         }
     }
 
-    media_recorder_close(ctx);
+    media_recorder_release_stream(ctx);
 
     media_recorder_ctx_release(ctx);
 
