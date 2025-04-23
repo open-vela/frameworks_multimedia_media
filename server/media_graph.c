@@ -530,20 +530,16 @@ static int media_graph_format_transfer(MediaCommand* cmd)
 
     if (!cmd->arg || !strcmp(cmd->cmd, "map")) {
         ret = avfilter_process_command(cmd->filter, "get_parameter", "format", res, sizeof(res), 0);
-        if (ret < 0 || sscanf(res, "fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels) != 3) {
-            MEDIA_ERR("Failed to parse format: %s\n", res);
-            return -EINVAL;
-        }
+        if (ret < 0 || sscanf(res, "fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels) != 3)
+            MEDIA_WARN("Failed to parse format: %s\n", res);
     } else {
-        if (sscanf(cmd->arg, "%*p %*p fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels) != 3) {
-            MEDIA_ERR("Failed to parse format: %s\n", cmd->arg);
-            return -EINVAL;
-        }
+        if (sscanf(cmd->arg, "%*p %*p fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels) != 3)
+            MEDIA_WARN("Failed to parse format: %s\n", cmd->arg);
     }
 
     if (format <= 0 || sample_rate <= 0 || channels <= 0) {
-        MEDIA_ERR("Invalid format: fmt=%d, rate=%d, ch=%d\n", format, sample_rate, channels);
-        return -EINVAL;
+        MEDIA_WARN("Invalid format: fmt=%d, rate=%d, ch=%d\n", format, sample_rate, channels);
+        return 0;
     }
 
     if (playback) { // Playback
