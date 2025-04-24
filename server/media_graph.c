@@ -1029,6 +1029,7 @@ int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, c
     if (ret < 0)
         MEDIA_ERR("%s set_parameter failed ret:%d\n", ctx->src->name, ret);
 
+    media_graph_try_touch(priv);
     return ret;
 }
 
@@ -1042,7 +1043,7 @@ int media_graph_audio_get_parameter(MediaGraphAudio** pctx, const char* key, cha
     if (!ctx || !key || !res || res_len <= 0)
         return -EINVAL;
 
-    snprintf(msg, sizeof(msg), "%p %s", ctx->link_handle, key);
+    snprintf(msg, sizeof(msg), "%s", key);
 
     ret = media_graph_queue_command(priv, ctx->src, "get_parameter", msg, res, res_len, FLAG_RES_PRECOPIED | FLAG_FAST_PROC_CMD);
     if (ret < 0)
