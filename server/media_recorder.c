@@ -787,10 +787,8 @@ static int media_recorder_pause(MediaRecorderContext* ctx)
         ret = 0;
     }
 
-    pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_idx >= 0)
         media_graph_audio_stop(&ctx->audio_input);
-    pthread_mutex_unlock(&ctx->mutex);
 
     media_recorder_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
     return 0;
@@ -802,10 +800,8 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
     if (ctx->state == MEDIA_RECORDER_STATE_STOPPED)
         return 0;
 
-    pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_idx >= 0)
         media_graph_audio_stop(&ctx->audio_input);
-    pthread_mutex_unlock(&ctx->mutex);
 
     if (ctx->state == MEDIA_RECORDER_STATE_PREPARED || ctx->state == MEDIA_RECORDER_STATE_COMPLETED)
         goto out;
@@ -946,6 +942,8 @@ static void media_recorder_proc_cmd(MediaRecorderContext* ctx, RecorderCmd* msg)
     case MEDIA_RECORDER_CMD_CLOSE:
         media_recorder_stop(ctx);
         ctx->exit = 1;
+        if (ctx->audio_input)
+            media_graph_audio_close(&ctx->audio_input);
         break;
     case MEDIA_RECORDER_CMD_STOP:
     case MEDIA_RECORDER_CMD_RESET:

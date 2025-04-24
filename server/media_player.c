@@ -950,10 +950,9 @@ static int media_player_pause(MediaPlayerContext* ctx)
         ctx->state = MEDIA_PLAYER_STATE_PAUSED;
         ret = 0;
     }
-    pthread_mutex_lock(&ctx->mutex);
+
     if (ctx->audio_output)
         media_graph_audio_stop(&ctx->audio_output);
-    pthread_mutex_unlock(&ctx->mutex);
 
     media_player_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
     return 0;
@@ -966,10 +965,8 @@ static int media_player_stop(MediaPlayerContext* ctx)
 
     media_player_clear_queue(ctx, MEDIA_PLAYER_DATA_QUEUE_IDX);
 
-    pthread_mutex_lock(&ctx->mutex);
     if (ctx->audio_output)
         media_graph_audio_stop(&ctx->audio_output);
-    pthread_mutex_unlock(&ctx->mutex);
 
     media_player_close_demuxer(ctx);
 
@@ -1108,7 +1105,6 @@ static int media_player_send_cmd(MediaPlayerContext* ctx, const int cmd, const v
     SIMPLEQ_FOREACH(tmp, &ctx->cmd_queue, entry)
     cnt++;
     if (cnt >= ctx->cmd_max && msg->cmd < MEDIA_PLAYER_CMD_STOP) {
-        pthread_mutex_unlock(&ctx->mutex);
         av_freep(&msg);
 
         return AVERROR(ENOMEM);
@@ -1162,6 +1158,8 @@ static void media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
 
         media_player_stop(ctx);
         ctx->exit = 1;
+        if (ctx->audio_output)
+            media_graph_audio_close(&ctx->audio_output);
         break;
     case MEDIA_PLAYER_CMD_STOP:
     case MEDIA_PLAYER_CMD_RESET:
