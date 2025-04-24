@@ -1043,7 +1043,7 @@ static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_
     int pad, i, nb_frames;
 
     for (pad = 0; pad < ctx->nb_streams; pad++) {
-        if (ctx->streams[pad].codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
+        if (ctx->streams[pad].codec_ctx && ctx->streams[pad].codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
             break;
     }
 
