@@ -788,7 +788,7 @@ static int media_recorder_pause(MediaRecorderContext* ctx)
     }
 
     pthread_mutex_lock(&ctx->mutex);
-    if (ctx->audio_input)
+    if (ctx->audio_idx >= 0)
         media_graph_audio_stop(&ctx->audio_input);
     pthread_mutex_unlock(&ctx->mutex);
 
@@ -803,7 +803,7 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
         return 0;
 
     pthread_mutex_lock(&ctx->mutex);
-    if (ctx->audio_input)
+    if (ctx->audio_idx >= 0)
         media_graph_audio_stop(&ctx->audio_input);
     pthread_mutex_unlock(&ctx->mutex);
 
@@ -841,7 +841,7 @@ static int media_recorder_start(MediaRecorderContext* ctx)
             goto out;
     }
 
-    if (!ctx->audio_input) {
+    if (ctx->audio_idx >= 0) {
         ret = media_graph_audio_start(&ctx->audio_input,
             ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
             ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
@@ -859,6 +859,14 @@ static int media_recorder_start(MediaRecorderContext* ctx)
 out:
     media_recorder_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
     return ret;
+}
+
+static void media_recorder_close(MediaRecorderContext* ctx)
+{
+    media_recorder_release_stream(ctx);
+
+    if (ctx->audio_input)
+        media_graph_audio_close(&ctx->audio_input);
 }
 
 static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filename)
@@ -1237,7 +1245,7 @@ static void* media_recorder_thread(void* arg)
         }
     }
 
-    media_recorder_release_stream(ctx);
+    media_recorder_close(ctx);
 
     media_recorder_ctx_release(ctx);
 
