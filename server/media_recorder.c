@@ -63,6 +63,7 @@
 
 enum media_recorder_state {
     MEDIA_RECORDER_STATE_IDLE = 0,
+    MEDIA_RECORDER_STATE_INITIALIZED,
     MEDIA_RECORDER_STATE_PREPARED,
     MEDIA_RECORDER_STATE_STARTED,
     MEDIA_RECORDER_STATE_PAUSED,
@@ -141,7 +142,7 @@ static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollf
 
 static inline int media_recorder_is_exit(MediaRecorderContext* ctx)
 {
-    return ctx->exit && (!ctx->audio_input || ctx->audio_idx == -1);
+    return ctx->exit && (ctx->state < MEDIA_RECORDER_STATE_STARTED || ctx->audio_idx == -1);
 }
 
 static void media_recorder_notify_finalize(MediaRecorderContext* ctx)
@@ -756,7 +757,7 @@ out:
 
 static void media_recorder_ctx_init(MediaRecorderContext* ctx)
 {
-    ctx->state = MEDIA_RECORDER_STATE_STOPPED;
+    ctx->state = MEDIA_RECORDER_STATE_INITIALIZED;
     ctx->cmd_max = CONFIG_MEDIA_RECORDER_CMD_QUEUE_SIZE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
@@ -871,7 +872,7 @@ static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filenam
     AVDictionaryEntry* tag;
     char* format = NULL;
 
-    if (ctx->state != MEDIA_RECORDER_STATE_STOPPED)
+    if (ctx->state != MEDIA_RECORDER_STATE_STOPPED && ctx->state != MEDIA_RECORDER_STATE_INITIALIZED)
         goto out;
 
     if ((tag = av_dict_get(ctx->format_opt, "format", NULL, 0)))
@@ -942,8 +943,6 @@ static void media_recorder_proc_cmd(MediaRecorderContext* ctx, RecorderCmd* msg)
     case MEDIA_RECORDER_CMD_CLOSE:
         media_recorder_stop(ctx);
         ctx->exit = 1;
-        if (ctx->audio_input)
-            media_graph_audio_close(&ctx->audio_input);
         break;
     case MEDIA_RECORDER_CMD_STOP:
     case MEDIA_RECORDER_CMD_RESET:

@@ -71,6 +71,7 @@ enum MediaPlayerSyncMode {
 
 enum MediaPlayerState {
     MEDIA_PLAYER_STATE_IDLE = 0,
+    MEDIA_PLAYER_STATE_INITIALIZED,
     MEDIA_PLAYER_STATE_PREPARED,
     MEDIA_PLAYER_STATE_STARTED,
     MEDIA_PLAYER_STATE_PAUSED,
@@ -188,9 +189,13 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
  * Private Functions
  ****************************************************************************/
 
+/**
+ *  Ensure all audio data is finished when the work thread is exit,
+ *  we need to check if the audio index is -1.
+ */
 static inline int media_player_is_exit(MediaPlayerContext* ctx)
 {
-    return ctx->exit && (!ctx->audio_output || ctx->audio_idx == -1);
+    return ctx->exit && (ctx->state < MEDIA_PLAYER_STATE_STARTED || ctx->audio_idx == -1);
 }
 
 static int media_player_is_queue_empty(MediaPlayerContext* ctx)
@@ -889,7 +894,7 @@ end:
 
 static void media_player_ctx_init(MediaPlayerContext* ctx)
 {
-    ctx->state = MEDIA_PLAYER_STATE_STOPPED;
+    ctx->state = MEDIA_PLAYER_STATE_INITIALIZED;
     ctx->cmd_max = CONFIG_MEDIA_PLAYER_CMD_QUEUE_SIZE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
@@ -1022,7 +1027,7 @@ static int media_player_prepare(MediaPlayerContext* ctx, const char* filename)
 {
     int ret = AVERROR(EPERM);
 
-    if (ctx->state != MEDIA_PLAYER_STATE_STOPPED)
+    if (ctx->state != MEDIA_PLAYER_STATE_STOPPED && ctx->state != MEDIA_PLAYER_STATE_INITIALIZED)
         goto out;
 
     ret = media_player_open_demuxer(ctx, filename);
@@ -1158,8 +1163,6 @@ static void media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
 
         media_player_stop(ctx);
         ctx->exit = 1;
-        if (ctx->audio_output)
-            media_graph_audio_close(&ctx->audio_output);
         break;
     case MEDIA_PLAYER_CMD_STOP:
     case MEDIA_PLAYER_CMD_RESET:
