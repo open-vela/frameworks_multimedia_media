@@ -1055,7 +1055,7 @@ static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_
         }
     }
 
-    snprintf(res, res_len, "%lld", latency);
+    snprintf(res, res_len, "%" PRId64 "d", latency);
 
     return 0;
 }
