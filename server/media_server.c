@@ -299,20 +299,17 @@ static int media_server_listen(struct media_server_priv* priv, int family)
 static int media_server_init(MediadPlugin* ctx)
 {
     struct media_server_priv* priv = ctx->priv;
-    int ret;
+    int ret1 = -1, ret2 = -1, ret3 = -1;
 
-    ret = media_server_listen(priv, PF_LOCAL);
-    if (ret < 0)
-        return ret;
-    ret = media_server_listen(priv, AF_RPMSG);
-    if (ret < 0)
-        return ret;
-
+    ret1 = media_server_listen(priv, PF_LOCAL);
+    ret2 = media_server_listen(priv, AF_RPMSG);
 #if CONFIG_MEDIA_SERVER_PORT >= 0
     ret3 = media_server_listen(priv, AF_INET);
-    if (ret < 0)
-        return ret;
 #endif
+
+    if (ret1 < 0 && ret2 < 0 && ret3 < 0)
+        return -EINVAL;
+
     return 0;
 }
 
