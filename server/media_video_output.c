@@ -241,8 +241,8 @@ int media_video_output_open(MediaVOutputContext** pctx, AVDictionary* options)
 {
     AVDictionary* tmp_options = NULL;
     AVDictionaryEntry* tag;
-    char* devname;
-    char* format;
+    char* devname = NULL;
+    char* format = NULL;
     char* endptr;
     AVStream* st;
     int ret;

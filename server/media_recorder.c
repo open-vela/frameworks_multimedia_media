@@ -343,8 +343,8 @@ static enum AVCodecID media_recorder_find_encoder_id(const char* name, enum AVMe
 
 static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 {
-    int ret, i, num_sample_fmts, num_samplerates, num_ch_layouts;
-    int width, height, bitrate = -1, vbr = -1, level = -1;
+    int ret, i = 0, num_sample_fmts, num_samplerates, num_ch_layouts;
+    int width = 0, height = 0, bitrate = -1, vbr = -1, level = -1;
     const enum AVSampleFormat* sample_fmts = NULL;
     const AVChannelLayout* ch_layouts = NULL;
     const int* supported_samplerates = NULL;
@@ -1033,7 +1033,7 @@ int media_recorder_onreceive(MediaRecorderContext* ctx, media_parcel* in, media_
         UNUSED(len);
         UNUSED(flags);
         ret = -ENOSYS;
-        MEDIA_ERR("unsupported id %d\n", id);
+        MEDIA_ERR("unsupported id %d\n", (int)id);
         break;
     }
 

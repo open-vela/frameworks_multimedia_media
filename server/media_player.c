@@ -473,7 +473,7 @@ static int media_player_dec_frames(MediaPlayerContext* ctx)
 {
     int got_frame = 0;
     AVFrame* frame;
-    int ret, i;
+    int ret = 0, i;
 
     for (i = 0; i < ctx->nb_streams; i++) {
         if (media_player_stream_inactive(ctx, i))
@@ -1220,9 +1220,9 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
     } else if (!strcmp(cmd, "set_options") && arg) {
         ret = media_player_send_cmd(ctx, MEDIA_PLAYER_CMD_SET_OPTIONS, arg, strlen(arg) + 1);
     } else if (!strcmp(cmd, "get_duration")) {
-        snprintf(res, res_len, "%d", ctx->duration_ms);
+        snprintf(res, res_len, "%" PRIu32, ctx->duration_ms);
     } else if (!strcmp(cmd, "get_position")) {
-        snprintf(res, res_len, "%d", ctx->current_ms);
+        snprintf(res, res_len, "%" PRIu32, ctx->current_ms);
     } else if (!strcmp(cmd, "get_playing")) {
         snprintf(res, res_len, "%d", ctx->state == MEDIA_PLAYER_STATE_STARTED);
     } else if (!strcmp(cmd, "get_volume")) {
@@ -1264,7 +1264,7 @@ int media_player_onreceive(MediaPlayerContext* ctx, media_parcel* in, media_parc
         UNUSED(len);
         UNUSED(flags);
         ret = -ENOSYS;
-        MEDIA_ERR("unsupported id %d\n", id);
+        MEDIA_ERR("unsupported id %d\n", (int)id);
         break;
     }
 
