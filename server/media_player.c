@@ -1599,10 +1599,10 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
     struct sched_param param;
     pthread_attr_t attr;
     pthread_t thread;
-    int ret;
+    int ret = -EINVAL;
 
     if (ctx->state != MEDIA_PLAYER_STATE_IDLE || name == NULL)
-        return AVERROR(EINVAL);
+        return ret;
 
     strlcpy(ctx->name, name, sizeof(ctx->name));
 
@@ -1611,8 +1611,7 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
     media_graph_audio_open(&ctx->audio_output, ctx->name);
     if (ctx->audio_output == NULL) {
         MEDIA_ERR("open audio output failed\n");
-        ctx->state = MEDIA_PLAYER_STATE_IDLE;
-        return -EINVAL;
+        goto out;
     }
 
     pthread_attr_init(&attr);
@@ -1620,15 +1619,21 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
     param.sched_priority = CONFIG_MEDIA_PLAYER_PRIORITY;
     pthread_attr_setschedparam(&attr, &param);
     ret = pthread_create(&thread, &attr, media_player_thread, ctx);
+    pthread_attr_destroy(&attr);
     if (ret != 0) {
-        ctx->state = MEDIA_PLAYER_STATE_IDLE;
-        return AVERROR(ret);
+        MEDIA_ERR("create player thread failed, ret %d\n", ret);
+        goto out;
     }
 
     pthread_setname_np(thread, ctx->name);
     pthread_detach(thread);
 
     return 0;
+
+out:
+    media_graph_audio_close(&ctx->audio_output);
+    ctx->state = MEDIA_PLAYER_STATE_IDLE;
+    return ret;
 }
 
 static int media_player_handler(MediadPlugin* handle, struct media_server_conn* conn, const char* target, const char* cmd, const char* arg, int flags, char* res, int res_len)

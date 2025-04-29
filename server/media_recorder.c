@@ -1255,10 +1255,10 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
     struct sched_param param;
     pthread_attr_t attr;
     pthread_t thread;
-    int ret;
+    int ret = -EINVAL;
 
     if (ctx->state != MEDIA_RECORDER_STATE_IDLE || name == NULL)
-        return AVERROR(EINVAL);
+        return ret;
 
     strlcpy(ctx->name, name, sizeof(ctx->name));
 
@@ -1267,8 +1267,7 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
     media_graph_audio_open(&ctx->audio_input, ctx->name);
     if (ctx->audio_input == NULL) {
         MEDIA_ERR("open audio input failed\n");
-        ctx->state = MEDIA_RECORDER_STATE_IDLE;
-        return -EINVAL;
+        goto out;
     }
 
     pthread_attr_init(&attr);
@@ -1276,15 +1275,21 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
     param.sched_priority = CONFIG_MEDIA_RECORDER_PRIORITY;
     pthread_attr_setschedparam(&attr, &param);
     ret = pthread_create(&thread, &attr, media_recorder_thread, ctx);
+    pthread_attr_destroy(&attr);
     if (ret != 0) {
-        ctx->state = MEDIA_RECORDER_STATE_IDLE;
-        return AVERROR(ret);
+        MEDIA_ERR("create recorder thread failed %d\n", ret);
+        goto out;
     }
 
     pthread_setname_np(thread, ctx->name);
     pthread_detach(thread);
 
     return 0;
+
+out:
+    media_graph_audio_close(&ctx->audio_input);
+    ctx->state = MEDIA_RECORDER_STATE_IDLE;
+    return ret;
 }
 
 static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn* conn,
