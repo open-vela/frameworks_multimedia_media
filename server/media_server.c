@@ -496,7 +496,7 @@ MediadPlugin media_server_plugin = {
     .uninit = media_server_uinit,
 };
 
-void* media_get_server()
+void* media_get_server(void)
 {
     return media_server_plugin.priv;
 }
