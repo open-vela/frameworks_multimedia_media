@@ -63,7 +63,6 @@
 
 enum media_recorder_state {
     MEDIA_RECORDER_STATE_IDLE = 0,
-    MEDIA_RECORDER_STATE_INITIALIZED,
     MEDIA_RECORDER_STATE_PREPARED,
     MEDIA_RECORDER_STATE_STARTED,
     MEDIA_RECORDER_STATE_PAUSED,
@@ -124,6 +123,7 @@ typedef struct MediaRecorderContext {
     const AVOutputFormat* format; /* output format */
     struct RecorderCmdQueue cmd_queue;
 
+    int audio_input_state; /** < 1: audio input is started, 0: not started */
     MediaGraphAudio* audio_input;
 } MediaRecorderContext;
 
@@ -142,7 +142,7 @@ static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollf
 
 static inline int media_recorder_is_exit(MediaRecorderContext* ctx)
 {
-    return ctx->exit && (ctx->state < MEDIA_RECORDER_STATE_STARTED || ctx->audio_idx == -1);
+    return ctx->exit && !ctx->audio_input_state;
 }
 
 static void media_recorder_notify_finalize(MediaRecorderContext* ctx)
@@ -600,8 +600,7 @@ static int media_recorder_on_event_cb(void* udata, int evt, int64_t args)
 
     if (evt < 0) {
         MEDIA_INFO("received unlink event form audio_input.\n");
-        if (ctx->state != MEDIA_RECORDER_STATE_PAUSED)
-            ctx->audio_idx = -1;
+        ctx->audio_input_state = 0;
         return 0;
     }
 
@@ -757,7 +756,7 @@ out:
 
 static void media_recorder_ctx_init(MediaRecorderContext* ctx)
 {
-    ctx->state = MEDIA_RECORDER_STATE_INITIALIZED;
+    ctx->state = MEDIA_RECORDER_STATE_STOPPED;
     ctx->cmd_max = CONFIG_MEDIA_RECORDER_CMD_QUEUE_SIZE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
@@ -849,6 +848,7 @@ static int media_recorder_start(MediaRecorderContext* ctx)
             goto out;
         } else
             MEDIA_INFO("media_graph_audio_start success.\n");
+        ctx->audio_input_state = 1;
     }
 
     ctx->state = MEDIA_RECORDER_STATE_STARTED;
@@ -872,7 +872,7 @@ static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filenam
     AVDictionaryEntry* tag;
     char* format = NULL;
 
-    if (ctx->state != MEDIA_RECORDER_STATE_STOPPED && ctx->state != MEDIA_RECORDER_STATE_INITIALIZED)
+    if (ctx->state != MEDIA_RECORDER_STATE_STOPPED)
         goto out;
 
     if ((tag = av_dict_get(ctx->format_opt, "format", NULL, 0)))

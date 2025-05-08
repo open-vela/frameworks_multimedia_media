@@ -71,7 +71,6 @@ enum MediaPlayerSyncMode {
 
 enum MediaPlayerState {
     MEDIA_PLAYER_STATE_IDLE = 0,
-    MEDIA_PLAYER_STATE_INITIALIZED,
     MEDIA_PLAYER_STATE_PREPARED,
     MEDIA_PLAYER_STATE_STARTED,
     MEDIA_PLAYER_STATE_PAUSED,
@@ -166,6 +165,7 @@ typedef struct MediaPlayerContext {
     enum MediaPlayerSyncMode sync_mode;
 
     /* audio or video output */
+    int audio_output_state; /** < 1: audio output is started, 0: not started */
     MediaGraphAudio* audio_output;
     MediaVOutputContext* video_output;
 } MediaPlayerContext;
@@ -190,12 +190,12 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
  ****************************************************************************/
 
 /**
- *  Ensure all audio data is finished when the work thread is exit,
- *  we need to check if the audio index is -1.
+ *  Ensure all audio data is finished when the work thread exit,
+ *  we need to check if the audio_output_state.
  */
 static inline int media_player_is_exit(MediaPlayerContext* ctx)
 {
-    return ctx->exit && (ctx->state < MEDIA_PLAYER_STATE_STARTED || ctx->audio_idx == -1);
+    return ctx->exit && !ctx->audio_output_state;
 }
 
 static int media_player_is_queue_empty(MediaPlayerContext* ctx)
@@ -275,8 +275,7 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
 
     if (evt < 0) {
         MEDIA_INFO("received unlink event form audio_output.");
-        if (ctx->state != MEDIA_PLAYER_STATE_PAUSED)
-            ctx->audio_idx = -1;
+        ctx->audio_output_state = 0;
         return 0;
     }
 
@@ -894,7 +893,7 @@ end:
 
 static void media_player_ctx_init(MediaPlayerContext* ctx)
 {
-    ctx->state = MEDIA_PLAYER_STATE_INITIALIZED;
+    ctx->state = MEDIA_PLAYER_STATE_STOPPED;
     ctx->cmd_max = CONFIG_MEDIA_PLAYER_CMD_QUEUE_SIZE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
@@ -976,6 +975,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
     media_player_close_demuxer(ctx);
 
     ctx->pending_stop = 0;
+    ctx->audio_idx = -1;
     ctx->video_idx = -1;
     ctx->state = MEDIA_PLAYER_STATE_STOPPED;
 
@@ -1001,6 +1001,7 @@ static int media_player_start(MediaPlayerContext* ctx)
             ret = AVERROR(EINVAL);
             goto error;
         }
+        ctx->audio_output_state = 1;
     }
 
     media_player_set_avsync_mode(ctx);
@@ -1027,7 +1028,7 @@ static int media_player_prepare(MediaPlayerContext* ctx, const char* filename)
 {
     int ret = AVERROR(EPERM);
 
-    if (ctx->state != MEDIA_PLAYER_STATE_STOPPED && ctx->state != MEDIA_PLAYER_STATE_INITIALIZED)
+    if (ctx->state != MEDIA_PLAYER_STATE_STOPPED)
         goto out;
 
     ret = media_player_open_demuxer(ctx, filename);
