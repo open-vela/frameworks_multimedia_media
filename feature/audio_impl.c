@@ -451,8 +451,6 @@ static bool audio_check_playerstate(AudioObject* obj, FeatureInstanceHandle feat
 
     if (obj->state == MEDIA_STATE_NONE) {
         FEATURE_LOG_ERROR("player:%p state is none.", obj->player);
-        if (FeatureCheckCallbackId(obj->event.onerror.feature, obj->event.onerror.callbackId))
-            FeatureInvokeCallback(obj->event.onerror.feature, obj->event.onerror.callbackId);
         return false;
     }
 
