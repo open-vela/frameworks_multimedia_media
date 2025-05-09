@@ -838,6 +838,15 @@ static int media_recorder_start(MediaRecorderContext* ctx)
     }
 
     if (ctx->audio_idx >= 0) {
+        if (ctx->streams[ctx->audio_idx].enc_ctx->frame_size) {
+            char buf[16] = { 0 };
+            snprintf(buf, sizeof(buf), "%d", ctx->streams[ctx->audio_idx].enc_ctx->frame_size);
+            ret = media_graph_audio_set_parameter(&ctx->audio_input, "frame_size", buf);
+            if (ret < 0) {
+                MEDIA_ERR("media_graph_audio_set_parameter failed.\n");
+                goto out;
+            }
+        }
         ret = media_graph_audio_start(&ctx->audio_input,
             ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
             ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
