@@ -537,7 +537,7 @@ static int media_graph_format_transfer(MediaCommand* cmd)
             MEDIA_WARN("Failed to parse format: %s\n", cmd->arg);
     }
 
-    if (format <= 0 || sample_rate <= 0 || channels <= 0) {
+    if (format < 0 || sample_rate <= 0 || channels <= 0) {
         MEDIA_WARN("Invalid format: fmt=%d, rate=%d, ch=%d\n", format, sample_rate, channels);
         return 0;
     }
