@@ -115,6 +115,7 @@ typedef struct MediaRecorderContext {
     int audio_idx;
     int video_idx;
     char name[64];
+    uint32_t aframe_cnt;
     uint32_t nb_streams; /* total stream count */
     uint32_t current_ms;
     pthread_mutex_t mutex;
@@ -255,6 +256,7 @@ static int media_recorder_queue_push(MediaRecorderContext* ctx, int idx, AVFrame
         return AVERROR(EINVAL);
 
     pthread_mutex_lock(&ctx->mutex);
+    ctx->aframe_cnt++;
     if (ff_framequeue_queued_frames(&ctx->streams[idx].queue) > ctx->streams[idx].nb_queue_max) {
         MEDIA_WARN("data queue is more than max count(%d).\n", ctx->streams[idx].nb_queue_max);
         AVFrame* last_frame = ff_framequeue_take(&ctx->streams[idx].queue);
@@ -776,6 +778,7 @@ static void media_recorder_ctx_init(MediaRecorderContext* ctx)
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
     ctx->exit = 0;
+    ctx->aframe_cnt = 0;
     SIMPLEQ_INIT(&ctx->cmd_queue);
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
@@ -1210,13 +1213,13 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
             continue;
         av_bprintf(&buf, "recorder[%d, %s] state:%d", i, ctx->name, ctx->state);
         if (ctx->audio_idx >= 0)
-            av_bprintf(&buf, ", a: %d %s %" PRId64 " %d %d %d",
+            av_bprintf(&buf, ", a: %d %s %" PRId64 " %d %d %d %" PRIu32 "",
                 ctx->audio_idx,
                 avcodec_get_name(ctx->streams[ctx->audio_idx].enc_ctx->codec_id),
                 ctx->streams[ctx->audio_idx].enc_ctx->bit_rate,
                 ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
                 ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
-                media_recorder_queue_cnt(ctx, ctx->audio_idx));
+                media_recorder_queue_cnt(ctx, ctx->audio_idx), ctx->aframe_cnt);
         if (ctx->video_idx >= 0)
             av_bprintf(&buf, ", v: %d %s %d %d %d",
                 ctx->video_idx,

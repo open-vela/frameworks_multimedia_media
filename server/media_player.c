@@ -141,6 +141,8 @@ typedef struct MediaPlayerContext {
     int audio_idx;
     int video_idx;
     int live_stream; /** < default is false, when set to true, avsync is disabled */
+    uint32_t aframe_cnt;
+    uint32_t vframe_cnt;
     uint32_t nb_streams;
     uint32_t current_ms; /** < current timestamp of the decoded frame */
     uint32_t duration_ms; /** < duration of whole stream */
@@ -409,6 +411,11 @@ static int media_player_queue_push(MediaPlayerContext* ctx, int idx, AVFrame* fr
 {
     int ret;
     pthread_mutex_lock(&ctx->mutex);
+
+    if (frame->width)
+        ctx->vframe_cnt++;
+    else
+        ctx->aframe_cnt++;
 
     ret = ff_framequeue_add(&ctx->streams[idx].queue, frame);
     if (ff_framequeue_queued_frames(&ctx->streams[idx].queue) == ctx->streams[idx].nb_queue_max
@@ -932,6 +939,8 @@ static void media_player_ctx_init(MediaPlayerContext* ctx)
     ctx->cmd_max = CONFIG_MEDIA_PLAYER_CMD_QUEUE_SIZE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
+    ctx->aframe_cnt = 0;
+    ctx->vframe_cnt = 0;
     ctx->sync_mode = MEDIA_PLAYER_SYNC_MODE_SYSTEM;
     ctx->ts_base = AV_NOPTS_VALUE;
     ctx->lat_base = AV_NOPTS_VALUE;
@@ -1523,18 +1532,19 @@ static void media_player_dump(MediaPlayerPriv* priv)
             continue;
         av_bprintf(&buf, "player[%d, %s] state:%d", i, ctx->name, ctx->state);
         if (ctx->audio_idx >= 0)
-            av_bprintf(&buf, ", a: %d %s %" PRId64 " %d ch:%d %d", ctx->audio_idx,
+            av_bprintf(&buf, ", a: %d %s %" PRId64 " %d ch:%d %d %" PRIu32 "",
+                ctx->audio_idx,
                 avcodec_get_name(ctx->streams[ctx->audio_idx].codec_ctx->codec_id),
                 ctx->streams[ctx->audio_idx].codec_ctx->bit_rate,
                 ctx->streams[ctx->audio_idx].codec_ctx->sample_rate,
                 ctx->streams[ctx->audio_idx].codec_ctx->ch_layout.nb_channels,
-                media_player_queue_cnt(ctx, ctx->audio_idx));
+                media_player_queue_cnt(ctx, ctx->audio_idx), ctx->aframe_cnt);
         if (ctx->video_idx >= 0)
-            av_bprintf(&buf, ", v: %d %s %dx%d %d", ctx->video_idx,
+            av_bprintf(&buf, ", v: %d %s %dx%d %d %" PRIu32 "", ctx->video_idx,
                 avcodec_get_name(ctx->streams[ctx->video_idx].codec_ctx->codec_id),
                 ctx->streams[ctx->video_idx].codec_ctx->width,
                 ctx->streams[ctx->video_idx].codec_ctx->height,
-                media_player_queue_cnt(ctx, ctx->video_idx));
+                media_player_queue_cnt(ctx, ctx->video_idx), ctx->vframe_cnt);
     }
     av_bprintf(&buf, "\n--------------player dump end---------------\n");
     MEDIA_INFO("%s\n", buf.str);
