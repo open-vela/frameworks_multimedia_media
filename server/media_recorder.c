@@ -116,6 +116,7 @@ typedef struct MediaRecorderContext {
     int video_idx;
     char name[64];
     uint32_t nb_streams; /* total stream count */
+    uint32_t current_ms;
     pthread_mutex_t mutex;
     OutputStream* streams; /* output stream */
     AVDictionary* format_opt; /* format options */
@@ -310,6 +311,9 @@ static int media_recorder_encode_frame(MediaRecorderContext* ctx, int idx, AVFra
         av_packet_rescale_ts(pkt,
             ctx->streams[idx].enc_ctx->time_base,
             ctx->format_ctx->streams[pkt->stream_index]->time_base);
+
+        if (frame)
+            ctx->current_ms = frame->pts / 1000;
 
         ret = av_write_frame(ctx->format_ctx, pkt);
         if (ret < 0)
@@ -632,6 +636,8 @@ static void media_recorder_close_muxer(MediaRecorderContext* ctx)
 
     if (ctx->format_opt)
         av_dict_free(&ctx->format_opt);
+
+    ctx->current_ms = 0;
 }
 
 static void media_recorder_clean(MediaRecorderContext* ctx)
@@ -812,6 +818,7 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
         ret = media_recorder_proc_dat(ctx);
     }
 
+    MEDIA_INFO("recorder current pos %" PRIu32 ".\n", ctx->current_ms);
 out:
     media_recorder_clean(ctx);
     return 0;
@@ -1010,6 +1017,8 @@ int media_recorder_process_cmd(MediaRecorderContext* ctx, const char* target,
             return AVERROR(EINVAL);
 
         ret = av_dict_parse_string(&ctx->format_opt, arg, "=", ":", 0);
+    } else if (!strcmp(cmd, "get_position")) {
+        snprintf(res, res_len, "%" PRIu32, ctx->current_ms);
     } else {
         MEDIA_ERR("unknown cmd: %s.\n", cmd);
         return AVERROR(EINVAL);
