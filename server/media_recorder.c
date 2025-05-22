@@ -22,6 +22,8 @@
  * Included Files
  ****************************************************************************/
 
+#include <pthread.h>
+#include <unistd.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <netpacket/rpmsg.h>
