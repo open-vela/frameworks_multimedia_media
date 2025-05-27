@@ -406,11 +406,6 @@ static int media_player_queue_push(MediaPlayerContext* ctx, int idx, AVFrame* fr
 {
     int ret;
     pthread_mutex_lock(&ctx->mutex);
-    if (ff_framequeue_queued_frames(&ctx->streams[idx].queue) > ctx->streams[idx].nb_queue_max) {
-        MEDIA_WARN("data queue is more than max count(%d).\n", ctx->streams[idx].nb_queue_max);
-        AVFrame* last_frame = ff_framequeue_take(&ctx->streams[idx].queue);
-        av_frame_free(&last_frame);
-    }
 
     ret = ff_framequeue_add(&ctx->streams[idx].queue, frame);
     pthread_mutex_unlock(&ctx->mutex);
@@ -1546,7 +1541,7 @@ static void media_player_proc_avsync(MediaPlayerContext* ctx)
         diff = media_player_sync_video(ctx, pts, ts, latency);
         if (diff >= 0) {
             if (diff > 0)
-                usleep(diff);
+                return;
             frame = media_player_queue_pop(ctx, ctx->video_idx);
             if (media_video_output_write_frame(ctx->video_output, frame) < 0)
                 MEDIA_ERR("video_output write frame failed.\n");
