@@ -589,6 +589,17 @@ out:
     return ret;
 }
 
+static void media_player_release_stream(MediaPlayerContext* ctx)
+{
+    int i;
+
+    for (i = 0; i < ctx->nb_streams; i++) {
+        ff_framequeue_free(&ctx->streams[i].queue);
+    }
+
+    av_freep(&ctx->streams);
+}
+
 static int media_player_init_stream(MediaPlayerContext* ctx)
 {
     AVStream* stream;
@@ -601,6 +612,8 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
 
     if (!ctx->format_ctx || ctx->format_ctx->nb_streams <= 0)
         return -EINVAL;
+
+    media_player_release_stream(ctx);
 
     char* at_sign = strchr(ctx->name, '@');
     if (at_sign && !strncmp(at_sign, "@Video", 6))
@@ -924,10 +937,7 @@ static void media_player_ctx_release(MediaPlayerContext* ctx)
 
 static void media_player_close(MediaPlayerContext* ctx)
 {
-    int i;
-    for (i = 0; i < ctx->nb_streams; i++) {
-        ff_framequeue_free(&ctx->streams[i].queue);
-    }
+    media_player_release_stream(ctx);
 
     if (ctx->audio_output)
         media_graph_audio_close(&ctx->audio_output);
@@ -937,8 +947,6 @@ static void media_player_close(MediaPlayerContext* ctx)
 
     if (ctx->global_opts)
         av_dict_free(&ctx->global_opts);
-
-    av_freep(&ctx->streams);
 }
 
 static int media_player_pause(MediaPlayerContext* ctx)
