@@ -350,7 +350,7 @@ static void mediatool_focus_callback(int suggestion, void* cookie)
     } else if (suggestion == MEDIA_FOCUS_PLAY_WITH_KEEP) {
         str = "MEDIA_FOCUS_PLAY_WITH_KEEP";
     } else {
-        str = "UNKOWN";
+        str = "UNKNOWN";
     }
 
     printf("%s, id %d, suggestion %s, suggestion %d, line %d\n",
