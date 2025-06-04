@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/eventfd.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/sysinfo.h>
@@ -125,6 +126,8 @@ typedef struct MediaPlayerContext {
     /* communication with media client */
     int tran_fd;
     int notify_fd;
+    int data_fd;
+    int poll_timeout; /** < timeout for poll, default is -1, set for fbdev in global_opt */
     uint32_t offset;
     media_parcel parcel;
 
@@ -223,6 +226,20 @@ static void media_player_set_avsync_mode(MediaPlayerContext* ctx)
     }
 }
 
+static void media_player_video_get_poll_timeout(MediaPlayerContext* ctx)
+{
+    struct pollfd fds[CONFIG_MEDIA_PLAYER_MAX_POLLFDS];
+    int count = CONFIG_MEDIA_PLAYER_MAX_POLLFDS;
+    int ret = media_video_output_get_pollfd(ctx->video_output, fds, count);
+    int frame_ms = ctx->frame_duration / 1000;
+    if (ret <= 0) {
+        if (frame_ms <= 0 || frame_ms > 50) // assume 20 as min fps
+            ctx->poll_timeout = 2;
+        else
+            ctx->poll_timeout = frame_ms;
+    }
+}
+
 static int media_player_output_get_pollfds(MediaPlayerContext* ctx, struct pollfd* fds, int count)
 {
     return media_video_output_get_pollfd(ctx->video_output, fds, count);
@@ -247,6 +264,7 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
 {
     MediaPlayerContext* ctx = (MediaPlayerContext*)udata;
     AVFrame* frame;
+    uint64_t cnt = 1;
 
     MEDIA_DEBUG("audio audio_output event: %d", evt);
 
@@ -270,6 +288,10 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
     AVFrame* out_frame = (AVFrame*)(uintptr_t)args;
     av_frame_move_ref(out_frame, frame);
     av_frame_free(&frame);
+
+    pthread_mutex_lock(&ctx->mutex);
+    write(ctx->data_fd, &cnt, sizeof(cnt));
+    pthread_mutex_unlock(&ctx->mutex);
 
     return 0;
 }
@@ -501,6 +523,8 @@ static int media_player_interrupt(void* opaque)
     int interrupt = 0;
     struct pollfd fds[1];
     struct pollfd* fd = &fds[0];
+    uint64_t cnt = 1;
+    int pending_stop = 0;
     fds[0].fd = ctx->tran_fd;
     fds[0].events = POLLIN;
     fds[0].revents = 0;
@@ -509,12 +533,16 @@ static int media_player_interrupt(void* opaque)
 
     SIMPLEQ_FOREACH(msg, &ctx->cmd_queue, entry)
     {
-        if (msg->cmd >= MEDIA_PLAYER_CMD_STOP) {
+        if (msg->cmd == MEDIA_PLAYER_CMD_CLOSE)
+            pending_stop = strtoul(msg->data, NULL, 0);
+        if (msg->cmd >= MEDIA_PLAYER_CMD_STOP)
             interrupt = 1;
-            break;
-        }
     }
-
+    if (pending_stop)
+        interrupt = 0;
+    pthread_mutex_lock(&ctx->mutex);
+    write(ctx->data_fd, &cnt, sizeof(cnt));
+    pthread_mutex_unlock(&ctx->mutex);
     return interrupt;
 }
 
@@ -681,6 +709,7 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
             ctx->frame_duration = av_rescale(AV_TIME_BASE, stream_out->frame_rate.den,
                 stream_out->frame_rate.num);
             ctx->max_latency = ctx->frame_duration;
+            media_player_video_get_poll_timeout(ctx);
 
             media_player_poll_add(ctx, "video_output",
                 media_player_output_get_pollfds,
@@ -825,7 +854,7 @@ static void media_player_event_cb(MediaPlayerContext* ctx, int event, int result
         media_player_notify_event(ctx, event, result, extra);
 }
 
-static void media_player_proc_dat(MediaPlayerContext* ctx)
+static int media_player_proc_dat(MediaPlayerContext* ctx)
 {
     int ret;
     ret = media_player_dec_frames(ctx);
@@ -842,13 +871,12 @@ static void media_player_proc_dat(MediaPlayerContext* ctx)
     }
 
     if (ret >= 0 || ret == AVERROR_EXIT)
-        return;
+        return ret;
     else if (ret == AVERROR_EOF) {
         if (!media_player_is_queue_empty(ctx) && (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN)) {
             media_graph_audio_resume(ctx->audio_output);
             ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_XRUN;
         }
-        ret = 0;
     }
 
     if (media_player_is_queue_empty(ctx)) {
@@ -857,9 +885,9 @@ static void media_player_proc_dat(MediaPlayerContext* ctx)
     }
 
     if (!ctx->pending_stop)
-        return;
+        return ret;
 
-    media_player_stop(ctx);
+    return media_player_stop(ctx);
 }
 
 static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush)
@@ -910,6 +938,9 @@ static void media_player_ctx_init(MediaPlayerContext* ctx)
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
 
+    ctx->data_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    ctx->poll_timeout = -1;
+
     ctx->poll_cnt = 0;
     media_player_poll_add(ctx, "media_player",
         media_player_get_pollfd,
@@ -927,6 +958,8 @@ static void media_player_ctx_release(MediaPlayerContext* ctx)
     ctx->offload = 0;
     ctx->pending_stop = 0;
     ctx->event = 0;
+    close(ctx->data_fd);
+    ctx->data_fd = -1;
     media_player_notify_finalize(ctx);
     media_parcel_deinit(&ctx->parcel);
     pthread_mutex_destroy(&ctx->mutex);
@@ -1353,6 +1386,12 @@ static int media_player_get_pollfd(MediaPlayerContext* ctx, struct pollfd* fds, 
     fds[nfd].events = POLLIN;
     fds[nfd].revents = 0;
     nfd++;
+
+    fds[nfd].fd = ctx->data_fd;
+    fds[nfd].events = POLLIN;
+    fds[nfd].revents = 0;
+    nfd++;
+
     return nfd;
 }
 
@@ -1361,41 +1400,50 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
     int ret = -EINVAL;
     uint32_t code;
     media_parcel ack;
+    uint64_t cnt = 0;
 
     if (fds->revents & POLLERR)
         goto out;
 
-    while (1) {
-        ret = media_parcel_recv(&ctx->parcel, ctx->tran_fd, &ctx->offset, MSG_DONTWAIT);
-        if (ret < 0)
-            break;
-
-        code = media_parcel_get_code(&ctx->parcel);
-        switch (code) {
-        case MEDIA_PARCEL_SEND:
-            media_player_onreceive(ctx, &ctx->parcel, NULL);
-            break;
-
-        case MEDIA_PARCEL_SEND_ACK:
-            media_parcel_init(&ack);
-            media_player_onreceive(ctx, &ctx->parcel, &ack);
-            ret = media_parcel_send(&ack, ctx->tran_fd, MEDIA_PARCEL_REPLY, 0);
-            media_parcel_deinit(&ack);
-            break;
-
-        case MEDIA_PARCEL_CREATE_NOTIFY:
-            ret = media_player_create_notify(ctx, &ctx->parcel);
-            if (ret > 0)
-                ctx->notify_fd = ret;
-            else
-                MEDIA_ERR("create notify failed %d\n", ret);
-            break;
-        default:
-            break;
+    if (fds->fd == ctx->data_fd) {
+        ret = read(ctx->data_fd, &cnt, sizeof(cnt));
+        if (ret < 0) {
+            MEDIA_ERR("read data_fd failed %d\n", ret);
+            goto out;
         }
+    } else if (fds->fd == ctx->tran_fd) {
+        while (1) {
+            ret = media_parcel_recv(&ctx->parcel, ctx->tran_fd, &ctx->offset, MSG_DONTWAIT);
+            if (ret < 0)
+                break;
 
-        media_parcel_reinit(&ctx->parcel);
-        ctx->offset = 0;
+            code = media_parcel_get_code(&ctx->parcel);
+            switch (code) {
+            case MEDIA_PARCEL_SEND:
+                media_player_onreceive(ctx, &ctx->parcel, NULL);
+                break;
+
+            case MEDIA_PARCEL_SEND_ACK:
+                media_parcel_init(&ack);
+                media_player_onreceive(ctx, &ctx->parcel, &ack);
+                ret = media_parcel_send(&ack, ctx->tran_fd, MEDIA_PARCEL_REPLY, 0);
+                media_parcel_deinit(&ack);
+                break;
+
+            case MEDIA_PARCEL_CREATE_NOTIFY:
+                ret = media_player_create_notify(ctx, &ctx->parcel);
+                if (ret > 0)
+                    ctx->notify_fd = ret;
+                else
+                    MEDIA_ERR("create notify failed %d\n", ret);
+                break;
+            default:
+                break;
+            }
+
+            media_parcel_reinit(&ctx->parcel);
+            ctx->offset = 0;
+        }
     }
 
     if (((fds->revents & POLLIN) && ret == -EPIPE) || (fds->revents & POLLHUP))
@@ -1429,7 +1477,7 @@ static void media_player_poll(MediaPlayerContext* ctx)
     if (n < 1)
         return;
 
-    poll(ctx->fds, n, 2);
+    poll(ctx->fds, n, ctx->poll_timeout);
 
     for (i = 0; i < n; i++) {
         if (!ctx->fds[i].revents)
@@ -1546,6 +1594,9 @@ static void media_player_proc_avsync(MediaPlayerContext* ctx)
     AVFrame* frame;
     int diff;
 
+    if (ctx->state != MEDIA_PLAYER_STATE_STARTED || media_player_queue_cnt(ctx, ctx->video_idx) == 0)
+        return;
+
     media_player_get_timestamp(ctx, &ts, &latency);
     if (ts != AV_NOPTS_VALUE) {
         frame = media_player_queue_peek(ctx, ctx->video_idx);
@@ -1575,6 +1626,7 @@ static void* media_player_thread(void* arg)
     MediaPlayerContext* ctx = (MediaPlayerContext*)arg;
     MEDIA_INFO("create player thread.\n");
     PlayerCmd* msg;
+    uint64_t cnt = 1;
 
     while (1) {
         if (media_player_is_exit(ctx))
@@ -1587,11 +1639,13 @@ static void* media_player_thread(void* arg)
             media_player_proc_cmd(ctx, msg);
         }
 
-        if (media_player_dat_available(ctx))
-            media_player_proc_dat(ctx);
+        if (media_player_dat_available(ctx) && media_player_proc_dat(ctx) >= 0) {
+            pthread_mutex_lock(&ctx->mutex);
+            write(ctx->data_fd, &cnt, sizeof(cnt));
+            pthread_mutex_unlock(&ctx->mutex);
+        }
 
-        if (ctx->state == MEDIA_PLAYER_STATE_STARTED && media_player_queue_cnt(ctx, ctx->video_idx) > 0)
-            media_player_proc_avsync(ctx);
+        media_player_proc_avsync(ctx);
     }
 
     media_player_close(ctx);
