@@ -89,7 +89,6 @@ typedef struct MediaGraphPriv {
     int fd;
     void* pollfts[MAX_POLL_FILTERS];
     int pollftn;
-    pid_t tid;
     int* filter_states;
 
     TAILQ_HEAD(, MediaCommand)
@@ -333,7 +332,6 @@ static int media_graph_init(MediadPlugin* ctx)
     if (ret < 0)
         goto err;
 
-    priv->tid = gettid();
     priv->filter_states = av_mallocz(priv->graph->nb_filters * sizeof(int));
     if (!priv->filter_states) {
         ret = -ENOMEM;
@@ -557,10 +555,16 @@ static int media_graph_format_transfer(MediaCommand* cmd)
     return ret;
 }
 
+static void media_graph_try_touch(MediaGraphPriv* priv)
+{
+    eventfd_t val = 1;
+    file_write(priv->filep, &val, sizeof(val));
+}
+
 static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 {
     MediaCommand* cmd;
-    int ret = 0;
+    int i, ret = 0;
 
     pthread_mutex_lock(&priv->qlock);
     if (TAILQ_EMPTY(&priv->cmdq)) {
@@ -574,6 +578,17 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
             cmd->filter->name, cmd->cmd, cmd->arg ? cmd->arg : "_");
 
         if (!strcmp(cmd->cmd, "link") || !strcmp(cmd->cmd, "map")) {
+            for (i = 0; i < cmd->filter->nb_outputs; i++) {
+                FilterLinkInternal* li = (FilterLinkInternal*)cmd->filter->outputs[i];
+                if (li->status_in != AVERROR_EOF && li->status_out != AVERROR_EOF) {
+                    MEDIA_WARN("%s outlink is not eof, cmd %s pending\n",
+                        cmd->filter->name, cmd->cmd);
+
+                    ret = -EAGAIN;
+                    media_graph_try_touch(priv);
+                    goto exit;
+                }
+            }
             ret = media_graph_format_transfer(cmd);
             if (ret < 0) {
                 MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
@@ -884,14 +899,6 @@ static int media_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn
     }
 
     return 0;
-}
-
-static void media_graph_try_touch(MediaGraphPriv* priv)
-{
-    if (priv->tid != gettid()) {
-        eventfd_t val = 1;
-        file_write(priv->filep, &val, sizeof(val));
-    }
 }
 
 MediadPlugin media_graph_plugin = {
