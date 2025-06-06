@@ -580,7 +580,7 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
         if (!strcmp(cmd->cmd, "link") || !strcmp(cmd->cmd, "map")) {
             for (i = 0; i < cmd->filter->nb_outputs; i++) {
                 FilterLinkInternal* li = (FilterLinkInternal*)cmd->filter->outputs[i];
-                if (li->status_in != AVERROR_EOF && li->status_out != AVERROR_EOF) {
+                if (li->status_in != li->status_out) {
                     MEDIA_WARN("%s outlink is not eof, cmd %s pending\n",
                         cmd->filter->name, cmd->cmd);
 
