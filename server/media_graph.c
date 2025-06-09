@@ -1020,6 +1020,39 @@ int media_graph_audio_close(MediaGraphAudio** pctx)
     return 0;
 }
 
+int media_graph_audio_pause(MediaGraphAudio* pctx)
+{
+    MediaGraphPriv* priv = media_graph_plugin.priv;
+    int ret;
+
+    if (!pctx || !pctx->src)
+        return -EINVAL;
+
+    ret = media_graph_queue_command(priv, pctx->src, "pause", NULL, NULL, 0, 0);
+    if (ret < 0)
+        MEDIA_ERR("pause %s failed: %d\n", pctx->src->name, ret);
+
+    return ret;
+}
+
+int media_graph_audio_resume(MediaGraphAudio* pctx)
+{
+    MediaGraphPriv* priv = media_graph_plugin.priv;
+    int ret;
+
+    if (!pctx || !pctx->src)
+        return -EINVAL;
+
+    ret = media_graph_queue_command(priv, pctx->src, "resume", NULL, NULL, 0, 0);
+    if (ret < 0) {
+        MEDIA_ERR("%s resume failed ret:%d\n", pctx->src->name, ret);
+        return ret;
+    }
+
+    media_graph_try_touch(priv);
+    return 0;
+}
+
 int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, const char* value)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;

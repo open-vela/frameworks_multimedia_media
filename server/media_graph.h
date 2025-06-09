@@ -82,6 +82,24 @@ int media_graph_audio_stop(MediaGraphAudio** pctx);
 int media_graph_audio_close(MediaGraphAudio** pctx);
 
 /*
+ * Pause the audio stream and all downstream connected filters.
+ * Typically called by the player when an audio underflow occurs (e.g., decode queue is empty),
+ * to pause audio graph data consumption and prevent invalid playback or resource waste.
+ * @ctx: [in,out] audio stream context
+ * @return: 0 on success, negative value on error
+ */
+int media_graph_audio_pause(MediaGraphAudio* pctx);
+
+/*
+ * Resume the audio stream and all downstream connected filters.
+ * Typically called by the player when the audio data queue is refilled,
+ * to resume audio graph data consumption and continue playback.
+ * @ctx: [in,out] audio stream context
+ * @return: 0 on success, negative value on error
+ */
+int media_graph_audio_resume(MediaGraphAudio* pctx);
+
+/*
  * Set stream parameter.
  * @ctx: [in,out] audio stream context
  * @param: [in] parameter key
