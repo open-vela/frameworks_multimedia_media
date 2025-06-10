@@ -648,6 +648,10 @@ static int media_focus_handler_l(media_focus* focus, void* cookie, const char* n
         media_stub_notify_finalize(&cookie);
         ret = media_focus_abandon_(priv, focus_handle);
         media_focus_queue_pop(priv);
+        if (!SIMPLEQ_EMPTY(&focus->req_q)) {
+            media_focus_request_t* req = (media_focus_request_t*)SIMPLEQ_FIRST(&focus->req_q);
+            media_focus_handler_l(req->focus, req->cookie, req->name, req->cmd, req->req_id, NULL, 0);
+        }
         return ret;
     } else if (!strcmp(cmd, "dump")) {
         media_focus_debug_stack_display();
