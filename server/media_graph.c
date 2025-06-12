@@ -853,6 +853,9 @@ int media_graph_audio_open(AVFilterContext** src, const char* stream)
     ret = media_stub_get_stream_name(stream, stream_name, sizeof(stream_name));
     if (ret >= 0)
         stream = stream_name;
+    else {
+        goto fail;
+    }
 
     pthread_mutex_lock(&priv->qlock);
     for (int i = 0; i < graph->nb_filters; i++) {

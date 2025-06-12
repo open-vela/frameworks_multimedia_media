@@ -1716,7 +1716,6 @@ out:
 static int media_player_handler(MediadPlugin* handle, struct media_server_conn* conn, const char* target, const char* cmd, const char* arg, int flags, char* res, int res_len)
 {
     MediaPlayerPriv* priv = handle->priv;
-    char stream_name[64] = { 0 };
     char option_name[64] = { 0 };
     char options[256] = { 0 };
     int ret = 0;
@@ -1725,12 +1724,6 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
         cmd, arg ? arg : "NULL", target ? target : "NULL");
 
     if (!strcmp(cmd, "open")) {
-        ret = media_stub_get_stream_name(arg, stream_name, sizeof(stream_name));
-        if (ret < 0) {
-            MEDIA_ERR("get stream name failed %d\n", ret);
-            return ret;
-        }
-
         MediaPlayerContext* ctx = media_player_get_available_session(priv);
         if (!ctx) {
             MEDIA_ERR("player open failed...\n");
@@ -1756,7 +1749,7 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
             }
         }
 
-        ret = media_player_open(ctx, stream_name);
+        ret = media_player_open(ctx, arg);
         if (ret < 0)
             return ret;
 

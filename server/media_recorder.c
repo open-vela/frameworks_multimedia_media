@@ -1293,11 +1293,9 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
     if (ctx->state != MEDIA_RECORDER_STATE_IDLE || name == NULL)
         return ret;
 
-    strlcpy(ctx->name, name, sizeof(ctx->name));
-
     media_recorder_ctx_init(ctx);
 
-    media_graph_audio_open(&ctx->audio_input, ctx->name);
+    media_graph_audio_open(&ctx->audio_input, name);
     if (ctx->audio_input == NULL) {
         MEDIA_ERR("open audio input failed\n");
         goto out;
@@ -1330,23 +1328,22 @@ static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn
     int flags, char* res, int res_len)
 {
     MediaRecorderPriv* priv = handle->priv;
-    char stream_name[64] = { 0 };
     int ret;
 
     MEDIA_INFO("cmd: %s, arg %s, target %s.\n",
         cmd, arg ? arg : "NULL", target ? target : "NULL");
 
     if (!strcmp(cmd, "open")) {
-        ret = media_stub_get_stream_name(arg, stream_name, sizeof(stream_name));
-        if (ret < 0) {
-            MEDIA_ERR("get stream name failed %d\n", ret);
-            return ret;
-        }
-
         MediaRecorderContext* ctx = media_recorder_get_available_session(priv);
         if (!ctx) {
             MEDIA_ERR("recorder open failed...\n");
             return -ENOMEM;
+        }
+
+        ret = media_stub_get_stream_name(arg, ctx->name, sizeof(ctx->name));
+        if (ret < 0) {
+            MEDIA_ERR("get stream name failed %d\n", ret);
+            return ret;
         }
 
         ctx->tran_fd = media_server_get_tran_fd(conn);
@@ -1357,7 +1354,7 @@ static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn
 
         media_server_clean_conn(conn);
 
-        ret = media_recorder_open(ctx, stream_name);
+        ret = media_recorder_open(ctx, arg);
         if (ret < 0)
             return ret;
 
