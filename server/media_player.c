@@ -126,7 +126,7 @@ typedef struct MediaPlayerContext {
     /* communication with media client */
     int tran_fd;
     int notify_fd;
-    int data_fd;
+    int event_fd;
     int poll_timeout; /** < timeout for poll, default is -1, set for fbdev in global_opt */
     uint32_t offset;
     media_parcel parcel;
@@ -292,7 +292,7 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
     av_frame_free(&frame);
 
     pthread_mutex_lock(&ctx->mutex);
-    write(ctx->data_fd, &cnt, sizeof(cnt));
+    write(ctx->event_fd, &cnt, sizeof(cnt));
     pthread_mutex_unlock(&ctx->mutex);
 
     return 0;
@@ -548,7 +548,7 @@ static int media_player_interrupt(void* opaque)
     if (pending_stop)
         interrupt = 0;
     pthread_mutex_lock(&ctx->mutex);
-    write(ctx->data_fd, &cnt, sizeof(cnt));
+    write(ctx->event_fd, &cnt, sizeof(cnt));
     pthread_mutex_unlock(&ctx->mutex);
     return interrupt;
 }
@@ -949,7 +949,7 @@ static void media_player_ctx_init(MediaPlayerContext* ctx)
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
 
-    ctx->data_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    ctx->event_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     ctx->poll_timeout = -1;
 
     ctx->poll_cnt = 0;
@@ -969,8 +969,8 @@ static void media_player_ctx_release(MediaPlayerContext* ctx)
     ctx->offload = 0;
     ctx->pending_stop = 0;
     ctx->event = 0;
-    close(ctx->data_fd);
-    ctx->data_fd = -1;
+    close(ctx->event_fd);
+    ctx->event_fd = -1;
     media_player_notify_finalize(ctx);
     media_parcel_deinit(&ctx->parcel);
     pthread_mutex_destroy(&ctx->mutex);
@@ -1401,7 +1401,7 @@ static int media_player_get_pollfd(MediaPlayerContext* ctx, struct pollfd* fds, 
     fds[nfd].revents = 0;
     nfd++;
 
-    fds[nfd].fd = ctx->data_fd;
+    fds[nfd].fd = ctx->event_fd;
     fds[nfd].events = POLLIN;
     fds[nfd].revents = 0;
     nfd++;
@@ -1419,10 +1419,10 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
     if (fds->revents & POLLERR)
         goto out;
 
-    if (fds->fd == ctx->data_fd) {
-        ret = read(ctx->data_fd, &cnt, sizeof(cnt));
+    if (fds->fd == ctx->event_fd) {
+        ret = read(ctx->event_fd, &cnt, sizeof(cnt));
         if (ret < 0) {
-            MEDIA_ERR("read data_fd failed %d\n", ret);
+            MEDIA_ERR("read event_fd failed %d\n", ret);
             goto out;
         }
     } else if (fds->fd == ctx->tran_fd) {
@@ -1656,7 +1656,7 @@ static void* media_player_thread(void* arg)
 
         if (media_player_dat_available(ctx) && media_player_proc_dat(ctx) >= 0) {
             pthread_mutex_lock(&ctx->mutex);
-            write(ctx->data_fd, &cnt, sizeof(cnt));
+            write(ctx->event_fd, &cnt, sizeof(cnt));
             pthread_mutex_unlock(&ctx->mutex);
         }
 
