@@ -346,7 +346,7 @@ void system_record_wrap_start(FeatureInstanceHandle feature, union AppendData ap
 
     strlcpy(obj->ch_layout_desc, info->numberOfChannels == 1 ? "mono" : "stereo",
         sizeof(obj->ch_layout_desc));
-    strncpy(obj->format, info->format, sizeof(obj->format));
+    strlcpy(obj->format, info->format, sizeof(obj->format));
 
     if (!strcmp(info->format, "opus"))
         snprintf(obj->options, sizeof(obj->options),
