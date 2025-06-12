@@ -822,7 +822,7 @@ void system_audio_set_src(void* feature, union AppendData append_data, FtString 
         snprintf(obj->src, sizeof(obj->src), "%s/app/%s%s",
             CONFIG_HAP_APP_PATH, pkg, src);
     else
-        strncpy(obj->src, src, sizeof(obj->src));
+        strlcpy(obj->src, src, sizeof(obj->src));
 
     FEATURE_LOG_INFO("audio set src:%s", obj->src);
 }
@@ -835,11 +835,11 @@ void system_audio_set_meta(void* feature, union AppendData append_data, system_a
     if (!obj)
         return;
     if (meta->title != NULL)
-        strncpy(obj->meta.title, meta->title, MAX_TITLE_LEN);
+        strlcpy(obj->meta.title, meta->title, MAX_TITLE_LEN);
     if (meta->album != NULL)
-        strncpy(obj->meta.album, meta->album, MAX_ALBUM_LEN);
+        strlcpy(obj->meta.album, meta->album, MAX_ALBUM_LEN);
     if (meta->artist != NULL)
-        strncpy(obj->meta.artist, meta->artist, MAX_ARTIST_LEN);
+        strlcpy(obj->meta.artist, meta->artist, MAX_ARTIST_LEN);
 }
 
 FtFloat system_audio_get_currentTime(void* feature, union AppendData append_data)
