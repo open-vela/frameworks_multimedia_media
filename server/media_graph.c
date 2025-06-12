@@ -531,61 +531,59 @@ static int media_graph_format_transfer(MediaCommand* cmd)
 
 static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 {
-    MediaCommand* cmd;
+    MediaCommand* cmd = NULL;
     int i, ret = 0;
 
     pthread_mutex_lock(&priv->qlock);
-    if (TAILQ_EMPTY(&priv->cmdq)) {
-        ret = -EAGAIN;
-        goto exit;
+    cmd = TAILQ_FIRST(&priv->cmdq);
+    if (!cmd) {
+        pthread_mutex_unlock(&priv->qlock);
+        return -EAGAIN;
     }
 
-    cmd = TAILQ_FIRST(&priv->cmdq);
-    if (process) {
-        av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
-            cmd->filter->name, cmd->cmd, cmd->arg ? cmd->arg : "_");
+    if (!process) {
+        TAILQ_REMOVE(&priv->cmdq, cmd, entries);
+        pthread_mutex_unlock(&priv->qlock);
+        goto exit;
+    }
+    pthread_mutex_unlock(&priv->qlock);
 
-        if (!strcmp(cmd->cmd, "link") || !strcmp(cmd->cmd, "map")) {
-            for (i = 0; i < cmd->filter->nb_outputs; i++) {
-                FilterLinkInternal* li = (FilterLinkInternal*)cmd->filter->outputs[i];
-                if (li->status_in != li->status_out) {
-                    MEDIA_WARN("%s outlink is not eof, cmd %s pending\n",
-                        cmd->filter->name, cmd->cmd);
+    av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
+        cmd->filter->name, cmd->cmd, cmd->arg ? cmd->arg : "_");
 
-                    ret = -EAGAIN;
-                    media_graph_try_touch(priv);
-                    goto exit;
-                }
-            }
-            ret = media_graph_format_transfer(cmd);
-            if (ret < 0) {
-                MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
-                goto exit;
+    if (!strcmp(cmd->cmd, "link") || !strcmp(cmd->cmd, "map")) {
+        for (i = 0; i < cmd->filter->nb_outputs; i++) {
+            FilterLinkInternal* li = (FilterLinkInternal*)cmd->filter->outputs[i];
+            if (li->status_in != li->status_out) {
+                MEDIA_WARN("%s outlink is not eof, cmd %s pending\n",
+                    cmd->filter->name, cmd->cmd);
+                media_graph_try_touch(priv);
+                return -EAGAIN;
             }
         }
 
-        if (!(cmd->flags & FLAG_FAST_PROC_CMD))
-            ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
-                cmd->res, 0, cmd->flags);
+        ret = media_graph_format_transfer(cmd);
+        if (ret < 0)
+            MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
     }
 
+    if (!(cmd->flags & FLAG_FAST_PROC_CMD)) {
+        ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
+            cmd->res, 0, cmd->flags);
+    }
+
+    pthread_mutex_lock(&priv->qlock);
     TAILQ_REMOVE(&priv->cmdq, cmd, entries);
     pthread_mutex_unlock(&priv->qlock);
 
+exit:
     free(cmd->cmd);
-
     if (!(cmd->flags & FLAG_ARG_PRECOPIED) && cmd->arg)
         free(cmd->arg);
-
     if (!(cmd->flags & FLAG_RES_PRECOPIED) && cmd->res)
         free(cmd->res);
-
     free(cmd);
 
-    return ret;
-
-exit:
-    pthread_mutex_unlock(&priv->qlock);
     return ret;
 }
 
