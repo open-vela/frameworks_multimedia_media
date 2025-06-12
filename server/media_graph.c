@@ -89,7 +89,7 @@ typedef struct MediaGraphPriv {
     int fd;
     void* pollfts[MAX_POLL_FILTERS];
     int pollftn;
-    int* filter_states;
+    int* occupied;
 
     TAILQ_HEAD(, MediaCommand)
     cmdq;
@@ -332,8 +332,8 @@ static int media_graph_init(MediadPlugin* ctx)
     if (ret < 0)
         goto err;
 
-    priv->filter_states = av_mallocz(priv->graph->nb_filters * sizeof(int));
-    if (!priv->filter_states) {
+    priv->occupied = av_mallocz(priv->graph->nb_filters * sizeof(int));
+    if (!priv->occupied) {
         ret = -ENOMEM;
         goto err;
     }
@@ -631,7 +631,7 @@ static int media_graph_uninit(MediadPlugin* ctx)
     } while (ret >= 0);
 
     avfilter_graph_free(&priv->graph);
-    av_freep(&priv->filter_states);
+    av_freep(&priv->occupied);
 
     return 0;
 }
@@ -935,8 +935,8 @@ int media_graph_audio_open(MediaGraphAudio** pctx, const char* stream)
 
     pthread_mutex_lock(&priv->qlock);
     for (int i = 0; i < graph->nb_filters; i++) {
-        if (graph->filters[i]->name && !priv->filter_states[i] && !strncmp(stream, graph->filters[i]->name, strlen(stream))) {
-            priv->filter_states[i] = 1;
+        if (graph->filters[i]->name && !priv->occupied[i] && !strncmp(stream, graph->filters[i]->name, strlen(stream))) {
+            priv->occupied[i] = 1;
             ctx->src = graph->filters[i];
             break;
         }
@@ -1009,7 +1009,7 @@ int media_graph_audio_close(MediaGraphAudio** pctx)
     for (int i = 0; i < priv->graph->nb_filters; i++) {
         AVFilterContext* filter = priv->graph->filters[i];
         if (filter == ctx->src) {
-            priv->filter_states[i] = 0;
+            priv->occupied[i] = 0;
             break;
         }
     }
