@@ -401,52 +401,21 @@ err_cmd:
     return NULL;
 }
 
+static void media_graph_try_touch(MediaGraphPriv* priv)
+{
+    eventfd_t val = 1;
+    file_write(priv->filep, &val, sizeof(val));
+}
+
 static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filter,
     const char* cmd, const char* arg, char* res, int res_len, int flags)
 {
     MediaCommand* newcmd = NULL;
     int ret = 0;
 
-    if (flags & FLAG_FAST_PROC_CMD) {
-        if (!strcmp(cmd, "map")) {
-            int old_map[MAX_LINKS] = { 0 };
-            int new_map[MAX_LINKS] = { 0 };
-            int i, index = 0;
-
-            ret = av_opt_get_array(filter, "map_array", AV_OPT_SEARCH_CHILDREN, 0, filter->nb_outputs, AV_OPT_TYPE_INT, old_map);
-            if (ret < 0)
-                return ret;
-
-            ret = avfilter_process_command(filter, cmd, arg, res, res_len, flags);
-            if (ret < 0)
-                return ret;
-
-            ret = av_opt_get_array(filter, "map_array", AV_OPT_SEARCH_CHILDREN, 0, filter->nb_outputs, AV_OPT_TYPE_INT, new_map);
-            if (ret < 0)
-                return ret;
-
-            for (i = 0; i < filter->nb_outputs; i++) {
-                if (old_map[i] == ROUTE_OFF && new_map[i] == ROUTE_ON) {
-                    index++;
-                    break;
-                }
-            }
-
-            if (index) {
-                newcmd = media_graph_create_command(cmd, arg, res, filter, flags);
-                if (!newcmd)
-                    return -ENOMEM;
-
-                pthread_mutex_lock(&priv->qlock);
-                TAILQ_INSERT_TAIL(&priv->cmdq, newcmd, entries);
-                pthread_mutex_unlock(&priv->qlock);
-            }
-
-            return ret;
-        }
-
+    if (flags & FLAG_FAST_PROC_CMD)
         return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
-    } else if (!strcmp(cmd, "volume")) {
+    else if (!strcmp(cmd, "volume")) {
         char msg[32];
         snprintf(msg, sizeof(msg), "stream_volume=%s", arg);
         return avfilter_process_command(filter, "set_parameter", msg, res, res_len, flags);
@@ -463,6 +432,8 @@ static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
     pthread_mutex_lock(&priv->qlock);
     TAILQ_INSERT_TAIL(&priv->cmdq, newcmd, entries);
     pthread_mutex_unlock(&priv->qlock);
+
+    media_graph_try_touch(priv);
 
     av_log(NULL, AV_LOG_INFO, "Pending command: %s %s\n", cmd, arg ? arg : "_");
     return ret;
@@ -553,12 +524,6 @@ static int media_graph_format_transfer(MediaCommand* cmd)
     media_graph_config_links(links, map, nb_links, format, sample_rate, channels, playback, inputs_indexs);
 
     return ret;
-}
-
-static void media_graph_try_touch(MediaGraphPriv* priv)
-{
-    eventfd_t val = 1;
-    file_write(priv->filep, &val, sizeof(val));
 }
 
 static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
@@ -873,8 +838,7 @@ static int media_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn
 
         av_log_set_level(strtol(arg, NULL, 0));
         return 0;
-    } else if (!strcmp(cmd, "map"))
-        flags |= FLAG_FAST_PROC_CMD;
+    }
 
     if (!target)
         return -EINVAL;
