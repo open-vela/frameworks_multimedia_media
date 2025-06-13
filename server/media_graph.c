@@ -59,10 +59,6 @@
 #define MAX_GRAPH_SIZE 4096
 #define MAX_POLL_FILTERS 32 
 
-#define FLAG_ARG_PRECOPIED (1 << 10)
-#define FLAG_RES_PRECOPIED (1 << 11)
-#define FLAG_FAST_PROC_CMD (1 << 12)
-
 #define MAX_LINKS 10
 
 #define ROUTE_OFF 0
@@ -77,7 +73,6 @@ typedef struct MediaCommand {
     char* cmd;
     char* arg;
     char* res;
-    int flags;
 
     TAILQ_ENTRY(MediaCommand)
     entries;
@@ -351,54 +346,55 @@ err:
     return ret;
 }
 
-static MediaCommand* media_graph_create_command(const char* cmd, const char* arg, char* res, AVFilterContext* filter, int flags)
+static inline bool media_graph_immediate_cmd(const char* cmd)
 {
-    MediaCommand* newcmd;
+    switch (cmd[0]) {
+    case 'l':
+        return strcmp(cmd, "link");
+    case 'u':
+        return strcmp(cmd, "unlink");
+    case 'm':
+        return strcmp(cmd, "map");
+    case 'p':
+        return strcmp(cmd, "pause");
+    case 'r':
+        return strcmp(cmd, "resume");
+    default:
+        return true;
+    }
+}
 
-    newcmd = malloc(sizeof(MediaCommand));
-    if (!newcmd)
+static MediaCommand* media_graph_create_command(const char* cmd, const char* arg, char* res, AVFilterContext* filter)
+{
+    MediaCommand* newcmd = NULL;
+    char* cmd_dup = NULL;
+    char* arg_dup = NULL;
+
+    cmd_dup = strdup(cmd);
+    if (!cmd_dup)
         return NULL;
 
-    newcmd->cmd = strdup(cmd);
-    if (!newcmd->cmd) {
-        free(newcmd);
+    if (arg) {
+        arg_dup = strdup(arg);
+        if (!arg_dup) {
+            free(cmd_dup);
+            return NULL;
+        }
+    }
+
+    newcmd = malloc(sizeof(MediaCommand));
+    if (!newcmd) {
+        free(cmd_dup);
+        free(arg_dup);
         return NULL;
     }
 
-    if (arg) {
-        if (flags & FLAG_ARG_PRECOPIED)
-            newcmd->arg = (char*)arg;
-        else {
-            newcmd->arg = strdup(arg);
-            if (!newcmd->arg)
-                goto err_cmd;
-        }
-    } else
-        newcmd->arg = NULL;
-
-    if (res) {
-        if (flags & FLAG_RES_PRECOPIED)
-            newcmd->res = res;
-        else {
-            newcmd->res = strdup(res);
-            if (!newcmd->res)
-                goto err_arg;
-        }
-    } else
-        newcmd->res = NULL;
-
+    newcmd->cmd = cmd_dup;
+    newcmd->arg = arg_dup;
+    newcmd->res = res;
     newcmd->filter = filter;
 
-    newcmd->flags = flags;
-
     return newcmd;
-
-err_arg:
-    free(newcmd->arg);
-err_cmd:
-    free(newcmd->cmd);
-    free(newcmd);
-    return NULL;
 }
 
 static void media_graph_try_touch(MediaGraphPriv* priv)
@@ -411,21 +407,22 @@ static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
     const char* cmd, const char* arg, char* res, int res_len, int flags)
 {
     MediaCommand* newcmd = NULL;
+    char msg[128];
     int ret = 0;
 
-    if (flags & FLAG_FAST_PROC_CMD)
+    if (media_graph_immediate_cmd(cmd)) {
+        if (!strcmp(cmd, "volume")) {
+            snprintf(msg, sizeof(msg), "stream_volume=%s", arg);
+            return avfilter_process_command(filter, "set_parameter", msg, res, res_len, 0);
+        } else if (!strcmp(cmd, "sample_rate")) {
+            snprintf(msg, sizeof(msg), "%s=%s", cmd, arg);
+            return avfilter_process_command(filter, "set_parameter", msg, res, res_len, 0);
+        }
+
         return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
-    else if (!strcmp(cmd, "volume")) {
-        char msg[32];
-        snprintf(msg, sizeof(msg), "stream_volume=%s", arg);
-        return avfilter_process_command(filter, "set_parameter", msg, res, res_len, flags);
-    } else if (!strcmp(cmd, "sample_rate")) {
-        char msg[128];
-        snprintf(msg, sizeof(msg), "%s=%s", cmd, arg);
-        return avfilter_process_command(filter, "set_parameter", msg, res, res_len, flags);
     }
 
-    newcmd = media_graph_create_command(cmd, arg, res, filter, flags);
+    newcmd = media_graph_create_command(cmd, arg, res, filter);
     if (!newcmd)
         return -ENOMEM;
 
@@ -567,10 +564,8 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
             MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
     }
 
-    if (!(cmd->flags & FLAG_FAST_PROC_CMD)) {
-        ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
-            cmd->res, 0, cmd->flags);
-    }
+    ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
+        cmd->res, 0, 0);
 
     pthread_mutex_lock(&priv->qlock);
     TAILQ_REMOVE(&priv->cmdq, cmd, entries);
@@ -578,12 +573,8 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 
 exit:
     free(cmd->cmd);
-    if (!(cmd->flags & FLAG_ARG_PRECOPIED) && cmd->arg)
-        free(cmd->arg);
-    if (!(cmd->flags & FLAG_RES_PRECOPIED) && cmd->res)
-        free(cmd->res);
+    free(cmd->arg);
     free(cmd);
-
     return ret;
 }
 
@@ -621,7 +612,7 @@ static int media_graph_get_pollfds(MediadPlugin* ctx, struct pollfd* fds,
 
         ret = media_graph_queue_command(priv, filter, "get_pollfd", NULL,
             (char*)&fds[nfd], sizeof(struct pollfd) * (count - nfd),
-            AV_OPT_SEARCH_CHILDREN | FLAG_FAST_PROC_CMD);
+            AV_OPT_SEARCH_CHILDREN);
         if (ret < 0)
             continue;
 
@@ -646,7 +637,7 @@ static int media_graph_poll_available(MediadPlugin* ctx, struct pollfd* fd, void
     if (cookie)
         media_graph_queue_command(priv, cookie, "poll_available", NULL,
             (char*)fd, sizeof(struct pollfd),
-            AV_OPT_SEARCH_CHILDREN | FLAG_FAST_PROC_CMD);
+            AV_OPT_SEARCH_CHILDREN);
     else
         eventfd_read(priv->fd, &unuse);
 
@@ -844,9 +835,6 @@ static int media_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn
     if (!target)
         return -EINVAL;
 
-    if (res && res_len > 0)
-        flags |= FLAG_FAST_PROC_CMD;
-
     for (i = 0; i < priv->graph->nb_filters; i++) {
         AVFilterContext* filter = priv->graph->filters[i];
 
@@ -935,7 +923,7 @@ int media_graph_audio_start(MediaGraphAudio** pctx, int format, int sample_rate,
 
     snprintf(msg, sizeof(msg), "%p %p fmt=%d:rate=%d:ch=%d", on_event_cb,
         udata, format, sample_rate, channels);
-    ret = media_graph_queue_command(priv, ctx->src, "link", msg, (char*)&ctx->link_handle, sizeof(void**), FLAG_RES_PRECOPIED);
+    ret = media_graph_queue_command(priv, ctx->src, "link", msg, (char*)&ctx->link_handle, sizeof(void**), 0);
     if (ret < 0) {
         MEDIA_ERR("%s link failed ret:%d\n", ctx->src->name, ret);
         return ret;
@@ -954,7 +942,8 @@ int media_graph_audio_stop(MediaGraphAudio** pctx)
     if (!pctx || !ctx || !ctx->src)
         return -EINVAL;
 
-    ret = media_graph_queue_command(priv, ctx->src, "unlink", (char*)ctx->link_handle, NULL, 0, FLAG_ARG_PRECOPIED);
+    ret = media_graph_queue_command(priv, ctx->src, "unlink",
+        (char*)ctx->link_handle, NULL, 0, 0);
     if (ret < 0)
         MEDIA_ERR("unlink %s failed: %d\n", ctx->src->name, ret);
 
@@ -1050,7 +1039,7 @@ int media_graph_audio_get_parameter(MediaGraphAudio** pctx, const char* key, cha
 
     snprintf(msg, sizeof(msg), "%s", key);
 
-    ret = media_graph_queue_command(priv, ctx->src, "get_parameter", msg, res, res_len, FLAG_RES_PRECOPIED | FLAG_FAST_PROC_CMD);
+    ret = media_graph_queue_command(priv, ctx->src, "get_parameter", msg, res, res_len, 0);
     if (ret < 0)
         MEDIA_ERR("%s get_parameter failed ret:%d\n", ctx->src->name, ret);
 
