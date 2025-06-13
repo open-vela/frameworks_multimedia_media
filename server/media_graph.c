@@ -439,41 +439,54 @@ static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
     return ret;
 }
 
-static int media_graph_calc_active_inputs(MediaCommand* cmd, int map[MAX_LINKS], int* inputs_indexs)
+static int media_graph_get_active_links(MediaCommand* cmd, AVFilterLink** active_links)
 {
+    int temp_map[MAX_LINKS] = { 0 };
     AVFilterContext* src_filter;
+    int ret, i, j, count = 0;
     AVFilterLink* out_link;
-    int ret, i, j;
-    int count = 0;
 
-    for (i = 0; i < cmd->filter->nb_inputs; i++) {
-        src_filter = cmd->filter->inputs[i]->src;
-
-        ret = av_opt_get_array(src_filter, "map_array", AV_OPT_SEARCH_CHILDREN, 0, src_filter->nb_outputs, AV_OPT_TYPE_INT, map);
+    if (cmd->filter->nb_inputs == 0) { // Playback
+        ret = av_opt_get_array(cmd->filter, "map_array", AV_OPT_SEARCH_CHILDREN,
+            0, cmd->filter->nb_outputs, AV_OPT_TYPE_INT, temp_map);
         if (ret < 0)
             return ret;
 
-        for (j = 0; j < src_filter->nb_outputs; j++) {
-            out_link = src_filter->outputs[j];
-            if (map[j] == ROUTE_ON && !strcmp(out_link->dst->name, cmd->filter->name))
-                inputs_indexs[count++] = i;
+        for (i = 0; i < cmd->filter->nb_outputs; i++) {
+            if (temp_map[i] == ROUTE_ON)
+                active_links[count++] = cmd->filter->outputs[i];
+        }
+    } else { // Capture
+        for (i = 0; i < cmd->filter->nb_inputs; i++) {
+            src_filter = cmd->filter->inputs[i]->src;
+
+            ret = av_opt_get_array(src_filter, "map_array", AV_OPT_SEARCH_CHILDREN,
+                0, src_filter->nb_outputs, AV_OPT_TYPE_INT, temp_map);
+            if (ret < 0)
+                return ret;
+
+            for (j = 0; j < src_filter->nb_outputs; j++) {
+                out_link = src_filter->outputs[j];
+                if (temp_map[j] == ROUTE_ON && !strcmp(out_link->dst->name, cmd->filter->name)) {
+                    active_links[count++] = cmd->filter->inputs[i];
+                    break;
+                }
+            }
         }
     }
 
     return count;
 }
 
-static void media_graph_config_links(AVFilterLink** links, int map[MAX_LINKS], int nb_links,
-    int format, int sample_rate, int channels, bool playback, int* inputs_indexs)
+static void media_graph_config_links(AVFilterLink** active_links, int nb_links,
+    int format, int sample_rate, int channels)
 {
     FilterLinkInternal* li;
     AVFilterLink* link;
     int i;
 
     for (i = 0; i < nb_links; i++) {
-        link = playback ? links[i] : links[inputs_indexs[i]];
-        if (playback && map[i] == ROUTE_OFF)
-            continue;
+        link = active_links[i];
 
         link->format = format;
         link->sample_rate = sample_rate;
@@ -488,14 +501,10 @@ static void media_graph_config_links(AVFilterLink** links, int map[MAX_LINKS], i
 
 static int media_graph_format_transfer(MediaCommand* cmd)
 {
-    bool playback = (cmd->filter->nb_inputs == 0);
-    int nb_links = playback ? cmd->filter->nb_outputs : cmd->filter->nb_inputs;
-    AVFilterLink** links = playback ? cmd->filter->outputs : cmd->filter->inputs;
     int format = -1, sample_rate = 0, channels = 0;
-    int inputs_indexs[MAX_LINKS] = { 0 };
-    int map[MAX_LINKS] = { 0 };
+    AVFilterLink* active_links[MAX_LINKS];
+    int ret, nb_links;
     char res[128];
-    int ret = 0;
 
     if (!cmd->arg || !strcmp(cmd->cmd, "map")) {
         ret = avfilter_process_command(cmd->filter, "get_parameter", "format", res, sizeof(res), 0);
@@ -511,19 +520,13 @@ static int media_graph_format_transfer(MediaCommand* cmd)
         return 0;
     }
 
-    if (playback) { // Playback
-        ret = av_opt_get_array(cmd->filter, "map_array", AV_OPT_SEARCH_CHILDREN, 0, cmd->filter->nb_outputs, AV_OPT_TYPE_INT, map);
-        if (ret < 0)
-            return ret;
-    } else { // Capture
-        nb_links = media_graph_calc_active_inputs(cmd, map, inputs_indexs);
-        if (nb_links < 0)
-            return nb_links;
-    }
+    nb_links = media_graph_get_active_links(cmd, active_links);
+    if (nb_links < 0)
+        return nb_links;
 
-    media_graph_config_links(links, map, nb_links, format, sample_rate, channels, playback, inputs_indexs);
+    media_graph_config_links(active_links, nb_links, format, sample_rate, channels);
 
-    return ret;
+    return 0;
 }
 
 static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
