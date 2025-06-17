@@ -548,9 +548,6 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
     av_log(NULL, AV_LOG_INFO, "process %s %s %s\n",
         cmd->filter->name, cmd->cmd, cmd->arg ? cmd->arg : "_");
 
-    ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
-        cmd->res, 0, 0);
-
     if (!strcmp(cmd->cmd, "link") || !strcmp(cmd->cmd, "map")) {
         for (i = 0; i < cmd->filter->nb_outputs; i++) {
             FilterLinkInternal* li = (FilterLinkInternal*)cmd->filter->outputs[i];
@@ -566,6 +563,9 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
         if (ret < 0)
             MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
     }
+
+    ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
+        cmd->res, 0, 0);
 
     pthread_mutex_lock(&priv->qlock);
     TAILQ_REMOVE(&priv->cmdq, cmd, entries);
