@@ -880,6 +880,8 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
     }
 
     if (media_player_is_queue_empty(ctx)) {
+        if (ret == AVERROR_EOF)
+            ret = 0;
         ctx->state = MEDIA_PLAYER_STATE_COMPLETED;
         media_player_event_cb(ctx, MEDIA_EVENT_COMPLETED, ret, NULL);
     }
