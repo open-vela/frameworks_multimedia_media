@@ -794,7 +794,7 @@ static int media_recorder_pause(MediaRecorderContext* ctx)
     }
 
     if (ctx->audio_idx >= 0)
-        media_graph_audio_stop(&ctx->audio_input);
+        media_graph_audio_pause(ctx->audio_input);
 
     media_recorder_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
     return 0;
@@ -854,16 +854,25 @@ static int media_recorder_start(MediaRecorderContext* ctx)
                 goto out;
             }
         }
-        ret = media_graph_audio_start(&ctx->audio_input,
-            ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
-            ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
-            ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
-            media_recorder_on_event_cb, ctx);
-        if (ret < 0) {
-            MEDIA_ERR("media_graph_audio_start failed, ret %d.\n", ret);
-            goto out;
-        } else
-            MEDIA_INFO("media_graph_audio_start success.\n");
+        if (ctx->state == MEDIA_RECORDER_STATE_PAUSED) {
+            ret = media_graph_audio_resume(ctx->audio_input);
+            if (ret < 0) {
+                MEDIA_ERR("media_graph_audio_resume failed, ret %d.\n", ret);
+                goto out;
+            } else
+                MEDIA_INFO("media_graph_audio_resume success.\n");
+        } else {
+            ret = media_graph_audio_start(&ctx->audio_input,
+                ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
+                ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
+                ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
+                media_recorder_on_event_cb, ctx);
+            if (ret < 0) {
+                MEDIA_ERR("media_graph_audio_start failed, ret %d.\n", ret);
+                goto out;
+            } else
+                MEDIA_INFO("media_graph_audio_start success.\n");
+        }
         ctx->audio_input_state = 1;
     }
 
