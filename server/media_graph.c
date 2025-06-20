@@ -554,7 +554,6 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
             if (li->status_in != li->status_out) {
                 MEDIA_WARN("%s outlink is not eof, cmd %s pending\n",
                     cmd->filter->name, cmd->cmd);
-                media_graph_try_touch(priv);
                 return -EAGAIN;
             }
         }
