@@ -1051,7 +1051,7 @@ static int media_player_start(MediaPlayerContext* ctx)
     if (ctx->audio_output) {
         char volume_str[16] = { 0 };
         snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
-        ret = media_graph_audio_set_parameter(&ctx->audio_output, "volume", volume_str);
+        ret = media_graph_audio_set_parameter(&ctx->audio_output, "player_volume", volume_str);
         if (ret < 0) {
             MEDIA_ERR("media_graph_audio_set_parameter failed.\n");
             goto error;

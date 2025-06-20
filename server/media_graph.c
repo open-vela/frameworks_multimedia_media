@@ -412,7 +412,7 @@ static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
 
     if (media_graph_immediate_cmd(cmd)) {
         if (!strcmp(cmd, "volume")) {
-            snprintf(msg, sizeof(msg), "stream_volume=%s", arg);
+            snprintf(msg, sizeof(msg), "volume=%s", arg);
             return avfilter_process_command(filter, "set_parameter", msg, res, res_len, 0);
         } else if (!strcmp(cmd, "sample_rate")) {
             snprintf(msg, sizeof(msg), "%s=%s", cmd, arg);
