@@ -637,6 +637,7 @@ static void media_recorder_close_muxer(MediaRecorderContext* ctx)
     if (ctx->format_opt)
         av_dict_free(&ctx->format_opt);
 
+    MEDIA_INFO("recorder last position %" PRIu32 ".\n", ctx->current_ms);
     ctx->current_ms = 0;
 }
 
@@ -818,7 +819,6 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
         ret = media_recorder_proc_dat(ctx);
     }
 
-    MEDIA_INFO("recorder current pos %" PRIu32 ".\n", ctx->current_ms);
 out:
     media_recorder_clean(ctx);
     return 0;
