@@ -41,9 +41,8 @@
  *      @evt: event type
  *      @args: event arguments
  */
-typedef struct MediaGraphAudio MediaGraphAudio;
 
-int media_graph_audio_open(MediaGraphAudio** pctx, const char* stream_type);
+int media_graph_audio_open(AVFilterContext** src, const char* stream_type);
 
 /*
  * Start a audio stream.
@@ -60,7 +59,7 @@ int media_graph_audio_open(MediaGraphAudio** pctx, const char* stream_type);
  *      @evt: event type
  *      @args: event arguments
  */
-int media_graph_audio_start(MediaGraphAudio** pctx, int format, int sample_rate, int channels,
+int media_graph_audio_start(AVFilterContext* src, int format, int sample_rate, int channels,
     int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata);
 
 /*
@@ -70,7 +69,7 @@ int media_graph_audio_start(MediaGraphAudio** pctx, int format, int sample_rate,
  *
  * Note that it must also be called during pause. Get it again after resume.
  */
-int media_graph_audio_stop(MediaGraphAudio** pctx);
+int media_graph_audio_stop(AVFilterContext* src);
 
 /*
  * Release a audio stream.
@@ -79,7 +78,7 @@ int media_graph_audio_stop(MediaGraphAudio** pctx);
  *
  * Note that it must also be called during pause. Get it again after resume.
  */
-int media_graph_audio_close(MediaGraphAudio** pctx);
+int media_graph_audio_close(AVFilterContext** src);
 
 /*
  * Pause the audio stream and all downstream connected filters.
@@ -88,7 +87,7 @@ int media_graph_audio_close(MediaGraphAudio** pctx);
  * @ctx: [in,out] audio stream context
  * @return: 0 on success, negative value on error
  */
-int media_graph_audio_pause(MediaGraphAudio* pctx);
+int media_graph_audio_pause(AVFilterContext* src);
 
 /*
  * Resume the audio stream and all downstream connected filters.
@@ -97,7 +96,7 @@ int media_graph_audio_pause(MediaGraphAudio* pctx);
  * @ctx: [in,out] audio stream context
  * @return: 0 on success, negative value on error
  */
-int media_graph_audio_resume(MediaGraphAudio* pctx);
+int media_graph_audio_resume(AVFilterContext* src);
 
 /*
  * Set stream parameter.
@@ -106,7 +105,7 @@ int media_graph_audio_resume(MediaGraphAudio* pctx);
  * @value: [in] parameter value
  * @return: 0 on success, negative value on error
  */
-int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, const char* value);
+int media_graph_audio_set_parameter(AVFilterContext* src, const char* param, const char* value);
 
 /*
  * Get stream parameter value.
@@ -116,6 +115,6 @@ int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, c
  * @res_len: [in] parameter value length
  * @return: 0 on success, negative value on error
  */
-int media_graph_audio_get_parameter(MediaGraphAudio** pctx, const char* key, char* res, int res_len);
+int media_graph_audio_get_parameter(AVFilterContext* src, const char* key, char* res, int res_len);
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_GRAPH_H */

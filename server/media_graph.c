@@ -91,17 +91,6 @@ typedef struct MediaGraphPriv {
     pthread_mutex_t qlock;
 } MediaGraphPriv;
 
-typedef struct MediaFilterPriv {
-    AVFilterContext* filter;
-    void* cookie;
-    bool event;
-} MediaFilterPriv;
-
-typedef struct MediaGraphAudio {
-    AVFilterContext* src;
-    void* link_handle;
-} MediaGraphAudio;
-
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -871,17 +860,12 @@ MediadPlugin media_graph_plugin = {
  * Public Functions
  ****************************************************************************/
 
-int media_graph_audio_open(MediaGraphAudio** pctx, const char* stream)
+int media_graph_audio_open(AVFilterContext** src, const char* stream)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
     AVFilterGraph* graph = priv->graph;
     char stream_name[64] = { 0 };
-    MediaGraphAudio* ctx;
     int ret;
-
-    ctx = av_calloc(1, sizeof(*ctx));
-    if (!ctx)
-        return -ENOMEM;
 
     ret = media_stub_get_stream_name(stream, stream_name, sizeof(stream_name));
     if (ret >= 0)
@@ -891,42 +875,36 @@ int media_graph_audio_open(MediaGraphAudio** pctx, const char* stream)
     for (int i = 0; i < graph->nb_filters; i++) {
         if (graph->filters[i]->name && !priv->occupied[i] && !strncmp(stream, graph->filters[i]->name, strlen(stream))) {
             priv->occupied[i] = 1;
-            ctx->src = graph->filters[i];
+            *src = graph->filters[i];
             break;
         }
     }
     pthread_mutex_unlock(&priv->qlock);
 
-    if (!ctx->src) {
+    if (!*src) {
         MEDIA_ERR("%s stream is not found\n", ret >= 0 ? stream_name : stream);
         ret = -EINVAL;
         goto fail;
     }
 
-    *pctx = ctx;
     return 0;
 
 fail:
-    av_free(ctx);
     return ret;
 }
 
-int media_graph_audio_start(MediaGraphAudio** pctx, int format, int sample_rate, int channels,
+int media_graph_audio_start(AVFilterContext* src, int format, int sample_rate, int channels,
     int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
-    MediaGraphAudio* ctx = *pctx;
     char msg[128] = { 0 };
     int ret;
 
-    if (!pctx || !ctx || !ctx->src)
-        return -EINVAL;
-
     snprintf(msg, sizeof(msg), "%p %p fmt=%d:rate=%d:ch=%d", on_event_cb,
         udata, format, sample_rate, channels);
-    ret = media_graph_queue_command(priv, ctx->src, "link", msg, (char*)&ctx->link_handle, sizeof(void**), 0);
+    ret = media_graph_queue_command(priv, src, "link", msg, NULL, 0, 0);
     if (ret < 0) {
-        MEDIA_ERR("%s link failed ret:%d\n", ctx->src->name, ret);
+        MEDIA_ERR("%s link failed ret:%d\n", src->name, ret);
         return ret;
     }
 
@@ -934,73 +912,58 @@ int media_graph_audio_start(MediaGraphAudio** pctx, int format, int sample_rate,
     return 0;
 }
 
-int media_graph_audio_stop(MediaGraphAudio** pctx)
+int media_graph_audio_stop(AVFilterContext* src)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
-    MediaGraphAudio* ctx = *pctx;
     int ret;
 
-    if (!pctx || !ctx || !ctx->src)
-        return -EINVAL;
-
-    ret = media_graph_queue_command(priv, ctx->src, "unlink",
-        (char*)ctx->link_handle, NULL, 0, 0);
+    ret = media_graph_queue_command(priv, src, "unlink",
+        NULL, NULL, 0, 0);
     if (ret < 0)
-        MEDIA_ERR("unlink %s failed: %d\n", ctx->src->name, ret);
+        MEDIA_ERR("unlink %s failed: %d\n", src->name, ret);
 
     media_graph_try_touch(priv);
     return ret;
 }
 
-int media_graph_audio_close(MediaGraphAudio** pctx)
+int media_graph_audio_close(AVFilterContext** src)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
-    MediaGraphAudio* ctx = *pctx;
-
-    if (!pctx || !ctx)
-        return -EINVAL;
 
     pthread_mutex_lock(&priv->qlock);
     for (int i = 0; i < priv->graph->nb_filters; i++) {
         AVFilterContext* filter = priv->graph->filters[i];
-        if (filter == ctx->src) {
+        if (filter == *src) {
             priv->occupied[i] = 0;
             break;
         }
     }
     pthread_mutex_unlock(&priv->qlock);
+    *src = NULL;
 
-    av_free(ctx);
-    *pctx = NULL;
     return 0;
 }
 
-int media_graph_audio_pause(MediaGraphAudio* pctx)
+int media_graph_audio_pause(AVFilterContext* src)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
     int ret;
 
-    if (!pctx || !pctx->src)
-        return -EINVAL;
-
-    ret = media_graph_queue_command(priv, pctx->src, "pause", NULL, NULL, 0, 0);
+    ret = media_graph_queue_command(priv, src, "pause", NULL, NULL, 0, 0);
     if (ret < 0)
-        MEDIA_ERR("pause %s failed: %d\n", pctx->src->name, ret);
+        MEDIA_ERR("pause %s failed: %d\n", src->name, ret);
 
     return ret;
 }
 
-int media_graph_audio_resume(MediaGraphAudio* pctx)
+int media_graph_audio_resume(AVFilterContext* src)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
     int ret;
 
-    if (!pctx || !pctx->src)
-        return -EINVAL;
-
-    ret = media_graph_queue_command(priv, pctx->src, "resume", NULL, NULL, 0, 0);
+    ret = media_graph_queue_command(priv, src, "resume", NULL, NULL, 0, 0);
     if (ret < 0) {
-        MEDIA_ERR("%s resume failed ret:%d\n", pctx->src->name, ret);
+        MEDIA_ERR("%s resume failed ret:%d\n", src->name, ret);
         return ret;
     }
 
@@ -1008,41 +971,39 @@ int media_graph_audio_resume(MediaGraphAudio* pctx)
     return 0;
 }
 
-int media_graph_audio_set_parameter(MediaGraphAudio** pctx, const char* param, const char* value)
+int media_graph_audio_set_parameter(AVFilterContext* src, const char* param, const char* value)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
-    MediaGraphAudio* ctx = *pctx;
     char msg[128];
     int ret;
 
-    if (!ctx || !param || !value)
+    if (!param || !value)
         return -EINVAL;
 
     snprintf(msg, sizeof(msg), "%s=%s", param, value);
 
-    ret = media_graph_queue_command(priv, ctx->src, "set_parameter", msg, NULL, 0, 0);
+    ret = media_graph_queue_command(priv, src, "set_parameter", msg, NULL, 0, 0);
     if (ret < 0)
-        MEDIA_ERR("%s set_parameter failed ret:%d\n", ctx->src->name, ret);
+        MEDIA_ERR("%s set_parameter failed ret:%d\n", src->name, ret);
 
     media_graph_try_touch(priv);
     return ret;
 }
 
-int media_graph_audio_get_parameter(MediaGraphAudio** pctx, const char* key, char* res, int res_len)
+int media_graph_audio_get_parameter(AVFilterContext* src, const char* key, char* res, int res_len)
 {
     MediaGraphPriv* priv = media_graph_plugin.priv;
-    MediaGraphAudio* ctx = *pctx;
     char msg[128];
     int ret;
 
-    if (!ctx || !key || !res || res_len <= 0)
+    if (!key || !res || res_len <= 0)
         return -EINVAL;
 
     snprintf(msg, sizeof(msg), "%s", key);
 
-    ret = media_graph_queue_command(priv, ctx->src, "get_parameter", msg, res, res_len, 0);
+    ret = media_graph_queue_command(priv, src, "get_parameter", msg, res, res_len, 0);
     if (ret < 0)
-        MEDIA_ERR("%s get_parameter failed ret:%d\n", ctx->src->name, ret);
+        MEDIA_ERR("%s get_parameter failed ret:%d\n", src->name, ret);
 
     return ret;
 }

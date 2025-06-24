@@ -170,7 +170,7 @@ typedef struct MediaPlayerContext {
 
     /* audio or video output */
     int audio_output_state; /** < 1: audio output is started, 0: not started */
-    MediaGraphAudio* audio_output;
+    AVFilterContext* audio_output;
     MediaVOutputContext* video_output;
 } MediaPlayerContext;
 
@@ -1016,7 +1016,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
     media_player_clear_queue(ctx, MEDIA_PLAYER_DATA_QUEUE_IDX);
 
     if (ctx->audio_output)
-        media_graph_audio_stop(&ctx->audio_output);
+        media_graph_audio_stop(ctx->audio_output);
 
     media_player_close_demuxer(ctx);
 
@@ -1042,7 +1042,7 @@ static int media_player_start(MediaPlayerContext* ctx)
             ret = media_graph_audio_resume(ctx->audio_output);
         } else {
             AVCodecContext* codec_ctx = ctx->streams[ctx->audio_idx].codec_ctx;
-            ret = media_graph_audio_start(&ctx->audio_output,
+            ret = media_graph_audio_start(ctx->audio_output,
                 codec_ctx->sample_fmt, codec_ctx->sample_rate,
                 codec_ctx->ch_layout.nb_channels, media_player_on_event_cb, ctx);
         }
@@ -1062,7 +1062,7 @@ static int media_player_start(MediaPlayerContext* ctx)
     if (ctx->audio_output) {
         char volume_str[16] = { 0 };
         snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
-        ret = media_graph_audio_set_parameter(&ctx->audio_output, "player_volume", volume_str);
+        ret = media_graph_audio_set_parameter(ctx->audio_output, "player_volume", volume_str);
         if (ret < 0) {
             MEDIA_ERR("media_graph_audio_set_parameter failed.\n");
             goto error;
@@ -1125,10 +1125,10 @@ static int media_player_volume(MediaPlayerContext* ctx, const char* args, char* 
 
     if (ctx->audio_output) {
         if (args) {
-            ret = media_graph_audio_set_parameter(&ctx->audio_output, "volume", args);
+            ret = media_graph_audio_set_parameter(ctx->audio_output, "volume", args);
             sscanf(args, "%f", &ctx->volume);
         } else if (res && res_len) {
-            ret = media_graph_audio_get_parameter(&ctx->audio_output, "volume", res, res_len);
+            ret = media_graph_audio_get_parameter(ctx->audio_output, "volume", res, res_len);
             sscanf(res, "%f", &ctx->volume);
         }
         if (ret < 0)

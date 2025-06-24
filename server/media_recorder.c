@@ -125,7 +125,7 @@ typedef struct MediaRecorderContext {
     struct RecorderCmdQueue cmd_queue;
 
     int audio_input_state; /** < 1: audio input is started, 0: not started */
-    MediaGraphAudio* audio_input;
+    AVFilterContext* audio_input;
 } MediaRecorderContext;
 
 typedef struct MediaRecorderPriv {
@@ -816,7 +816,7 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
         return 0;
 
     if (ctx->audio_idx >= 0)
-        media_graph_audio_stop(&ctx->audio_input);
+        media_graph_audio_stop(ctx->audio_input);
 
     if (ctx->state == MEDIA_RECORDER_STATE_PREPARED || ctx->state == MEDIA_RECORDER_STATE_COMPLETED)
         goto out;
@@ -856,7 +856,7 @@ static int media_recorder_start(MediaRecorderContext* ctx)
         if (ctx->streams[ctx->audio_idx].enc_ctx->frame_size) {
             char buf[16] = { 0 };
             snprintf(buf, sizeof(buf), "%d", ctx->streams[ctx->audio_idx].enc_ctx->frame_size);
-            ret = media_graph_audio_set_parameter(&ctx->audio_input, "frame_size", buf);
+            ret = media_graph_audio_set_parameter(ctx->audio_input, "frame_size", buf);
             if (ret < 0) {
                 MEDIA_ERR("media_graph_audio_set_parameter failed.\n");
                 goto out;
@@ -870,7 +870,7 @@ static int media_recorder_start(MediaRecorderContext* ctx)
             } else
                 MEDIA_INFO("media_graph_audio_resume success.\n");
         } else {
-            ret = media_graph_audio_start(&ctx->audio_input,
+            ret = media_graph_audio_start(ctx->audio_input,
                 ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
                 ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
                 ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
