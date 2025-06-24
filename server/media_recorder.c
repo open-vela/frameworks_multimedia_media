@@ -641,6 +641,14 @@ static void media_recorder_close_muxer(MediaRecorderContext* ctx)
     ctx->current_ms = 0;
 }
 
+static void media_recorder_conn_close(MediaRecorderContext* ctx)
+{
+    close(ctx->tran_fd);
+    ctx->tran_fd = -EPERM;
+    ctx->offset = 0;
+    media_parcel_deinit(&ctx->parcel);
+}
+
 static void media_recorder_clean(MediaRecorderContext* ctx)
 {
     if (ctx->state != MEDIA_RECORDER_STATE_STOPPED) {
@@ -889,6 +897,9 @@ static void media_recorder_close(MediaRecorderContext* ctx)
 
     if (ctx->audio_input)
         media_graph_audio_close(&ctx->audio_input);
+
+    if (ctx->tran_fd > 0)
+        media_recorder_conn_close(ctx);
 }
 
 static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filename)
@@ -1116,14 +1127,6 @@ static int media_recorder_create_notify(MediaRecorderContext* ctx, media_parcel*
     }
 
     return fd;
-}
-
-static void media_recorder_conn_close(MediaRecorderContext* ctx)
-{
-    close(ctx->tran_fd);
-    ctx->tran_fd = -EPERM;
-    ctx->offset = 0;
-    media_parcel_deinit(&ctx->parcel);
 }
 
 static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollfd* fd)

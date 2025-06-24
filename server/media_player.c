@@ -967,6 +967,14 @@ static void media_player_ctx_release(MediaPlayerContext* ctx)
     pthread_mutex_destroy(&ctx->mutex);
 }
 
+static void media_player_conn_close(MediaPlayerContext* ctx)
+{
+    close(ctx->tran_fd);
+    ctx->tran_fd = -EPERM;
+    ctx->offset = 0;
+    media_parcel_deinit(&ctx->parcel);
+}
+
 static void media_player_close(MediaPlayerContext* ctx)
 {
     media_player_release_stream(ctx);
@@ -979,6 +987,9 @@ static void media_player_close(MediaPlayerContext* ctx)
 
     if (ctx->global_opts)
         av_dict_free(&ctx->global_opts);
+
+    if (ctx->tran_fd > 0)
+        media_player_conn_close(ctx);
 }
 
 static int media_player_pause(MediaPlayerContext* ctx)
@@ -1367,14 +1378,6 @@ static int media_player_create_notify(MediaPlayerContext* ctx, media_parcel* par
     }
 
     return fd;
-}
-
-static void media_player_conn_close(MediaPlayerContext* ctx)
-{
-    close(ctx->tran_fd);
-    ctx->tran_fd = -EPERM;
-    ctx->offset = 0;
-    media_parcel_deinit(&ctx->parcel);
 }
 
 static int media_player_get_pollfd(MediaPlayerContext* ctx, struct pollfd* fds, int count)
