@@ -496,7 +496,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
         ctx->streams[idx].enc_ctx->sample_fmt = sample_fmt;
         ctx->streams[idx].enc_ctx->sample_rate = sample_rate;
         ctx->streams[idx].enc_ctx->ch_layout = ch_layout;
-        ctx->streams[idx].enc_ctx->time_base = (AVRational) { 1, sample_rate };
+        ctx->streams[idx].enc_ctx->time_base = (AVRational) { 1, 1000000 };
     } else {
         ctx->streams[idx].enc_ctx->width = width;
         ctx->streams[idx].enc_ctx->height = height;
