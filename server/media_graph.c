@@ -337,20 +337,11 @@ err:
 
 static inline bool media_graph_immediate_cmd(const char* cmd)
 {
-    switch (cmd[0]) {
-    case 'l':
-        return strcmp(cmd, "link");
-    case 'u':
-        return strcmp(cmd, "unlink");
-    case 'm':
-        return strcmp(cmd, "map");
-    case 'p':
-        return strcmp(cmd, "pause");
-    case 'r':
-        return strcmp(cmd, "resume");
-    default:
-        return true;
-    }
+    return strcmp(cmd, "link")
+        && strcmp(cmd, "unlink")
+        && strcmp(cmd, "map")
+        && strcmp(cmd, "pause")
+        && strcmp(cmd, "resume");
 }
 
 static MediaCommand* media_graph_create_command(const char* cmd, const char* arg, char* res, AVFilterContext* filter)
