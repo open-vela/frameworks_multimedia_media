@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/eventfd.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/sysinfo.h>
@@ -105,6 +106,7 @@ typedef struct MediaRecorderContext {
     /* communication with media client */
     int tran_fd;
     int notify_fd;
+    int event_fd;
     uint32_t offset;
     media_parcel parcel;
 
@@ -603,6 +605,7 @@ static int media_recorder_on_event_cb(void* udata, int evt, int64_t args)
     MediaRecorderContext* ctx = (MediaRecorderContext*)udata;
     AVFrame* in_frame = (AVFrame*)(uintptr_t)args;
     AVFrame* frame;
+    uint64_t cnt = 1;
 
     if (evt < 0) {
         MEDIA_INFO("received unlink event form audio_input.\n");
@@ -615,7 +618,7 @@ static int media_recorder_on_event_cb(void* udata, int evt, int64_t args)
         return AVERROR(ENOMEM);
 
     media_recorder_queue_push(ctx, ctx->audio_idx, frame);
-
+    write(ctx->event_fd, &cnt, sizeof(cnt));
     return 0;
 }
 
@@ -667,6 +670,7 @@ static int media_recorder_interrupt(void* opaque)
     int interrupt = 0;
     struct pollfd fds[1];
     struct pollfd* fd = &fds[0];
+    uint64_t cnt = 1;
     fds[0].fd = ctx->tran_fd;
     fds[0].events = POLLIN;
     fds[0].revents = 0;
@@ -680,7 +684,7 @@ static int media_recorder_interrupt(void* opaque)
             break;
         }
     }
-
+    write(ctx->event_fd, &cnt, sizeof(cnt));
     return interrupt;
 }
 
@@ -727,6 +731,7 @@ out:
 static int media_recorder_proc_dat(MediaRecorderContext* ctx)
 {
     AVFrame* frame;
+    uint64_t cnt = 1;
     int ret;
     int i;
     for (i = 0; i < ctx->nb_streams; i++) {
@@ -758,7 +763,7 @@ static int media_recorder_proc_dat(MediaRecorderContext* ctx)
             goto out;
         }
     }
-
+    write(ctx->event_fd, &cnt, sizeof(cnt));
     return 0;
 
 out:
@@ -782,6 +787,7 @@ static void media_recorder_ctx_init(MediaRecorderContext* ctx)
     SIMPLEQ_INIT(&ctx->cmd_queue);
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
+    ctx->event_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
 }
 
 static void media_recorder_ctx_release(MediaRecorderContext* ctx)
@@ -794,6 +800,8 @@ static void media_recorder_ctx_release(MediaRecorderContext* ctx)
     media_recorder_notify_finalize(ctx);
     media_parcel_deinit(&ctx->parcel);
     pthread_mutex_destroy(&ctx->mutex);
+    close(ctx->event_fd);
+    ctx->event_fd = -1;
 }
 
 static int media_recorder_pause(MediaRecorderContext* ctx)
@@ -1141,37 +1149,46 @@ static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollf
     if (fd->revents & POLLERR)
         goto out;
 
-    while (1) {
-        ret = media_parcel_recv(&ctx->parcel, ctx->tran_fd, &ctx->offset, MSG_DONTWAIT);
-        if (ret < 0)
-            break;
-
-        code = media_parcel_get_code(&ctx->parcel);
-        switch (code) {
-        case MEDIA_PARCEL_SEND:
-            media_recorder_onreceive(ctx, &ctx->parcel, NULL);
-            break;
-
-        case MEDIA_PARCEL_SEND_ACK:
-            media_parcel_init(&ack);
-            media_recorder_onreceive(ctx, &ctx->parcel, &ack);
-            ret = media_parcel_send(&ack, ctx->tran_fd, MEDIA_PARCEL_REPLY, 0);
-            media_parcel_deinit(&ack);
-            break;
-
-        case MEDIA_PARCEL_CREATE_NOTIFY:
-            ret = media_recorder_create_notify(ctx, &ctx->parcel);
-            if (ret > 0)
-                ctx->notify_fd = ret;
-            else
-                MEDIA_ERR("create notify failed %d\n", ret);
-            break;
-        default:
-            break;
+    if (fd->fd == ctx->event_fd) {
+        uint64_t cnt;
+        ret = read(ctx->event_fd, &cnt, sizeof(cnt));
+        if (ret < 0) {
+            MEDIA_ERR("read event fd failed %d\n", ret);
+            goto out;
         }
+    } else if (fd->fd == ctx->tran_fd) {
+        while (1) {
+            ret = media_parcel_recv(&ctx->parcel, ctx->tran_fd, &ctx->offset, MSG_DONTWAIT);
+            if (ret < 0)
+                break;
 
-        media_parcel_reinit(&ctx->parcel);
-        ctx->offset = 0;
+            code = media_parcel_get_code(&ctx->parcel);
+            switch (code) {
+            case MEDIA_PARCEL_SEND:
+                media_recorder_onreceive(ctx, &ctx->parcel, NULL);
+                break;
+
+            case MEDIA_PARCEL_SEND_ACK:
+                media_parcel_init(&ack);
+                media_recorder_onreceive(ctx, &ctx->parcel, &ack);
+                ret = media_parcel_send(&ack, ctx->tran_fd, MEDIA_PARCEL_REPLY, 0);
+                media_parcel_deinit(&ack);
+                break;
+
+            case MEDIA_PARCEL_CREATE_NOTIFY:
+                ret = media_recorder_create_notify(ctx, &ctx->parcel);
+                if (ret > 0)
+                    ctx->notify_fd = ret;
+                else
+                    MEDIA_ERR("create notify failed %d\n", ret);
+                break;
+            default:
+                break;
+            }
+
+            media_parcel_reinit(&ctx->parcel);
+            ctx->offset = 0;
+        }
     }
 
     if (((fd->revents & POLLIN) && ret == -EPIPE) || (fd->revents & POLLHUP))
@@ -1235,22 +1252,29 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
 
 static void media_recorder_poll(MediaRecorderContext* ctx)
 {
-    struct pollfd fds[1];
-    struct pollfd* fd = &fds[0];
+    struct pollfd fds[2];
     fds[0].fd = ctx->tran_fd;
     fds[0].events = POLLIN;
     fds[0].revents = 0;
+    fds[1].fd = ctx->event_fd;
+    fds[1].events = POLLIN;
+    fds[1].revents = 0;
     int ret;
 
-    ret = poll(fds, 1, 2);
+    ret = poll(fds, 2, -1);
     if (ret == -1) {
         MEDIA_ERR("poll failed err=%d\n", -errno);
     } else if (ret == 0)
         MEDIA_DEBUG("poll timeout\n");
 
-    ret = media_recorder_poll_available(ctx, fd);
-    if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
-        MEDIA_ERR("poll_available failed %d\n", ret);
+    for (int i = 0; i < 2; i++) {
+        if (!fds[i].revents)
+            continue;
+
+        ret = media_recorder_poll_available(ctx, &fds[i]);
+        if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
+            MEDIA_ERR("poll_available failed %d\n", ret);
+    }
 }
 
 static void* media_recorder_thread(void* arg)
