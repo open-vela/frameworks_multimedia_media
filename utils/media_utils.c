@@ -56,7 +56,7 @@ const char* media_event_get_name(int event)
     case MEDIA_EVENT_START:
         return "START";
     case MEDIA_EVENT_PAUSE:
-        return "START";
+        return "PAUSE";
     case MEDIA_EVENT_STOP:
         return "STOP";
     case MEDIA_EVENT_PREV_SONG:
