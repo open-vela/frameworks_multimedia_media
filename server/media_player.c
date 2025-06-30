@@ -1125,10 +1125,10 @@ static int media_player_volume(MediaPlayerContext* ctx, const char* args, char* 
 
     if (ctx->audio_output) {
         if (args) {
-            ret = media_graph_audio_set_parameter(ctx->audio_output, "volume", args);
+            ret = media_graph_audio_set_parameter(ctx->audio_output, "player_volume", args);
             sscanf(args, "%f", &ctx->volume);
         } else if (res && res_len) {
-            ret = media_graph_audio_get_parameter(ctx->audio_output, "volume", res, res_len);
+            ret = media_graph_audio_get_parameter(ctx->audio_output, "player_volume", res, res_len);
             sscanf(res, "%f", &ctx->volume);
         }
         if (ret < 0)
