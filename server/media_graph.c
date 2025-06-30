@@ -28,24 +28,15 @@
 #include <libavdevice/avdevice.h>
 #include <libavfilter/avfilter.h>
 #include <libavfilter/avfilter_internal.h>
-#include <libavfilter/buffersrc.h>
-#include <libavfilter/filters.h>
-#include <libavfilter/formats.h>
 #include <libavutil/bprint.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/mem.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
-#include <libavutil/pixfmt.h>
-#include <libavutil/samplefmt.h>
 
-#include <assert.h>
 #include <fcntl.h>
-#include <media_api.h>
 #include <sys/eventfd.h>
 #include <sys/queue.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include "media_common.h"
 #include "media_graph.h"
