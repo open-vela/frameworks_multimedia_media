@@ -199,7 +199,7 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
  */
 static inline int media_player_is_exit(MediaPlayerContext* ctx)
 {
-    return ctx->exit && !ctx->audio_output_state;
+    return ctx->exit && (!ctx->audio_output_state || ctx->audio_idx == -1);
 }
 
 static int media_player_is_queue_empty(MediaPlayerContext* ctx)
@@ -1015,7 +1015,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
 
     media_player_clear_queue(ctx, MEDIA_PLAYER_DATA_QUEUE_IDX);
 
-    if (ctx->audio_output)
+    if (ctx->audio_output && ctx->audio_idx != -1)
         media_graph_audio_stop(ctx->audio_output);
 
     media_player_close_demuxer(ctx);
