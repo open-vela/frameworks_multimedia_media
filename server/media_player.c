@@ -906,7 +906,7 @@ static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush)
     if (flush)
         media_player_clear_queue(ctx, MEDIA_PLAYER_DATA_QUEUE_IDX);
 
-    ret = avformat_seek_file(ctx->format_ctx, -1, INT64_MIN, timestamp, INT64_MAX, 0);
+    ret = avformat_seek_file(ctx->format_ctx, -1, INT64_MIN, timestamp, INT64_MAX, AVSEEK_FLAG_ANY);
     if (ret < 0)
         goto end;
 
