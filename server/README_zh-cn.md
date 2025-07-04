@@ -73,3 +73,26 @@
  - 举例，如音响播放来自手机的音乐：
    - 控制者：UI界面是控制者。
    - 受控者：与手机建立音频通道的蓝牙模块是受控者。
+
+### **FFmpeg**
+ Media Graph 模块通过调用 FFmpeg 库，实现了音视频编解码、封装与解封装以及音视频流处理等功能。借助 FFmpeg，系统能够满足多样化的多媒体需求，包括但不限于视频播放、视频录制、拍照以及音视频剪辑等。
+
+ 在 FFmpeg 内部，通过启用解复用器（demuxer）、解码器（decoder）、复用器（muxer）、编码器（encoder）和过滤器（filter）等模块对音视频数据进行处理。FFmpeg 将解复用器、解码器、过滤器等模块组合成完整的处理流程（pipeline），以实现诸如视频播放、视频录制等完整功能。
+
+ 具体而言，通过一个配置文件（conf 文件）预先连接各个功能所需的过滤器。然后，利用 FFmpeg API 解析并初始化该配置文件，从而构建出处理流程。向此处理流程输入数据，即可实现数据的传输。
+
+ 通过配置参数 CONFIG_LIB_FFMPEG=y 使能 FFmpeg 功能，并通过 CONFIG_LIB_FFMPEG_CONFIGURATION 对上述模块进行配置。
+- **demuxer**：解复用模块，用于将各种音视频的 containter 中 extract 出音视频 stream 送给 decoder 解码。例如支持 mp3,mp4 格式，通过配置 CONFIG_LIB_FFMPEG_CONFIGURATION="--enable-demuxer='mp3,mp4' 等参数配置使能。
+- **decoder**：用于接收 demuxer 处理后音视频数据解码，例如支持 h264，aac 格式，通过配置 CONFIG_LIB_FFMPEG_CONFIGURATION="--enable-decoder='h264,aac' 等参数配置使能。
+- **muxer**：复用模块，用于将各种音视频 stream 按照特定的多媒体容器格式的规则，封装成一个完整的 containter。同 demuxer，通过配置 CONFIG_LIB_FFMPEG_CONFIGURATION="--enable-muxer='mp3,mp4' 等参数配置使能。
+- **encoder**：用于接收 muxer 处理后音视频数据编码，同 decoder，通过配置 CONFIG_LIB_FFMPEG_CONFIGURATION="--enable-encoder='h264,aac' 等参数配置使能。
+- **filter**：用于对音视频数据进行处理，例如音视频的裁剪，缩放，旋转，音视频的混合，音视频的编解码，音视频的封装和解封装等。例如 graph 内配置如下通路，具体路径：/vendor/openvela/boards/vela/src/etc/media/graph.conf：
+  ```
+  adevsrc@pcm0c=format=nuttx:devname=/dev/audio/pcm0c[a],
+  devsrc@InVsrc=d=/dev/video:s=640x480:r=30[v],
+  [v]streamselect@SelVideo=inputs=1:map=0 -1[vout0][vout1],
+  [vout0]devsink@fb=format=fbdev:devname=/dev/fb0,
+  [a][vout1]moviesink_async@cap
+  ```
+  - adevsrc filter 从驱动设备文件 /dev/audio/pcm0c 中获取 audio 数据，devsrc filter 从驱动设备文件中获取 video 数据，然后通过 streamselect filter 将 audio/video 数据送到 moviesink_async filter 实现录像功能生成视频文件。
+  - devsrc filter 从驱动设备文件中获取 video 数据，通过 streamselect filter 将数据送到 devsink，最终通过驱动设备节点 /dev/fb0 将 video 数据送到 framebuffer 中显示出来实现图像预览功能。
