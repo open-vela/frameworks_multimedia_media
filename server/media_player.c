@@ -244,6 +244,9 @@ static void media_player_video_get_poll_timeout(MediaPlayerContext* ctx)
 
 static int media_player_output_get_pollfds(MediaPlayerContext* ctx, struct pollfd* fds, int count)
 {
+    if (ctx->state >= MEDIA_PLAYER_STATE_STOPPED)
+        return 0;
+
     return media_video_output_get_pollfd(ctx->video_output, fds, count);
 }
 
@@ -991,9 +994,6 @@ static void media_player_close(MediaPlayerContext* ctx)
     if (ctx->audio_output)
         media_graph_audio_close(&ctx->audio_output);
 
-    if (ctx->video_output)
-        media_video_output_close(&ctx->video_output);
-
     if (ctx->global_opts)
         av_dict_free(&ctx->global_opts);
 
@@ -1026,6 +1026,9 @@ static int media_player_stop(MediaPlayerContext* ctx)
 
     if (ctx->audio_output && ctx->audio_idx != -1)
         media_graph_audio_stop(ctx->audio_output);
+
+    if (ctx->video_output)
+        media_video_output_close(&ctx->video_output);
 
     media_player_close_demuxer(ctx);
 
