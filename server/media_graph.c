@@ -617,6 +617,34 @@ static int media_graph_poll_available(MediadPlugin* ctx, struct pollfd* fd, void
     return 0;
 }
 
+static int media_graph_run_all(AVFilterGraph* graph)
+{
+    FFFilterContext* ctxi;
+    unsigned i;
+    int ret;
+
+    while (1) {
+        ctxi = fffilterctx(graph->filters[0]);
+        for (i = 1; i < graph->nb_filters; i++) {
+            FFFilterContext* ctxi_other = fffilterctx(graph->filters[i]);
+            if (ctxi_other->ready > ctxi->ready)
+                ctxi = ctxi_other;
+        }
+        if (!ctxi->ready) {
+            ret = 0;
+            break;
+        }
+
+        ret = ff_filter_activate(&ctxi->p);
+        if (ret < 0 && ret != AVERROR_EOF && ret != AVERROR(EAGAIN)) {
+            av_log(graph, AV_LOG_ERROR, "%s %s activate failed, ret %d.\n", __func__, ctxi->p.name, ret);
+            break;
+        }
+    }
+
+    return ret;
+}
+
 static int media_graph_run_once(MediadPlugin* ctx)
 {
     MediaGraphPriv* priv = ctx->priv;
@@ -626,17 +654,9 @@ static int media_graph_run_once(MediadPlugin* ctx)
         ret = media_graph_dequeue_command(priv, true);
     } while (ret >= 0);
 
-    while (1) {
-        ret = ff_filter_graph_run_once(priv->graph);
-        if (ret < 0)
-            break;
-    }
-
-    if (ret < 0) {
-        if (ret == AVERROR(EAGAIN))
-            return 0;
-        MEDIA_ERR("media graph run error ret:%d:%s\n", ret, av_err2str(ret));
-    }
+    ret = media_graph_run_all(priv->graph);
+    if (ret < 0)
+        return ret;
 
     return 0;
 }
