@@ -29,19 +29,25 @@
 #include "media_common.h"
 #include "media_video_output.h"
 
+#include "config.h"
 #include "libavcodec/avcodec.h"
 #include "libavdevice/avdevice.h"
 #include "libavformat/avformat.h"
 #include "libavutil/imgutils.h"
 #include "libavutil/pixdesc.h"
+
+#if CONFIG_SWSCALE
 #include "libswscale/swscale.h"
+#endif
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
 typedef struct MediaVOutputContext {
     AVFormatContext* fmt_ctx;
+#if CONFIG_SWSCALE
     struct SwsContext* sws_ctx;
+#endif
 
     enum AVPixelFormat pix_fmt; /**< output pixel format*/
     int width; /**< output frame width */
@@ -55,6 +61,7 @@ typedef struct MediaVOutputContext {
  * Private Functions
  ****************************************************************************/
 
+#if CONFIG_SWSCALE
 static int media_video_output_scale(MediaVOutputContext* ctx, AVFrame* frame, AVFrame* dst_frame)
 {
     int ret;
@@ -107,6 +114,7 @@ static void media_video_output_scale_uninit(MediaVOutputContext* ctx)
         ctx->sws_ctx = NULL;
     }
 }
+#endif
 
 static int media_video_output_control_message(struct AVFormatContext* s, int type,
     void* data, size_t data_size)
@@ -147,6 +155,7 @@ static int media_video_output_start(MediaVOutputContext* ctx, AVFrame* frame)
         return ret;
     }
 
+#if CONFIG_SWSCALE
     if (frame->width != ctx->width || frame->height != ctx->height || frame->format != ctx->pix_fmt) {
         ret = media_video_output_scale_init(ctx, frame);
         if (ret < 0) {
@@ -156,6 +165,7 @@ static int media_video_output_start(MediaVOutputContext* ctx, AVFrame* frame)
 
         ctx->brescale = 1;
     }
+#endif
 
     ctx->started = 1;
 
@@ -212,12 +222,13 @@ int media_video_output_write_frame(MediaVOutputContext* ctx, AVFrame* frame)
             MEDIA_ERR("Failed to allocate dst frame\n");
             return AVERROR(ENOMEM);
         }
-
+#if CONFIG_SWSCALE
         ret = media_video_output_scale(ctx, frame, dst_frame);
         if (ret < 0) {
             MEDIA_ERR("Failed to scale frame: %s\n", av_err2str(ret));
             goto err;
         }
+#endif
     } else {
         dst_frame = frame;
     }
@@ -317,7 +328,9 @@ int media_video_output_close(MediaVOutputContext** pctx)
 
     media_video_output_stop(ctx);
 
+#if CONFIG_SWSCALE
     media_video_output_scale_uninit(ctx);
+#endif
 
     if (ctx) {
         if (ctx->fmt_ctx) {
