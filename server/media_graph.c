@@ -525,7 +525,6 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
             if (li->status_in != li->status_out) {
                 MEDIA_WARN("%s outlink is not eof, cmd %s pending\n",
                     cmd->filter->name, cmd->cmd);
-                media_graph_try_touch(priv);
                 return -EAGAIN;
             }
         }
@@ -650,15 +649,15 @@ static int media_graph_run_once(MediadPlugin* ctx)
     MediaGraphPriv* priv = ctx->priv;
     int ret;
 
-    do {
-        ret = media_graph_dequeue_command(priv, true);
-    } while (ret >= 0);
-
     ret = media_graph_run_all(priv->graph);
     if (ret < 0)
         return ret;
 
-    return 0;
+    do {
+        ret = media_graph_dequeue_command(priv, true);
+    } while (ret >= 0);
+
+    return ret == -EAGAIN ? 0 : ret;
 }
 
 static int media_graph_dump_link(AVBPrint* buf, AVFilterLink* link)
