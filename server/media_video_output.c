@@ -220,7 +220,8 @@ int media_video_output_write_frame(MediaVOutputContext* ctx, AVFrame* frame)
         dst_frame = av_frame_alloc();
         if (!dst_frame) {
             MEDIA_ERR("Failed to allocate dst frame\n");
-            return AVERROR(ENOMEM);
+            ret = AVERROR(ENOMEM);
+            goto err;
         }
 #if CONFIG_SWSCALE
         ret = media_video_output_scale(ctx, frame, dst_frame);
