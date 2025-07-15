@@ -711,19 +711,15 @@ static void mediatool_uv_player_write_cb(uv_write_t* req, int status)
 static void mediatool_uv_player_read_cb(uv_fs_t* req)
 {
     mediatool_chain_t* chain = uv_req_get_data((uv_req_t*)req);
-    mediatool_t* mediatool = chain->data;
-    uv_fs_t close_req;
     uv_buf_t iov;
 
     if (req->result < 0) {
         printf("[%s][%d] Player Read error: %s\n", __func__, __LINE__,
             uv_strerror(req->result));
-        free(chain->buf);
-        chain->buf = NULL;
         return;
     } else if (req->result == 0) {
         printf("[%s][%d] Player read to end of file\n", __func__, __LINE__);
-        uv_fs_close(&mediatool->loop, &close_req, chain->fd, NULL);
+        return;
     } else {
         iov = uv_buf_init(chain->buf, req->result);
         uv_req_set_data((uv_req_t*)&chain->write_req, chain);
