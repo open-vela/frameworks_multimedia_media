@@ -1116,10 +1116,13 @@ static ssize_t mediatool_process_data(int fd, bool player,
 
     fds[0].fd = fd;
     fds[0].events = event;
-    ret = poll(fds, 1, -1);
+    ret = poll(fds, 1, 500);
 
     if (ret < 0)
         return -errno;
+
+    if (ret == 0)
+        return 0;
 
     if (player)
         return send(fd, data, len, 0);
