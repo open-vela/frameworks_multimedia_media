@@ -775,7 +775,7 @@ int media_uv_disconnect(void* handle, media_uv_callback on_release)
 
     proxy->on_release = on_release;
 
-    if (proxy->flags == 0) /* Needn't shutdown command socket if not ready. */
+    if (proxy->flags == 0 && proxy->cpipe) /* Needn't shutdown command socket if not ready. */
         media_uv_shutdown(proxy->cpipe);
 
     proxy->flags |= MEDIA_PROXYFLAG_DISCONNECT;
