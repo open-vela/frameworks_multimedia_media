@@ -1099,8 +1099,11 @@ static int media_player_prepare(MediaPlayerContext* ctx, const char* filename)
         goto out;
 
     ret = media_player_open_demuxer(ctx, filename);
-    if (ret >= 0)
-        ctx->state = MEDIA_PLAYER_STATE_PREPARED;
+    if (ret < 0) {
+        MEDIA_ERR("media_player_open_demuxer failed %d.\n", ret);
+        goto out;
+    }
+    ctx->state = MEDIA_PLAYER_STATE_PREPARED;
 
 out:
     media_player_event_cb(ctx, MEDIA_EVENT_PREPARED, ret, NULL);
