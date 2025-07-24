@@ -1657,7 +1657,7 @@ static void* media_player_thread(void* arg)
 
         media_player_poll(ctx);
 
-        if ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
+        while ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
             SIMPLEQ_REMOVE_HEAD(&ctx->cmd_queue, entry);
             media_player_proc_cmd(ctx, msg);
         }
