@@ -1289,7 +1289,7 @@ static void* media_recorder_thread(void* arg)
 
         media_recorder_poll(ctx);
 
-        if ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
+        while ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
             SIMPLEQ_REMOVE_HEAD(&ctx->cmd_queue, entry);
             media_recorder_proc_cmd(ctx, msg);
         }
