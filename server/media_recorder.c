@@ -608,7 +608,7 @@ static int media_recorder_on_event_cb(void* udata, int evt, int64_t args)
     uint64_t cnt = 1;
 
     if (evt < 0) {
-        MEDIA_INFO("received unlink event form audio_input.\n");
+        MEDIA_INFO("ctx %p received unlink event form audio_input.\n", ctx);
         ctx->audio_input_state = 0;
         return 0;
     }
@@ -642,7 +642,7 @@ static void media_recorder_close_muxer(MediaRecorderContext* ctx)
     if (ctx->format_opt)
         av_dict_free(&ctx->format_opt);
 
-    MEDIA_INFO("recorder last position %" PRIu32 ".\n", ctx->current_ms);
+    MEDIA_INFO("ctx %p recorder last position %" PRIu32 ".\n", ctx, ctx->current_ms);
     ctx->current_ms = 0;
 }
 
@@ -744,7 +744,7 @@ static int media_recorder_proc_dat(MediaRecorderContext* ctx)
 
         /* user request stop, flush code which data = 0 */
         if (!frame->data[0]) {
-            MEDIA_INFO("reveice empty frame\n");
+            MEDIA_INFO("ctx %p received empty frame\n", ctx);
             av_frame_free(&frame);
         } else if (ctx->state == MEDIA_RECORDER_STATE_PAUSED) {
             if (ctx->streams[i].type == AVMEDIA_TYPE_AUDIO)
@@ -869,17 +869,17 @@ static int media_recorder_start(MediaRecorderContext* ctx)
             snprintf(buf, sizeof(buf), "%d", ctx->streams[ctx->audio_idx].enc_ctx->frame_size);
             ret = media_graph_audio_set_parameter(ctx->audio_input, "frame_size", buf);
             if (ret < 0) {
-                MEDIA_ERR("media_graph_audio_set_parameter failed.\n");
+                MEDIA_ERR("ctx %p media_graph_audio_set_parameter failed.\n", ctx);
                 goto out;
             }
         }
         if (ctx->state == MEDIA_RECORDER_STATE_PAUSED) {
             ret = media_graph_audio_resume(ctx->audio_input);
             if (ret < 0) {
-                MEDIA_ERR("media_graph_audio_resume failed, ret %d.\n", ret);
+                MEDIA_ERR("ctx %p media_graph_audio_resume failed, ret %d.\n", ctx, ret);
                 goto out;
             } else
-                MEDIA_INFO("media_graph_audio_resume success.\n");
+                MEDIA_INFO("ctx %p media_graph_audio_resume success.\n", ctx);
         } else {
             ret = media_graph_audio_start(ctx->audio_input,
                 ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
@@ -887,10 +887,10 @@ static int media_recorder_start(MediaRecorderContext* ctx)
                 ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
                 media_recorder_on_event_cb, ctx);
             if (ret < 0) {
-                MEDIA_ERR("media_graph_audio_start failed, ret %d.\n", ret);
+                MEDIA_ERR("ctx %p media_graph_audio_start failed, ret %d.\n", ctx, ret);
                 goto out;
             } else
-                MEDIA_INFO("media_graph_audio_start success.\n");
+                MEDIA_INFO("ctx %p media_graph_audio_start success.\n", ctx);
         }
         ctx->audio_input_state = 1;
     }
@@ -927,7 +927,7 @@ static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filenam
 
     ctx->format = av_guess_format(format, filename, NULL);
     if (!ctx->format) {
-        MEDIA_ERR("unknown format.\n");
+        MEDIA_ERR("ctx %p unknown format.\n", ctx);
         ret = AVERROR(EINVAL);
         goto out;
     }
@@ -969,8 +969,37 @@ static int media_recorder_send_cmd(MediaRecorderContext* ctx, const int cmd, con
     return 0;
 }
 
+static const char* media_recorder_cmd_to_string(int cmd)
+{
+    switch (cmd) {
+    case MEDIA_RECORDER_CMD_OPEN:
+        return "OPEN";
+    case MEDIA_RECORDER_CMD_SET_EVENT:
+        return "SET_EVENT";
+    case MEDIA_RECORDER_CMD_SET_OPTIONS:
+        return "SET_OPTIONS";
+    case MEDIA_RECORDER_CMD_PREPARE:
+        return "PREPARE";
+    case MEDIA_RECORDER_CMD_START:
+        return "START";
+    case MEDIA_RECORDER_CMD_PAUSE:
+        return "PAUSE";
+    case MEDIA_RECORDER_CMD_STOP:
+        return "STOP";
+    case MEDIA_RECORDER_CMD_RESET:
+        return "RESET";
+    case MEDIA_RECORDER_CMD_CLOSE:
+        return "CLOSE";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 static void media_recorder_proc_cmd(MediaRecorderContext* ctx, RecorderCmd* msg)
 {
+    MEDIA_INFO("ctx %p name %s proc cmd %s (ID:%d)\n",
+        ctx, ctx->name, media_recorder_cmd_to_string(msg->cmd), msg->cmd);
+
     switch (msg->cmd) {
     case MEDIA_RECORDER_CMD_SET_EVENT:
         break;
@@ -1011,7 +1040,7 @@ int media_recorder_process_cmd(MediaRecorderContext* ctx, const char* target,
     if (!ctx)
         return -EINVAL;
 
-    MEDIA_INFO("cmd: %s, arg %s, target %s.\n", cmd, arg ? arg : "NULL", target ? target : "NULL");
+    MEDIA_INFO("ctx %p cmd: %s, arg %s, target %s.\n", ctx, cmd, arg ? arg : "NULL", target ? target : "NULL");
 
     if (!strcmp(cmd, "set_event")) {
         ctx->event = true;
@@ -1026,7 +1055,7 @@ int media_recorder_process_cmd(MediaRecorderContext* ctx, const char* target,
             else
                 snprintf(url, sizeof(url), "rpmsg:%s:%s?listen=0", arg, target);
             arg = url;
-            MEDIA_INFO("url: %s.\n", url);
+            MEDIA_INFO("ctx %p url: %s.\n", ctx, url);
         }
         if (!arg)
             return AVERROR(EINVAL);
@@ -1051,7 +1080,7 @@ int media_recorder_process_cmd(MediaRecorderContext* ctx, const char* target,
     } else if (!strcmp(cmd, "get_position")) {
         snprintf(res, res_len, "%" PRIu32, ctx->current_ms);
     } else {
-        MEDIA_ERR("unknown cmd: %s.\n", cmd);
+        MEDIA_ERR("ctx %p unknown cmd: %s.\n", ctx, cmd);
         return AVERROR(EINVAL);
     }
 
@@ -1081,7 +1110,7 @@ int media_recorder_onreceive(MediaRecorderContext* ctx, media_parcel* in, media_
         UNUSED(len);
         UNUSED(flags);
         ret = -ENOSYS;
-        MEDIA_ERR("unsupported id %d\n", (int)id);
+        MEDIA_ERR("ctx %p unsupported id %d\n", ctx, (int)id);
         break;
     }
 
@@ -1153,7 +1182,7 @@ static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollf
         uint64_t cnt;
         ret = read(ctx->event_fd, &cnt, sizeof(cnt));
         if (ret < 0) {
-            MEDIA_ERR("read event fd failed %d\n", ret);
+            MEDIA_ERR("ctx %p read event fd failed %d\n", ctx, ret);
             goto out;
         }
     } else if (fd->fd == ctx->tran_fd) {
@@ -1180,7 +1209,7 @@ static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollf
                 if (ret > 0)
                     ctx->notify_fd = ret;
                 else
-                    MEDIA_ERR("create notify failed %d\n", ret);
+                    MEDIA_ERR("ctx %p create notify failed %d\n", ctx, ret);
                 break;
             default:
                 break;
@@ -1197,7 +1226,7 @@ static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollf
     return ret;
 
 out:
-    MEDIA_DEBUG("fd:%d revent:%d\n", fd->fd, (int)fd->revents);
+    MEDIA_DEBUG("ctx %p fd:%d revent:%d\n", ctx, fd->fd, (int)fd->revents);
     media_recorder_conn_close(ctx);
     return 0;
 }
@@ -1263,9 +1292,9 @@ static void media_recorder_poll(MediaRecorderContext* ctx)
 
     ret = poll(fds, 2, -1);
     if (ret == -1) {
-        MEDIA_ERR("poll failed err=%d\n", -errno);
+        MEDIA_ERR("ctx %p poll failed err=%d\n", ctx, -errno);
     } else if (ret == 0)
-        MEDIA_DEBUG("poll timeout\n");
+        MEDIA_DEBUG("ctx %p poll timeout\n", ctx);
 
     for (int i = 0; i < 2; i++) {
         if (!fds[i].revents)
@@ -1273,7 +1302,7 @@ static void media_recorder_poll(MediaRecorderContext* ctx)
 
         ret = media_recorder_poll_available(ctx, &fds[i]);
         if (ret < 0 && ret != -EAGAIN && ret != -EPIPE)
-            MEDIA_ERR("poll_available failed %d\n", ret);
+            MEDIA_ERR("ctx %p poll_available failed %d\n", ctx, ret);
     }
 }
 
@@ -1281,7 +1310,7 @@ static void* media_recorder_thread(void* arg)
 {
     MediaRecorderContext* ctx = (MediaRecorderContext*)arg;
     RecorderCmd* msg;
-    MEDIA_INFO("create recorder thread.\n");
+    MEDIA_INFO("ctx %p create recorder thread.\n", ctx);
 
     while (1) {
         if (media_recorder_is_exit(ctx))
@@ -1303,7 +1332,7 @@ static void* media_recorder_thread(void* arg)
 
     media_recorder_ctx_release(ctx);
 
-    MEDIA_INFO("exit recorder thread.\n");
+    MEDIA_INFO("ctx %p %s recorder thread exit.\n", ctx, ctx->name);
     return NULL;
 }
 
@@ -1321,7 +1350,7 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
 
     media_graph_audio_open(&ctx->audio_input, name);
     if (ctx->audio_input == NULL) {
-        MEDIA_ERR("open audio input failed\n");
+        MEDIA_ERR("ctx %p open audio input failed\n", ctx);
         goto out;
     }
 
@@ -1332,7 +1361,7 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
     ret = pthread_create(&thread, &attr, media_recorder_thread, ctx);
     pthread_attr_destroy(&attr);
     if (ret != 0) {
-        MEDIA_ERR("create recorder thread failed %d\n", ret);
+        MEDIA_ERR("ctx %p create recorder thread failed %d\n", ctx, ret);
         goto out;
     }
 
@@ -1382,7 +1411,7 @@ static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn
         if (ret < 0)
             return ret;
 
-        MEDIA_INFO("open recorder success...\n");
+        MEDIA_INFO("ctx %p open recorder success...\n", ctx);
     } else if (!strcmp(cmd, "dump")) {
         media_recorder_dump(priv);
     }
