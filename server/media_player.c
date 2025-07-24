@@ -274,7 +274,7 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
     MEDIA_DEBUG("audio audio_output event: %d", evt);
 
     if (evt < 0) {
-        MEDIA_INFO("received unlink event form audio_output.");
+        MEDIA_INFO("ctx %p received unlink event form audio_output.", ctx);
         pthread_mutex_lock(&ctx->mutex);
         ctx->audio_output_state = 0;
         pthread_mutex_unlock(&ctx->mutex);
@@ -791,14 +791,14 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
 
     media_player_map_protocol(ctx, filename, name, MAX_URL_SIZE);
 
-    MEDIA_INFO("DEBUG: url %s start open input.\n", name);
+    MEDIA_INFO("ctx %p url %s start open input.\n", ctx, name);
     ret = avformat_open_input(&ctx->format_ctx, name, iformat, &ctx->format_opt);
     if (ret < 0) {
         MEDIA_ERR("Failed to avformat_open_input ret %d, %s.\n", ret, av_err2str(ret));
         goto out;
     }
 
-    MEDIA_INFO("DEBUG: url %s open input done.\n", name);
+    MEDIA_INFO("ctx %p url %s open input done.\n", ctx, name);
 
     ret = avformat_find_stream_info(ctx->format_ctx, NULL);
     if (ret < 0) {
@@ -806,11 +806,11 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
         goto out;
     }
 
-    MEDIA_INFO("DEBUG: url %s find stream info done.\n", name);
+    MEDIA_INFO("ctx %p url %s find stream info done.\n", ctx, name);
 
     ret = media_player_init_stream(ctx);
     if (ret < 0) {
-        MEDIA_ERR("Failed to init movie stream, ret %d, %s.\n", ret, av_err2str(ret));
+        MEDIA_ERR("ctx %p failed to init movie stream, ret %d, %s.\n", ctx, ret, av_err2str(ret));
         goto out;
     }
 
@@ -1149,9 +1149,9 @@ static int media_player_volume(MediaPlayerContext* ctx, const char* args, char* 
             sscanf(res, "%f", &ctx->volume);
         }
         if (ret < 0)
-            MEDIA_ERR("media_player_volume failed.\n");
+            MEDIA_ERR("ctx %p media_player_volume failed.\n", ctx);
     } else {
-        MEDIA_INFO("audio_output is NULL.\n");
+        MEDIA_INFO("ctx %p audio_output is NULL.\n", ctx);
         if (args) {
             sscanf(args, "%f", &ctx->volume);
             ret = 0;
@@ -1191,9 +1191,42 @@ static int media_player_send_cmd(MediaPlayerContext* ctx, const int cmd, const v
     return 0;
 }
 
+static const char* media_player_cmd_to_string(int cmd)
+{
+    switch (cmd) {
+    case MEDIA_PLAYER_CMD_OPEN:
+        return "OPEN";
+    case MEDIA_PLAYER_CMD_SET_EVENT:
+        return "SET_EVENT";
+    case MEDIA_PLAYER_CMD_SET_OPTIONS:
+        return "SET_OPTIONS";
+    case MEDIA_PLAYER_CMD_SET_LOOP:
+        return "SET_LOOP";
+    case MEDIA_PLAYER_CMD_PREPARE:
+        return "PREPARE";
+    case MEDIA_PLAYER_CMD_START:
+        return "START";
+    case MEDIA_PLAYER_CMD_PAUSE:
+        return "PAUSE";
+    case MEDIA_PLAYER_CMD_SEEK:
+        return "SEEK";
+    case MEDIA_PLAYER_CMD_STOP:
+        return "STOP";
+    case MEDIA_PLAYER_CMD_RESET:
+        return "RESET";
+    case MEDIA_PLAYER_CMD_CLOSE:
+        return "CLOSE";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 static void media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
 {
     uint32_t time, pending_stop;
+
+    MEDIA_INFO("ctx %p name %s proc cmd %s (ID:%d)\n",
+        ctx, ctx->name, media_player_cmd_to_string(msg->cmd), msg->cmd);
 
     switch (msg->cmd) {
     case MEDIA_PLAYER_CMD_SET_EVENT:
@@ -1254,7 +1287,7 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
     if (!ctx)
         return -EINVAL;
 
-    MEDIA_INFO("cmd: %s, arg %s, target %s.\n", cmd, arg ? arg : "NULL",
+    MEDIA_INFO("ctx %p cmd: %s, arg %s, target %s.\n", ctx, cmd, arg ? arg : "NULL",
         target ? target : "NULL");
 
     if (!strcmp(cmd, "set_event")) {
@@ -1270,7 +1303,7 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
             else
                 snprintf(url, sizeof(url), "rpmsg:%s:%s?listen=0", arg, target);
             arg = url;
-            MEDIA_INFO("url: %s.\n", url);
+            MEDIA_INFO("ctx %p url: %s.\n", ctx, url);
         }
         if (!arg)
             return AVERROR(EINVAL);
@@ -1338,7 +1371,7 @@ int media_player_onreceive(MediaPlayerContext* ctx, media_parcel* in, media_parc
         UNUSED(len);
         UNUSED(flags);
         ret = -ENOSYS;
-        MEDIA_ERR("unsupported id %d\n", (int)id);
+        MEDIA_ERR("ctx %p unsupported id %d\n", ctx, (int)id);
         break;
     }
 
@@ -1588,16 +1621,16 @@ static int media_player_sync_video(MediaPlayerContext* ctx, int64_t pts, int64_t
         else
             ctx->ts_base = ts - pts;
         ctx->lat_base = lat;
-        MEDIA_INFO("sync pts:%" PRId64 " ts:%" PRId64 " base:%" PRId64 " lat:%" PRId64 "\n",
-            pts, ts, ctx->ts_base, lat);
+        MEDIA_INFO("ctx %p sync pts:%" PRId64 " ts:%" PRId64 " base:%" PRId64 " lat:%" PRId64 "\n",
+            ctx, pts, ts, ctx->ts_base, lat);
     }
 
     now = ts - ctx->ts_base;
     diff = pts - now;
     diff += ctx->lat_base;
 
-    MEDIA_DEBUG("sync pts:%" PRId64 " ts:%" PRId64 " now:%" PRId64 " diff:%" PRId64 " lat:%" PRId64 "\n",
-        pts, ts, now, diff, lat);
+    MEDIA_DEBUG("ctx %p sync pts:%" PRId64 " ts:%" PRId64 " now:%" PRId64 " diff:%" PRId64 " lat:%" PRId64 "\n",
+        ctx, pts, ts, now, diff, lat);
 
     if (diff > ctx->frame_duration)
         return ctx->frame_duration;
@@ -1630,24 +1663,24 @@ static void media_player_proc_avsync(MediaPlayerContext* ctx)
                 return;
             frame = media_player_queue_pop(ctx, ctx->video_idx);
             if (media_video_output_write_frame(ctx->video_output, frame) < 0)
-                MEDIA_ERR("video_output write frame failed.\n");
+                MEDIA_ERR("ctx %p video_output write frame failed.\n", ctx);
         } else {
             frame = media_player_queue_pop(ctx, ctx->video_idx);
             av_frame_free(&frame);
-            MEDIA_ERR("drop frame pts:%" PRId64 " ts:%" PRId64 " diff:%d\n",
-                pts, ts, diff);
+            MEDIA_ERR("ctx %p drop frame pts:%" PRId64 " ts:%" PRId64 " diff:%d\n",
+                ctx, pts, ts, diff);
         }
     } else {
         frame = media_player_queue_pop(ctx, ctx->video_idx);
         if (media_video_output_write_frame(ctx->video_output, frame) < 0)
-            MEDIA_ERR("video_output write frame failed.\n");
+            MEDIA_ERR("ctx %p video_output write frame failed.\n", ctx);
     }
 }
 
 static void* media_player_thread(void* arg)
 {
     MediaPlayerContext* ctx = (MediaPlayerContext*)arg;
-    MEDIA_INFO("create player thread.\n");
+    MEDIA_INFO("ctx %p create player thread.\n", ctx);
     PlayerCmd* msg;
     uint64_t cnt = 1;
 
@@ -1675,7 +1708,7 @@ static void* media_player_thread(void* arg)
 
     media_player_ctx_release(ctx);
 
-    MEDIA_INFO("exit player thread.\n");
+    MEDIA_INFO("ctx %p %s player thread exit.\n", ctx, ctx->name);
     return NULL;
 }
 
@@ -1695,7 +1728,7 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
 
     media_graph_audio_open(&ctx->audio_output, ctx->name);
     if (ctx->audio_output == NULL) {
-        MEDIA_ERR("open audio output failed\n");
+        MEDIA_ERR("ctx %p open audio output failed\n", ctx);
         goto out;
     }
 
@@ -1761,7 +1794,7 @@ static int media_player_handler(MediadPlugin* handle, struct media_server_conn* 
         if (ret < 0)
             return ret;
 
-        MEDIA_INFO("open %s success...\n", ctx->name);
+        MEDIA_INFO("ctx %p open %s success...\n", ctx, ctx->name);
     } else if (!strcmp(cmd, "dump")) {
         media_player_dump(priv);
     }
