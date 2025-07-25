@@ -539,6 +539,9 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
         ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
             cmd->res, 0, 0);
 
+    if (ret >= 0)
+        media_graph_try_touch(priv);
+
     pthread_mutex_lock(&priv->qlock);
     TAILQ_REMOVE(&priv->cmdq, cmd, entries);
     pthread_mutex_unlock(&priv->qlock);
