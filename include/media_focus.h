@@ -26,6 +26,13 @@
 #include <media_defs.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+#define EXTERN extern "C"
+extern "C" {
+#else
+#define EXTERN extern
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -198,6 +205,11 @@ int media_uv_focus_abandon(void* handle, media_uv_callback on_abandon);
  * @return int  Zero on success, negative errno on failure.
  */
 int media_uv_focus_reply(void* handle, int req_id);
+#endif
+
+#undef EXTERN
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_FOCUS_H */
