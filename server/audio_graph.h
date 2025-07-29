@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/include/media_graph.h
+ * frameworks/media/include/audio_graph.h
  *
  * Copyright (C) 2020 Xiaomi Corporation
  *
@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
-#ifndef FRAMEWORKS_MEDIA_INCLUDE_MEDIA_GRAPH_H
-#define FRAMEWORKS_MEDIA_INCLUDE_MEDIA_GRAPH_H
+#ifndef FRAMEWORKS_MEDIA_INCLUDE_AUDIO_GRAPH_H
+#define FRAMEWORKS_MEDIA_INCLUDE_AUDIO_GRAPH_H
 
 /****************************************************************************
  * Included Files
@@ -42,7 +42,7 @@
  *      @args: event arguments
  */
 
-int media_graph_audio_open(AVFilterContext** src, const char* stream_type);
+int audio_graph_open(AVFilterContext** src, const char* stream_type);
 
 /*
  * Start a audio stream.
@@ -59,7 +59,7 @@ int media_graph_audio_open(AVFilterContext** src, const char* stream_type);
  *      @evt: event type
  *      @args: event arguments
  */
-int media_graph_audio_start(AVFilterContext* src, int format, int sample_rate, int channels,
+int audio_graph_start(AVFilterContext* src, int format, int sample_rate, int channels,
     int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata);
 
 /*
@@ -69,7 +69,7 @@ int media_graph_audio_start(AVFilterContext* src, int format, int sample_rate, i
  *
  * Note that it must also be called during pause. Get it again after resume.
  */
-int media_graph_audio_stop(AVFilterContext* src);
+int audio_graph_stop(AVFilterContext* src);
 
 /*
  * Release a audio stream.
@@ -78,7 +78,7 @@ int media_graph_audio_stop(AVFilterContext* src);
  *
  * Note that it must also be called during pause. Get it again after resume.
  */
-int media_graph_audio_close(AVFilterContext** src);
+int audio_graph_close(AVFilterContext** src);
 
 /*
  * Pause the audio stream and all downstream connected filters.
@@ -87,7 +87,7 @@ int media_graph_audio_close(AVFilterContext** src);
  * @ctx: [in,out] audio stream context
  * @return: 0 on success, negative value on error
  */
-int media_graph_audio_pause(AVFilterContext* src);
+int audio_graph_pause(AVFilterContext* src);
 
 /*
  * Resume the audio stream and all downstream connected filters.
@@ -96,7 +96,7 @@ int media_graph_audio_pause(AVFilterContext* src);
  * @ctx: [in,out] audio stream context
  * @return: 0 on success, negative value on error
  */
-int media_graph_audio_resume(AVFilterContext* src);
+int audio_graph_resume(AVFilterContext* src);
 
 /*
  * Set stream parameter.
@@ -105,7 +105,7 @@ int media_graph_audio_resume(AVFilterContext* src);
  * @value: [in] parameter value
  * @return: 0 on success, negative value on error
  */
-int media_graph_audio_set_parameter(AVFilterContext* src, const char* param, const char* value);
+int audio_graph_set_parameter(AVFilterContext* src, const char* param, const char* value);
 
 /*
  * Get stream parameter value.
@@ -115,6 +115,6 @@ int media_graph_audio_set_parameter(AVFilterContext* src, const char* param, con
  * @res_len: [in] parameter value length
  * @return: 0 on success, negative value on error
  */
-int media_graph_audio_get_parameter(AVFilterContext* src, const char* key, char* res, int res_len);
+int audio_graph_get_parameter(AVFilterContext* src, const char* key, char* res, int res_len);
 
-#endif /* FRAMEWORKS_MEDIA_INCLUDE_MEDIA_GRAPH_H */
+#endif /* FRAMEWORKS_MEDIA_INCLUDE_AUDIO_GRAPH_H */

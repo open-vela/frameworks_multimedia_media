@@ -101,7 +101,7 @@ int media_stub_onreceive(struct media_server_conn* conn, media_parcel* in, media
         if (len > 0)
             response = zalloc(len);
 
-        ret = media_plugin_command(media_plugin_get("media_graph"), NULL, target, cmd, arg, 0, response, len);
+        ret = media_plugin_command(media_plugin_get("audio_graph"), NULL, target, cmd, arg, 0, response, len);
         break;
 
     case MEDIA_ID_PLAYER:
@@ -194,7 +194,7 @@ int media_stub_process_command(const char* target,
     const char* cmd, const char* arg)
 {
 #ifdef CONFIG_LIB_FFMPEG
-    return media_plugin_command(media_plugin_get("media_graph"), NULL, target, cmd, arg, 0, NULL, 0);
+    return media_plugin_command(media_plugin_get("audio_graph"), NULL, target, cmd, arg, 0, NULL, 0);
 #else
     return -ENOSYS;
 #endif

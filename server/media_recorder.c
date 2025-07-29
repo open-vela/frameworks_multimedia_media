@@ -46,8 +46,8 @@
 #include "libavutil/bprint.h"
 #include "libavutil/opt.h"
 
+#include "audio_graph.h"
 #include "media_common.h"
-#include "media_graph.h"
 #include "media_plugin.h"
 #include "media_server.h"
 
@@ -814,7 +814,7 @@ static int media_recorder_pause(MediaRecorderContext* ctx)
     }
 
     if (ctx->audio_idx >= 0)
-        media_graph_audio_pause(ctx->audio_input);
+        audio_graph_pause(ctx->audio_input);
 
     media_recorder_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
     return 0;
@@ -827,7 +827,7 @@ static int media_recorder_stop(MediaRecorderContext* ctx)
         return 0;
 
     if (ctx->audio_idx >= 0)
-        media_graph_audio_stop(ctx->audio_input);
+        audio_graph_stop(ctx->audio_input);
 
     if (ctx->state == MEDIA_RECORDER_STATE_PREPARED || ctx->state == MEDIA_RECORDER_STATE_COMPLETED)
         goto out;
@@ -867,30 +867,30 @@ static int media_recorder_start(MediaRecorderContext* ctx)
         if (ctx->streams[ctx->audio_idx].enc_ctx->frame_size) {
             char buf[16] = { 0 };
             snprintf(buf, sizeof(buf), "%d", ctx->streams[ctx->audio_idx].enc_ctx->frame_size);
-            ret = media_graph_audio_set_parameter(ctx->audio_input, "frame_size", buf);
+            ret = audio_graph_set_parameter(ctx->audio_input, "frame_size", buf);
             if (ret < 0) {
-                MEDIA_ERR("ctx %p media_graph_audio_set_parameter failed.\n", ctx);
+                MEDIA_ERR("ctx %p audio_graph_set_parameter failed.\n", ctx);
                 goto out;
             }
         }
         if (ctx->state == MEDIA_RECORDER_STATE_PAUSED) {
-            ret = media_graph_audio_resume(ctx->audio_input);
+            ret = audio_graph_resume(ctx->audio_input);
             if (ret < 0) {
-                MEDIA_ERR("ctx %p media_graph_audio_resume failed, ret %d.\n", ctx, ret);
+                MEDIA_ERR("ctx %p audio_graph_resume failed, ret %d.\n", ctx, ret);
                 goto out;
             } else
-                MEDIA_INFO("ctx %p media_graph_audio_resume success.\n", ctx);
+                MEDIA_INFO("ctx %p audio_graph_resume success.\n", ctx);
         } else {
-            ret = media_graph_audio_start(ctx->audio_input,
+            ret = audio_graph_start(ctx->audio_input,
                 ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt,
                 ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
                 ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
                 media_recorder_on_event_cb, ctx);
             if (ret < 0) {
-                MEDIA_ERR("ctx %p media_graph_audio_start failed, ret %d.\n", ctx, ret);
+                MEDIA_ERR("ctx %p audio_graph_start failed, ret %d.\n", ctx, ret);
                 goto out;
             } else
-                MEDIA_INFO("ctx %p media_graph_audio_start success.\n", ctx);
+                MEDIA_INFO("ctx %p audio_graph_start success.\n", ctx);
         }
         ctx->audio_input_state = 1;
     }
@@ -907,7 +907,7 @@ static void media_recorder_close(MediaRecorderContext* ctx)
     media_recorder_release_stream(ctx);
 
     if (ctx->audio_input)
-        media_graph_audio_close(&ctx->audio_input);
+        audio_graph_close(&ctx->audio_input);
 
     if (ctx->tran_fd > 0)
         media_recorder_conn_close(ctx);
@@ -1348,7 +1348,7 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
 
     media_recorder_ctx_init(ctx);
 
-    media_graph_audio_open(&ctx->audio_input, name);
+    audio_graph_open(&ctx->audio_input, name);
     if (ctx->audio_input == NULL) {
         MEDIA_ERR("ctx %p open audio input failed\n", ctx);
         goto out;
@@ -1371,7 +1371,7 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
     return 0;
 
 out:
-    media_graph_audio_close(&ctx->audio_input);
+    audio_graph_close(&ctx->audio_input);
     ctx->state = MEDIA_RECORDER_STATE_IDLE;
     return ret;
 }

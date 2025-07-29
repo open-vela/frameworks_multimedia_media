@@ -71,7 +71,7 @@ ifneq ($(CONFIG_MEDIA_SERVER),)
 endif
 
 ifneq ($(CONFIG_LIB_FFMPEG),)
-  CSRCS  += server/media_graph.c server/media_session.c
+  CSRCS  += server/audio_graph.c server/media_session.c
   CSRCS  += server/media_player.c
   CSRCS  += server/media_recorder.c
   CSRCS  += server/media_video_output.c

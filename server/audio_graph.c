@@ -1,5 +1,5 @@
 /****************************************************************************
- * frameworks/media/server/media_graph.c
+ * frameworks/media/server/audio_graph.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -38,8 +38,8 @@
 #include <sys/eventfd.h>
 #include <sys/queue.h>
 
+#include "audio_graph.h"
 #include "media_common.h"
-#include "media_graph.h"
 #include "media_plugin.h"
 #include "media_server.h"
 
@@ -106,7 +106,7 @@ static void media_trace_end(void* avcl, const char* fmt, va_list vl)
 }
 #endif
 
-static void media_graph_log_callback(void* avcl, int level,
+static void audio_graph_log_callback(void* avcl, int level,
     const char* fmt, va_list vl)
 {
     if (level > av_log_get_level())
@@ -138,7 +138,7 @@ static void media_graph_log_callback(void* avcl, int level,
     vsyslog(level, fmt, vl);
 }
 
-static int media_graph_config_pointers(AVFilterGraph* graph)
+static int audio_graph_config_pointers(AVFilterGraph* graph)
 {
     FFFilterGraph* ffgraph = fffiltergraph(graph);
     int sink_links_count = 0, n = 0;
@@ -187,7 +187,7 @@ static int media_graph_config_pointers(AVFilterGraph* graph)
  * to be called to set link status to eof and to 0
  * when linking.
  */
-static void media_graph_set_links_status(AVFilterGraph* graph, int status)
+static void audio_graph_set_links_status(AVFilterGraph* graph, int status)
 {
     AVFilterContext* filt;
     int i, j;
@@ -206,7 +206,7 @@ static void media_graph_set_links_status(AVFilterGraph* graph, int status)
     }
 }
 
-static int media_graph_load(MediaGraphPriv* priv, char* conf)
+static int audio_graph_load(MediaGraphPriv* priv, char* conf)
 {
     char graph_desc[MAX_GRAPH_SIZE];
     AVFilterInOut* input = NULL;
@@ -214,7 +214,7 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
     int ret;
     int fd;
 
-    av_log_set_callback(media_graph_log_callback);
+    av_log_set_callback(audio_graph_log_callback);
 #ifdef CONFIG_MEDIA_TRACE
     av_trace_set_callback(media_trace_begin, media_trace_end);
 #endif
@@ -254,12 +254,12 @@ static int media_graph_load(MediaGraphPriv* priv, char* conf)
 
     avfilter_graph_set_auto_convert(priv->graph, AVFILTER_AUTO_CONVERT_NONE);
 
-    ret = media_graph_config_pointers(priv->graph);
+    ret = audio_graph_config_pointers(priv->graph);
     if (ret < 0)
         goto out;
 
     /* set the status of all links to AVERROR_EOF */
-    media_graph_set_links_status(priv->graph, AVERROR_EOF);
+    audio_graph_set_links_status(priv->graph, AVERROR_EOF);
 
     priv->graph->opaque = priv;
 
@@ -287,7 +287,7 @@ out:
  * Public Functions
  ****************************************************************************/
 
-static int media_graph_init(MediadPlugin* ctx)
+static int audio_graph_init(MediadPlugin* ctx)
 {
     char* file = CONFIG_MEDIA_SERVER_CONFIG_PATH "graph.conf";
     MediaGraphPriv* priv = ctx->priv;
@@ -303,7 +303,7 @@ static int media_graph_init(MediadPlugin* ctx)
     if (ret < 0)
         goto err;
 
-    ret = media_graph_load(priv, file);
+    ret = audio_graph_load(priv, file);
     if (ret < 0)
         goto err;
 
@@ -326,7 +326,7 @@ err:
     return ret;
 }
 
-static inline bool media_graph_immediate_cmd(const char* cmd)
+static inline bool audio_graph_immediate_cmd(const char* cmd)
 {
     return strcmp(cmd, "link")
         && strcmp(cmd, "unlink")
@@ -335,7 +335,7 @@ static inline bool media_graph_immediate_cmd(const char* cmd)
         && strcmp(cmd, "resume");
 }
 
-static MediaCommand* media_graph_create_command(const char* cmd, const char* arg, char* res, AVFilterContext* filter)
+static MediaCommand* audio_graph_create_command(const char* cmd, const char* arg, char* res, AVFilterContext* filter)
 {
     MediaCommand* newcmd = NULL;
     char* cmd_dup = NULL;
@@ -368,20 +368,20 @@ static MediaCommand* media_graph_create_command(const char* cmd, const char* arg
     return newcmd;
 }
 
-static void media_graph_try_touch(MediaGraphPriv* priv)
+static void audio_graph_try_touch(MediaGraphPriv* priv)
 {
     eventfd_t val = 1;
     file_write(priv->filep, &val, sizeof(val));
 }
 
-static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filter,
+static int audio_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filter,
     const char* cmd, const char* arg, char* res, int res_len, int flags)
 {
     MediaCommand* newcmd = NULL;
     char msg[128];
     int ret = 0;
 
-    if (media_graph_immediate_cmd(cmd)) {
+    if (audio_graph_immediate_cmd(cmd)) {
         if (!strcmp(cmd, "volume")) {
             snprintf(msg, sizeof(msg), "volume=%s", arg);
             return avfilter_process_command(filter, "set_parameter", msg, res, res_len, 0);
@@ -393,7 +393,7 @@ static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
         return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
     }
 
-    newcmd = media_graph_create_command(cmd, arg, res, filter);
+    newcmd = audio_graph_create_command(cmd, arg, res, filter);
     if (!newcmd)
         return -ENOMEM;
 
@@ -401,13 +401,13 @@ static int media_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
     TAILQ_INSERT_TAIL(&priv->cmdq, newcmd, entries);
     pthread_mutex_unlock(&priv->qlock);
 
-    media_graph_try_touch(priv);
+    audio_graph_try_touch(priv);
 
     av_log(NULL, AV_LOG_INFO, "Pending command: %s %s\n", cmd, arg ? arg : "_");
     return ret;
 }
 
-static int media_graph_get_active_links(MediaCommand* cmd, AVFilterLink** active_links)
+static int audio_graph_get_active_links(MediaCommand* cmd, AVFilterLink** active_links)
 {
     int temp_map[MAX_LINKS] = { 0 };
     AVFilterContext* src_filter;
@@ -446,7 +446,7 @@ static int media_graph_get_active_links(MediaCommand* cmd, AVFilterLink** active
     return count;
 }
 
-static void media_graph_config_links(AVFilterLink** active_links, int nb_links,
+static void audio_graph_config_links(AVFilterLink** active_links, int nb_links,
     int format, int sample_rate, int channels)
 {
     FilterLinkInternal* li;
@@ -467,7 +467,7 @@ static void media_graph_config_links(AVFilterLink** active_links, int nb_links,
     }
 }
 
-static int media_graph_format_transfer(MediaCommand* cmd)
+static int audio_graph_format_transfer(MediaCommand* cmd)
 {
     int format = -1, sample_rate = 0, channels = 0;
     AVFilterLink* active_links[MAX_LINKS];
@@ -488,16 +488,16 @@ static int media_graph_format_transfer(MediaCommand* cmd)
         return 0;
     }
 
-    nb_links = media_graph_get_active_links(cmd, active_links);
+    nb_links = audio_graph_get_active_links(cmd, active_links);
     if (nb_links < 0)
         return nb_links;
 
-    media_graph_config_links(active_links, nb_links, format, sample_rate, channels);
+    audio_graph_config_links(active_links, nb_links, format, sample_rate, channels);
 
     return 0;
 }
 
-static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
+static int audio_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 {
     MediaCommand* cmd = NULL;
     int i, ret = 0;
@@ -532,7 +532,7 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
         ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
             cmd->res, 0, 0);
 
-        ret = media_graph_format_transfer(cmd);
+        ret = audio_graph_format_transfer(cmd);
         if (ret < 0)
             MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
     } else
@@ -540,7 +540,7 @@ static int media_graph_dequeue_command(MediaGraphPriv* priv, bool process)
             cmd->res, 0, 0);
 
     if (ret >= 0)
-        media_graph_try_touch(priv);
+        audio_graph_try_touch(priv);
 
     pthread_mutex_lock(&priv->qlock);
     TAILQ_REMOVE(&priv->cmdq, cmd, entries);
@@ -553,13 +553,13 @@ exit:
     return ret;
 }
 
-static int media_graph_uninit(MediadPlugin* ctx)
+static int audio_graph_uninit(MediadPlugin* ctx)
 {
     MediaGraphPriv* priv = ctx->priv;
     int ret;
 
     do {
-        ret = media_graph_dequeue_command(priv, false);
+        ret = audio_graph_dequeue_command(priv, false);
     } while (ret >= 0);
 
     avfilter_graph_free(&priv->graph);
@@ -568,7 +568,7 @@ static int media_graph_uninit(MediadPlugin* ctx)
     return 0;
 }
 
-static int media_graph_get_pollfds(MediadPlugin* ctx, struct pollfd* fds,
+static int audio_graph_get_pollfds(MediadPlugin* ctx, struct pollfd* fds,
     void** cookies, int count)
 {
     MediaGraphPriv* priv = ctx->priv;
@@ -585,7 +585,7 @@ static int media_graph_get_pollfds(MediadPlugin* ctx, struct pollfd* fds,
     for (i = 0; i < priv->pollftn; i++) {
         AVFilterContext* filter = priv->pollfts[i];
 
-        ret = media_graph_queue_command(priv, filter, "get_pollfd", NULL,
+        ret = audio_graph_queue_command(priv, filter, "get_pollfd", NULL,
             (char*)&fds[nfd], sizeof(struct pollfd) * (count - nfd),
             AV_OPT_SEARCH_CHILDREN);
         if (ret < 0)
@@ -601,7 +601,7 @@ static int media_graph_get_pollfds(MediadPlugin* ctx, struct pollfd* fds,
     return nfd;
 }
 
-static int media_graph_poll_available(MediadPlugin* ctx, struct pollfd* fd, void* cookie)
+static int audio_graph_poll_available(MediadPlugin* ctx, struct pollfd* fd, void* cookie)
 {
     MediaGraphPriv* priv = ctx->priv;
     eventfd_t unuse;
@@ -610,7 +610,7 @@ static int media_graph_poll_available(MediadPlugin* ctx, struct pollfd* fd, void
         return -EINVAL;
 
     if (cookie)
-        media_graph_queue_command(priv, cookie, "poll_available", NULL,
+        audio_graph_queue_command(priv, cookie, "poll_available", NULL,
             (char*)fd, sizeof(struct pollfd),
             AV_OPT_SEARCH_CHILDREN);
     else
@@ -619,7 +619,7 @@ static int media_graph_poll_available(MediadPlugin* ctx, struct pollfd* fd, void
     return 0;
 }
 
-static int media_graph_run_all(AVFilterGraph* graph)
+static int audio_graph_run_all(AVFilterGraph* graph)
 {
     FFFilterContext* ctxi;
     unsigned i;
@@ -647,23 +647,23 @@ static int media_graph_run_all(AVFilterGraph* graph)
     return ret;
 }
 
-static int media_graph_run_once(MediadPlugin* ctx)
+static int audio_graph_run_once(MediadPlugin* ctx)
 {
     MediaGraphPriv* priv = ctx->priv;
     int ret;
 
-    ret = media_graph_run_all(priv->graph);
+    ret = audio_graph_run_all(priv->graph);
     if (ret < 0)
         return ret;
 
     do {
-        ret = media_graph_dequeue_command(priv, true);
+        ret = audio_graph_dequeue_command(priv, true);
     } while (ret >= 0);
 
     return ret == -EAGAIN ? 0 : ret;
 }
 
-static int media_graph_dump_link(AVBPrint* buf, AVFilterLink* link)
+static int audio_graph_dump_link(AVBPrint* buf, AVFilterLink* link)
 {
     const char* format;
     AVBPrint dummy_buffer;
@@ -698,7 +698,7 @@ static int media_graph_dump_link(AVBPrint* buf, AVFilterLink* link)
     return buf->len;
 }
 
-static void media_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
+static void audio_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
 {
     unsigned i, j, x, e;
 
@@ -716,14 +716,14 @@ static void media_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
             unsigned ln = strlen(l->src->name) + 1 + strlen(l->srcpad->name);
             max_src_name = FFMAX(max_src_name, ln);
             max_in_name = FFMAX(max_in_name, strlen(l->dstpad->name));
-            max_in_fmt = FFMAX(max_in_fmt, media_graph_dump_link(NULL, l));
+            max_in_fmt = FFMAX(max_in_fmt, audio_graph_dump_link(NULL, l));
         }
         for (j = 0; j < filter->nb_outputs; j++) {
             AVFilterLink* l = filter->outputs[j];
             unsigned ln = strlen(l->dst->name) + 1 + strlen(l->dstpad->name);
             max_dst_name = FFMAX(max_dst_name, ln);
             max_out_name = FFMAX(max_out_name, strlen(l->srcpad->name));
-            max_out_fmt = FFMAX(max_out_fmt, media_graph_dump_link(NULL, l));
+            max_out_fmt = FFMAX(max_out_fmt, audio_graph_dump_link(NULL, l));
         }
         in_indent = max_src_name + max_in_name + max_in_fmt;
         in_indent += in_indent ? 4 : 0;
@@ -744,7 +744,7 @@ static void media_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
                 av_bprintf(buf, "%s:%s", l->src->name, l->srcpad->name);
                 av_bprint_chars(buf, '-', e - buf->len);
                 e = buf->len + max_in_fmt + 2 + max_in_name - strlen(l->dstpad->name);
-                media_graph_dump_link(buf, l);
+                audio_graph_dump_link(buf, l);
                 av_bprint_chars(buf, '-', e - buf->len);
                 av_bprintf(buf, "%s", l->dstpad->name);
             } else {
@@ -773,7 +773,7 @@ static void media_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
                 av_bprintf(buf, "%s", l->srcpad->name);
                 av_bprint_chars(buf, '-', e - buf->len);
                 e = buf->len + max_out_fmt + 2 + max_dst_name - ln;
-                media_graph_dump_link(buf, l);
+                audio_graph_dump_link(buf, l);
                 av_bprint_chars(buf, '-', e - buf->len);
                 av_bprintf(buf, "%s:%s", l->dst->name, l->dstpad->name);
             }
@@ -787,22 +787,22 @@ static void media_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
     }
 }
 
-static char* media_graph_server_dump(AVFilterGraph* graph, const char* options)
+static char* audio_graph_server_dump(AVFilterGraph* graph, const char* options)
 {
     AVBPrint buf;
     char* dump;
 
     av_bprint_init(&buf, 0, AV_BPRINT_SIZE_COUNT_ONLY);
-    media_graph_dump_to_buf(&buf, graph);
+    audio_graph_dump_to_buf(&buf, graph);
     dump = av_malloc(buf.len + 1);
     if (!dump)
         return NULL;
     av_bprint_init_for_buffer(&buf, dump, buf.len + 1);
-    media_graph_dump_to_buf(&buf, graph);
+    audio_graph_dump_to_buf(&buf, graph);
     return dump;
 }
 
-static int media_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn, const char* target, const char* cmd,
+static int audio_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn, const char* target, const char* cmd,
     const char* arg, int flags, char* res, int res_len)
 {
     MediaGraphPriv* priv = ctx->priv;
@@ -813,7 +813,7 @@ static int media_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn
         conn, target, cmd, arg, flags, res, res_len);
 
     if (!target && !strcmp(cmd, "dump")) {
-        dump = media_graph_server_dump(priv->graph, NULL);
+        dump = audio_graph_server_dump(priv->graph, NULL);
         if (dump)
             MEDIA_INFO("\n%s\n", dump);
 
@@ -834,12 +834,12 @@ static int media_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn
         AVFilterContext* filter = priv->graph->filters[i];
 
         if (!strcmp(target, filter->name)) {
-            ret = media_graph_queue_command(priv, filter, cmd, arg, res, res_len, flags);
+            ret = audio_graph_queue_command(priv, filter, cmd, arg, res, res_len, flags);
         } else {
             const char* tmp = strchr(filter->name, '@');
 
             if (tmp && !strncmp(tmp + 1, target, strlen(target)))
-                ret = media_graph_queue_command(priv, filter, cmd, arg, res, res_len, flags);
+                ret = audio_graph_queue_command(priv, filter, cmd, arg, res, res_len, flags);
         }
 
         if (ret < 0)
@@ -849,25 +849,25 @@ static int media_graph_handler(MediadPlugin* ctx, struct media_server_conn* conn
     return 0;
 }
 
-MediadPlugin media_graph_plugin = {
-    .name = "media_graph",
+MediadPlugin audio_graph_plugin = {
+    .name = "audio_graph",
     .priv_size = sizeof(MediaGraphPriv),
     .priv = NULL,
-    .init = media_graph_init,
-    .get = media_graph_get_pollfds,
-    .available = media_graph_poll_available,
-    .run_once = media_graph_run_once,
-    .uninit = media_graph_uninit,
-    .process_command = media_graph_handler,
+    .init = audio_graph_init,
+    .get = audio_graph_get_pollfds,
+    .available = audio_graph_poll_available,
+    .run_once = audio_graph_run_once,
+    .uninit = audio_graph_uninit,
+    .process_command = audio_graph_handler,
 };
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-int media_graph_audio_open(AVFilterContext** src, const char* stream)
+int audio_graph_open(AVFilterContext** src, const char* stream)
 {
-    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphPriv* priv = audio_graph_plugin.priv;
     AVFilterGraph* graph = priv->graph;
     char stream_name[64] = { 0 };
     int ret;
@@ -901,16 +901,16 @@ fail:
     return ret;
 }
 
-int media_graph_audio_start(AVFilterContext* src, int format, int sample_rate, int channels,
+int audio_graph_start(AVFilterContext* src, int format, int sample_rate, int channels,
     int (*on_event_cb)(void* udata, int evt, int64_t args), void* udata)
 {
-    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphPriv* priv = audio_graph_plugin.priv;
     char msg[128] = { 0 };
     int ret;
 
     snprintf(msg, sizeof(msg), "%p %p fmt=%d:rate=%d:ch=%d", on_event_cb,
         udata, format, sample_rate, channels);
-    ret = media_graph_queue_command(priv, src, "link", msg, NULL, 0, 0);
+    ret = audio_graph_queue_command(priv, src, "link", msg, NULL, 0, 0);
     if (ret < 0) {
         MEDIA_ERR("%s link failed ret:%d\n", src->name, ret);
         return ret;
@@ -919,12 +919,12 @@ int media_graph_audio_start(AVFilterContext* src, int format, int sample_rate, i
     return 0;
 }
 
-int media_graph_audio_stop(AVFilterContext* src)
+int audio_graph_stop(AVFilterContext* src)
 {
-    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphPriv* priv = audio_graph_plugin.priv;
     int ret;
 
-    ret = media_graph_queue_command(priv, src, "unlink",
+    ret = audio_graph_queue_command(priv, src, "unlink",
         NULL, NULL, 0, 0);
     if (ret < 0)
         MEDIA_ERR("unlink %s failed: %d\n", src->name, ret);
@@ -932,9 +932,9 @@ int media_graph_audio_stop(AVFilterContext* src)
     return ret;
 }
 
-int media_graph_audio_close(AVFilterContext** src)
+int audio_graph_close(AVFilterContext** src)
 {
-    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphPriv* priv = audio_graph_plugin.priv;
 
     pthread_mutex_lock(&priv->qlock);
     for (int i = 0; i < priv->graph->nb_filters; i++) {
@@ -950,24 +950,24 @@ int media_graph_audio_close(AVFilterContext** src)
     return 0;
 }
 
-int media_graph_audio_pause(AVFilterContext* src)
+int audio_graph_pause(AVFilterContext* src)
 {
-    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphPriv* priv = audio_graph_plugin.priv;
     int ret;
 
-    ret = media_graph_queue_command(priv, src, "pause", NULL, NULL, 0, 0);
+    ret = audio_graph_queue_command(priv, src, "pause", NULL, NULL, 0, 0);
     if (ret < 0)
         MEDIA_ERR("pause %s failed: %d\n", src->name, ret);
 
     return ret;
 }
 
-int media_graph_audio_resume(AVFilterContext* src)
+int audio_graph_resume(AVFilterContext* src)
 {
-    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphPriv* priv = audio_graph_plugin.priv;
     int ret;
 
-    ret = media_graph_queue_command(priv, src, "resume", NULL, NULL, 0, 0);
+    ret = audio_graph_queue_command(priv, src, "resume", NULL, NULL, 0, 0);
     if (ret < 0) {
         MEDIA_ERR("%s resume failed ret:%d\n", src->name, ret);
         return ret;
@@ -976,9 +976,9 @@ int media_graph_audio_resume(AVFilterContext* src)
     return 0;
 }
 
-int media_graph_audio_set_parameter(AVFilterContext* src, const char* param, const char* value)
+int audio_graph_set_parameter(AVFilterContext* src, const char* param, const char* value)
 {
-    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphPriv* priv = audio_graph_plugin.priv;
     char msg[128];
     int ret;
 
@@ -987,16 +987,16 @@ int media_graph_audio_set_parameter(AVFilterContext* src, const char* param, con
 
     snprintf(msg, sizeof(msg), "%s=%s", param, value);
 
-    ret = media_graph_queue_command(priv, src, "set_parameter", msg, NULL, 0, 0);
+    ret = audio_graph_queue_command(priv, src, "set_parameter", msg, NULL, 0, 0);
     if (ret < 0)
         MEDIA_ERR("%s set_parameter failed ret:%d\n", src->name, ret);
 
     return ret;
 }
 
-int media_graph_audio_get_parameter(AVFilterContext* src, const char* key, char* res, int res_len)
+int audio_graph_get_parameter(AVFilterContext* src, const char* key, char* res, int res_len)
 {
-    MediaGraphPriv* priv = media_graph_plugin.priv;
+    MediaGraphPriv* priv = audio_graph_plugin.priv;
     char msg[128];
     int ret;
 
@@ -1005,7 +1005,7 @@ int media_graph_audio_get_parameter(AVFilterContext* src, const char* key, char*
 
     snprintf(msg, sizeof(msg), "%s", key);
 
-    ret = media_graph_queue_command(priv, src, "get_parameter", msg, res, res_len, 0);
+    ret = audio_graph_queue_command(priv, src, "get_parameter", msg, res, res_len, 0);
     if (ret < 0)
         MEDIA_ERR("%s get_parameter failed ret:%d\n", src->name, ret);
 

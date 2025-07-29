@@ -57,7 +57,7 @@ typedef struct MediaPriv {
 extern MediadPlugin media_focus_plugin;
 #endif
 #ifdef CONFIG_LIB_FFMPEG
-extern MediadPlugin media_graph_plugin;
+extern MediadPlugin audio_graph_plugin;
 extern MediadPlugin media_session_plugin;
 extern MediadPlugin media_player_plugin;
 extern MediadPlugin media_recorder_plugin;
@@ -72,7 +72,7 @@ MediadPlugin* g_media[] = {
     &media_focus_plugin,
 #endif
 #ifdef CONFIG_LIB_FFMPEG
-    &media_graph_plugin,
+    &audio_graph_plugin,
     &media_session_plugin,
     &media_player_plugin,
     &media_recorder_plugin,

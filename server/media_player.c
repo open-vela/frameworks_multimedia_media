@@ -46,8 +46,8 @@
 #include "libavutil/opt.h"
 #include "libavutil/time.h"
 
+#include "audio_graph.h"
 #include "media_common.h"
-#include "media_graph.h"
 #include "media_plugin.h"
 #include "media_server.h"
 #include "media_video_output.h"
@@ -286,7 +286,7 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
     frame = media_player_queue_pop(ctx, AVMEDIA_TYPE_AUDIO);
     if (!frame) {
         if (ctx->audio_output)
-            media_graph_audio_pause(ctx->audio_output);
+            audio_graph_pause(ctx->audio_output);
 
         pthread_mutex_lock(&ctx->mutex);
         ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_XRUN;
@@ -450,9 +450,9 @@ static int media_player_queue_push(MediaPlayerContext* ctx, int idx, AVFrame* fr
     ret = ff_framequeue_add(&ctx->streams[idx]->queue, frame);
     if (ff_framequeue_queued_frames(&ctx->streams[idx]->queue) == ctx->streams[idx]->nb_queue_max
         && (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN)) {
-        ret = media_graph_audio_resume(ctx->audio_output);
+        ret = audio_graph_resume(ctx->audio_output);
         if (ret < 0) {
-            MEDIA_ERR("media_graph_audio_resume failed.\n");
+            MEDIA_ERR("audio_graph_resume failed.\n");
             pthread_mutex_unlock(&ctx->mutex);
             ret = AVERROR(EINVAL);
             return ret;
@@ -894,7 +894,7 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
         return ret;
     else if (ret == AVERROR_EOF) {
         if (!media_player_is_queue_empty(ctx) && (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN)) {
-            media_graph_audio_resume(ctx->audio_output);
+            audio_graph_resume(ctx->audio_output);
             ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_XRUN;
         }
     }
@@ -1004,7 +1004,7 @@ static void media_player_close(MediaPlayerContext* ctx)
     media_player_release_stream(ctx);
 
     if (ctx->audio_output)
-        media_graph_audio_close(&ctx->audio_output);
+        audio_graph_close(&ctx->audio_output);
 
     if (ctx->global_opts)
         av_dict_free(&ctx->global_opts);
@@ -1023,7 +1023,7 @@ static int media_player_pause(MediaPlayerContext* ctx)
     }
 
     if (ctx->audio_output)
-        media_graph_audio_pause(ctx->audio_output);
+        audio_graph_pause(ctx->audio_output);
 
     media_player_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
     return 0;
@@ -1037,7 +1037,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
     media_player_clear_queue(ctx, MEDIA_PLAYER_DATA_QUEUE_IDX);
 
     if (ctx->audio_output && ctx->audio_stream)
-        media_graph_audio_stop(ctx->audio_output);
+        audio_graph_stop(ctx->audio_output);
 
     if (ctx->video_output && ctx->video_stream)
         media_video_output_close(&ctx->video_output);
@@ -1061,15 +1061,15 @@ static int media_player_start(MediaPlayerContext* ctx)
     }
     if (ctx->audio_stream) {
         if (ctx->state == MEDIA_PLAYER_STATE_PAUSED) {
-            ret = media_graph_audio_resume(ctx->audio_output);
+            ret = audio_graph_resume(ctx->audio_output);
         } else {
             AVCodecContext* codec_ctx = ctx->audio_stream->codec_ctx;
-            ret = media_graph_audio_start(ctx->audio_output,
+            ret = audio_graph_start(ctx->audio_output,
                 codec_ctx->sample_fmt, codec_ctx->sample_rate,
                 codec_ctx->ch_layout.nb_channels, media_player_on_event_cb, ctx);
         }
         if (ret < 0) {
-            MEDIA_ERR("media_graph_audio_start failed.\n");
+            MEDIA_ERR("audio_graph_start failed.\n");
             ret = AVERROR(EINVAL);
             goto error;
         }
@@ -1084,9 +1084,9 @@ static int media_player_start(MediaPlayerContext* ctx)
     if (ctx->audio_output) {
         char volume_str[16] = { 0 };
         snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
-        ret = media_graph_audio_set_parameter(ctx->audio_output, "player_volume", volume_str);
+        ret = audio_graph_set_parameter(ctx->audio_output, "player_volume", volume_str);
         if (ret < 0) {
-            MEDIA_ERR("media_graph_audio_set_parameter failed.\n");
+            MEDIA_ERR("audio_graph_set_parameter failed.\n");
             goto error;
         }
     }
@@ -1145,10 +1145,10 @@ static int media_player_volume(MediaPlayerContext* ctx, const char* args, char* 
 
     if (ctx->audio_output) {
         if (args) {
-            ret = media_graph_audio_set_parameter(ctx->audio_output, "player_volume", args);
+            ret = audio_graph_set_parameter(ctx->audio_output, "player_volume", args);
             sscanf(args, "%f", &ctx->volume);
         } else if (res && res_len) {
-            ret = media_graph_audio_get_parameter(ctx->audio_output, "player_volume", res, res_len);
+            ret = audio_graph_get_parameter(ctx->audio_output, "player_volume", res, res_len);
             sscanf(res, "%f", &ctx->volume);
         }
         if (ret < 0)
@@ -1729,7 +1729,7 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
 
     media_player_ctx_init(ctx);
 
-    media_graph_audio_open(&ctx->audio_output, ctx->name);
+    audio_graph_open(&ctx->audio_output, ctx->name);
     if (ctx->audio_output == NULL) {
         MEDIA_ERR("ctx %p open audio output failed\n", ctx);
         goto out;
@@ -1752,7 +1752,7 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
     return 0;
 
 out:
-    media_graph_audio_close(&ctx->audio_output);
+    audio_graph_close(&ctx->audio_output);
     ctx->state = MEDIA_PLAYER_STATE_IDLE;
     return ret;
 }
