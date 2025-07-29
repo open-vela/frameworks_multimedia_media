@@ -49,7 +49,7 @@
  ****************************************************************************/
 
 #define MAX_GRAPH_SIZE 4096
-#define MAX_POLL_FILTERS 24
+#define MAX_POLL_FILTERS 32
 
 #define MediaPlayerPriv MediaFilterPriv
 #define MediaRecorderPriv MediaFilterPriv
