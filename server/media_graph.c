@@ -916,7 +916,6 @@ int media_graph_audio_start(AVFilterContext* src, int format, int sample_rate, i
         return ret;
     }
 
-    media_graph_try_touch(priv);
     return 0;
 }
 
@@ -930,7 +929,6 @@ int media_graph_audio_stop(AVFilterContext* src)
     if (ret < 0)
         MEDIA_ERR("unlink %s failed: %d\n", src->name, ret);
 
-    media_graph_try_touch(priv);
     return ret;
 }
 
@@ -975,7 +973,6 @@ int media_graph_audio_resume(AVFilterContext* src)
         return ret;
     }
 
-    media_graph_try_touch(priv);
     return 0;
 }
 
@@ -994,7 +991,6 @@ int media_graph_audio_set_parameter(AVFilterContext* src, const char* param, con
     if (ret < 0)
         MEDIA_ERR("%s set_parameter failed ret:%d\n", src->name, ret);
 
-    media_graph_try_touch(priv);
     return ret;
 }
 
