@@ -1270,8 +1270,8 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
             av_bprintf(&buf, ", v: %d %s %d %d %d",
                 ctx->video_idx,
                 avcodec_get_name(ctx->streams[ctx->video_idx].enc_ctx->codec_id),
-                ctx->streams[ctx->audio_idx].enc_ctx->width,
-                ctx->streams[ctx->audio_idx].enc_ctx->height,
+                ctx->streams[ctx->video_idx].enc_ctx->width,
+                ctx->streams[ctx->video_idx].enc_ctx->height,
                 media_recorder_queue_cnt(ctx, ctx->video_idx));
     }
     av_bprintf(&buf, "\n--------------recorder dump end---------------\n");
