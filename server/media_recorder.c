@@ -772,7 +772,6 @@ out:
     ctx->state = MEDIA_RECORDER_STATE_COMPLETED;
     media_recorder_event_cb(ctx, MEDIA_EVENT_COMPLETED,
         ret == AVERROR_EOF ? 0 : ret, NULL);
-    media_recorder_clean(ctx);
     return ret;
 }
 
