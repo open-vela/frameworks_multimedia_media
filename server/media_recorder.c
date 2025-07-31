@@ -137,6 +137,30 @@ typedef struct MediaRecorderPriv {
     MediaRecorderContext ctxs[CONFIG_MEDIA_RECORDER_MAX_CNT];
 } MediaRecorderPriv;
 
+typedef struct {
+    const char* dict_key;
+    const char* codec_option;
+} CodecOption;
+
+typedef struct {
+    enum AVCodecID codec_id;
+    const CodecOption* options;
+} CodecSpecificOptions;
+
+static const CodecOption opus_codec_options[] = {
+    { "bitrate", "b" },
+    { "vbr", "vbr" },
+    { "level", "compression_level" },
+    { "application", "application" },
+    { "frame_duration", "frame_duration" },
+    { NULL, NULL }
+};
+
+static const CodecSpecificOptions codec_specific_map[] = {
+    { AV_CODEC_ID_OPUS, opus_codec_options },
+    { AV_CODEC_ID_NONE, NULL }
+};
+
 /****************************************************************************
  * Function declaration
  ****************************************************************************/
@@ -352,10 +376,33 @@ static enum AVCodecID media_recorder_find_encoder_id(const char* name, enum AVMe
     return codec->id;
 }
 
+static int media_recorder_apply_options(AVCodecContext* avctx, AVDictionary* format_opt)
+{
+    const CodecSpecificOptions* spec_opts;
+    const CodecOption* map;
+    AVDictionaryEntry* tag;
+
+    for (spec_opts = codec_specific_map; spec_opts->codec_id != AV_CODEC_ID_NONE; spec_opts++) {
+        if (spec_opts->codec_id == avctx->codec_id) {
+            for (map = spec_opts->options; map->dict_key != NULL; map++) {
+                tag = av_dict_get(format_opt, map->dict_key, NULL, 0);
+                if (tag && map->codec_option) {
+                    if (strcmp(tag->value, "") != 0) {
+                        av_opt_set_int(avctx, map->codec_option, strtol(tag->value, NULL, 0), 0);
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    return 0;
+}
+
 static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 {
     int ret, i = 0, num_sample_fmts, num_samplerates, num_ch_layouts;
-    int width = 0, height = 0, bitrate = -1, vbr = -1, level = -1;
+    int width = 0, height = 0;
     const enum AVSampleFormat* sample_fmts = NULL;
     const AVChannelLayout* ch_layouts = NULL;
     const int* supported_samplerates = NULL;
@@ -484,15 +531,6 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
     if ((tag = av_dict_get(ctx->format_opt, "height", NULL, 0)))
         height = strtol(tag->value, NULL, 0);
 
-    if ((tag = av_dict_get(ctx->format_opt, "bitrate", NULL, 0)))
-        bitrate = strtol(tag->value, NULL, 0);
-
-    if ((tag = av_dict_get(ctx->format_opt, "vbr", NULL, 0)))
-        vbr = strtol(tag->value, NULL, 0);
-
-    if ((tag = av_dict_get(ctx->format_opt, "level", NULL, 0)))
-        level = strtol(tag->value, NULL, 0);
-
     ctx->streams[idx].enc_ctx = avcodec_alloc_context3(enc);
     if (!ctx->streams[idx].enc_ctx) {
         return AVERROR(ENOMEM);
@@ -513,14 +551,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
 
     ctx->streams[idx].enc_ctx->strict_std_compliance = FF_COMPLIANCE_UNOFFICIAL;
 
-    if (bitrate != -1)
-        av_opt_set_int(ctx->streams[idx].enc_ctx, "b", bitrate, 0);
-
-    if (vbr != -1)
-        av_opt_set_int(ctx->streams[idx].enc_ctx, "vbr", vbr, AV_OPT_SEARCH_CHILDREN);
-
-    if (level != -1)
-        av_opt_set_int(ctx->streams[idx].enc_ctx, "compression_level", level, 0);
+    media_recorder_apply_options(ctx->streams[idx].enc_ctx, ctx->format_opt);
 
     if (ctx->format_opt)
         av_dict_copy(&dict, ctx->format_opt, 0);
