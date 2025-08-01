@@ -769,6 +769,11 @@ static int mediatool_common_stop_inner(mediatool_chain_t* chain)
 
     switch (chain->type) {
     case MEDIATOOL_PLAYER:
+        if (chain->direct) {
+            chain->direct_connect = false;
+            pthread_join(chain->thread, NULL);
+        }
+
         ret = media_player_stop(chain->handle);
         break;
 
@@ -1158,9 +1163,11 @@ static void* mediatool_buffer_thread(void* arg)
 
             tmp = chain->buf;
             while (act > 0) {
-                if (chain->direct)
+                if (chain->direct) {
+                    if (!chain->direct_connect)
+                        goto out;
                     ret = mediatool_process_data(fd, true, tmp, act);
-                else
+                } else
                     ret = media_player_write_data(chain->handle, tmp, act);
 
                 if (ret == 0) {
