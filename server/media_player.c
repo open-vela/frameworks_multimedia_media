@@ -1575,7 +1575,7 @@ static void media_player_dump(MediaPlayerPriv* priv)
         if (ctx->state == MEDIA_PLAYER_STATE_IDLE)
             continue;
         av_bprintf(&buf, "player[%d, %s] state:%d", i, ctx->name, ctx->state);
-        if (ctx->audio_stream)
+        if (ctx->audio_stream && ctx->audio_stream->codec_ctx)
             av_bprintf(&buf, ", a: %d %s %" PRId64 " %d ch:%d %d %" PRIu32 "",
                 AVMEDIA_TYPE_AUDIO,
                 avcodec_get_name(ctx->audio_stream->codec_ctx->codec_id),
@@ -1583,7 +1583,7 @@ static void media_player_dump(MediaPlayerPriv* priv)
                 ctx->audio_stream->codec_ctx->sample_rate,
                 ctx->audio_stream->codec_ctx->ch_layout.nb_channels,
                 media_player_queue_cnt(ctx, AVMEDIA_TYPE_AUDIO), ctx->aframe_cnt);
-        if (ctx->video_stream)
+        if (ctx->video_stream && ctx->video_stream->codec_ctx)
             av_bprintf(&buf, ", v: %d %s %dx%d %d %" PRIu32 "", AVMEDIA_TYPE_VIDEO,
                 avcodec_get_name(ctx->video_stream->codec_ctx->codec_id),
                 ctx->video_stream->codec_ctx->width,
