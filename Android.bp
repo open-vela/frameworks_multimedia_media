@@ -3,7 +3,7 @@ cc_library_static {
     vendor_available: true,
     export_include_dirs: ["include"],
 
-    include_dirs: ["vendor/vela/frameworks/media/utils"],
+    include_dirs: ["vendor/vela/frameworks/multimedia/media/utils"],
 
     srcs: [
         "client/media_graph.c",
