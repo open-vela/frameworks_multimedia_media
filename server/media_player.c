@@ -279,6 +279,7 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
         MEDIA_INFO("ctx %p received unlink event form audio_output.", ctx);
         pthread_mutex_lock(&ctx->mutex);
         ctx->audio_output_state = 0;
+        write(ctx->event_fd, &cnt, sizeof(cnt));
         pthread_mutex_unlock(&ctx->mutex);
         return 0;
     }
