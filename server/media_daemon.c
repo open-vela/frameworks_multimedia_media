@@ -40,6 +40,10 @@
 #define MAX_POLLFDS CONFIG_MEDIA_SERVER_MAX_POLLFDS
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+#ifndef CONFIG_MEDIA_PROCESS_TIME
+#define CONFIG_MEDIA_PROCESS_TIME
+#endif
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -102,6 +106,15 @@ MediadPlugin* media_plugin_get(const char* name)
     return NULL;
 }
 
+#if defined(CONFIG_MEDIA_PROCESS_TIME)
+uint32_t media_get_timestamp_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_BOOTTIME, &ts);
+    return (uint32_t)((ts.tv_sec * 1000L) + (ts.tv_nsec / 1000000));
+}
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -110,6 +123,16 @@ int main(int argc, char* argv[])
 {
     MediaPriv* priv;
     int ret, n, i;
+
+#if defined(CONFIG_MEDIA_PROCESS_TIME)
+    uint32_t total_start = 0;
+    uint32_t total_end = 0;
+    uint32_t total_diff = 0;
+    uint32_t poll_start = 0;
+    uint32_t poll_end = 0;
+    uint32_t poll_diff = 0;
+    double poll_ratio = 0;
+#endif
 
     priv = zalloc(sizeof(MediaPriv));
     if (!priv)
@@ -124,6 +147,9 @@ int main(int argc, char* argv[])
     }
 
     while (1) {
+#if defined(CONFIG_MEDIA_PROCESS_TIME)
+        total_start += media_get_timestamp_ms();
+#endif
         for (n = i = 0; i < ARRAY_SIZE(g_media); i++) {
             if (!g_media[i]->get)
                 continue;
@@ -140,7 +166,13 @@ int main(int argc, char* argv[])
 
         assert(n > 0 && n < MAX_POLLFDS);
 
+#if defined(CONFIG_MEDIA_PROCESS_TIME)
+        poll_start += media_get_timestamp_ms();
+#endif
         poll(priv->fds, n, -1);
+#if defined(CONFIG_MEDIA_PROCESS_TIME)
+        poll_end += media_get_timestamp_ms();
+#endif
 
         for (i = 0; i < n; i++) {
             if (!priv->fds[i].revents)
@@ -160,6 +192,25 @@ int main(int argc, char* argv[])
             if (ret < 0)
                 MEDIA_ERR("%s run_once failed %d\n", g_media[i]->name, ret);
         }
+
+#if defined(CONFIG_MEDIA_PROCESS_TIME)
+        total_end += media_get_timestamp_ms();
+        total_diff = total_end - total_start;
+        if (total_diff > 2 * 1000) {
+            poll_diff = poll_end - poll_start;
+            if (0 != total_diff) {
+                poll_ratio = ((double)(total_diff - poll_diff)) / ((double)total_diff);
+                MEDIA_ERR("check CPU usage rate: busy(%" PRIu32 ") / total(%" PRIu32 ") =%f",
+                    (total_diff - poll_diff), total_diff, poll_ratio);
+            }
+            total_start = 0;
+            total_end = 0;
+            total_diff = 0;
+            poll_start = 0;
+            poll_end = 0;
+            poll_diff = 0;
+        }
+#endif
     }
 
 out:
