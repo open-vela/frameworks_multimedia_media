@@ -1269,9 +1269,10 @@ static void media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
             break;
         }
 
-        media_player_stop(ctx);
+        if (!pending_stop)
+            media_player_notify_finalize(ctx);
+
         ctx->exit = 1;
-        break;
     case MEDIA_PLAYER_CMD_STOP:
     case MEDIA_PLAYER_CMD_RESET:
         media_player_stop(ctx);
