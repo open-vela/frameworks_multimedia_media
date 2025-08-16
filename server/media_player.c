@@ -299,9 +299,7 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
     av_frame_move_ref(out_frame, frame);
     av_frame_free(&frame);
 
-    pthread_mutex_lock(&ctx->mutex);
     write(ctx->event_fd, &cnt, sizeof(cnt));
-    pthread_mutex_unlock(&ctx->mutex);
 
     return 0;
 }
@@ -578,9 +576,7 @@ static int media_player_interrupt(void* opaque)
     }
     if (pending_stop)
         interrupt = 0;
-    pthread_mutex_lock(&ctx->mutex);
     write(ctx->event_fd, &cnt, sizeof(cnt));
-    pthread_mutex_unlock(&ctx->mutex);
     return interrupt;
 }
 
@@ -1701,9 +1697,7 @@ static void* media_player_thread(void* arg)
         }
 
         if (media_player_dat_available(ctx) && media_player_proc_dat(ctx) >= 0) {
-            pthread_mutex_lock(&ctx->mutex);
             write(ctx->event_fd, &cnt, sizeof(cnt));
-            pthread_mutex_unlock(&ctx->mutex);
         }
 
         media_player_proc_avsync(ctx);
