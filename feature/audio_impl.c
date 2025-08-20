@@ -1005,15 +1005,15 @@ void system_audio_set_muted(void* feature, union AppendData append_data, FtBool 
 FtString system_audio_get_streamType(void* feature, union AppendData append_data)
 {
     FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
-    AudioObject* obj;
     FtString src;
 
-    obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
-    if (!obj)
-        return MEDIA_STREAM_MUSIC;
+    src = (FtString)FeatureMalloc(6, FT_CHAR);
+    if (src == NULL) {
+        FEATURE_LOG_ERROR("FeatureMalloc failed!\n");
+        return NULL;
+    }
 
-    src = (FtString)FeatureMalloc(MAX_STREAMTYPE_LEN + 1, FT_CHAR);
-    strncpy((char*)src, obj->streamType, MAX_STREAMTYPE_LEN);
+    snprintf((char*)src, 6, "music");
 
     return src;
 }
