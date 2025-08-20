@@ -720,6 +720,9 @@ static void mediatool_uv_player_read_cb(uv_fs_t* req)
     } else if (req->result == 0) {
         printf("[%s][%d] Player read to end of file\n", __func__, __LINE__);
         return;
+    } else if (chain->pipe == NULL) {
+        printf("[%s][%d] Player pipe is NULL, cannot write\n", __func__, __LINE__);
+        return;
     } else {
         iov = uv_buf_init(chain->buf, req->result);
         uv_req_set_data((uv_req_t*)&chain->write_req, chain);
