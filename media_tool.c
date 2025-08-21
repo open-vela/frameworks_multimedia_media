@@ -1081,6 +1081,10 @@ CMD1(reset, int, id)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
+    if (mediatool->chain[id].direct) {
+        mediatool->chain[id].direct_connect = false;
+        pthread_join(mediatool->chain[id].thread, NULL);
+    }
     switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
         ret = media_player_reset(mediatool->chain[id].handle);
