@@ -1257,7 +1257,7 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
         if (ctx->state == MEDIA_RECORDER_STATE_IDLE)
             continue;
         av_bprintf(&buf, "recorder[%d, %s] state:%d", i, ctx->name, ctx->state);
-        if (ctx->audio_idx >= 0)
+        if (ctx->audio_idx >= 0 && ctx->streams[ctx->audio_idx].enc_ctx)
             av_bprintf(&buf, ", a: %d %s %" PRId64 " %d %d %d %" PRIu32 "",
                 ctx->audio_idx,
                 avcodec_get_name(ctx->streams[ctx->audio_idx].enc_ctx->codec_id),
@@ -1265,7 +1265,7 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
                 ctx->streams[ctx->audio_idx].enc_ctx->sample_rate,
                 ctx->streams[ctx->audio_idx].enc_ctx->ch_layout.nb_channels,
                 media_recorder_queue_cnt(ctx, ctx->audio_idx), ctx->aframe_cnt);
-        if (ctx->video_idx >= 0)
+        if (ctx->video_idx >= 0 && ctx->streams[ctx->video_idx].enc_ctx)
             av_bprintf(&buf, ", v: %d %s %d %d %d",
                 ctx->video_idx,
                 avcodec_get_name(ctx->streams[ctx->video_idx].enc_ctx->codec_id),
