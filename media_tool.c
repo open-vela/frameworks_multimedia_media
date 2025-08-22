@@ -165,7 +165,7 @@ typedef struct mediatool_chain_s {
     pthread_t thread;
     int fd;
 
-    bool start;
+    bool running;
     bool loop;
 
     bool direct;
@@ -720,8 +720,10 @@ static void mediatool_uv_player_read_cb(uv_fs_t* req)
     } else if (req->result == 0) {
         printf("[%s][%d] Player read to end of file\n", __func__, __LINE__);
         return;
-    } else if (chain->pipe == NULL) {
-        printf("[%s][%d] Player pipe is NULL, cannot write\n", __func__, __LINE__);
+    } else if (chain->running == false) {
+        printf("[%s][%d] Player stopped.\n", __func__, __LINE__);
+        free(chain->buf);
+        chain->buf = NULL;
         return;
     } else {
         iov = uv_buf_init(chain->buf, req->result);
@@ -738,10 +740,16 @@ static void mediatool_uv_player_connection_cb(void* cookie, int ret, void* obj)
     uv_buf_t iov;
 
     printf("[%s][%d] id:%d ret:%d obj:%p\n", __func__, __LINE__, chain->id, ret, obj);
+    if (!obj) {
+        chain->running = false;
+        return;
+    }
+
     chain->size = MEDIATOOL_MAX_SIZE;
     chain->buf = malloc(MEDIATOOL_MAX_SIZE);
     assert(chain->buf);
     chain->pipe = obj;
+    chain->running = true;
 
     iov = uv_buf_init(chain->buf, chain->size);
     uv_req_set_data((uv_req_t*)&chain->fs_req, chain);
@@ -942,6 +950,8 @@ CMD2(close, int, id, int, pending_stop)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
+    mediatool->chain[id].running = false;
+
     switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
         if (!pending_stop)
@@ -1081,6 +1091,7 @@ CMD1(reset, int, id)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
+    mediatool->chain[id].running = false;
     if (mediatool->chain[id].direct) {
         mediatool->chain[id].direct_connect = false;
         pthread_join(mediatool->chain[id].thread, NULL);
@@ -1325,6 +1336,7 @@ CMD2(start, int, id, string_t, scenario)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
+    mediatool->chain[id].running = true;
     switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
         ret = media_player_start(mediatool->chain[id].handle);
@@ -1372,6 +1384,7 @@ CMD1(stop, int, id)
     if (id < 0 || id >= MEDIATOOL_MAX_CHAIN || !mediatool->chain[id].handle)
         return -EINVAL;
 
+    mediatool->chain[id].running = false;
     return mediatool_common_stop_inner(&mediatool->chain[id]);
 }
 
