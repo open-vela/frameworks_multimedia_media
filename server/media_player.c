@@ -143,7 +143,6 @@ typedef struct MediaPlayerContext {
     int live_stream; /** < default is false, when set to true, avsync is disabled */
     uint32_t aframe_cnt;
     uint32_t vframe_cnt;
-    uint32_t nb_streams;
     uint32_t current_ms; /** < current timestamp of the decoded frame */
     uint32_t duration_ms; /** < duration of whole stream */
     char name[64];
@@ -270,6 +269,7 @@ static void media_player_poll_add(MediaPlayerContext* ctx, const char* name,
 static int media_player_on_event_cb(void* udata, int evt, int64_t args)
 {
     MediaPlayerContext* ctx = (MediaPlayerContext*)udata;
+    AVFrame* out_frame = (AVFrame*)(uintptr_t)args;
     AVFrame* frame;
     uint64_t cnt = 1;
 
@@ -295,7 +295,6 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
         return AVERROR(EAGAIN);
     }
 
-    AVFrame* out_frame = (AVFrame*)(uintptr_t)args;
     av_frame_move_ref(out_frame, frame);
     av_frame_free(&frame);
 
@@ -328,15 +327,10 @@ static int media_player_loop(MediaPlayerContext* ctx)
 
 static int media_player_queue_cnt(MediaPlayerContext* ctx, int type)
 {
-    OutputStream* stream;
+    OutputStream* stream = NULL;
     int count = 0;
 
-    if (type == AVMEDIA_TYPE_AUDIO)
-        stream = ctx->audio_stream;
-    else if (type == AVMEDIA_TYPE_VIDEO)
-        stream = ctx->video_stream;
-    else
-        return 0; // other stream types are not supported
+    stream = type == AVMEDIA_TYPE_AUDIO ? ctx->audio_stream : ctx->video_stream;
 
     if (!stream)
         return 0;
@@ -360,14 +354,12 @@ static inline int media_player_dat_available(MediaPlayerContext* ctx)
 static AVFrame* media_player_queue_pop(MediaPlayerContext* ctx, int type)
 {
     AVFrame* frame = NULL;
-    OutputStream* stream;
+    OutputStream* stream = NULL;
 
-    if (type == AVMEDIA_TYPE_AUDIO)
-        stream = ctx->audio_stream;
-    else if (type == AVMEDIA_TYPE_VIDEO)
-        stream = ctx->video_stream;
-    else
-        return NULL; // other stream types are not supported
+    stream = type == AVMEDIA_TYPE_AUDIO ? ctx->audio_stream : ctx->video_stream;
+
+    if (!stream)
+        return NULL;
 
     pthread_mutex_lock(&ctx->mutex);
     if (ff_framequeue_queued_frames(&stream->queue)) {
@@ -380,14 +372,12 @@ static AVFrame* media_player_queue_pop(MediaPlayerContext* ctx, int type)
 static AVFrame* media_player_queue_peek(MediaPlayerContext* ctx, int type)
 {
     AVFrame* frame = NULL;
-    OutputStream* stream;
+    OutputStream* stream = NULL;
 
-    if (type == AVMEDIA_TYPE_AUDIO)
-        stream = ctx->audio_stream;
-    else if (type == AVMEDIA_TYPE_VIDEO)
-        stream = ctx->video_stream;
-    else
-        return NULL; // other stream types are not supported
+    stream = type == AVMEDIA_TYPE_AUDIO ? ctx->audio_stream : ctx->video_stream;
+
+    if (!stream)
+        return NULL;
 
     pthread_mutex_lock(&ctx->mutex);
     if (ff_framequeue_queued_frames(&stream->queue)) {
@@ -605,6 +595,7 @@ static void media_player_map_protocol(
 
 static int media_player_open_decoder(MediaPlayerContext* ctx, OutputStream* stream, AVCodecParameters* codecpar)
 {
+    AVDictionaryEntry* tag = NULL;
     const AVCodec* codec;
     int ret;
 
@@ -620,7 +611,6 @@ static int media_player_open_decoder(MediaPlayerContext* ctx, OutputStream* stre
         goto out;
     }
 
-    AVDictionaryEntry* tag = NULL;
     if ((tag = av_dict_get(ctx->format_opt, "request_sample_fmt", NULL, 0)))
         stream->codec_ctx->request_sample_fmt = av_get_sample_fmt(tag->value);
 
@@ -673,8 +663,8 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
 
         stream = ctx->format_ctx->streams[i];
 
-        if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
-            MEDIA_INFO("Skip attached picture stream %d.\n", i);
+        if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC || (stream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO && stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO)) {
+            MEDIA_INFO("Skip stream %d, type %d, disposition %d.\n", i, stream->codecpar->codec_type, stream->disposition);
             continue;
         } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && !strncmp(ctx->name, "Video", 5)) {
             av_log(NULL, AV_LOG_ERROR, "%s:%d stream %d, type %d.\n", __func__, __LINE__, i, stream->codecpar->codec_type);
@@ -684,9 +674,6 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
             av_log(NULL, AV_LOG_ERROR, "%s:%d stream %d, type %d.\n", __func__, __LINE__, i, stream->codecpar->codec_type);
             ctx->streams[AVMEDIA_TYPE_AUDIO] = stream_out = ctx->audio_stream = av_calloc(1, sizeof(OutputStream));
             stream_out->type = AVMEDIA_TYPE_AUDIO;
-        } else {
-            MEDIA_INFO("Skip stream %d, type %d.\n", i, stream->codecpar->codec_type);
-            continue;
         }
 
         stream_out->type = stream->codecpar->codec_type;
@@ -785,8 +772,10 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
         return AVERROR(ENOMEM);
 
     ctx->format_ctx = avformat_alloc_context();
-    if (!ctx->format_ctx)
+    if (!ctx->format_ctx) {
+        av_freep(name);
         return AVERROR(ENOMEM);
+    }
 
     ctx->format_ctx->interrupt_callback.callback = media_player_interrupt;
     ctx->format_ctx->interrupt_callback.opaque = ctx;
@@ -836,7 +825,6 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
     return 0;
 
 out:
-
     av_free(name);
     media_player_close_demuxer(ctx);
     return ret;
@@ -975,7 +963,6 @@ static void media_player_ctx_release(MediaPlayerContext* ctx)
     ctx->state = MEDIA_PLAYER_STATE_IDLE;
     ctx->exit = 0;
     ctx->loop_count = 0;
-    ctx->nb_streams = 0;
     ctx->offload = 0;
     ctx->pending_stop = 0;
     ctx->event = 0;
@@ -1131,7 +1118,7 @@ static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_
         }
     }
 
-    snprintf(res, res_len, "%" PRId64 "d", latency);
+    snprintf(res, res_len, "%" PRId64, latency);
 
     return 0;
 }
