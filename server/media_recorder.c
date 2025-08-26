@@ -610,6 +610,7 @@ static int media_recorder_on_event_cb(void* udata, int evt, int64_t args)
     if (evt < 0) {
         MEDIA_INFO("ctx %p received unlink event form audio_input.\n", ctx);
         ctx->audio_input_state = 0;
+        write(ctx->event_fd, &cnt, sizeof(cnt));
         return 0;
     }
 
