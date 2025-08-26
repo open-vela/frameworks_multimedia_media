@@ -70,7 +70,7 @@ ifneq ($(CONFIG_MEDIA_SERVER),)
   STACKSIZE = $(CONFIG_MEDIA_SERVER_STACKSIZE)
 endif
 
-ifneq ($(CONFIG_LIB_FFMPEG),)
+ifneq ($(CONFIG_MEDIA_GRAPH),)
   CSRCS  += server/audio_graph.c server/media_session.c
   CSRCS  += server/media_player.c
   CSRCS  += server/media_recorder.c
@@ -79,7 +79,7 @@ ifneq ($(CONFIG_LIB_FFMPEG),)
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/ffmpeg/ffmpeg
 endif
 
-ifneq ($(CONFIG_LIB_PFW),)
+ifneq ($(CONFIG_MEDIA_POLICY),)
   CSRCS  += server/media_policy.c
   CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/frameworks/multimedia/media/pfw/include
 endif

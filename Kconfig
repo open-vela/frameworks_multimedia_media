@@ -53,6 +53,16 @@ config MEDIA_SERVER_PRIORITY
 	int "Media server priority"
 	default 245
 
+config MEDIA_GRAPH
+	bool "Enable media graph"
+	default y
+	depends on LIB_FFMPEG
+
+config MEDIA_POLICY
+	bool "Enable media policy"
+	default y
+	depends on LIB_PFW
+
 config MEDIA_FOCUS
 	bool "Enable media focus"
 	default n

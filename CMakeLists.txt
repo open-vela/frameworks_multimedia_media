@@ -55,7 +55,7 @@ if(CONFIG_MEDIA)
     list(APPEND SERVER_SRCS server/media_focus.c server/focus_stack.c)
   endif()
 
-  if(CONFIG_LIB_FFMPEG)
+  if(CONFIG_MEDIA_GRAPH)
     list(APPEND SERVER_SRCS server/audio_graph.c server/media_session.c
                             server/media_player.c server/media_recorder.c
                             server/media_video_output.c
@@ -64,7 +64,7 @@ if(CONFIG_MEDIA)
     list(APPEND INCDIR ${NUTTX_APPS_DIR}/external/ffmpeg/ffmpeg)
   endif()
 
-  if(CONFIG_LIB_PFW)
+  if(CONFIG_MEDIA_POLICY)
     list(APPEND SERVER_SRCS server/media_policy.c)
     list(APPEND INCDIR ${CMAKE_CURRENT_LIST_DIR}/pfw/include)
     list(APPEND INCDIR ${NUTTX_APPS_DIR}/frameworks/system/utils/include)
