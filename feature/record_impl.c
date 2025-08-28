@@ -396,5 +396,7 @@ void system_record_wrap_stop(FeatureInstanceHandle feature, union AppendData app
     if (!obj || !obj->recordbusy || !obj->handle)
         return;
 
+    if (obj->duration > 0)
+        uv_timer_stop(&obj->timer);
     media_uv_recorder_stop(obj->handle, record_uv_stop_cb, obj);
 }
