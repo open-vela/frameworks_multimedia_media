@@ -696,8 +696,8 @@ static void mediatool_uv_player_write_cb(uv_write_t* req, int status)
     mediatool_t* mediatool = chain->data;
     uv_buf_t iov;
 
-    if (status < 0) {
-        printf("[%s][%d] Player write error: %s\n", __func__, __LINE__, uv_strerror(status));
+    if ((status < 0) || (chain->running == false)) {
+        printf("[%s][%d] Player stopped: %s.\n", __func__, __LINE__, status < 0 ? uv_strerror(status) : "not running");
         free(chain->buf);
         chain->buf = NULL;
         return;
