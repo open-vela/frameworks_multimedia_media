@@ -39,6 +39,7 @@
 #include <sys/queue.h>
 
 #include "audio_graph.h"
+#include "audio_negotiation.h"
 #include "media_common.h"
 #include "media_plugin.h"
 #include "media_server.h"
@@ -195,10 +196,17 @@ static void audio_graph_set_links_status(AVFilterGraph* graph, int status)
     for (i = 0; i < graph->nb_filters; i++) {
         filt = graph->filters[i];
 
-        if (filt->nb_inputs == 0) {
-            for (j = 0; j < filt->nb_outputs; j++) {
-                AVFilterLink* outlink = filt->outputs[j];
-                FilterLinkInternal* li = (FilterLinkInternal*)outlink;
+        for (j = 0; j < filt->nb_outputs; j++) {
+            if (filt->outputs[j]) {
+                FilterLinkInternal* li = (FilterLinkInternal*)filt->outputs[j];
+                li->status_in = status;
+                li->status_out = status;
+            }
+        }
+
+        for (j = 0; j < filt->nb_inputs; j++) {
+            if (filt->inputs[j]) {
+                FilterLinkInternal* li = (FilterLinkInternal*)filt->inputs[j];
                 li->status_in = status;
                 li->status_out = status;
             }
@@ -385,9 +393,6 @@ static int audio_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
         if (!strcmp(cmd, "volume")) {
             snprintf(msg, sizeof(msg), "volume=%s", arg);
             return avfilter_process_command(filter, "set_parameter", msg, res, res_len, 0);
-        } else if (!strcmp(cmd, "sample_rate")) {
-            snprintf(msg, sizeof(msg), "%s=%s", cmd, arg);
-            return avfilter_process_command(filter, "set_parameter", msg, res, res_len, 0);
         }
 
         return avfilter_process_command(filter, cmd, arg, res, res_len, flags);
@@ -405,96 +410,6 @@ static int audio_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
 
     av_log(NULL, AV_LOG_INFO, "Pending command: %s %s\n", cmd, arg ? arg : "_");
     return ret;
-}
-
-static int audio_graph_get_active_links(MediaCommand* cmd, AVFilterLink** active_links)
-{
-    int temp_map[MAX_LINKS] = { 0 };
-    AVFilterContext* src_filter;
-    int ret, i, j, count = 0;
-    AVFilterLink* out_link;
-
-    if (cmd->filter->nb_inputs == 0) { // Playback
-        ret = av_opt_get_array(cmd->filter, "map_array", AV_OPT_SEARCH_CHILDREN,
-            0, cmd->filter->nb_outputs, AV_OPT_TYPE_INT, temp_map);
-        if (ret < 0)
-            return ret;
-
-        for (i = 0; i < cmd->filter->nb_outputs; i++) {
-            if (temp_map[i] == ROUTE_ON)
-                active_links[count++] = cmd->filter->outputs[i];
-        }
-    } else { // Capture
-        for (i = 0; i < cmd->filter->nb_inputs; i++) {
-            src_filter = cmd->filter->inputs[i]->src;
-
-            ret = av_opt_get_array(src_filter, "map_array", AV_OPT_SEARCH_CHILDREN,
-                0, src_filter->nb_outputs, AV_OPT_TYPE_INT, temp_map);
-            if (ret < 0)
-                return ret;
-
-            for (j = 0; j < src_filter->nb_outputs; j++) {
-                out_link = src_filter->outputs[j];
-                if (temp_map[j] == ROUTE_ON && !strcmp(out_link->dst->name, cmd->filter->name)) {
-                    active_links[count++] = cmd->filter->inputs[i];
-                    break;
-                }
-            }
-        }
-    }
-
-    return count;
-}
-
-static void audio_graph_config_links(AVFilterLink** active_links, int nb_links,
-    int format, int sample_rate, int channels)
-{
-    FilterLinkInternal* li;
-    AVFilterLink* link;
-    int i;
-
-    for (i = 0; i < nb_links; i++) {
-        link = active_links[i];
-
-        link->format = format;
-        link->sample_rate = sample_rate;
-        av_channel_layout_default(&link->ch_layout, channels);
-        link->time_base = (AVRational) { 1, sample_rate };
-
-        li = (FilterLinkInternal*)link;
-        li->status_in = 0;
-        li->status_out = 0;
-    }
-}
-
-static int audio_graph_format_transfer(MediaCommand* cmd)
-{
-    int format = -1, sample_rate = 0, channels = 0;
-    AVFilterLink* active_links[MAX_LINKS];
-    int ret, nb_links;
-    char res[128];
-
-    if (!cmd->arg || !strcmp(cmd->cmd, "map")) {
-        ret = avfilter_process_command(cmd->filter, "get_parameter", "format", res, sizeof(res), 0);
-        if (ret < 0 || sscanf(res, "fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels) != 3)
-            MEDIA_WARN("Failed to parse format: %s\n", res);
-    } else {
-        if (sscanf(cmd->arg, "%*p %*p fmt=%d:rate=%d:ch=%d", &format, &sample_rate, &channels) != 3)
-            MEDIA_WARN("Failed to parse format: %s\n", cmd->arg);
-    }
-
-    if (format < 0 || sample_rate <= 0 || channels <= 0) {
-        MEDIA_WARN("Invalid format: fmt=%d, rate=%d, ch=%d\n", format, sample_rate, channels);
-        return 0;
-    }
-
-    nb_links = audio_graph_get_active_links(cmd, active_links);
-    if (nb_links < 0)
-        return nb_links;
-
-    audio_graph_config_links(active_links, nb_links, format, sample_rate, channels);
-
-    return 0;
 }
 
 static int audio_graph_dequeue_command(MediaGraphPriv* priv, bool process)
@@ -532,7 +447,7 @@ static int audio_graph_dequeue_command(MediaGraphPriv* priv, bool process)
         ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
             cmd->res, 0, 0);
 
-        ret = audio_graph_format_transfer(cmd);
+        ret = audio_formats_transfer(cmd->filter);
         if (ret < 0)
             MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
     } else
@@ -684,8 +599,8 @@ static int audio_graph_dump_link(AVBPrint* buf, AVFilterLink* link)
 
     case AVMEDIA_TYPE_AUDIO:
         format = av_x_if_null(av_get_sample_fmt_name(link->format), "?");
-        av_bprintf(buf, "[%dHz %s: fifo:%d wt:%d icnt:%" PRId64 " ocnt:%" PRId64 " ",
-            (int)link->sample_rate, format, (int)ff_framequeue_queued_frames(&li->fifo),
+        av_bprintf(buf, "[%dHz %s: status_in:%d status_out: %d fifo:%d wt:%d icnt:%" PRId64 " ocnt:%" PRId64 " ",
+            (int)link->sample_rate, format, li->status_in, li->status_out, (int)ff_framequeue_queued_frames(&li->fifo),
             li->frame_wanted_out, li->l.frame_count_in, li->l.frame_count_out);
         av_channel_layout_describe_bprint(&link->ch_layout, buf);
         av_bprint_chars(buf, ']', 1);
