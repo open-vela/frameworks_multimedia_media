@@ -29,6 +29,7 @@
 #include <math.h>
 #include <poll.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -782,6 +783,7 @@ static int mediatool_common_stop_inner(mediatool_chain_t* chain)
     case MEDIATOOL_PLAYER:
         if (chain->direct) {
             chain->direct_connect = false;
+            pthread_kill(chain->thread, SIGUSR1);
             pthread_join(chain->thread, NULL);
         }
 
@@ -791,6 +793,7 @@ static int mediatool_common_stop_inner(mediatool_chain_t* chain)
     case MEDIATOOL_RECORDER:
         if (chain->direct) {
             chain->direct_connect = false;
+            pthread_kill(chain->thread, SIGUSR1);
             pthread_join(chain->thread, NULL);
         }
         ret = media_recorder_stop(chain->handle);
@@ -1092,16 +1095,22 @@ CMD1(reset, int, id)
         return -EINVAL;
 
     mediatool->chain[id].running = false;
-    if (mediatool->chain[id].direct) {
-        mediatool->chain[id].direct_connect = false;
-        pthread_join(mediatool->chain[id].thread, NULL);
-    }
     switch (mediatool->chain[id].type) {
     case MEDIATOOL_PLAYER:
+        if (mediatool->chain[id].direct) {
+            mediatool->chain[id].direct_connect = false;
+            pthread_kill(mediatool->chain[id].thread, SIGUSR1);
+            pthread_join(mediatool->chain[id].thread, NULL);
+        }
         ret = media_player_reset(mediatool->chain[id].handle);
         break;
 
     case MEDIATOOL_RECORDER:
+        if (mediatool->chain[id].direct) {
+            mediatool->chain[id].direct_connect = false;
+            pthread_kill(mediatool->chain[id].thread, SIGUSR1);
+            pthread_join(mediatool->chain[id].thread, NULL);
+        }
         ret = media_recorder_reset(mediatool->chain[id].handle);
         break;
 
