@@ -48,9 +48,8 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define MAX_GRAPH_SIZE 4096
+#define MAX_GRAPH_SIZE CONFIG_MEDIA_GRAPH_SIZE_MAX
 #define MAX_POLL_FILTERS 32
-
 #define MAX_LINKS 10
 
 #define ROUTE_OFF 0

@@ -71,6 +71,10 @@ config MEDIA_TRACE
 	bool "Enable media trace"
 	default n
 
+config MEDIA_GRAPH_SIZE_MAX
+	int "Max graph file size"
+	default 4096
+
 config MEDIA_SERVER_MAXCONN
 	int "Max socket connections"
 	default 16
