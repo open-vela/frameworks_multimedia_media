@@ -525,7 +525,7 @@ static int audio_negotiate_three_stage_link(
     return 0;
 }
 
-static int audio_query_all_filters_formats(AVFilterContext* filter, int nb_filters)
+static int audio_negotiate_formats_init(AVFilterContext* filter)
 {
     AVFilterContext* stack[MAX_LINKS];
     bool traverse_downstream;
@@ -533,8 +533,7 @@ static int audio_query_all_filters_formats(AVFilterContext* filter, int nb_filte
     int map[MAX_LINKS];
     AVFilterLink* link;
     int stack_size = 0;
-    int ret;
-    int i;
+    int i, j, ret;
 
     // query the starting node first
     ret = audio_query_formats(filter);
@@ -576,6 +575,20 @@ static int audio_query_all_filters_formats(AVFilterContext* filter, int nb_filte
                 link = current->inputs[i];
                 if (!link || !link->src)
                     continue;
+
+                for (j = 0; j < link->src->nb_outputs; j++) {
+                    if (link->src->outputs[j] == link)
+                        break;
+                }
+
+                av_opt_get_array(link->src, "map_array", AV_OPT_SEARCH_CHILDREN,
+                    0, link->src->nb_outputs, AV_OPT_TYPE_INT, map);
+
+                if (map[j] != ROUTE_ON) {
+                    MEDIA_INFO("Skipping query for input[%d] of '%s' (src output[%d] map=OFF)\n",
+                        i, current->name, j);
+                    continue;
+                }
 
                 ret = audio_query_formats(link->src);
                 if (ret < 0)
@@ -681,14 +694,15 @@ static int audio_transfer_formats_from_source(AVFilterContext* filter)
     AVFilterLink* enabled_outputs[MAX_LINKS] = { 0 };
     AVFilterContext* srcs[MAX_LINKS] = { 0 };
     AVFilterContext* stack[MAX_LINKS] = { 0 };
-    int map[MAX_LINKS] = { 0 };
     int dst_map[MAX_LINKS] = { 0 };
+    int map[MAX_LINKS] = { 0 };
+    FilterLinkInternal* li;
     int ret = 0, i, j, s;
     int enabled_count = 0;
     int map_on_count = 0;
+    bool all_eof = true;
     int src_count = 0;
     int stack_top = 0;
-    bool all_eof;
 
     // 1. collect all source filters (filters with no inputs)
     if (filter->nb_inputs == 0 || (filter->nb_inputs && filter->nb_outputs))
@@ -714,39 +728,34 @@ static int audio_transfer_formats_from_source(AVFilterContext* filter)
         if (!src->nb_outputs)
             continue;
 
-        // check if all outputs are at EOF
-        for (i = 0; i < src->nb_outputs; i++) {
-            if (src->outputs[i] && ((FilterLinkInternal*)src->outputs[i])->status_in != AVERROR_EOF
-                && ((FilterLinkInternal*)src->outputs[i])->status_out != AVERROR_EOF) {
-                all_eof = false;
-                break;
-            }
-        }
-
         av_opt_get_array(src, "map_array", AV_OPT_SEARCH_CHILDREN,
             0, src->nb_outputs, AV_OPT_TYPE_INT, map);
 
-        // count enabled outputs
+        all_eof = true;
         map_on_count = 0;
+        enabled_count = 0;
+
         for (i = 0; i < src->nb_outputs; i++) {
+            li = (FilterLinkInternal*)src->outputs[i];
+            if (src->outputs[i] && li->status_in != AVERROR_EOF
+                && li->status_out != AVERROR_EOF)
+                all_eof = false;
+
             if (map[i] == ROUTE_ON)
                 map_on_count++;
+
+            if (src->outputs[i])
+                enabled_outputs[enabled_count++] = src->outputs[i];
         }
 
         // 3. handle multiple enabled outputs
         if (map_on_count > 1 && all_eof) {
-            enabled_count = 0;
-            for (i = 0; i < src->nb_outputs && enabled_count < MAX_LINKS; i++) {
-                if (map[i] == ROUTE_ON && src->outputs[i]) {
-                    enabled_outputs[enabled_count++] = src->outputs[i];
-                }
-            }
-
             ret = audio_handle_multi_outputs(src, enabled_count, enabled_outputs);
             if (ret < 0)
                 MEDIA_WARN("Failed to handle multiple outputs for '%s'", src->name);
         }
-        // 4. handle single or no enabled outputs
+
+        // 4. map_on_count is 1 or the map changes from one path to multiple paths
         else {
             for (i = 0; i < src->nb_outputs; i++) {
                 if (map[i] != ROUTE_ON || !src->outputs[i])
@@ -801,7 +810,7 @@ int audio_formats_transfer(AVFilterContext* filter)
 {
     int ret;
 
-    ret = audio_query_all_filters_formats(filter, filter->graph->nb_filters);
+    ret = audio_negotiate_formats_init(filter);
     if (ret < 0)
         return ret;
 

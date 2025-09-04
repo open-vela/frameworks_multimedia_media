@@ -45,7 +45,7 @@
  * @note This function is typically called during graph configuration, before audio
  *       processing begins. It must be called after all filters are linked.
  *
- * @see audio_query_all_filters_formats
+ * @see audio_negotiate_formats_init
  * @see audio_transfer_formats_from_source
  */
 
