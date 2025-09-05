@@ -1133,7 +1133,7 @@ static int media_player_volume(MediaPlayerContext* ctx, const char* args, char* 
             sscanf(args, "%f", &ctx->volume);
         } else if (res && res_len) {
             ret = audio_graph_get_parameter(ctx->audio_output, "player_volume", res, res_len);
-            sscanf(res, "%f", &ctx->volume);
+            sscanf(res, "vol:%f", &ctx->volume);
         }
         if (ret < 0)
             MEDIA_ERR("ctx %p media_player_volume failed.\n", ctx);
