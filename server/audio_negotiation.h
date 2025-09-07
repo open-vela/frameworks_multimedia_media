@@ -46,9 +46,9 @@
  *       processing begins. It must be called after all filters are linked.
  *
  * @see audio_negotiate_formats_init
- * @see audio_transfer_formats_from_source
+ * @see audio_negotiate_src
  */
 
-int audio_formats_transfer(AVFilterContext* filter);
+int audio_negotiation_trigger(AVFilterContext* filter);
 
 #endif // MEDIA_NEGOTIATION_H

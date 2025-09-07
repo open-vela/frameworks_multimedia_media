@@ -447,7 +447,7 @@ static int audio_graph_dequeue_command(MediaGraphPriv* priv, bool process)
         ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
             cmd->res, 0, 0);
 
-        ret = audio_formats_transfer(cmd->filter);
+        ret = audio_negotiation_trigger(cmd->filter);
         if (ret < 0)
             MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
     } else

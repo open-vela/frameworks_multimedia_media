@@ -270,76 +270,31 @@ static void audio_calculate_intersection(
             a->channel_layouts, b->channel_layouts);
 }
 
-static void audio_get_min_format_from_incfg(const AVFilterLink* link, int* fmt)
+static void audio_get_min_format(AVFilterFormatsConfig* config, int* fmt)
 {
-    *fmt = -1;
-    if (link->incfg.formats && link->incfg.formats->nb_formats > 0) {
-        *fmt = link->incfg.formats->formats[0];
-        for (int i = 1; i < link->incfg.formats->nb_formats; i++)
-            *fmt = FFMIN(*fmt, link->incfg.formats->formats[i]);
-    }
-}
-
-static void audio_get_min_samplerate_from_incfg(const AVFilterLink* link, int* rate)
-{
-    *rate = -1;
-    if (link->incfg.samplerates && link->incfg.samplerates->nb_formats > 0) {
-        *rate = link->incfg.samplerates->formats[0];
-        for (int i = 1; i < link->incfg.samplerates->nb_formats; i++)
-            *rate = FFMIN(*rate, link->incfg.samplerates->formats[i]);
-    }
-}
-
-static void audio_get_min_channels_from_incfg(const AVFilterLink* link, int* ch)
-{
-    *ch = -1;
-    if (link->incfg.channel_layouts && link->incfg.channel_layouts->nb_channel_layouts > 0) {
-        *ch = link->incfg.channel_layouts->channel_layouts[0].nb_channels;
-        for (int i = 1; i < link->incfg.channel_layouts->nb_channel_layouts; i++)
-            *ch = FFMIN(*ch, link->incfg.channel_layouts->channel_layouts[i].nb_channels);
-    }
-}
-
-static void audio_select_min_values(
-    AVFilterLink* link,
-    AVFilterFormatsConfig* config,
-    int* fmt, int* rate, int* ch)
-{
-    int min_fmt = -1;
-    int min_rate = -1;
-    int min_ch = -1;
-    int i;
-
     if (config->formats && config->formats->nb_formats > 0) {
-        min_fmt = config->formats->formats[0];
-        for (i = 1; i < config->formats->nb_formats; i++) {
-            min_fmt = FFMIN(min_fmt, config->formats->formats[i]);
-        }
-    } else if (link->incfg.formats && link->incfg.formats->nb_formats > 0)
-        audio_get_min_format_from_incfg(link, &min_fmt);
+        *fmt = config->formats->formats[0];
+        for (int i = 1; i < config->formats->nb_formats; i++)
+            *fmt = FFMIN(*fmt, config->formats->formats[i]);
+    }
+}
 
-    *fmt = min_fmt;
-
+static void audio_get_min_samplerate(AVFilterFormatsConfig* config, int* rate)
+{
     if (config->samplerates && config->samplerates->nb_formats > 0) {
-        min_rate = config->samplerates->formats[0];
-        for (i = 1; i < config->samplerates->nb_formats; i++) {
-            min_rate = FFMIN(min_rate, config->samplerates->formats[i]);
-        }
-    } else if (link->incfg.samplerates && link->incfg.samplerates->nb_formats > 0)
-        audio_get_min_samplerate_from_incfg(link, &min_rate);
+        *rate = config->samplerates->formats[0];
+        for (int i = 1; i < config->samplerates->nb_formats; i++)
+            *rate = FFMIN(*rate, config->samplerates->formats[i]);
+    }
+}
 
-    *rate = min_rate;
-
-    min_ch = -1;
+static void audio_get_min_channels(AVFilterFormatsConfig* config, int* ch)
+{
     if (config->channel_layouts && config->channel_layouts->nb_channel_layouts > 0) {
-        min_ch = config->channel_layouts->channel_layouts[0].nb_channels;
-        for (i = 1; i < config->channel_layouts->nb_channel_layouts; i++) {
-            min_ch = FFMIN(min_ch, config->channel_layouts->channel_layouts[i].nb_channels);
-        }
-    } else if (link->incfg.channel_layouts && link->incfg.channel_layouts->nb_channel_layouts > 0)
-        audio_get_min_channels_from_incfg(link, &min_ch);
-
-    *ch = min_ch;
+        *ch = config->channel_layouts->channel_layouts[0].nb_channels;
+        for (int i = 1; i < config->channel_layouts->nb_channel_layouts; i++)
+            *ch = FFMIN(*ch, config->channel_layouts->channel_layouts[i].nb_channels);
+    }
 }
 
 static void audio_free_formats_config(AVFilterFormatsConfig* config)
@@ -400,130 +355,6 @@ static void audio_debug_print_formats_config(AVFilterFormatsConfig* config, cons
     }
 }
 #endif
-
-static int audio_negotiate_three_stage_link(
-    AVFilterLink* src_link,
-    AVFilterLink* sink_link)
-{
-    int sink_fmt = -1, sink_rate = -1, sink_ch = -1;
-    int src_fmt = -1, src_rate = -1, src_ch = -1;
-    AVFilterFormatsConfig final_config = { 0 };
-    AVFilterFormatsConfig sink_config = { 0 };
-    AVFilterFormatsConfig src_config = { 0 };
-    int i;
-
-    // Stage 1: Calculate internal format intersections for both links
-    audio_calculate_intersection(&src_link->outcfg, &src_link->incfg, &src_config);
-    audio_calculate_intersection(&sink_link->outcfg, &sink_link->incfg, &sink_config);
-
-#if defined(CONFIG_MEDIA_LOG_DEBUG)
-    MEDIA_INFO("[Intersection Debug] After src_link (outcfg & incfg):\n");
-    audio_debug_print_formats_config(&src_config, "    ");
-    MEDIA_INFO("[Intersection Debug] After sink_link (outcfg & incfg):\n");
-    audio_debug_print_formats_config(&sink_config, "    ");
-#endif
-
-    // Stage 2: Calculate final intersection between source and sink configurations
-    audio_calculate_intersection(&src_config, &sink_config, &final_config);
-
-#if defined(CONFIG_MEDIA_LOG_DEBUG)
-    MEDIA_INFO("[Intersection Debug] After final intersection (src_config & sink_config):\n");
-    audio_debug_print_formats_config(&final_config, "    ");
-#endif
-
-    // 1. Negotiate sample format with three-level fallback strategy
-    if (final_config.formats && final_config.formats->nb_formats > 0) {
-
-        // Priority 1: Use minimum value from final_config intersection
-        src_fmt = sink_fmt = final_config.formats->formats[0];
-        for (i = 1; i < final_config.formats->nb_formats; i++)
-            src_fmt = sink_fmt = FFMIN(src_fmt, final_config.formats->formats[i]);
-    } else {
-
-        // Priority 2: Fallback to individual configs if no final intersection
-        if (src_config.formats && src_config.formats->nb_formats > 0) {
-            src_fmt = src_config.formats->formats[0];
-            for (i = 1; i < src_config.formats->nb_formats; i++)
-                src_fmt = FFMIN(src_fmt, src_config.formats->formats[i]);
-        } else
-            // Priority 3: Ultimate fallback to source link's incfg
-            audio_get_min_format_from_incfg(src_link, &src_fmt);
-
-        if (sink_config.formats && sink_config.formats->nb_formats > 0) {
-            sink_fmt = sink_config.formats->formats[0];
-            for (i = 1; i < sink_config.formats->nb_formats; i++)
-                sink_fmt = FFMIN(sink_fmt, sink_config.formats->formats[i]);
-        } else
-            // Priority 3: Ultimate fallback to sink link's incfg
-            audio_get_min_format_from_incfg(sink_link, &sink_fmt);
-    }
-
-    // 2. Negotiate sample rate with three-level fallback strategy
-    if (final_config.samplerates && final_config.samplerates->nb_formats > 0) {
-
-        // Priority 1: Use minimum value from final_config intersection
-        src_rate = sink_rate = final_config.samplerates->formats[0];
-        for (i = 1; i < final_config.samplerates->nb_formats; i++)
-            src_rate = sink_rate = FFMIN(src_rate, final_config.samplerates->formats[i]);
-    } else {
-
-        // Priority 2: Fallback to individual configs if no final intersection
-        if (src_config.samplerates && src_config.samplerates->nb_formats > 0) {
-            src_rate = src_config.samplerates->formats[0];
-            for (i = 1; i < src_config.samplerates->nb_formats; i++)
-                src_rate = FFMIN(src_rate, src_config.samplerates->formats[i]);
-        } else
-            // Priority 3: Ultimate fallback to source link's incfg
-            audio_get_min_samplerate_from_incfg(src_link, &src_rate);
-
-        if (sink_config.samplerates && sink_config.samplerates->nb_formats > 0) {
-            sink_rate = sink_config.samplerates->formats[0];
-            for (i = 1; i < sink_config.samplerates->nb_formats; i++)
-                sink_rate = FFMIN(sink_rate, sink_config.samplerates->formats[i]);
-        } else
-            audio_get_min_samplerate_from_incfg(sink_link, &sink_rate);
-    }
-
-    // 3. Negotiate channel layout with three-level fallback strategy
-    if (final_config.channel_layouts && final_config.channel_layouts->nb_channel_layouts > 0) {
-
-        // Priority 1: Use minimum channel count from final_config intersection
-        src_ch = sink_ch = final_config.channel_layouts->channel_layouts[0].nb_channels;
-        for (i = 1; i < final_config.channel_layouts->nb_channel_layouts; i++)
-            src_ch = sink_ch = FFMIN(src_ch, final_config.channel_layouts->channel_layouts[i].nb_channels);
-    } else {
-
-        // Priority 2: Fallback to individual configs if no final intersection
-        if (src_config.channel_layouts && src_config.channel_layouts->nb_channel_layouts > 0) {
-            src_ch = src_config.channel_layouts->channel_layouts[0].nb_channels;
-            for (i = 1; i < src_config.channel_layouts->nb_channel_layouts; i++)
-                src_ch = FFMIN(src_ch, src_config.channel_layouts->channel_layouts[i].nb_channels);
-        } else
-            // Priority 3: Ultimate fallback to source link's incfg
-            audio_get_min_channels_from_incfg(src_link, &src_ch);
-
-        if (sink_config.channel_layouts && sink_config.channel_layouts->nb_channel_layouts > 0) {
-            sink_ch = sink_config.channel_layouts->channel_layouts[0].nb_channels;
-            for (i = 1; i < sink_config.channel_layouts->nb_channel_layouts; i++)
-                sink_ch = FFMIN(sink_ch, sink_config.channel_layouts->channel_layouts[i].nb_channels);
-        } else
-            audio_get_min_channels_from_incfg(sink_link, &sink_ch);
-    }
-
-    // Apply negotiated format configuration to source link
-    if (src_fmt > 0 && src_rate > 0 && src_ch > 0)
-        audio_set_format_config(src_link, src_fmt, src_rate, src_ch);
-
-    // Apply negotiated format configuration to sink link
-    if (sink_fmt > 0 && sink_rate > 0 && sink_ch > 0)
-        audio_set_format_config(sink_link, sink_fmt, sink_rate, sink_ch);
-
-    audio_free_formats_config(&src_config);
-    audio_free_formats_config(&sink_config);
-    audio_free_formats_config(&final_config);
-
-    return 0;
-}
 
 static int audio_negotiate_formats_init(AVFilterContext* filter)
 {
@@ -605,59 +436,94 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
 
 static int audio_handle_multi_outputs(AVFilterContext* src, int enabled_count, AVFilterLink** enabled_outputs)
 {
+    AVFilterFormatsConfig fcfg_src = { 0 }, fcfg_sink = { 0 }, fcfg_final = { 0 };
+    int cand_fmt = -1, cand_rate = -1, cand_ch = -1;
+    int temp_fmt = -1, temp_rate = -1, temp_ch = -1;
+    int ds_fmt = -1, ds_rate = -1, ds_ch = -1;
     int fmt = -1, rate = -1, ch = -1;
-    bool has_complete_intersection = false;
-    AVFilterFormatsConfig config = { 0 };
-    AVFilterLink* dst_outlink;
     int dst_map[MAX_LINKS] = { 0 };
-    int ret = 0, i = 0;
+    AVFilterLink* link = NULL;
+    int i = 0, j = 0, ret = 0;
+    bool has_common = false;
 
-    // 1. try to find complete intersection from all enabled outputs
+    /* Strategy 1: Find the minimal common format intersection across all enabled outputs */
     for (i = 0; i < enabled_count; i++) {
-        audio_calculate_intersection(&enabled_outputs[i]->outcfg,
-            &enabled_outputs[i]->incfg,
-            &config);
+        audio_calculate_intersection(&enabled_outputs[i]->outcfg, &enabled_outputs[i]->incfg, &fcfg_src);
+        MEDIA_DEBUG("[Intersection Debug] After src_link (outcfg & incfg) for output %d:\n", i);
+#if defined(CONFIG_MEDIA_LOG_DEBUG)
+        audio_debug_print_formats_config(&fcfg_src, "    ");
+#endif
 
-        has_complete_intersection = (config.formats && config.formats->nb_formats > 0)
-            && (config.samplerates && config.samplerates->nb_formats > 0)
-            && (config.channel_layouts && config.channel_layouts->nb_channel_layouts > 0);
+        has_common = (fcfg_src.formats && fcfg_src.formats->nb_formats > 0)
+            || (fcfg_src.samplerates && fcfg_src.samplerates->nb_formats > 0)
+            || (fcfg_src.channel_layouts && fcfg_src.channel_layouts->nb_channel_layouts > 0);
 
-        if (has_complete_intersection) {
-            fmt = config.formats->formats[0];
-            rate = config.samplerates->formats[0];
-            ch = config.channel_layouts->channel_layouts[0].nb_channels;
+        if (has_common) {
+            if (fcfg_src.formats && fcfg_src.formats->nb_formats > 0) {
+                audio_get_min_format(&fcfg_src, &temp_fmt);
+                if (cand_fmt == -1 || temp_fmt < cand_fmt)
+                    cand_fmt = temp_fmt;
+            }
 
-            for (i = 1; i < config.formats->nb_formats; i++)
-                fmt = FFMIN(fmt, config.formats->formats[i]);
-            for (i = 1; i < config.samplerates->nb_formats; i++)
-                rate = FFMIN(rate, config.samplerates->formats[i]);
-            for (i = 1; i < config.channel_layouts->nb_channel_layouts; i++)
-                ch = FFMIN(ch, config.channel_layouts->channel_layouts[i].nb_channels);
+            if (fcfg_src.samplerates && fcfg_src.samplerates->nb_formats > 0) {
+                audio_get_min_samplerate(&fcfg_src, &temp_rate);
+                if (cand_rate == -1 || temp_rate < cand_rate)
+                    cand_rate = temp_rate;
+            }
 
-            break;
+            if (fcfg_src.channel_layouts && fcfg_src.channel_layouts->nb_channel_layouts > 0) {
+                audio_get_min_channels(&fcfg_src, &temp_ch);
+                if (cand_ch == -1 || temp_ch < cand_ch)
+                    cand_ch = temp_ch;
+            }
+
+            MEDIA_DEBUG("Found common intersection for output %d: fmt=%s, rate=%d, ch=%d\n",
+                i,
+                cand_fmt != -1 ? av_get_sample_fmt_name(cand_fmt) : "N/A",
+                cand_rate != -1 ? cand_rate : -1,
+                cand_ch != -1 ? cand_ch : -1);
+
+            // Update each parameter independently, without relying on a global found_common_min flag
+            if (cand_fmt != -1 && (fmt == -1 || cand_fmt < fmt))
+                fmt = cand_fmt;
+
+            if (cand_rate != -1 && (rate == -1 || cand_rate < rate))
+                rate = cand_rate;
+
+            if (cand_ch != -1 && (ch == -1 || cand_ch < ch))
+                ch = cand_ch;
         }
+        audio_free_formats_config(&fcfg_src);
+        memset(&fcfg_src, 0, sizeof(fcfg_src));
 
-        audio_free_formats_config(&config);
-        memset(&config, 0, sizeof(config));
+        cand_fmt = -1;
+        cand_rate = -1;
+        cand_ch = -1;
     }
 
-    // 2. if no complete intersection, use first output's preferred format
-    if (!has_complete_intersection && enabled_count > 0) {
-        AVFilterFormatsConfig* first_config = &enabled_outputs[0]->incfg;
-        if (first_config->formats
-            && first_config->formats->nb_formats > 0)
-            fmt = first_config->formats->formats[0];
+    /* Strategy 2: For parameters without a common intersection,
+       fall back to the minimal format from the first output's incfg */
+    AVFilterFormatsConfig* first_cfg = &enabled_outputs[0]->incfg;
 
-        if (first_config->samplerates
-            && first_config->samplerates->nb_formats > 0)
-            rate = first_config->samplerates->formats[0];
-
-        if (first_config->channel_layouts
-            && first_config->channel_layouts->nb_channel_layouts > 0)
-            ch = first_config->channel_layouts->channel_layouts[0].nb_channels;
+    if (fmt == -1) {
+        MEDIA_INFO("No common sample format intersection found, using first output's min format.\n");
+        if (first_cfg->formats && first_cfg->formats->nb_formats > 0)
+            audio_get_min_format(first_cfg, &fmt);
     }
 
-    // 3. apply the selected format to all enabled outputs
+    if (rate == -1) {
+        MEDIA_INFO("No common sample rate intersection found, using first output's min rate.\n");
+        if (first_cfg->samplerates && first_cfg->samplerates->nb_formats > 0)
+            audio_get_min_samplerate(first_cfg, &rate);
+    }
+
+    if (ch == -1) {
+        MEDIA_INFO("No common channel layout intersection found, using first output's min channels.\n");
+        if (first_cfg->channel_layouts && first_cfg->channel_layouts->nb_channel_layouts > 0)
+            audio_get_min_channels(first_cfg, &ch);
+    }
+
+    /* Strategy 3: Apply the negotiated format to all enabled outputs */
     for (i = 0; i < enabled_count; i++) {
         ret = audio_set_format_config(enabled_outputs[i], fmt, rate, ch);
         if (ret < 0) {
@@ -665,44 +531,154 @@ static int audio_handle_multi_outputs(AVFilterContext* src, int enabled_count, A
             continue;
         }
 
-        // handle downstream negotiation for third-stage links
+        /* Handle downstream link negotiation - using independent parameter negotiation strategy */
         if (enabled_outputs[i]->dst && enabled_outputs[i]->dst->nb_outputs > 0) {
             av_opt_get_array(enabled_outputs[i]->dst, "map_array", AV_OPT_SEARCH_CHILDREN,
                 0, enabled_outputs[i]->dst->nb_outputs, AV_OPT_TYPE_INT, dst_map);
 
-            for (int j = 0; j < enabled_outputs[i]->dst->nb_outputs; j++) {
+            cand_fmt = -1;
+            cand_rate = -1;
+            cand_ch = -1;
+
+            for (j = 0; j < enabled_outputs[i]->dst->nb_outputs; j++) {
                 if (dst_map[j] != ROUTE_ON)
                     continue;
 
-                dst_outlink = enabled_outputs[i]->dst->outputs[j];
-                ret = audio_negotiate_three_stage_link(enabled_outputs[i], dst_outlink);
-                if (ret < 0) {
-                    MEDIA_WARN("Negotiation failed between '%s' and '%s'",
-                        enabled_outputs[i]->dst->name,
-                        dst_outlink->dst->name);
+                link = enabled_outputs[i]->dst->outputs[j];
+
+                audio_calculate_intersection(&enabled_outputs[i]->outcfg, &enabled_outputs[i]->incfg, &fcfg_src);
+                audio_calculate_intersection(&link->outcfg, &link->incfg, &fcfg_sink);
+
+#if defined(CONFIG_MEDIA_LOG_DEBUG)
+                MEDIA_DEBUG("[Intersection Debug] For downstream link %d:\n", j);
+                MEDIA_DEBUG("[Intersection Debug] After src_link (outcfg & incfg):\n");
+                audio_debug_print_formats_config(&fcfg_src, "    ");
+                MEDIA_DEBUG("[Intersection Debug] After sink_link (outcfg & incfg):\n");
+                audio_debug_print_formats_config(&fcfg_sink, "    ");
+#endif
+
+                audio_calculate_intersection(&fcfg_src, &fcfg_sink, &fcfg_final);
+
+#if defined(CONFIG_MEDIA_LOG_DEBUG)
+                MEDIA_DEBUG("[Intersection Debug] After final intersection (src_config & sink_config):\n");
+                audio_debug_print_formats_config(&fcfg_final, "    ");
+#endif
+
+                /* Negotiate each format parameter independently */
+                // 1. Sample format negotiation
+                if (fcfg_final.formats && fcfg_final.formats->nb_formats > 0) {
+                    temp_fmt = fcfg_final.formats->formats[0];
+                    for (int k = 1; k < fcfg_final.formats->nb_formats; k++)
+                        temp_fmt = FFMIN(temp_fmt, fcfg_final.formats->formats[k]);
+
+                    if (cand_fmt == -1 || temp_fmt < cand_fmt)
+                        cand_fmt = temp_fmt;
+                } else if (fcfg_sink.formats && fcfg_sink.formats->nb_formats > 0) {
+                    temp_fmt = fcfg_sink.formats->formats[0];
+                    for (int k = 1; k < fcfg_sink.formats->nb_formats; k++)
+                        temp_fmt = FFMIN(temp_fmt, fcfg_sink.formats->formats[k]);
+
+                    if (cand_fmt == -1 || temp_fmt < cand_fmt)
+                        cand_fmt = temp_fmt;
+                } else {
+                    audio_get_min_format(&link->incfg, &temp_fmt);
+                    if (cand_fmt == -1 || temp_fmt < cand_fmt)
+                        cand_fmt = temp_fmt;
                 }
+
+                // 2. Sample rate negotiation
+                if (fcfg_final.samplerates && fcfg_final.samplerates->nb_formats > 0) {
+                    temp_rate = fcfg_final.samplerates->formats[0];
+                    for (int k = 1; k < fcfg_final.samplerates->nb_formats; k++)
+                        temp_rate = FFMIN(temp_rate, fcfg_final.samplerates->formats[k]);
+
+                    if (cand_rate == -1 || temp_rate < cand_rate)
+                        cand_rate = temp_rate;
+
+                } else if (fcfg_sink.samplerates && fcfg_sink.samplerates->nb_formats > 0) {
+                    temp_rate = fcfg_sink.samplerates->formats[0];
+                    for (int k = 1; k < fcfg_sink.samplerates->nb_formats; k++)
+                        temp_rate = FFMIN(temp_rate, fcfg_sink.samplerates->formats[k]);
+
+                    if (cand_rate == -1 || temp_rate < cand_rate)
+                        cand_rate = temp_rate;
+                } else {
+                    audio_get_min_samplerate(&link->incfg, &temp_rate);
+                    if (cand_rate == -1 || temp_rate < cand_rate)
+                        cand_rate = temp_rate;
+                }
+
+                // 3. Channel count negotiation
+                if (fcfg_final.channel_layouts && fcfg_final.channel_layouts->nb_channel_layouts > 0) {
+                    temp_ch = fcfg_final.channel_layouts->channel_layouts[0].nb_channels;
+                    for (int k = 1; k < fcfg_final.channel_layouts->nb_channel_layouts; k++)
+                        temp_ch = FFMIN(temp_ch, fcfg_final.channel_layouts->channel_layouts[k].nb_channels);
+
+                    if (cand_ch == -1 || temp_ch < cand_ch)
+                        cand_ch = temp_ch;
+                } else if (fcfg_sink.channel_layouts && fcfg_sink.channel_layouts->nb_channel_layouts > 0) {
+                    temp_ch = fcfg_sink.channel_layouts->channel_layouts[0].nb_channels;
+                    for (int k = 1; k < fcfg_sink.channel_layouts->nb_channel_layouts; k++)
+                        temp_ch = FFMIN(temp_ch, fcfg_sink.channel_layouts->channel_layouts[k].nb_channels);
+
+                    if (cand_ch == -1 || temp_ch < cand_ch)
+                        cand_ch = temp_ch;
+                } else {
+                    audio_get_min_channels(&link->incfg, &temp_ch);
+                    if (cand_ch == -1 || temp_ch < cand_ch)
+                        cand_ch = temp_ch;
+                }
+
+                MEDIA_DEBUG("Downstream intersection found for output %d, link %d: fmt=%s, rate=%d, ch=%d\n",
+                    i, j,
+                    cand_fmt != -1 ? av_get_sample_fmt_name(cand_fmt) : "N/A",
+                    cand_rate != -1 ? cand_rate : -1,
+                    cand_ch != -1 ? cand_ch : -1);
+
+                audio_free_formats_config(&fcfg_src);
+                audio_free_formats_config(&fcfg_sink);
+                audio_free_formats_config(&fcfg_final);
+                memset(&fcfg_src, 0, sizeof(fcfg_src));
+                memset(&fcfg_sink, 0, sizeof(fcfg_sink));
+                memset(&fcfg_final, 0, sizeof(fcfg_final));
+            }
+
+            ds_fmt = cand_fmt != -1 ? cand_fmt : ds_fmt;
+            ds_rate = cand_rate != -1 ? cand_rate : ds_rate;
+            ds_ch = cand_ch != -1 ? cand_ch : ds_ch;
+
+            MEDIA_DEBUG("Downstream negotiated format for output %d: fmt=%s, rate=%d, ch=%d\n",
+                i,
+                ds_fmt != -1 ? av_get_sample_fmt_name(ds_fmt) : "N/A",
+                ds_rate != -1 ? ds_rate : -1,
+                ds_ch != -1 ? ds_ch : -1);
+
+            for (j = 0; j < enabled_outputs[i]->dst->nb_outputs; j++) {
+                if (dst_map[j] != ROUTE_ON)
+                    continue;
+
+                ret = audio_set_format_config(enabled_outputs[i]->dst->outputs[j], ds_fmt, ds_rate, ds_ch);
+                if (ret < 0)
+                    MEDIA_ERR("Failed to set downstream format on link %d from '%s'", j, enabled_outputs[i]->dst->name);
             }
         }
     }
 
-    audio_free_formats_config(&config);
-    return ret;
+    audio_free_formats_config(&fcfg_src);
+    audio_free_formats_config(&fcfg_sink);
+    audio_free_formats_config(&fcfg_final);
+
+    return 0;
 }
 
-static int audio_transfer_formats_from_source(AVFilterContext* filter)
+static int audio_negotiate_src(AVFilterContext* filter)
 {
+    int src_count = 0, stack_top = 0, enabled_count = 0;
     AVFilterLink* enabled_outputs[MAX_LINKS] = { 0 };
     AVFilterContext* srcs[MAX_LINKS] = { 0 };
     AVFilterContext* stack[MAX_LINKS] = { 0 };
-    int dst_map[MAX_LINKS] = { 0 };
     int map[MAX_LINKS] = { 0 };
-    FilterLinkInternal* li;
-    int ret = 0, i, j, s;
-    int enabled_count = 0;
-    int map_on_count = 0;
-    bool all_eof = true;
-    int src_count = 0;
-    int stack_top = 0;
+    int i, s;
 
     // 1. collect all source filters (filters with no inputs)
     if (filter->nb_inputs == 0 || (filter->nb_inputs && filter->nb_outputs))
@@ -731,82 +707,26 @@ static int audio_transfer_formats_from_source(AVFilterContext* filter)
         av_opt_get_array(src, "map_array", AV_OPT_SEARCH_CHILDREN,
             0, src->nb_outputs, AV_OPT_TYPE_INT, map);
 
-        all_eof = true;
-        map_on_count = 0;
         enabled_count = 0;
-
         for (i = 0; i < src->nb_outputs; i++) {
-            li = (FilterLinkInternal*)src->outputs[i];
-            if (src->outputs[i] && li->status_in != AVERROR_EOF
-                && li->status_out != AVERROR_EOF)
-                all_eof = false;
+            if (map[i] != ROUTE_ON)
+                continue;
 
-            if (map[i] == ROUTE_ON)
-                map_on_count++;
-
-            if (src->outputs[i])
-                enabled_outputs[enabled_count++] = src->outputs[i];
+            enabled_outputs[enabled_count++] = src->outputs[i];
         }
 
-        // 3. handle multiple enabled outputs
-        if (map_on_count > 1 && all_eof) {
-            ret = audio_handle_multi_outputs(src, enabled_count, enabled_outputs);
-            if (ret < 0)
-                MEDIA_WARN("Failed to handle multiple outputs for '%s'", src->name);
-        }
-
-        // 4. map_on_count is 1 or the map changes from one path to multiple paths
-        else {
-            for (i = 0; i < src->nb_outputs; i++) {
-                if (map[i] != ROUTE_ON || !src->outputs[i])
-                    continue;
-
-                AVFilterLink* link = src->outputs[i];
-
-                // handle third-stage links (links with destination that has outputs)
-                if (link->dst && link->dst->nb_outputs > 0) {
-                    av_opt_get_array(link->dst, "map_array", AV_OPT_SEARCH_CHILDREN,
-                        0, link->dst->nb_outputs, AV_OPT_TYPE_INT, dst_map);
-
-                    for (j = 0; j < link->dst->nb_outputs; j++) {
-                        if (dst_map[j] != ROUTE_ON || !link->dst->outputs[j])
-                            continue;
-
-                        ret = audio_negotiate_three_stage_link(link, link->dst->outputs[j]);
-                        if (ret < 0)
-                            MEDIA_WARN("Three-stage negotiation failed for '%s'", link->dst->name);
-                    }
-                }
-
-                // handle direct links
-                else {
-                    AVFilterFormatsConfig config = { 0 };
-                    int fmt = -1, rate = -1, ch = -1;
-
-                    audio_calculate_intersection(&link->outcfg, &link->incfg, &config);
-                    audio_select_min_values(link, &config, &fmt, &rate, &ch);
-
-                    if (fmt > 0 && rate > 0 && ch > 0) {
-                        ret = audio_set_format_config(link, fmt, rate, ch);
-                        if (ret < 0) {
-                            MEDIA_WARN("Failed to set format config for direct link");
-                        }
-                    }
-
-                    audio_free_formats_config(&config);
-                }
-            }
-        }
+        if (enabled_count)
+            audio_handle_multi_outputs(src, enabled_count, enabled_outputs);
     }
 
-    return ret;
+    return 0;
 }
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-int audio_formats_transfer(AVFilterContext* filter)
+int audio_negotiation_trigger(AVFilterContext* filter)
 {
     int ret;
 
@@ -814,5 +734,5 @@ int audio_formats_transfer(AVFilterContext* filter)
     if (ret < 0)
         return ret;
 
-    return audio_transfer_formats_from_source(filter);
+    return audio_negotiate_src(filter);
 }
