@@ -619,6 +619,14 @@ static void mediatool_uv_take_picture_complete_cb(void* cookie, int ret)
         printf("take pic successed!\n");
 }
 
+static void mediatool_uv_common_close_handler(mediatool_chain_t* chain)
+{
+    if (chain->fd > 0) {
+        close(chain->fd);
+        chain->fd = -1;
+    }
+}
+
 static void mediatool_uv_recorder_alloc_cb(uv_handle_t* handle,
     size_t suggested_size, uv_buf_t* buf)
 {
@@ -643,6 +651,7 @@ static void mediatool_uv_recorder_write_cb(uv_fs_t* req)
             __LINE__, uv_strerror(req->result));
         free(chain->buf);
         chain->buf = NULL;
+        mediatool_uv_common_close_handler(chain);
         return;
     }
 
@@ -660,12 +669,13 @@ static void mediatool_uv_recorder_read_cb(uv_stream_t* stream, ssize_t nread, co
 
     if (nread == UV_ENOBUFS) {
         usleep(1000);
+        mediatool_uv_common_close_handler(chain);
         return;
     }
     assert(nread <= MEDIATOOL_MAX_SIZE);
     chain->buf = buf->base;
     uv_req_set_data((uv_req_t*)&chain->fs_req, chain);
-    if (nread < 0) {
+    if ((nread < 0) || (chain->running == false)) {
         if (nread != UV_EOF)
             printf("[%s][%d] Recorder read error %s\n", __func__, __LINE__, uv_err_name(nread));
         uv_fs_close(&mediatool->loop, &close_req, chain->fd, NULL);
@@ -684,8 +694,11 @@ static void mediatool_uv_recorder_connection_cb(void* cookie, int ret, void* obj
     mediatool_chain_t* chain = cookie;
 
     printf("[%s][%d] id:%d ret:%d obj:%p\n", __func__, __LINE__, chain->id, ret, obj);
-    if (!obj)
+    if (!obj) {
+        chain->running = false;
+        mediatool_uv_common_close_handler(chain);
         return;
+    }
 
     uv_handle_set_data(obj, cookie);
     uv_read_start(obj, mediatool_uv_recorder_alloc_cb, mediatool_uv_recorder_read_cb);
@@ -701,6 +714,7 @@ static void mediatool_uv_player_write_cb(uv_write_t* req, int status)
         printf("[%s][%d] Player stopped: %s.\n", __func__, __LINE__, status < 0 ? uv_strerror(status) : "not running");
         free(chain->buf);
         chain->buf = NULL;
+        mediatool_uv_common_close_handler(chain);
         return;
     } else {
         iov = uv_buf_init(chain->buf, chain->size);
@@ -717,14 +731,17 @@ static void mediatool_uv_player_read_cb(uv_fs_t* req)
     if (req->result < 0) {
         printf("[%s][%d] Player Read error: %s\n", __func__, __LINE__,
             uv_strerror(req->result));
+        mediatool_uv_common_close_handler(chain);
         return;
     } else if (req->result == 0) {
         printf("[%s][%d] Player read to end of file\n", __func__, __LINE__);
+        mediatool_uv_common_close_handler(chain);
         return;
     } else if (chain->running == false) {
         printf("[%s][%d] Player stopped.\n", __func__, __LINE__);
         free(chain->buf);
         chain->buf = NULL;
+        mediatool_uv_common_close_handler(chain);
         return;
     } else {
         iov = uv_buf_init(chain->buf, req->result);
@@ -743,6 +760,7 @@ static void mediatool_uv_player_connection_cb(void* cookie, int ret, void* obj)
     printf("[%s][%d] id:%d ret:%d obj:%p\n", __func__, __LINE__, chain->id, ret, obj);
     if (!obj) {
         chain->running = false;
+        mediatool_uv_common_close_handler(chain);
         return;
     }
 
@@ -1103,6 +1121,7 @@ CMD1(reset, int, id)
             pthread_join(mediatool->chain[id].thread, NULL);
         }
         ret = media_player_reset(mediatool->chain[id].handle);
+        mediatool_common_stop_thread(&mediatool->chain[id]);
         break;
 
     case MEDIATOOL_RECORDER:
@@ -1112,6 +1131,7 @@ CMD1(reset, int, id)
             pthread_join(mediatool->chain[id].thread, NULL);
         }
         ret = media_recorder_reset(mediatool->chain[id].handle);
+        mediatool_common_stop_thread(&mediatool->chain[id]);
         break;
 
 #ifdef CONFIG_LIBUV_EXTENSION
@@ -1129,8 +1149,6 @@ CMD1(reset, int, id)
     default:
         return 0;
     }
-
-    mediatool_common_stop_thread(&mediatool->chain[id]);
 
     return ret;
 }
