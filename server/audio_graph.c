@@ -415,7 +415,7 @@ static int audio_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
 static int audio_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 {
     MediaCommand* cmd = NULL;
-    int i, ret = 0;
+    int i, j, ret = 0;
 
     pthread_mutex_lock(&priv->qlock);
     cmd = TAILQ_FIRST(&priv->cmdq);
@@ -436,20 +436,36 @@ static int audio_graph_dequeue_command(MediaGraphPriv* priv, bool process)
 
     if (!strcmp(cmd->cmd, "link") || !strcmp(cmd->cmd, "map")) {
         for (i = 0; i < cmd->filter->nb_outputs; i++) {
-            FilterLinkInternal* li = (FilterLinkInternal*)cmd->filter->outputs[i];
+            AVFilterLink* outlink = cmd->filter->outputs[i];
+            FilterLinkInternal* li = (FilterLinkInternal*)outlink;
+
             if (li->status_in != li->status_out) {
-                MEDIA_WARN("%s outlink is not eof, cmd %s pending\n",
-                    cmd->filter->name, cmd->cmd);
+                MEDIA_WARN("%s outlink %d is not EOF synchronized, cmd '%s' pending\n",
+                    cmd->filter->name, i, cmd->cmd);
                 return -EAGAIN;
+            }
+
+            if (outlink->dst && outlink->dst->nb_outputs > 0) {
+                for (j = 0; j < outlink->dst->nb_outputs; j++) {
+                    AVFilterLink* dst_outlink = outlink->dst->outputs[j];
+                    FilterLinkInternal* dst_li = (FilterLinkInternal*)dst_outlink;
+
+                    if (dst_li->status_in != dst_li->status_out) {
+                        MEDIA_WARN("%s (downstream of %s) outlink %d not EOF synchronized, cmd '%s' pending\n",
+                            outlink->dst->name, cmd->filter->name, j, cmd->cmd);
+                        return -EAGAIN;
+                    }
+                }
             }
         }
 
-        ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
-            cmd->res, 0, 0);
-
-        ret = audio_negotiation_trigger(cmd->filter);
-        if (ret < 0)
-            MEDIA_ERR("media graph link error ret:%d:%s\n", ret, av_err2str(ret));
+        ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg, cmd->res, 0, 0);
+        if (ret >= 0) {
+            ret = audio_negotiation_trigger(cmd->filter);
+            if (ret < 0)
+                MEDIA_ERR("Media graph link error after command '%s': %d:%s\n",
+                    cmd->cmd, ret, av_err2str(ret));
+        }
     } else
         ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
             cmd->res, 0, 0);
