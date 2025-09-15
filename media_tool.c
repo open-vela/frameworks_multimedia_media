@@ -669,7 +669,6 @@ static void mediatool_uv_recorder_read_cb(uv_stream_t* stream, ssize_t nread, co
 
     if (nread == UV_ENOBUFS) {
         usleep(1000);
-        mediatool_uv_common_close_handler(chain);
         return;
     }
     assert(nread <= MEDIATOOL_MAX_SIZE);
@@ -700,6 +699,7 @@ static void mediatool_uv_recorder_connection_cb(void* cookie, int ret, void* obj
         return;
     }
 
+    chain->running = true;
     uv_handle_set_data(obj, cookie);
     uv_read_start(obj, mediatool_uv_recorder_alloc_cb, mediatool_uv_recorder_read_cb);
 }
