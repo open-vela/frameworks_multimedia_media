@@ -1107,7 +1107,7 @@ static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_
     int64_t latency = 0;
     int i, nb_frames;
 
-    if (!ctx->audio_stream)
+    if (ctx->state != MEDIA_PLAYER_STATE_STARTED || !ctx->audio_stream)
         return AVERROR(EINVAL);
 
     nb_frames = media_player_queue_cnt(ctx, AVMEDIA_TYPE_AUDIO);
