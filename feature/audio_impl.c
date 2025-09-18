@@ -81,8 +81,8 @@ typedef struct {
     float currentTime;
     float duration;
     float percent;
-    float volume;
-    float mutedvolume; /* Store volume before mute. */
+    double volume;
+    double mutedvolume; /* Store volume before mute. */
     bool autoplay;
     bool loop;
 } AudioObject;
@@ -137,7 +137,7 @@ void system_audio_onCreate(FeatureRuntimeContext ctx, FeatureProtoHandle handle)
 
     ret = media_policy_get_stream_volume(obj->streamType, &volume);
     if (ret >= 0)
-        obj->volume = volume / 10.0;
+        obj->volume = (double)(volume / 10.0);
 
     if (!obj->session) {
         FEATURE_LOG_ERROR("%s::%s(), session register failed\n", file_tag, __FUNCTION__);
@@ -553,7 +553,7 @@ static void audio_media_player_query_cb(void* cookie, int ret, void* object)
         obj->currentTime = cdata->position / 1000;
         obj->duration = cdata->duration / 1000;
         obj->percent = (obj->currentTime * 100.0) / obj->duration;
-        obj->volume = cdata->volume / 10.0;
+        obj->volume = (double)cdata->volume / 10.0;
     }
 
     if (FeatureCheckCallbackId(obj->event.ontimeupdate.feature, obj->event.ontimeupdate.callbackId))
@@ -941,19 +941,19 @@ void system_audio_set_loop(void* feature, union AppendData append_data, FtBool l
     obj->loop = loop;
 }
 
-FtFloat system_audio_get_volume(void* feature, union AppendData append_data)
+double system_audio_get_volume(void* feature, union AppendData append_data)
 {
-    FEATURE_LOG_INFO("%s::%s(),\n", file_tag, __FUNCTION__);
     AudioObject* obj;
 
     obj = (AudioObject*)FeatureGetProtoData(FeatureGetProtoHandle(feature));
     if (!obj)
         return 0;
 
+    FEATURE_LOG_INFO("%s::%s(), obj->volume: %f\n", file_tag, __FUNCTION__, obj->volume);
     return obj->volume;
 }
 
-void system_audio_set_volume(void* feature, union AppendData append_data, FtFloat volume)
+void system_audio_set_volume(void* feature, union AppendData append_data, double volume)
 {
     FEATURE_LOG_INFO("%s::%s(), volume:%f\n", file_tag, __FUNCTION__, volume);
     FeatureManagerHandle manager;
@@ -971,7 +971,7 @@ void system_audio_set_volume(void* feature, union AppendData append_data, FtFloa
 
     manager = FeatureGetManagerHandleFromProto(obj->proto);
     loop = FeatureGetUVLoop(manager);
-    media_uv_policy_set_stream_volume(loop, obj->streamType, volume * 10, NULL, NULL);
+    media_uv_policy_set_stream_volume(loop, obj->streamType, (int)(volume * 10), NULL, NULL);
     obj->volume = volume;
 }
 

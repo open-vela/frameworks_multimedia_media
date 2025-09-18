@@ -27,7 +27,7 @@ struct AudioState {
     float currentTime;
     boolean autoplay;
     boolean loop;
-    float volume;
+    double volume;
     boolean muted;
     float duration;
     float percent;
@@ -55,7 +55,7 @@ property float currentTime;
 property float duration readonly;
 property boolean autoplay;
 property boolean loop;
-property float volume;
+property double volume;
 property boolean muted;
 property string streamType readonly;
 property float percent readonly;
