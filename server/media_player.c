@@ -638,12 +638,14 @@ static void media_player_release_stream(MediaPlayerContext* ctx)
     if (ctx->audio_stream) {
         ff_framequeue_free(&ctx->audio_stream->queue);
         memset(ctx->audio_stream, 0, sizeof(OutputStream));
+        av_freep(&ctx->audio_stream);
         ctx->streams[AVMEDIA_TYPE_AUDIO] = NULL;
     }
 
     if (ctx->video_stream) {
         ff_framequeue_free(&ctx->video_stream->queue);
         memset(ctx->video_stream, 0, sizeof(OutputStream));
+        av_freep(&ctx->video_stream);
         ctx->streams[AVMEDIA_TYPE_VIDEO] = NULL;
     }
 }
