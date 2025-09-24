@@ -307,7 +307,7 @@ static int audio_graph_init(MediadPlugin* ctx)
         goto err;
     }
 
-    ret = fs_getfilep(priv->fd, &priv->filep);
+    ret = file_get(priv->fd, &priv->filep);
     if (ret < 0)
         goto err;
 
