@@ -22,6 +22,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <assert.h>
 #include <stdlib.h>
 #include <sys/queue.h>
 #include <uv.h>
