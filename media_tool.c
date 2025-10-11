@@ -625,6 +625,8 @@ static void mediatool_uv_common_close_handler(mediatool_chain_t* chain)
         close(chain->fd);
         chain->fd = -1;
     }
+
+    media_uv_player_close_socket(chain->handle);
 }
 
 static void mediatool_uv_recorder_alloc_cb(uv_handle_t* handle,

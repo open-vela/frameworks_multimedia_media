@@ -604,6 +604,18 @@ int media_uv_player_get_property(void* handle, const char* target, const char* k
  * @endcode
  */
 int media_uv_player_query(void* handle, media_uv_object_callback on_query, void* cookie);
+
+/**
+ * @brief Close socket fd.
+ *
+ * @param[in] handle    Player handle.
+ * @return Zero on success; a negated errno value on failure.
+ *
+ * @note This api is thread-safe, in buffer mode, you can finalize data
+ * transaction by this api in your worker thread.
+ */
+int media_uv_player_close_socket(void* handle);
+
 #endif /* CONFIG_LIBUV */
 
 #undef EXTERN
