@@ -752,6 +752,15 @@ int media_uv_player_close(void* handle, int pending, media_uv_callback on_close)
     return ret;
 }
 
+int media_uv_player_close_socket(void* handle)
+{
+    if (!handle)
+        return -EINVAL;
+
+    media_uv_stream_close_pipe(handle);
+    return 0;
+}
+
 int media_uv_player_listen(void* handle, media_event_callback on_event)
 {
     MediaPlayerPriv* priv = handle;
