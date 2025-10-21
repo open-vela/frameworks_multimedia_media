@@ -26,6 +26,7 @@
  ****************************************************************************/
 
 #include <media_defs.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #ifdef __cplusplus

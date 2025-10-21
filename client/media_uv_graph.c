@@ -106,6 +106,10 @@ typedef struct MediaTakePicPriv {
     int err_code;
 } MediaTakePicPriv;
 
+typedef struct MediaTriggerPriv {
+    MEDIA_STREAM_FIELDS
+} MediaTriggerPriv;
+
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
@@ -1392,4 +1396,153 @@ err:
     priv->err_code = ret;
     media_uv_recorder_take_picture_close(priv->handle, false);
     return 0;
+}
+
+/****************************************************************************
+ * Trigger Functions
+ ****************************************************************************/
+
+static int media_uv_trigger_send_with_payload(MediaTriggerPriv* priv,
+    const char* cmd, const void* data, size_t size,
+    int resp_len, media_uv_parcel_callback parser, void* cb, void* cookie)
+{
+    media_parcel parcel;
+    int ret;
+
+    media_parcel_init(&parcel);
+    /* follow server format: id, cmd, arg, size, resp, then optional data */
+    ret = media_parcel_append_printf(&parcel, "%i%s%s%i%i",
+        priv->id, cmd, NULL, (int)size, resp_len);
+    if (ret < 0)
+        goto out;
+
+    MEDIA_INFO("%s:%p send cmd:%s size:%zu resp_len:%d\n",
+        priv->name, priv, cmd, size, resp_len);
+
+    if (data && size > 0) {
+        ret = media_parcel_append(&parcel, data, size);
+        if (ret < 0)
+            goto out;
+    }
+
+    ret = media_uv_send(priv->proxy, parser, cb, cookie, &parcel);
+
+out:
+    media_parcel_deinit(&parcel);
+    return ret;
+}
+
+void* media_uv_trigger_open(void* loop, const char* params,
+    media_uv_callback on_open, void* cookie)
+{
+    MediaTriggerPriv* priv;
+
+    if (params && params[0] != '\0') {
+        priv = zalloc(sizeof(MediaTriggerPriv) + strlen(params) + 1);
+        if (!priv)
+            return NULL;
+
+        priv->name = (char*)(priv + 1);
+        strcpy(priv->name, params);
+    } else {
+        priv = zalloc(sizeof(MediaTriggerPriv));
+        if (!priv)
+            return NULL;
+    }
+
+    priv->loop = loop;
+    priv->cookie = cookie;
+    priv->on_open = on_open;
+    priv->id = MEDIA_ID_TRIGGER;
+    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
+        media_uv_stream_connect_cb, priv);
+    if (!priv->proxy) {
+        media_uv_stream_disconnect_cb(priv, 0);
+        return NULL;
+    }
+
+    return priv;
+}
+
+int media_uv_trigger_close(void* handle, media_uv_callback on_close)
+{
+    MediaTriggerPriv* priv = handle;
+    int ret;
+
+    if (!priv)
+        return -EINVAL;
+
+    priv->on_close = on_close;
+    ret = media_uv_trigger_send_with_payload(priv, "close", NULL, 0,
+        0, media_uv_stream_receive_cb, media_uv_stream_close_cb, priv);
+
+    if (ret < 0)
+        media_uv_stream_close_cb(priv, ret);
+
+    return ret;
+}
+
+int media_uv_trigger_listen(void* handle, media_event_callback on_event)
+{
+    MediaTriggerPriv* priv = handle;
+    int ret;
+
+    if (!priv || !on_event)
+        return -EINVAL;
+
+    priv->on_event = on_event;
+    ret = media_uv_trigger_send_with_payload(priv, "set_event", NULL, 0,
+        0, NULL, NULL, NULL);
+    if (ret < 0)
+        return ret;
+
+    return media_uv_listen(priv->proxy, NULL, media_uv_stream_event_cb);
+}
+
+int media_uv_trigger_load_sound_model(void* handle, void* model, size_t size,
+    media_uv_callback cb, void* cookie)
+{
+    MediaTriggerPriv* priv = handle;
+
+    if (!priv || !model || size == 0)
+        return -EINVAL;
+
+    return media_uv_trigger_send_with_payload(priv, "load", model, size,
+        0, media_uv_stream_receive_cb, cb, cookie);
+}
+
+int media_uv_trigger_unload_sound_model(void* handle, media_uv_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_trigger_send_with_payload(handle, "unload", NULL, 0,
+        0, media_uv_stream_receive_cb, cb, cookie);
+}
+
+int media_uv_trigger_start_recognition(void* handle, media_uv_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_trigger_send_with_payload(handle, "start", NULL, 0,
+        0, media_uv_stream_receive_cb, cb, cookie);
+}
+
+int media_uv_trigger_stop_recognition(void* handle, media_uv_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_trigger_send_with_payload(handle, "stop", NULL, 0,
+        0, media_uv_stream_receive_cb, cb, cookie);
+}
+
+int media_uv_trigger_get_property(void* handle, media_uv_string_callback cb, void* cookie)
+{
+    if (!handle)
+        return -EINVAL;
+
+    return media_uv_trigger_send_with_payload(handle, "get_property", NULL, 0,
+        128, media_uv_stream_receive_string_cb, cb, cookie);
 }

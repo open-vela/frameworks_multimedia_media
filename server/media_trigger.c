@@ -478,11 +478,14 @@ static int media_trigger_open(MediaTriggerContext* ctx)
     return 0;
 }
 
-static int media_trigger_handler(struct MediadPlugin* plugin, struct media_server_conn* conn, const char* cmd, const char* arg,
-    const char* data, int size, char* res, int res_len)
+static int media_trigger_handler(struct MediadPlugin* pctx, struct media_server_conn* conn,
+    const char* target, const char* cmd, const char* arg, int flags, char* res, int res_len)
 {
     MediaTriggerContext* ctx = NULL;
     int ret = 0;
+
+    MEDIA_INFO("media trigger cmd:%s arg:%s flags:%d res:%s res_len:%d\n",
+        cmd, arg ? arg : "_", flags, res ? res : "_", res_len);
 
     if (!strcmp(cmd, "open")) {
         ctx = media_trigger_ctx_init();
@@ -491,7 +494,7 @@ static int media_trigger_handler(struct MediadPlugin* plugin, struct media_serve
 
         ctx->tran_fd = media_server_get_tran_fd(conn);
         if (ctx->tran_fd < 0) {
-            MEDIA_ERR("recorder get tran fd failed...\n");
+            MEDIA_ERR("trigger get tran fd failed...\n");
             media_trigger_ctx_release(ctx);
             return -EINVAL;
         }

@@ -135,6 +135,94 @@ int media_trigger_close(void* handle);
  */
 int media_trigger_get_property(char* properties, int len);
 
+#ifdef CONFIG_LIBUV
+/**
+ * @brief Open an async media trigger instance.
+ *
+ * @param[in] loop      Loop handle of current thread (libuv loop).
+ * @param[in] params    Trigger parameters/name, e.g. "default".
+ * @param[out] on_open  Open callback, called after open is done.
+ * @param[in] cookie    Long-term callback context for: on_open/on_event/on_close.
+ * @return void*  Handle of trigger, NULL on error.
+ *
+ */
+void* media_uv_trigger_open(void* loop, const char* params,
+    media_uv_callback on_open, void* cookie);
+
+/**
+ * @brief Listen to trigger events.
+ *
+ * @param[in] handle    Async trigger handle.
+ * @param[out] on_event Event callback, called after receiving notification.
+ * @return int  Zero on success, negative errno on failure.
+ */
+int media_uv_trigger_listen(void* handle, media_event_callback on_event);
+
+/**
+ * @brief Load a sound model for trigger.
+ *
+ * @param[in] handle    Async trigger handle.
+ * @param[in] model     Sound model buffer.
+ * @param[in] size      Size of model buffer in bytes.
+ * @param[out] cb       Callback after receiving result.
+ * @param[in] cookie    Callback argument for `cb`.
+ * @return int  Zero on success, negative errno on failure.
+ */
+int media_uv_trigger_load_sound_model(void* handle, void* model, size_t size,
+    media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Unload current sound model.
+ *
+ * @param[in] handle    Async trigger handle.
+ * @param[out] cb       Callback after receiving result.
+ * @param[in] cookie    Callback argument for `cb`.
+ * @return int  Zero on success, negative errno on failure.
+ */
+int media_uv_trigger_unload_sound_model(void* handle,
+    media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Start trigger recognition.
+ *
+ * @param[in] handle    Async trigger handle.
+ * @param[out] cb       Callback after receiving result.
+ * @param[in] cookie    Callback argument for `cb`.
+ * @return int  Zero on success, negative errno on failure.
+ */
+int media_uv_trigger_start_recognition(void* handle, media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Stop trigger recognition.
+ *
+ * @param[in] handle    Async trigger handle.
+ * @param[out] cb       Callback after receiving result.
+ * @param[in] cookie    Callback argument for `cb`.
+ * @return int  Zero on success, negative errno on failure.
+ */
+int media_uv_trigger_stop_recognition(void* handle, media_uv_callback cb, void* cookie);
+
+/**
+ * @brief Get string properties from trigger (e.g., DSP info).
+ *
+ * @param[in] handle    Async trigger handle.
+ * @param[out] cb       Callback to receive string value.
+ * @param[in] cookie    Callback argument for `cb`.
+ * @return int  Zero on success, negative errno on failure.
+ */
+int media_uv_trigger_get_property(void* handle, media_uv_string_callback cb, void* cookie);
+
+/**
+ * @brief Close the async trigger instance.
+ *
+ * @param[in] handle    Async trigger handle.
+ * @param[out] on_close Release callback, called after releasing internal resources.
+ * @return int  Zero on success, negative errno on illegal handle.
+ *
+ */
+int media_uv_trigger_close(void* handle, media_uv_callback on_close);
+#endif /* CONFIG_LIBUV */
+
 #undef EXTERN
 #ifdef __cplusplus
 }
