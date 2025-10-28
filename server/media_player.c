@@ -187,6 +187,7 @@ typedef struct MediaPlayerPriv {
  * Function declaration
  ****************************************************************************/
 static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush);
+static int media_player_start(MediaPlayerContext* ctx);
 static int media_player_stop(MediaPlayerContext* ctx);
 static void media_player_poll(MediaPlayerContext* ctx);
 static AVFrame* media_player_queue_pop(MediaPlayerContext* ctx, int type);
@@ -928,6 +929,10 @@ static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush)
 
     ctx->current_ms = ms;
     ctx->ts_base = AV_NOPTS_VALUE;
+
+    /* Auto-start playback if we were in completed state and seek was successful */
+    if ((ctx->state == MEDIA_PLAYER_STATE_COMPLETED) && ret >= 0)
+        media_player_start(ctx);
 
 end:
 
