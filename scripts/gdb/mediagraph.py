@@ -167,6 +167,10 @@ class MediaGraphHander:
 
             for link in sub_pipeline:
                 if link == "none":
+                    if pre_link is None:
+                        gdb.write("WARNING: graph nodes with unknown structure\n")
+                        continue
+
                     final_filter = pre_link[1]["dst"]
                     if filter_func := avf.get_filter_func(
                         filters.get(final_filter["name"].string())
