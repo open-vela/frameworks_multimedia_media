@@ -22,12 +22,11 @@
  * Included Files
  ****************************************************************************/
 
-#include <pthread.h>
-#include <unistd.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <netpacket/rpmsg.h>
 #include <poll.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,6 +35,7 @@
 #include <sys/socket.h>
 #include <sys/sysinfo.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include "libavcodec/avcodec.h"
 #include "libavfilter/filters.h"
