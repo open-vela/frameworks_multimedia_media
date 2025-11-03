@@ -686,6 +686,7 @@ void system_audio_wrap_stop(FeatureInstanceHandle feature, union AppendData appe
 
     if (obj->state == MEDIA_STATE_STOPPED) {
         FEATURE_LOG_WARN("player:%p already stopped, no action needed", obj->player);
+        audio_reset_obj(obj);
         return;
     }
 
