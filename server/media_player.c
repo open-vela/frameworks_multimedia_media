@@ -289,8 +289,10 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
 
     frame = media_player_queue_pop(ctx, AVMEDIA_TYPE_AUDIO);
     if (!frame) {
-        if (ctx->audio_output)
+        if (ctx->audio_output) {
+            MEDIA_INFO("player %s xrun, pause audio output.", ctx->name);
             audio_graph_pause(ctx->audio_output);
+        }
 
         pthread_mutex_lock(&ctx->mutex);
         ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_XRUN;
