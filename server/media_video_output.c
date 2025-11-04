@@ -174,6 +174,9 @@ static int media_video_output_start(MediaVOutputContext* ctx, AVFrame* frame)
 
 static int media_video_output_stop(MediaVOutputContext* ctx)
 {
+    if (!ctx)
+        return -EINVAL;
+
     if (ctx->fmt_ctx)
         av_write_trailer(ctx->fmt_ctx);
     ctx->started = 0;
