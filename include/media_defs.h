@@ -221,6 +221,7 @@ typedef void (*media_policy_change_callback)(void* cookie,
 #define MEDIA_SCENARIO_INFO "Info"
 #define MEDIA_SCENARIO_MUSIC "Music"
 #define MEDIA_SCENARIO_COMMUNICATION "Communication"
+#define MEDIA_SCENARIO_METRONOME "Metronome"
 
 /****************************************************************************
  * Stream Definitions
@@ -244,7 +245,7 @@ typedef void (*media_policy_change_callback)(void* cookie,
 #define MEDIA_STREAM_A2DP_SNK "A2dpsnk" /* bt music */
 #define MEDIA_STREAM_INCALL "SCO" /* @deprecated */
 #define MEDIA_STREAM_COMMUNICATION "Intercom"
-
+#define MEDIA_STREAM_METRONOME "Metronome"
 /****************************************************************************
  * Source Definitions
  ****************************************************************************/
