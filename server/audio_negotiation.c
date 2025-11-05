@@ -159,6 +159,8 @@ static int audio_query_formats(AVFilterContext* ctx)
 static int audio_set_format_config(AVFilterLink* link, int fmt, int rate, int ch)
 {
     FilterLinkInternal* li = (FilterLinkInternal*)link;
+    int (*config_link)(AVFilterLink*);
+    int ret = 0;
 
     if (fmt < 0 || rate <= 0 || ch <= 0) {
         MEDIA_WARN("Invalid format: fmt=%d, rate=%d, ch=%d\n", fmt, rate, ch);
@@ -181,7 +183,23 @@ static int audio_set_format_config(AVFilterLink* link, int fmt, int rate, int ch
     li->status_in = 0;
     li->status_out = 0;
 
-    return 0;
+    if (link->srcpad && (config_link = link->srcpad->config_props)) {
+        ret = config_link(link);
+        if (ret < 0) {
+            MEDIA_ERR("Failed to configure output pad on %s\n", link->src->name);
+            return ret;
+        }
+    }
+
+    if (link->dstpad && (config_link = link->dstpad->config_props)) {
+        ret = config_link(link);
+        if (ret < 0) {
+            MEDIA_ERR("Failed to configure input pad on %s\n", link->dst->name);
+            return ret;
+        }
+    }
+
+    return ret;
 }
 
 static AVFilterFormats* audio_create_merged_formats(AVFilterFormats* a, AVFilterFormats* b)
