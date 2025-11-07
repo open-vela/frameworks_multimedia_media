@@ -68,7 +68,6 @@ typedef struct MediaFocusPriv {
     void* handle; /* Focus handle. */
     media_uv_callback on_play;
     void* on_play_cookie;
-    atomic_bool active;
 } MediaFocusPriv;
 
 typedef struct MediaQueryPriv {
@@ -534,8 +533,6 @@ static void media_uv_stream_abandon_focus(MediaStreamPriv* stream)
             stream->focus = NULL;
         }
     }
-
-    atomic_store(&priv->active, false);
 }
 
 static int media_uv_stream_request_focus(MediaStreamPriv* stream,
@@ -551,7 +548,6 @@ static int media_uv_stream_request_focus(MediaStreamPriv* stream,
     priv->stream = stream;
     priv->on_play = on_play;
     priv->on_play_cookie = cookie;
-    atomic_init(&priv->active, true);
     priv->handle = media_uv_focus_request(stream->loop, scenario,
         on_suggestion, priv);
     if (!priv->handle) {
@@ -651,7 +647,7 @@ static void media_uv_player_suggest_cb(int suggest, void* cookie)
     MediaPlayerPriv* player = priv->stream;
     bool suggest_active = false;
 
-    if (!player || !atomic_load(&priv->active)) {
+    if (!player) {
         MEDIA_INFO("focus:%p suggest:%d canceled\n", priv, suggest);
         return;
     }
