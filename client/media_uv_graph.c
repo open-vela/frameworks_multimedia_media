@@ -61,7 +61,8 @@ typedef LIST_HEAD(MediaListenList, MediaListenPriv) MediaListenList;
     /* Fields for auto focus. */                  \
     MediaFocusPriv* focus;                        \
     /* Fields for query metadata. */              \
-    MediaQueryPriv* query;
+    MediaQueryPriv* query;                        \
+    bool active;
 
 typedef struct MediaFocusPriv {
     void* stream;
@@ -718,6 +719,7 @@ void* media_uv_player_open(void* loop, const char* stream,
     priv->cookie = cookie;
     priv->on_open = on_open;
     priv->id = MEDIA_ID_PLAYER;
+    priv->active = true;
     priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_stream_connect_cb, priv);
     if (!priv->proxy) {
@@ -738,6 +740,7 @@ int media_uv_player_close(void* handle, int pending, media_uv_callback on_close)
         return -EINVAL;
 
     priv->on_close = on_close;
+    priv->active = false;
     snprintf(tmp, sizeof(tmp), "%d", pending);
     ret = media_uv_stream_send(priv, NULL, "close", tmp, 0,
         media_uv_stream_receive_cb, media_uv_stream_close_cb, priv);
@@ -766,7 +769,7 @@ int media_uv_player_listen(void* handle, media_event_callback on_event)
     MediaPlayerPriv* priv = handle;
     int ret;
 
-    if (!priv || !on_event)
+    if (!priv || !on_event || !priv->active)
         return -EINVAL;
 
     priv->on_event = on_event;
@@ -785,7 +788,7 @@ int media_uv_player_prepare(void* handle, const char* url, const char* options,
     char addr[32];
     int ret = 0;
 
-    if (!handle)
+    if (!priv || !priv->active)
         return -EINVAL;
 
     if (!url || !url[0]) {
@@ -817,7 +820,9 @@ int media_uv_player_prepare(void* handle, const char* url, const char* options,
 
 int media_uv_player_reset(void* handle, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     media_uv_stream_close_pipe(handle);
@@ -832,7 +837,7 @@ int media_uv_player_start_auto(void* handle, const char* scenario,
 {
     MediaPlayerPriv* priv = handle;
 
-    if (!priv || !scenario || !scenario[0])
+    if (!priv || !scenario || !scenario[0] || !priv->active)
         return -EINVAL;
 
     if (priv->focus) {
@@ -846,7 +851,9 @@ int media_uv_player_start_auto(void* handle, const char* scenario,
 
 int media_uv_player_start(void* handle, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, NULL, "start", NULL, 0,
@@ -857,7 +864,7 @@ int media_uv_player_pause(void* handle, media_uv_callback cb, void* cookie)
 {
     MediaPlayerPriv* priv = handle;
 
-    if (!priv)
+    if (!priv || !priv->active)
         return -EINVAL;
 
     media_uv_stream_abandon_focus(handle);
@@ -869,7 +876,7 @@ int media_uv_player_stop(void* handle, media_uv_callback cb, void* cookie)
 {
     MediaPlayerPriv* priv = handle;
 
-    if (!priv)
+    if (!priv || !priv->active)
         return -EINVAL;
 
     media_uv_stream_close_pipe(handle);
@@ -882,9 +889,10 @@ int media_uv_player_stop(void* handle, media_uv_callback cb, void* cookie)
 int media_uv_player_set_volume(void* handle, float volume,
     media_uv_callback cb, void* cookie)
 {
+    MediaPlayerPriv* priv = handle;
     char tmp[32];
 
-    if (!handle)
+    if (!priv || !priv->active)
         return -EINVAL;
 
     snprintf(tmp, sizeof(tmp), "%f", volume);
@@ -894,7 +902,9 @@ int media_uv_player_set_volume(void* handle, float volume,
 
 int media_uv_player_get_volume(void* handle, media_uv_float_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, NULL, "get_volume", NULL, 32,
@@ -903,7 +913,9 @@ int media_uv_player_get_volume(void* handle, media_uv_float_callback cb, void* c
 
 int media_uv_player_get_playing(void* handle, media_uv_int_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, NULL, "get_playing", NULL, 32,
@@ -913,7 +925,9 @@ int media_uv_player_get_playing(void* handle, media_uv_int_callback cb, void* co
 int media_uv_player_get_position(void* handle,
     media_uv_unsigned_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, NULL, "get_position", NULL, 32,
@@ -923,7 +937,9 @@ int media_uv_player_get_position(void* handle,
 int media_uv_player_get_duration(void* handle,
     media_uv_unsigned_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, NULL, "get_duration", NULL, 32,
@@ -933,7 +949,9 @@ int media_uv_player_get_duration(void* handle,
 int media_uv_player_get_latency(void* handle,
     media_uv_unsigned_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, NULL, "get_latency", NULL, 32,
@@ -943,9 +961,10 @@ int media_uv_player_get_latency(void* handle,
 int media_uv_player_set_looping(void* handle, int loop,
     media_uv_callback cb, void* cookie)
 {
+    MediaPlayerPriv* priv = handle;
     char tmp[32];
 
-    if (!handle)
+    if (!priv || !priv->active)
         return -EINVAL;
 
     snprintf(tmp, sizeof(tmp), "%d", loop);
@@ -956,9 +975,10 @@ int media_uv_player_set_looping(void* handle, int loop,
 int media_uv_player_seek(void* handle, unsigned int msec,
     media_uv_callback cb, void* cookie)
 {
+    MediaPlayerPriv* priv = handle;
     char tmp[32];
 
-    if (!handle)
+    if (!priv || !priv->active)
         return -EINVAL;
 
     snprintf(tmp, sizeof(tmp), "%u", msec);
@@ -969,7 +989,9 @@ int media_uv_player_seek(void* handle, unsigned int msec,
 int media_uv_player_set_property(void* handle, const char* target, const char* key,
     const char* value, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, target, key, value, 0,
@@ -979,7 +1001,9 @@ int media_uv_player_set_property(void* handle, const char* target, const char* k
 int media_uv_player_get_property(void* handle, const char* target, const char* key,
     media_uv_string_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaPlayerPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, target, key, NULL, 32,
@@ -990,7 +1014,7 @@ int media_uv_player_query(void* handle, media_uv_object_callback cb, void* cooki
 {
     MediaPlayerPriv* priv = handle;
 
-    if (!priv || !cb)
+    if (!priv || !cb || !priv->active)
         return -EINVAL;
 
     if (!priv->query) {
@@ -1094,6 +1118,7 @@ void* media_uv_recorder_open(void* loop, const char* source,
     priv->cookie = cookie;
     priv->on_open = on_open;
     priv->id = MEDIA_ID_RECORDER;
+    priv->active = true;
     priv->proxy = media_uv_connect(loop, media_get_cpuname(),
         media_uv_stream_connect_cb, priv);
     if (!priv->proxy) {
@@ -1113,6 +1138,7 @@ int media_uv_recorder_close(void* handle, media_uv_callback on_close)
         return -EINVAL;
 
     priv->on_close = on_close;
+    priv->active = false;
     ret = media_uv_stream_send(priv, NULL, "close", "0", 0,
         media_uv_stream_receive_cb, media_uv_stream_close_cb, priv);
 
@@ -1131,7 +1157,7 @@ int media_uv_recorder_listen(void* handle, media_event_callback on_event)
     MediaRecorderPriv* priv = handle;
     int ret;
 
-    if (!priv || !on_event)
+    if (!priv || !on_event || !priv->active)
         return -EINVAL;
 
     priv->on_event = on_event;
@@ -1150,7 +1176,7 @@ int media_uv_recorder_prepare(void* handle, const char* url, const char* options
     char addr[32];
     int ret = 0;
 
-    if (!handle)
+    if (!handle || !priv->active)
         return -EINVAL;
 
     if (!url || !url[0]) {
@@ -1185,7 +1211,7 @@ int media_uv_recorder_start_auto(void* handle, const char* scenario,
 {
     MediaRecorderPriv* priv = handle;
 
-    if (!priv || !scenario || !scenario[0])
+    if (!priv || !scenario || !scenario[0] || !priv->active)
         return -EINVAL;
 
     if (priv->focus) {
@@ -1199,7 +1225,9 @@ int media_uv_recorder_start_auto(void* handle, const char* scenario,
 
 int media_uv_recorder_start(void* handle, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaRecorderPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, NULL, "start", NULL, 0,
@@ -1210,7 +1238,7 @@ int media_uv_recorder_pause(void* handle, media_uv_callback cb, void* cookie)
 {
     MediaRecorderPriv* priv = handle;
 
-    if (!priv)
+    if (!priv || !priv->active)
         return -EINVAL;
 
     media_uv_stream_abandon_focus(handle);
@@ -1222,7 +1250,7 @@ int media_uv_recorder_stop(void* handle, media_uv_callback cb, void* cookie)
 {
     MediaRecorderPriv* priv = handle;
 
-    if (!priv)
+    if (!priv || !priv->active)
         return -EINVAL;
 
     media_uv_stream_close_pipe(handle);
@@ -1235,7 +1263,9 @@ int media_uv_recorder_stop(void* handle, media_uv_callback cb, void* cookie)
 int media_uv_recorder_set_property(void* handle, const char* target, const char* key,
     const char* value, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaRecorderPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, target, key, value, 0,
@@ -1245,7 +1275,9 @@ int media_uv_recorder_set_property(void* handle, const char* target, const char*
 int media_uv_recorder_get_property(void* handle, const char* target, const char* key,
     media_uv_string_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaRecorderPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     return media_uv_stream_send(handle, target, key, NULL, 32,
@@ -1254,7 +1286,9 @@ int media_uv_recorder_get_property(void* handle, const char* target, const char*
 
 int media_uv_recorder_reset(void* handle, media_uv_callback cb, void* cookie)
 {
-    if (!handle)
+    MediaRecorderPriv* priv = handle;
+
+    if (!priv || !priv->active)
         return -EINVAL;
 
     media_uv_stream_close_pipe(handle);
