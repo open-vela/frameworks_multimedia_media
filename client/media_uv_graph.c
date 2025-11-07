@@ -527,8 +527,6 @@ static void media_uv_stream_abandon_focus(MediaStreamPriv* stream)
 
     priv = stream->focus;
     if (priv) {
-        atomic_store(&priv->active, false);
-
         ret = media_uv_focus_abandon(priv->handle, media_uv_stream_abandon_focus_cb);
         if (ret >= 0) {
             /* Detach focus and stream at once. */
@@ -536,6 +534,8 @@ static void media_uv_stream_abandon_focus(MediaStreamPriv* stream)
             stream->focus = NULL;
         }
     }
+
+    atomic_store(&priv->active, false);
 }
 
 static int media_uv_stream_request_focus(MediaStreamPriv* stream,
