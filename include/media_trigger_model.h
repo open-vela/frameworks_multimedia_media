@@ -37,6 +37,13 @@ extern "C" {
 #endif
 
 /****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
+typedef void (*hotword_detection_callback_t)(void* user_data, int event,
+                                             int result, const char* extra);
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -56,7 +63,7 @@ void media_trigger_model_get_properties(void* properties, size_t* size);
  * @param[in] size          model size.
  * @return void* context on success; NULL on failure.
  */
-void* media_trigger_model_load(const void* model, size_t size);
+void* media_trigger_model_load(const void* model, size_t size, hotword_detection_callback_t callback, void* priv);
 
 /**
  * @brief Get sound model capture options.

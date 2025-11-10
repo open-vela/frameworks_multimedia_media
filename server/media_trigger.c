@@ -114,6 +114,14 @@ static int media_trigger_notify_event(MediaTriggerContext* ctx, int event,
     return ret;
 }
 
+static void hotword_detection_result_callback(void* user_data, int event,
+                                              int result, const char* extra)
+{
+    MediaTriggerContext* ctx = (MediaTriggerContext*)user_data;
+
+    media_trigger_notify_event(ctx, event, result, extra);
+}
+
 static int media_trigger_stop_recorder(MediaTriggerContext* ctx)
 {
     int ret;
@@ -279,7 +287,7 @@ static void media_trigger_onreceive(MediaTriggerContext* ctx, media_parcel* in, 
         }
 
         data = media_parcel_read(in, size);
-        ctx->context = media_trigger_model_load(data, size);
+        ctx->context = media_trigger_model_load(data, size, hotword_detection_result_callback, ctx);
         if (!ctx->context) {
             MEDIA_ERR("load model failed\n");
             goto outside;
