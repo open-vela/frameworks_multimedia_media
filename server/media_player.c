@@ -61,8 +61,9 @@
 #define MEDIA_PLAYER_CMD_QUEUE_IDX (1 << 0)
 #define MEDIA_PLAYER_DATA_QUEUE_IDX (1 << 1)
 
-#define MEDIA_AUDIO_OUTPUT_STARTED (1 << 0)
-#define MEDIA_AUDIO_OUTPUT_XRUN (1 << 1)
+#define MEDIA_AUDIO_OUTPUT_STARTING (1 << 0)
+#define MEDIA_AUDIO_OUTPUT_STARTED (1 << 1)
+#define MEDIA_AUDIO_OUTPUT_XRUN (1 << 2)
 
 #define STREAMS_MAX 2
 
@@ -174,7 +175,7 @@ typedef struct MediaPlayerContext {
     enum MediaPlayerSyncMode sync_mode;
 
     /* audio or video output */
-    int audio_output_state; /** < 1: audio output is started, 0: not started */
+    int audio_output_state;
     AVFilterContext* audio_output;
     MediaVOutputContext* video_output;
 } MediaPlayerContext;
@@ -349,11 +350,15 @@ static int media_player_queue_cnt(MediaPlayerContext* ctx, int type)
 
 static inline int media_player_dat_available(MediaPlayerContext* ctx)
 {
+    int ret;
+
     if (ctx->state >= MEDIA_PLAYER_STATE_STOPPED)
         return 0;
 
     /* As long as one data queue less than nb_queue_max, continue read */
-    return ((ctx->audio_stream && (media_player_queue_cnt(ctx, AVMEDIA_TYPE_AUDIO) < ctx->audio_stream->nb_queue_max)) || (ctx->video_stream && (media_player_queue_cnt(ctx, AVMEDIA_TYPE_VIDEO) < ctx->video_stream->nb_queue_max)));
+    ret = ((ctx->audio_stream && (media_player_queue_cnt(ctx, AVMEDIA_TYPE_AUDIO) < ctx->audio_stream->nb_queue_max))
+        || (ctx->video_stream && (media_player_queue_cnt(ctx, AVMEDIA_TYPE_VIDEO) < ctx->video_stream->nb_queue_max)));
+    return ret;
 }
 
 static AVFrame* media_player_queue_pop(MediaPlayerContext* ctx, int type)
@@ -431,31 +436,112 @@ static int media_player_read_frame(MediaPlayerContext* ctx)
     return ret == AVERROR_INVALIDDATA ? 0 : ret;
 }
 
+static void media_player_notify_event(MediaPlayerContext* ctx, int event, int result, const char* extra)
+{
+    media_parcel notify;
+
+    media_parcel_init(&notify);
+    media_parcel_append_printf(&notify, "%i%i%s", event, result, extra);
+    if (ctx->notify_fd > 0)
+        media_parcel_send(&notify, ctx->notify_fd, MEDIA_PARCEL_SEND, MSG_DONTWAIT);
+
+    media_parcel_deinit(&notify);
+    return;
+}
+
+static void media_player_event_cb(MediaPlayerContext* ctx, int event, int result, const char* extra)
+{
+    if (ctx->event)
+        media_player_notify_event(ctx, event, result, extra);
+}
+
+static int media_player_start_audio(MediaPlayerContext* ctx)
+{
+    AVCodecContext* codec_ctx;
+    int ret = 0;
+
+    if (!ctx->audio_output) {
+        ret = AVERROR(EINVAL);
+        goto out;
+    }
+
+    if (!ctx->audio_stream || !ctx->audio_stream->codec_ctx) {
+        ret = AVERROR(EINVAL);
+        goto out;
+    }
+    codec_ctx = ctx->audio_stream->codec_ctx;
+
+    ret = audio_graph_start(ctx->audio_output,
+        codec_ctx->sample_fmt,
+        codec_ctx->sample_rate,
+        codec_ctx->ch_layout.nb_channels,
+        media_player_on_event_cb,
+        ctx);
+    if (ret < 0)
+        MEDIA_ERR("Failed to start audio graph: %s\n", av_err2str(ret));
+
+    pthread_mutex_lock(&ctx->mutex);
+    ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_STARTING;
+    pthread_mutex_unlock(&ctx->mutex);
+
+out:
+    media_player_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
+    return 0;
+}
+
+static int media_player_resume_audio(MediaPlayerContext* ctx, bool xrun)
+{
+    int ret = 0;
+
+    ret = audio_graph_resume(ctx->audio_output);
+    if (ret < 0)
+        MEDIA_ERR("Failed to resume audio graph: %s\n", av_err2str(ret));
+
+    if (!xrun)
+        ctx->state = MEDIA_PLAYER_STATE_STARTED;
+    else {
+        pthread_mutex_lock(&ctx->mutex);
+        ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_XRUN;
+        pthread_mutex_unlock(&ctx->mutex);
+    }
+
+    media_player_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
+    return ret;
+}
+
 static int media_player_queue_push(MediaPlayerContext* ctx, int idx, AVFrame* frame)
 {
     int ret;
+
     pthread_mutex_lock(&ctx->mutex);
 
-    if (frame->width)
-        ctx->vframe_cnt++;
-    else
+    if (ctx->streams[idx]->type == AVMEDIA_TYPE_AUDIO)
         ctx->aframe_cnt++;
+    else
+        ctx->vframe_cnt++;
 
     ret = ff_framequeue_add(&ctx->streams[idx]->queue, frame);
-    if (ff_framequeue_queued_frames(&ctx->streams[idx]->queue) == ctx->streams[idx]->nb_queue_max
-        && (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN)) {
-        ret = audio_graph_resume(ctx->audio_output);
-        if (ret < 0) {
-            MEDIA_ERR("audio_graph_resume failed.\n");
-            pthread_mutex_unlock(&ctx->mutex);
-            ret = AVERROR(EINVAL);
-            return ret;
-        }
-        ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_XRUN;
+    if (ret < 0) {
+        pthread_mutex_unlock(&ctx->mutex);
+        MEDIA_ERR("Failed to add frame to queue: %s\n", av_err2str(ret));
+        return ret;
+    }
+
+    if (ff_framequeue_queued_frames(&ctx->streams[idx]->queue) == ctx->streams[idx]->nb_queue_max) {
+        if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_STARTING)
+            ret = media_player_start_audio(ctx);
+        else if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN)
+            ret = media_player_resume_audio(ctx, true);
+
+        if (ret < 0)
+            MEDIA_ERR("Failed to start/resume audio output: %s\n", av_err2str(ret));
+
+        pthread_mutex_lock(&ctx->mutex);
+        ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
+        pthread_mutex_unlock(&ctx->mutex);
     }
     pthread_mutex_unlock(&ctx->mutex);
-
-    return ret;
+    return 0;
 }
 
 static void media_player_clear_queue(MediaPlayerContext* ctx, int what)
@@ -846,26 +932,6 @@ static void media_player_notify_finalize(MediaPlayerContext* ctx)
     }
 }
 
-static int media_player_notify_event(MediaPlayerContext* ctx, int event, int result, const char* extra)
-{
-    media_parcel notify;
-    int ret = -EINVAL;
-    media_parcel_init(&notify);
-    media_parcel_append_printf(&notify, "%i%i%s", event, result, extra);
-
-    if (ctx->notify_fd > 0)
-        ret = media_parcel_send(&notify, ctx->notify_fd, MEDIA_PARCEL_SEND, MSG_DONTWAIT);
-
-    media_parcel_deinit(&notify);
-    return ret;
-}
-
-static void media_player_event_cb(MediaPlayerContext* ctx, int event, int result, const char* extra)
-{
-    if (ctx->event)
-        media_player_notify_event(ctx, event, result, extra);
-}
-
 static int media_player_proc_dat(MediaPlayerContext* ctx)
 {
     int ret;
@@ -885,9 +951,20 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
     if (ret >= 0 || ret == AVERROR_EXIT)
         return ret;
     else if (ret == AVERROR_EOF) {
-        if (!media_player_is_queue_empty(ctx) && (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN)) {
-            audio_graph_resume(ctx->audio_output);
-            ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_XRUN;
+        if (!media_player_is_queue_empty(ctx)) {
+            if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_STARTING)
+                ret = media_player_start_audio(ctx);
+            else if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN)
+                ret = media_player_resume_audio(ctx, true);
+
+            if (ret < 0) {
+                MEDIA_ERR("audio play/resume failed: %s\n", av_err2str(ret));
+                return ret;
+            }
+
+            pthread_mutex_lock(&ctx->mutex);
+            ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
+            pthread_mutex_unlock(&ctx->mutex);
         }
     }
 
@@ -1048,50 +1125,48 @@ static int media_player_stop(MediaPlayerContext* ctx)
 
 static int media_player_start(MediaPlayerContext* ctx)
 {
+    char volume_str[16] = { 0 };
     int ret = 0;
 
-    if (ctx->state != MEDIA_PLAYER_STATE_PREPARED && ctx->state != MEDIA_PLAYER_STATE_PAUSED && ctx->state != MEDIA_PLAYER_STATE_COMPLETED) {
-        ret = AVERROR(EPERM);
-        goto error;
+    if (!ctx->audio_output) {
+        ret = AVERROR(EINVAL);
+        goto err;
     }
-    if (ctx->audio_stream) {
-        if (ctx->state == MEDIA_PLAYER_STATE_PAUSED) {
-            ret = audio_graph_resume(ctx->audio_output);
-        } else {
-            AVCodecContext* codec_ctx = ctx->audio_stream->codec_ctx;
-            ret = audio_graph_start(ctx->audio_output,
-                codec_ctx->sample_fmt, codec_ctx->sample_rate,
-                codec_ctx->ch_layout.nb_channels, media_player_on_event_cb, ctx);
-        }
-        if (ret < 0) {
-            MEDIA_ERR("audio_graph_start failed.\n");
-            ret = AVERROR(EINVAL);
-            goto error;
-        }
+
+    if (ctx->state != MEDIA_PLAYER_STATE_PREPARED
+        && ctx->state != MEDIA_PLAYER_STATE_PAUSED
+        && ctx->state != MEDIA_PLAYER_STATE_COMPLETED) {
+        ret = AVERROR(EPERM);
+        goto err;
     }
 
     pthread_mutex_lock(&ctx->mutex);
-    ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
+    ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTING;
     pthread_mutex_unlock(&ctx->mutex);
 
     media_player_set_avsync_mode(ctx);
 
-    if (ctx->audio_output) {
-        char volume_str[16] = { 0 };
-        snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
-        ret = audio_graph_set_parameter(ctx->audio_output, "player_volume", volume_str);
-        if (ret < 0) {
-            MEDIA_ERR("audio_graph_set_parameter failed.\n");
-            goto error;
-        }
+    if (media_player_queue_cnt(ctx, AVMEDIA_TYPE_AUDIO) >= ctx->audio_stream->nb_queue_max) {
+        if (ctx->state == MEDIA_PLAYER_STATE_PAUSED)
+            ret = media_player_resume_audio(ctx, false);
+        else
+            ret = media_player_start_audio(ctx);
+
+        pthread_mutex_lock(&ctx->mutex);
+        ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
+        pthread_mutex_unlock(&ctx->mutex);
     }
+
+    snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
+    ret = audio_graph_set_parameter(ctx->audio_output, "player_volume", volume_str);
+    if (ret < 0)
+        MEDIA_ERR("audio_graph_set_parameter failed.\n");
 
     ctx->state = MEDIA_PLAYER_STATE_STARTED;
     ctx->ts_base = AV_NOPTS_VALUE;
-
-error:
+err:
     media_player_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
-    return 0;
+    return ret;
 }
 
 static int media_player_prepare(MediaPlayerContext* ctx, const char* filename)
