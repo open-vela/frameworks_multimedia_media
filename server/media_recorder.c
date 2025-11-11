@@ -22,12 +22,11 @@
  * Included Files
  ****************************************************************************/
 
-#include <pthread.h>
-#include <unistd.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <netpacket/rpmsg.h>
 #include <poll.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +36,7 @@
 #include <sys/sysinfo.h>
 #include <sys/time.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include "libavcodec/avcodec.h"
 #include "libavfilter/filters.h"
@@ -1106,9 +1106,6 @@ int media_recorder_process_cmd(MediaRecorderContext* ctx, const char* target,
     } else if (!strcmp(cmd, "pause")) {
         ret = media_recorder_send_cmd(ctx, MEDIA_RECORDER_CMD_PAUSE, NULL, 0);
     } else if (!strcmp(cmd, "set_options") && arg) {
-        if (!arg)
-            return AVERROR(EINVAL);
-
         ret = av_dict_parse_string(&ctx->format_opt, arg, "=", ":", 0);
     } else if (!strcmp(cmd, "get_position")) {
         snprintf(res, res_len, "%" PRIu32, ctx->current_ms);
