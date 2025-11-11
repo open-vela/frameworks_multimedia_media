@@ -1606,7 +1606,11 @@ static void media_player_poll(MediaPlayerContext* ctx)
     if (n < 1)
         return;
 
-    poll(ctx->fds, n, ctx->poll_timeout);
+    ret = poll(ctx->fds, n, ctx->poll_timeout);
+    if (ret < 0)
+        MEDIA_ERR("poll failed %d\n", ret);
+    else if (ret == 0)
+        MEDIA_DEBUG("poll timeout\n");
 
     for (i = 0; i < n; i++) {
         if (!ctx->fds[i].revents)
