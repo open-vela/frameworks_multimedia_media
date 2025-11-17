@@ -109,7 +109,7 @@ static int media_video_output_scale_init(MediaVOutputContext* ctx, AVFrame* fram
 
 static void media_video_output_scale_uninit(MediaVOutputContext* ctx)
 {
-    if (ctx->sws_ctx) {
+    if (ctx && ctx->sws_ctx) {
         sws_freeContext(ctx->sws_ctx);
         ctx->sws_ctx = NULL;
     }
