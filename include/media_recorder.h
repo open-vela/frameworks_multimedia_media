@@ -303,7 +303,7 @@ int media_uv_recorder_close(void* handle, media_uv_callback on_close);
  *
  * @param[in] handle        Async recorder handle.
  * @param[in] url           Path of destination.
- * @param[in] options       Destination options, @see media_recorder_prpare.
+ * @param[in] options       Destination options, @see media_recorder_prepare.
  * @param[in] on_connection
  * @param[in] on_prepare    Call after receiving result, will give an uv_pipe_t
  *                          to write data in buffer mode.

@@ -125,7 +125,7 @@ int media_policy_is_devices_use(const char* devices, int* use);
  * @param[in] rate  8000 for cvsd, 16000 for msbc.
  * @return int  Zero on success; a negative errno value on failure.
  *
- * @warning This api is only for certain service, if you are not sure
+ * @note This api is only for certain service, if you are not sure
  * whether you need this API, then you definitely don't need.
  */
 int media_policy_set_hfp_samplerate(int rate);
@@ -137,7 +137,7 @@ int media_policy_set_hfp_samplerate(int rate);
  *                      support multi-devices with "|" delimiter.
  * @return int  Zero on success; a negative errno value on failure.
  *
- * @warning This api is only for certain service, if you are not sure
+ * @note This api is only for certain service, if you are not sure
  * whether you need this API, then you definitely don't need.
  */
 int media_policy_set_devices_available(const char* devices);
@@ -149,7 +149,7 @@ int media_policy_set_devices_available(const char* devices);
  *                      support multi-devices with "|" delimiter.
  * @return int  Zero on success; a negative errno value on failure.
  *
- * @warning This api is only for certain service, if you are not sure
+ * @note This api is only for certain service, if you are not sure
  * whether you need this API, then you definitely don't need.
  */
 int media_policy_set_devices_unavailable(const char* devices);
@@ -248,7 +248,7 @@ int media_policy_set_mic_mute(int mute);
  *
  * @return int  Zero on success; a negative errno value on failure.
  *
- * @warning This api is only for certain service, if you are not sure
+ * @note This api is only for certain service, if you are not sure
  * whether you need this API, then you definitely don't need.
  */
 int media_policy_set_int(const char* name, int value, int apply);
@@ -653,7 +653,7 @@ int media_uv_policy_is_devices_use(void* loop,
  * @param[in] cookie    Callback argument.
  * @return int  Zero on success; a negative errno value on failure.
  *
- * @warning This api is only for certain service, if you are not sure
+ * @note This api is only for certain service, if you are not sure
  * whether you need this API, then you definitely don't need.
  *
  * @deprecated This api would soon use `int rate`.
@@ -671,7 +671,7 @@ int media_uv_policy_set_hfp_samplerate(void* loop, int rate,
  * @param[in] cookie    Callback argument.
  * @return int  Zero on success; a negative errno value on failure.
  *
- * @warning This api is only for certain service, if you are not sure
+ * @note This api is only for certain service, if you are not sure
  * whether you need this API, then you definitely don't need.
  */
 int media_uv_policy_set_devices_available(void* loop,
