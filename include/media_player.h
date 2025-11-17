@@ -347,7 +347,7 @@ int media_player_get_property(void* handle, const char* target,
  *
  *  // 3. start playing (delay till prepare is done).
  *  media_uv_player_start(ctx->handle, NULL, NULL);
- * @endcode example1.
+ * @endcode
  *
  * @code example2.
  *  void user_on_open(void* cookie, int ret) {
@@ -362,7 +362,7 @@ int media_player_get_property(void* handle, const char* target,
  *
  *  ctx->handle = media_uv_player_open(loop, MEDIA_STREAM_MUSIC,
  *      user_on_open, ctx);
- * @endcode example2.
+ * @endcode
  */
 void* media_uv_player_open(void* loop, const char* stream,
     media_uv_callback on_open, void* cookie);
@@ -395,8 +395,17 @@ int media_uv_player_close(void* handle, int pending,
  * @brief Prepare resource for playing.
  *
  * @param[in] handle            Async player handle.
- * @param[in] url               Path of resources, details @see media_player_prpare.
- * @param[in] options           Resource options, @see media_player_prpare.
+ * @param[in] url       Path of resource, there is 2 mode:
+ *                      1. URL: `url` is Local file path or Network address;
+ *                          media framework would read the resource and play.
+ *                      2. BUFFER: `url` is NULL, so caller should continuously
+ *                          provide buffers to media framework for playing;
+ *                          there are 2 ways to provide buffers,
+ *                              1. Use `media_player_write_data()`.
+ *                              2. Use `media_player_get_socket()` and `write()`
+ * @param[in] options   Extra options about the resource, usually it's key-value pairs
+ *                      to describe format of resource.
+ *                      (e.g. "format=s16le,sample_rate=44100,channels=2")
  * @param[out] on_connection    Callback to receive uv_pipe_t in buffer mode.
  * @param[out] on_prepare       Callback to receive result.
  * @param[in] cookie            Callback argument for `on_prepare`.

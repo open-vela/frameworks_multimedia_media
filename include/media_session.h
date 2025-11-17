@@ -45,7 +45,8 @@ extern "C" {
  * @param[in] params    NULL, Not used yet.
  * @return void*    Controller handle, NULL on error.
  *
- * @note The control messages sent from controller is always passed to
+ * @code
+ * The control messages sent from controller is always passed to
  * the most active controlee.
  *                                                +---------------+
  * +------------+                                 | Media Session |
@@ -59,6 +60,7 @@ extern "C" {
  * | Controllee |                                 |   |           |
  * |            | <-------------------------------+---+           |
  * +------------+                                 +---------------+
+ * @endcode
  */
 void* media_session_open(const char* params);
 
@@ -138,8 +140,6 @@ int media_session_pause(void* handle);
  * @param[in] handle    Controller handle.
  * @param[in] position  The msec position from beginning.
  * @return int  Zero on success; a negative errno value on failure.
- *
- * @warning not implement yet.
  */
 int media_session_seek(void* handle, unsigned position);
 
@@ -254,7 +254,8 @@ int media_session_get_volume(void* handle, int* volume);
  * @param[out] on_event Event callback.
  * @return void*    Controllee handle, NULL on failure.
  *
- * @note Only the most active controllee would receive control message
+ * @code
+ * Only the most active controllee would receive control message
  * and notify result from&to controllers;
  * If there are many controllees and you want to become the most active one,
  * just call update your metadata and set state > 0.
@@ -271,6 +272,7 @@ int media_session_get_volume(void* handle, int* volume);
  * | Controllee |                                 |   |           |
  * |            | on_event() <----- MEDIA_EVENT_* +---+           |
  * +------------+                                 +---------------+
+ * @endcode
  */
 void* media_session_register(void* cookie, media_event_callback on_event);
 
