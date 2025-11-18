@@ -83,7 +83,7 @@ config MEDIA_PLAYER_CMD_QUEUE_SIZE
 
 config MEDIA_PLAYER_DATA_QUEUE_SIZE
 	int "Media player data queue size"
-	default 4
+	default 6
 
 config MEDIA_PLAYER_MAX_POLLFDS
 	int "Media player max pollfds"
