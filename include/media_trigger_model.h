@@ -102,6 +102,22 @@ bool media_trigger_model_detect_hotword(void* context, const char* buffer, size_
  */
 void media_trigger_model_unload(void* context);
 
+/*
+ * @brief Get model poll fd.
+ *
+ * @param[in] context    model context.
+ * @return poll fd on success; -1 on failure.
+ */
+int media_trigger_model_get_poll_fd(void* context);
+
+/*
+ * @brief Model poll available.
+ *
+ * @param[in] context    model context.
+ * @return 0 on success; -1 on failure.
+ */
+int media_trigger_model_poll_available(void* context);
+
 #undef EXTERN
 #ifdef __cplusplus
 }

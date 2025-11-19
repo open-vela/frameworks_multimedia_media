@@ -23,6 +23,7 @@
  ****************************************************************************/
 
 #include <errno.h>
+#include <fcntl.h>
 #include <malloc.h>
 #include <media_recorder.h>
 #include <media_trigger_model.h>
@@ -70,6 +71,7 @@ typedef struct MediaTriggerContext {
     bool exit;
     int tran_fd;
     int notify_fd;
+    int recorder_fd;
     uint32_t offset;
     char* buffer;
     size_t buffer_size;
@@ -128,7 +130,7 @@ static int media_trigger_stop_recorder(MediaTriggerContext* ctx)
 
     ret = media_recorder_stop(ctx->handle);
     if (ret < 0) {
-        MEDIA_ERR("stop recorder failed:%d\n", ret);
+        MEDIA_ERR("stop recorder failed: %d\n", ret);
         return ret;
     }
 
@@ -136,6 +138,7 @@ static int media_trigger_stop_recorder(MediaTriggerContext* ctx)
     ctx->handle = NULL;
     free(ctx->buffer);
     ctx->buffer = NULL;
+    ctx->recorder_fd = -1;
 
     return ret;
 }
@@ -146,19 +149,19 @@ static int media_trigger_start_recorder(MediaTriggerContext* ctx, const char* op
 
     ctx->handle = media_recorder_open("Capture");
     if (!ctx->handle) {
-        MEDIA_ERR("Recorder: open failed. \n");
+        MEDIA_ERR("recorder open failed\n");
         return -EINVAL;
     }
 
     ret = media_recorder_prepare(ctx->handle, NULL, options);
     if (ret < 0) {
-        MEDIA_ERR("Recorder: prepare failed. \n");
+        MEDIA_ERR("recorder prepare failed\n");
         goto out;
     }
 
     ret = media_recorder_start(ctx->handle);
     if (ret < 0) {
-        MEDIA_ERR("Recorder: start failed. \n");
+        MEDIA_ERR("recorder start failed\n");
         goto out;
     }
 
@@ -172,6 +175,15 @@ static int media_trigger_start_recorder(MediaTriggerContext* ctx, const char* op
     if (!ctx->buffer) {
         ret = -ENOMEM;
         goto out;
+    }
+
+    // Get recorder socket and set non-blocking
+    ctx->recorder_fd = media_recorder_get_socket(ctx->handle);
+    if (ctx->recorder_fd >= 0) {
+        if (fcntl(ctx->recorder_fd, F_SETFL, fcntl(ctx->recorder_fd, F_GETFL, 0) | O_NONBLOCK) < 0) {
+            MEDIA_ERR("Failed to set recorder fd non-blocking\n");
+            ctx->recorder_fd = -1;
+        }
     }
 
     return ret;
@@ -203,6 +215,7 @@ static MediaTriggerContext* media_trigger_ctx_init(void)
     ctx->handle = NULL;
     ctx->notify_fd = -1;
     ctx->tran_fd = -1;
+    ctx->recorder_fd = -1;
     ctx->offset = 0;
     ctx->exit = false;
     ctx->priv = NULL;
@@ -304,7 +317,7 @@ static void media_trigger_onreceive(MediaTriggerContext* ctx, media_parcel* in, 
         }
 
         media_trigger_model_get_options(ctx->context, options, MAX_RECORDER_OPTIONS_LEN);
-        MEDIA_INFO("recorder options:%s\n", options);
+        MEDIA_INFO("recorder options: %s\n", options);
 
         ret = media_trigger_start_recorder(ctx, options);
         if (ret < 0)
@@ -332,7 +345,7 @@ static void media_trigger_onreceive(MediaTriggerContext* ctx, media_parcel* in, 
         if (ctx->state == SOUND_TRIGGER_STATE_STARTED) {
             ret = media_trigger_stop_recorder(ctx);
             if (ret < 0) {
-                MEDIA_ERR("unload: auto stop recorder failed:%d\n", ret);
+                MEDIA_ERR("unload: auto stop recorder failed: %d\n", ret);
                 goto outside;
             }
             ctx->state = SOUND_TRIGGER_STATE_STOPPED;
@@ -346,7 +359,7 @@ static void media_trigger_onreceive(MediaTriggerContext* ctx, media_parcel* in, 
         if (ctx->state == SOUND_TRIGGER_STATE_STARTED) {
             ret = media_trigger_stop_recorder(ctx);
             if (ret < 0) {
-                MEDIA_ERR("close: stop recorder failed:%d\n", ret);
+                MEDIA_ERR("close: stop recorder failed: %d\n", ret);
             }
         }
 
@@ -392,36 +405,23 @@ outside:
         free(response);
 }
 
-static int media_trigger_poll_available(MediaTriggerContext* ctx)
+
+static int media_trigger_handle_tran_fd(MediaTriggerContext* ctx)
 {
-    struct pollfd fds[1];
-    struct pollfd* fd = &fds[0];
-    fds[0].fd = ctx->tran_fd;
-    fds[0].events = POLLIN;
-    fds[0].revents = 0;
     media_parcel ack;
     uint32_t code;
     int ret;
 
-    ret = poll(fds, 1, 5);
-    if (ret == -1) {
-        MEDIA_ERR("poll failed err=%d\n", -errno);
-    } else if (ret == 0) {
-        MEDIA_DEBUG("poll timeout\n");
-    }
-
-    if (ret < 0 && ret != -EAGAIN && ret != -EPIPE) {
-        MEDIA_ERR("poll_available failed %d\n", ret);
-        return ret;
-    }
-
-    if (fd->revents & POLLERR)
-        goto out;
-
     while (1) {
         ret = media_parcel_recv(&ctx->parcel, ctx->tran_fd, &ctx->offset, MSG_DONTWAIT);
-        if (ret < 0)
+        if (ret < 0) {
+            if (ret == -EPIPE) {
+                MEDIA_INFO("fd %d connection broken\n", ctx->tran_fd);
+                media_trigger_conn_close(ctx);
+                return -EPIPE;
+            }
             break;
+        }
 
         code = media_parcel_get_code(&ctx->parcel);
         switch (code) {
@@ -441,7 +441,7 @@ static int media_trigger_poll_available(MediaTriggerContext* ctx)
             if (ret > 0)
                 ctx->notify_fd = ret;
             else
-                MEDIA_ERR("create notify failed %d\n", ret);
+                MEDIA_ERR("create notify failed: %d\n", ret);
             break;
         default:
             break;
@@ -451,52 +451,147 @@ static int media_trigger_poll_available(MediaTriggerContext* ctx)
         ctx->offset = 0;
     }
 
-    if (((fd->revents & POLLIN) && ret == -EPIPE) || (fd->revents & POLLHUP))
-        goto out;
-
-    return ret;
-
-out:
-    MEDIA_INFO("fd:%d revent:%d\n", fd->fd, (int)fd->revents);
-    media_trigger_conn_close(ctx);
     return 0;
 }
 
-static void media_trigger_poll(MediaTriggerContext* ctx)
+static int media_trigger_handle_recorder_fd(MediaTriggerContext* ctx)
 {
     bool detected;
     int ret;
 
-    ret = media_trigger_poll_available(ctx);
-    if (ret < 0 && ret != -EAGAIN)
-        return;
+    ret = recv(ctx->recorder_fd, ctx->buffer, ctx->buffer_size, MSG_DONTWAIT);
 
-    if (ctx->state == SOUND_TRIGGER_STATE_STARTED) {
-        ret = media_recorder_read_data(ctx->handle, ctx->buffer, ctx->buffer_size);
-        if (ret == ctx->buffer_size) {
-            detected = media_trigger_model_detect_hotword(ctx->context, ctx->buffer, ctx->buffer_size);
-            if (detected) {
-                MEDIA_INFO("Hotword detected\n");
-                media_trigger_notify_event(ctx, 0, 0, NULL);
-            }
+    if (ret > 0) {
+        MEDIA_DEBUG("received %d bytes\n", ret);
+
+        detected = media_trigger_model_detect_hotword(ctx->context, ctx->buffer, ret);
+        if (detected) {
+            MEDIA_INFO("hotword detected\n");
+            media_trigger_notify_event(ctx, 0, 0, NULL);
+        }
+    } else if (ret == 0) {
+        MEDIA_INFO("recorder socket closed\n");
+        media_recorder_close_socket(ctx->handle);
+        ctx->recorder_fd = -1;
+    } else if (ret < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        MEDIA_ERR("recv from recorder failed: %d\n", errno);
+    }
+
+    return 0;
+}
+
+static int media_trigger_setup_poll_fds(MediaTriggerContext* ctx, struct pollfd* fds,
+                                        int* tran_idx, int* recorder_idx, int* model_idx)
+{
+    int model_poll_fd = -1;
+    int nfds = 0;
+
+    *tran_idx = *recorder_idx = *model_idx = -1;
+
+    // Setup transport fd (always present)
+    *tran_idx = nfds;
+    fds[nfds].fd = ctx->tran_fd;
+    fds[nfds].events = POLLIN;
+    fds[nfds].revents = 0;
+    nfds++;
+
+    // Setup recorder fd (present when started)
+    if (ctx->state == SOUND_TRIGGER_STATE_STARTED && ctx->recorder_fd >= 0) {
+        *recorder_idx = nfds;
+        fds[nfds].fd = ctx->recorder_fd;
+        fds[nfds].events = POLLIN;
+        fds[nfds].revents = 0;
+        nfds++;
+    }
+
+    // Setup model poll fd (optional, only if available)
+    if (ctx->context) {
+        model_poll_fd = media_trigger_model_get_poll_fd(ctx->context);
+        if (model_poll_fd >= 0) {
+            *model_idx = nfds;
+            fds[nfds].fd = model_poll_fd;
+            fds[nfds].events = POLLIN;
+            fds[nfds].revents = 0;
+            nfds++;
         }
     }
+
+    return nfds;
+}
+
+static int media_trigger_poll(MediaTriggerContext* ctx)
+{
+    struct pollfd fds[3];
+    int nfds;
+    int ret;
+    int tran_idx, recorder_idx, model_idx;
+
+    nfds = media_trigger_setup_poll_fds(ctx, fds, &tran_idx, &recorder_idx, &model_idx);
+
+    ret = poll(fds, nfds, -1);
+    if (ret < 0) {
+        if (errno == EINTR) {
+            MEDIA_DEBUG("poll interrupted by signal\n");
+            return 0;
+        }
+        MEDIA_ERR("poll failed: %d\n", errno);
+        return -errno;
+    } else if (ret == 0) {
+        MEDIA_DEBUG("poll timeout\n");
+        return -EAGAIN;
+    }
+
+    // Check for transport fd errors or hangup first (highest priority)
+    if (fds[tran_idx].revents & (POLLERR | POLLHUP)) {
+        MEDIA_INFO("tran_fd %d revent: %d\n", ctx->tran_fd, (int)fds[tran_idx].revents);
+        media_trigger_conn_close(ctx);
+        return -EPIPE;
+    }
+
+    // Handle transport fd data (high priority - commands)
+    if (fds[tran_idx].revents & POLLIN) {
+        ret = media_trigger_handle_tran_fd(ctx);
+        if (ret == -EPIPE) {
+            return -EPIPE;
+        }
+    }
+
+    // Handle recorder fd data (medium priority - audio data)
+    if (recorder_idx >= 0 && (fds[recorder_idx].revents & POLLIN)) {
+        media_trigger_handle_recorder_fd(ctx);
+    }
+
+    // Handle model poll fd events (low priority - optional)
+    if (model_idx >= 0 && (fds[model_idx].revents & POLLIN)) {
+        MEDIA_DEBUG("model poll fd has data available\n");
+        ret = media_trigger_model_poll_available(ctx->context);
+        if (ret < 0) {
+            MEDIA_ERR("model poll available failed: %d\n", ret);
+        }
+    }
+
+    return 0;
 }
 
 static void* media_trigger_thread(void* arg)
 {
     MediaTriggerContext* ctx = (MediaTriggerContext*)arg;
-    MEDIA_INFO("create trigger thread.\n");
+    int ret;
+
+    MEDIA_INFO("create trigger thread\n");
 
     while (1) {
         if (media_trigger_is_exit(ctx))
             break;
 
-        media_trigger_poll(ctx);
+        ret = media_trigger_poll(ctx);
+        if (ret < 0 && ret != -EAGAIN) {
+            MEDIA_ERR("poll available error: %d\n", ret);
+        }
     }
 
     media_trigger_ctx_release(ctx);
-    MEDIA_INFO("exit trigger thread.\n");
+    MEDIA_INFO("exit trigger thread\n");
 
     return NULL;
 }
@@ -554,7 +649,7 @@ static int media_trigger_handler(struct MediadPlugin* pctx, struct media_server_
     MediaTriggerContext* ctx = NULL;
     int ret = 0;
 
-    MEDIA_INFO("media trigger cmd:%s arg:%s flags:%d res:%s res_len:%d\n",
+    MEDIA_INFO("media trigger cmd: %s arg: %s flags: %d res: %s res_len: %d\n",
         cmd, arg ? arg : "_", flags, res ? res : "_", res_len);
 
     if (!strcmp(cmd, "open")) {
@@ -570,7 +665,7 @@ static int media_trigger_handler(struct MediadPlugin* pctx, struct media_server_
 
         ctx->tran_fd = media_server_get_tran_fd(conn);
         if (ctx->tran_fd < 0) {
-            MEDIA_ERR("trigger get tran fd failed...\n");
+            MEDIA_ERR("trigger get tran fd failed\n");
             media_trigger_ctx_release(ctx);
             return -EINVAL;
         }
