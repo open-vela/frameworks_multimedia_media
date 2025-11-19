@@ -1412,7 +1412,7 @@ static int media_uv_trigger_send_with_payload(MediaTriggerPriv* priv,
     media_parcel_init(&parcel);
     /* follow server format: id, cmd, arg, size, resp, then optional data */
     ret = media_parcel_append_printf(&parcel, "%i%s%s%i%i",
-        priv->id, cmd, NULL, (int)size, resp_len);
+        priv->id, cmd, cmd, (int)size, resp_len);
     if (ret < 0)
         goto out;
 
@@ -1430,6 +1430,19 @@ static int media_uv_trigger_send_with_payload(MediaTriggerPriv* priv,
 out:
     media_parcel_deinit(&parcel);
     return ret;
+}
+
+static void media_uv_trigger_connect_cb(void* cookie, int ret)
+{
+    MediaTriggerPriv* priv = cookie;
+
+    if (ret >= 0)
+        ret = media_uv_trigger_send_with_payload(priv, "open", priv->name,
+            priv->name ? strlen(priv->name) : 0, 0,
+            media_uv_stream_receive_cb, media_uv_stream_open_cb, priv);
+
+    if (ret < 0 && priv->on_open)
+        priv->on_open(priv->cookie, ret);
 }
 
 void* media_uv_trigger_open(void* loop, const char* params,
@@ -1455,7 +1468,7 @@ void* media_uv_trigger_open(void* loop, const char* params,
     priv->on_open = on_open;
     priv->id = MEDIA_ID_TRIGGER;
     priv->proxy = media_uv_connect(loop, media_get_cpuname(),
-        media_uv_stream_connect_cb, priv);
+        media_uv_trigger_connect_cb, priv);
     if (!priv->proxy) {
         media_uv_stream_disconnect_cb(priv, 0);
         return NULL;
