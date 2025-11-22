@@ -56,6 +56,8 @@
 #define ROUTE_OFF 0
 #define ROUTE_ON 1
 
+#define SUBGRAPH_PARSER_FLAGS "<subgraph>"
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -219,6 +221,7 @@ static int audio_graph_load(MediaGraphPriv* priv, char* conf)
     char graph_desc[MAX_GRAPH_SIZE];
     AVFilterInOut* input = NULL;
     AVFilterInOut* output = NULL;
+    char* subgraph_start;
     int ret;
     int fd;
 
@@ -246,6 +249,9 @@ static int audio_graph_load(MediaGraphPriv* priv, char* conf)
     graph_desc[ret] = 0;
 
     MEDIA_INFO("%s, graph_desc:\n%s\n", __func__, graph_desc);
+    subgraph_start = strstr(graph_desc, SUBGRAPH_PARSER_FLAGS);
+    if (subgraph_start)
+        *subgraph_start = '\0';
 
     priv->graph = avfilter_graph_alloc();
     if (!priv->graph)
@@ -271,6 +277,64 @@ static int audio_graph_load(MediaGraphPriv* priv, char* conf)
 
     priv->graph->opaque = priv;
 
+    if (subgraph_start) {
+        char* current = subgraph_start + strlen(SUBGRAPH_PARSER_FLAGS);
+        while (current) {
+            char *colon, *config_end, *subgraph_name;
+            int found_subgraph = 0;
+            char filter_name[64];
+
+            // Skip whitespace
+            while (*current == ' ' || *current == '\n' || *current == '\r')
+                current++;
+
+            colon = strchr(current, ':');
+            if (!colon) {
+                MEDIA_ERR("Error in parsing subgraph filter name.\n");
+                ret = -EINVAL;
+                goto out;
+            }
+
+            *colon = '\0';
+            subgraph_name = current;
+            current = colon + 1;
+
+            config_end = strstr(current, SUBGRAPH_PARSER_FLAGS);
+            if (config_end)
+                *config_end = '\0';
+
+            MEDIA_INFO("Found subgraph %s with config: %s\n", subgraph_name, current);
+
+            snprintf(filter_name, sizeof(filter_name), "asubgraph@%s", subgraph_name);
+            for (int i = 0; i < priv->graph->nb_filters; i++) {
+                AVFilterContext* filter = priv->graph->filters[i];
+                if (filter->name && !strcmp(filter->name, filter_name)) {
+                    ret = avfilter_process_command(filter, "graph_parse", current, NULL, 0, 0);
+                    if (ret < 0) {
+                        MEDIA_ERR("Failed to parse subgraph config for %s:%s, %s\n",
+                            filter_name, current, av_err2str(ret));
+                        goto out;
+                    }
+
+                    found_subgraph = 1;
+                    MEDIA_INFO("Successfully parsed subgraph config for %s:%s\n",
+                        filter_name, current);
+                    break;
+                }
+            }
+
+            if (!found_subgraph) {
+                MEDIA_ERR("Failed to find subgraph filter %s\n", filter_name);
+                ret = -EINVAL;
+                goto out;
+            }
+
+            if (!config_end)
+                break;
+            current = config_end + strlen(SUBGRAPH_PARSER_FLAGS);
+        }
+    }
+
     priv->pollftn = 0;
     for (fd = 0; fd < priv->graph->nb_filters; fd++) {
         AVFilterContext* filter = priv->graph->filters[fd];
@@ -279,6 +343,7 @@ static int audio_graph_load(MediaGraphPriv* priv, char* conf)
             priv->pollfts[priv->pollftn++] = filter;
             if (priv->pollftn > MAX_POLL_FILTERS) {
                 MEDIA_ERR("%s, media graph too many pollfds\n", __func__);
+                ret = -EINVAL;
                 goto out;
             }
         }
