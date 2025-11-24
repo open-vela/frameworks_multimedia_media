@@ -556,7 +556,7 @@ static int audio_negotiate_link(
     if (final_config.channel_layouts && final_config.channel_layouts->nb_channel_layouts > 0) {
 
         // Priority 1: Use largest channel count from final_config intersection
-        osrc_link->sample_rate = osink_link->sample_rate
+        osrc_link->ch_layout.nb_channels = osink_link->ch_layout.nb_channels
             = final_config.channel_layouts->channel_layouts[0].nb_channels;
         for (i = 1; i < final_config.channel_layouts->nb_channel_layouts; i++)
             osrc_link->ch_layout.nb_channels
