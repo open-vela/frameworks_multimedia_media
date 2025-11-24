@@ -181,6 +181,7 @@ typedef void (*media_focus_callback2)(int suggestion, int req_id, void* cookie);
 #define MEDIA_AUDIO_MODE_RINGTONE "ringtone"
 #define MEDIA_AUDIO_MODE_VOIP "voip"
 
+#define MEDIA_DEVICE_SPK "spk" /*!< speaker */
 #define MEDIA_DEVICE_A2DP "a2dp" /*!< bt cellphone */
 #define MEDIA_DEVICE_A2DP_SNK "a2dpsnk"
 #define MEDIA_DEVICE_BLE "ble"
@@ -251,6 +252,7 @@ typedef void (*media_policy_change_callback)(void* cookie,
 /* Source types, for recorder. */
 
 #define MEDIA_SOURCE_MIC "Capture"
+#define MEDIA_SOURCE_HOTWORD "Hotword"
 
 /****************************************************************************
  * Metadata Definitions
