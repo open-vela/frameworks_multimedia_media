@@ -233,7 +233,7 @@ static AVFilterChannelLayouts* audio_create_merged_channel_layouts(
     AVFilterChannelLayouts* a, AVFilterChannelLayouts* b)
 {
     AVFilterChannelLayouts* merged = NULL;
-    AVChannelLayout layouts[64];
+    AVChannelLayout layouts[64] = { 0 };
     int i, j, count = 0;
     int ret = 0;
 
