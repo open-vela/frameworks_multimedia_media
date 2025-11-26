@@ -1199,10 +1199,11 @@ out:
 
 static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_len)
 {
+    int64_t audio_latency = 0;
+    int i, nb_frames, ret;
     int64_t latency = 0;
-    int i, nb_frames;
 
-    if (ctx->state != MEDIA_PLAYER_STATE_STARTED || !ctx->audio_stream)
+    if (!ctx->audio_stream)
         return AVERROR(EINVAL);
 
     pthread_mutex_lock(&ctx->mutex);
@@ -1214,6 +1215,12 @@ static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_
         }
     }
     pthread_mutex_unlock(&ctx->mutex);
+
+    ret = audio_graph_get_parameter(ctx->audio_output, "latency", res, res_len);
+    if (ret == 0) {
+        sscanf(res, "latency:%" PRId64, &audio_latency);
+        latency += audio_latency * 1000;
+    }
 
     snprintf(res, res_len, "%" PRId64, latency);
 
