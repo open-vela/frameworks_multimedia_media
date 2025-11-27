@@ -485,8 +485,7 @@ static int media_player_start_audio(MediaPlayerContext* ctx)
     pthread_mutex_unlock(&ctx->mutex);
 
 out:
-    media_player_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
-    return 0;
+    return ret;
 }
 
 static int media_player_resume_audio(MediaPlayerContext* ctx, bool xrun)
@@ -505,7 +504,6 @@ static int media_player_resume_audio(MediaPlayerContext* ctx, bool xrun)
         pthread_mutex_unlock(&ctx->mutex);
     }
 
-    media_player_event_cb(ctx, MEDIA_EVENT_STARTED, ret, NULL);
     return ret;
 }
 
@@ -1153,6 +1151,11 @@ static int media_player_start(MediaPlayerContext* ctx)
             ret = media_player_resume_audio(ctx, false);
         else
             ret = media_player_start_audio(ctx);
+
+        if (ret < 0) {
+            MEDIA_ERR("audio play/resume failed: %s\n", av_err2str(ret));
+            goto err;
+        }
 
         pthread_mutex_lock(&ctx->mutex);
         ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
