@@ -206,7 +206,11 @@ static int media_player_poll_available(MediaPlayerContext* ctx, struct pollfd* f
  */
 static inline int media_player_is_exit(MediaPlayerContext* ctx)
 {
-    return ctx->exit && (!ctx->audio_output_state || !ctx->audio_stream);
+    int is_exit;
+    pthread_mutex_lock(&ctx->mutex);
+    is_exit = ctx->exit && (!ctx->audio_output_state || !ctx->audio_stream);
+    pthread_mutex_unlock(&ctx->mutex);
+    return is_exit;
 }
 
 static int media_player_is_queue_empty(MediaPlayerContext* ctx)
