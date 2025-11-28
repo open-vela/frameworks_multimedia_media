@@ -536,9 +536,7 @@ static int media_player_queue_push(MediaPlayerContext* ctx, int idx, AVFrame* fr
         if (ret < 0)
             MEDIA_ERR("Failed to start/resume audio output: %s\n", av_err2str(ret));
 
-        pthread_mutex_lock(&ctx->mutex);
         ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
-        pthread_mutex_unlock(&ctx->mutex);
     }
     pthread_mutex_unlock(&ctx->mutex);
     return 0;
