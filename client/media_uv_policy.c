@@ -212,7 +212,7 @@ int media_uv_policy_set_string(void* loop, const char* name,
         return -ENOMEM;
     }
 
-    MEDIA_DEBUG("handle:%p %s %s %s.",
+    MEDIA_INFO("handle:%p %s %s %s.",
         priv->proxy, name, "set_string", value ? value : "_");
 
     return 0;
@@ -235,7 +235,7 @@ int media_uv_policy_get_string(void* loop, const char* name,
         return -ENOMEM;
     }
 
-    MEDIA_DEBUG("handle:%p %s %s.", priv->proxy, name, "get_string");
+    MEDIA_INFO("handle:%p %s %s.", priv->proxy, name, "get_string");
 
     return 0;
 }
@@ -259,7 +259,7 @@ int media_uv_policy_set_int(void* loop, const char* name,
         return -ENOMEM;
     }
 
-    MEDIA_DEBUG("handle:%p %s %s %d.", priv->proxy, name, "set_int", value);
+    MEDIA_INFO("handle:%p %s %s %d.", priv->proxy, name, "set_int", value);
 
     return 0;
 }
@@ -281,7 +281,7 @@ int media_uv_policy_get_int(void* loop, const char* name,
         return -ENOMEM;
     }
 
-    MEDIA_DEBUG("handle:%p %s %s.", priv->proxy, name, "get_int");
+    MEDIA_INFO("handle:%p %s %s.", priv->proxy, name, "get_int");
 
     return 0;
 }
@@ -303,7 +303,7 @@ int media_uv_policy_increase(void* loop, const char* name, int apply,
         return -ENOMEM;
     }
 
-    MEDIA_DEBUG("handle:%p %s %s.", priv->proxy, name, "increase");
+    MEDIA_INFO("handle:%p %s %s.", priv->proxy, name, "increase");
 
     return 0;
 }
@@ -325,7 +325,7 @@ int media_uv_policy_decrease(void* loop, const char* name, int apply,
         return -ENOMEM;
     }
 
-    MEDIA_DEBUG("handle:%p %s %s.", priv->proxy, name, "decrease");
+    MEDIA_INFO("handle:%p %s %s.", priv->proxy, name, "decrease");
 
     return 0;
 }
@@ -347,7 +347,7 @@ int media_uv_policy_include(void* loop, const char* name,
         return -ENOMEM;
     }
 
-    MEDIA_DEBUG("handle:%p %s %s %s.",
+    MEDIA_INFO("handle:%p %s %s %s.",
         priv->proxy, name, "include", value ? value : "_");
 
     return 0;
@@ -370,7 +370,7 @@ int media_uv_policy_exclude(void* loop, const char* name,
         return -ENOMEM;
     }
 
-    MEDIA_DEBUG("handle:%p %s %s %s.",
+    MEDIA_INFO("handle:%p %s %s %s.",
         priv->proxy, name, "exclude", value ? value : "_");
 
     return 0;
@@ -393,7 +393,7 @@ int media_uv_policy_contain(void* loop, const char* name, const char* value,
         return -ENOMEM;
     }
 
-    MEDIA_DEBUG("handle:%p %s %s %s.",
+    MEDIA_INFO("handle:%p %s %s %s.",
         priv->proxy, name, "contain", value ? value : "_");
 
     return 0;
