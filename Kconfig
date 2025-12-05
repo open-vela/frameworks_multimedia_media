@@ -179,6 +179,24 @@ config MEDIA_TRIGGER_MAX_MODEL_NUM
 	int "Media trigger max model num support"
 	default 10
 
+config MEDIA_TRIGGER_DUMP
+	bool "Enable media trigger audio dump for debugging"
+	default n
+	help
+		Enable this option to dump audio input buffers to file for debugging.
+		Audio data will be saved to the path specified by MEDIA_TRIGGER_DUMP_PATH.
+
+if MEDIA_TRIGGER_DUMP
+
+config MEDIA_TRIGGER_DUMP_PATH
+	string "Media trigger audio dump directory path"
+	default "/data"
+	help
+		Specify the directory path for dumping media trigger audio input data.
+		File will be named: media_trigger_input.pcm
+
+endif # MEDIA_TRIGGER_DUMP
+
 endif # MEDIA TRIGGER
 
 osource "$APPSDIR/frameworks/multimedia/media/pfw/Kconfig"

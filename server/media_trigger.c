@@ -32,6 +32,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <sched.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/sysinfo.h>
@@ -47,6 +48,10 @@
  ****************************************************************************/
 
 #define MAX_RECORDER_OPTIONS_LEN 128
+
+#ifdef CONFIG_MEDIA_TRIGGER_DUMP
+#define MEDIA_TRIGGER_DUMP_DIR CONFIG_MEDIA_TRIGGER_DUMP_PATH
+#endif
 
 enum {
     SOUND_TRIGGER_STATE_NOP,
@@ -77,6 +82,11 @@ typedef struct MediaTriggerContext {
     size_t buffer_size;
     media_parcel parcel;
     MediaTriggerPluginPriv* priv;
+#ifdef CONFIG_MEDIA_TRIGGER_DUMP
+    int sample_rate;
+    int channels;
+    int bits_per_sample;
+#endif
 } MediaTriggerContext;
 
 struct MediaTriggerPluginPriv {
@@ -86,6 +96,89 @@ struct MediaTriggerPluginPriv {
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+#ifdef CONFIG_MEDIA_TRIGGER_DUMP
+static void media_trigger_parse_audio_format(MediaTriggerContext* ctx, const char* options)
+{
+    const char* ptr;
+
+    /* Parse sample rate */
+    ptr = strstr(options, "sample_rate=");
+    if (ptr) {
+        ctx->sample_rate = atoi(ptr + 12);
+    }
+
+    /* Parse channels from ch_layout */
+    ptr = strstr(options, "ch_layout=");
+    if (ptr) {
+        ptr += 10;
+        if (strncmp(ptr, "mono", 4) == 0) {
+            ctx->channels = 1;
+        } else if (strncmp(ptr, "stereo", 6) == 0) {
+            ctx->channels = 2;
+        } else {
+            /* Try to parse as number */
+            ctx->channels = atoi(ptr);
+        }
+    }
+
+    /* Parse bits per sample from format */
+    ptr = strstr(options, "format=");
+    if (ptr) {
+        ptr += 7;
+        if (strncmp(ptr, "s16", 3) == 0 || strncmp(ptr, "S16", 3) == 0) {
+            ctx->bits_per_sample = 16;
+        } else if (strncmp(ptr, "s32", 3) == 0 || strncmp(ptr, "S32", 3) == 0) {
+            ctx->bits_per_sample = 32;
+        } else if (strncmp(ptr, "s24", 3) == 0 || strncmp(ptr, "S24", 3) == 0) {
+            ctx->bits_per_sample = 24;
+        } else if (strncmp(ptr, "s8", 2) == 0 || strncmp(ptr, "S8", 2) == 0) {
+            ctx->bits_per_sample = 8;
+        } else if (strncmp(ptr, "u16", 3) == 0 || strncmp(ptr, "U16", 3) == 0) {
+            ctx->bits_per_sample = 16;
+        } else if (strncmp(ptr, "u8", 2) == 0 || strncmp(ptr, "U8", 2) == 0) {
+            ctx->bits_per_sample = 8;
+        }
+    }
+
+    MEDIA_INFO("parsed audio format: %dHz, %dch, %dbit\n",
+        ctx->sample_rate, ctx->channels, ctx->bits_per_sample);
+}
+
+static void media_trigger_dump_audio(MediaTriggerContext* ctx, const char* buffer, size_t size)
+{
+    int rate = ctx->sample_rate > 0 ? ctx->sample_rate : 16000;
+    char filename[256];
+    int fd;
+
+    /* Format sample rate as 8K, 16K, 48K, etc. */
+    if (rate % 1000 == 0) {
+        snprintf(filename, sizeof(filename), "%s/media_trigger_%dK_%dch_%dbit.pcm",
+            MEDIA_TRIGGER_DUMP_DIR,
+            rate / 1000,
+            ctx->channels > 0 ? ctx->channels : 1,
+            ctx->bits_per_sample > 0 ? ctx->bits_per_sample : 16);
+    } else {
+        snprintf(filename, sizeof(filename), "%s/media_trigger_%dHz_%dch_%dbit.pcm",
+            MEDIA_TRIGGER_DUMP_DIR,
+            rate,
+            ctx->channels > 0 ? ctx->channels : 1,
+            ctx->bits_per_sample > 0 ? ctx->bits_per_sample : 16);
+    }
+
+    fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    if (fd >= 0) {
+        ssize_t written = write(fd, buffer, size);
+        if (written != (ssize_t)size) {
+            MEDIA_WARN("failed to write complete buffer: written=%zd, expected=%zu\n",
+                written, size);
+        }
+        close(fd);
+    } else {
+        MEDIA_ERR("failed to open dump file: %s, errno=%d\n", filename, errno);
+    }
+}
+#endif
 
 static inline bool media_trigger_is_exit(MediaTriggerContext* ctx)
 {
@@ -117,7 +210,7 @@ static int media_trigger_notify_event(MediaTriggerContext* ctx, int event,
 }
 
 static void hotword_detection_result_callback(void* user_data, int event,
-                                              int result, const char* extra)
+    int result, const char* extra)
 {
     MediaTriggerContext* ctx = (MediaTriggerContext*)user_data;
 
@@ -220,6 +313,11 @@ static MediaTriggerContext* media_trigger_ctx_init(void)
     ctx->exit = false;
     ctx->priv = NULL;
     media_parcel_init(&ctx->parcel);
+#ifdef CONFIG_MEDIA_TRIGGER_DUMP
+    ctx->sample_rate = 0;
+    ctx->channels = 0;
+    ctx->bits_per_sample = 0;
+#endif
 
     return ctx;
 }
@@ -319,6 +417,10 @@ static void media_trigger_onreceive(MediaTriggerContext* ctx, media_parcel* in, 
         media_trigger_model_get_options(ctx->context, options, MAX_RECORDER_OPTIONS_LEN);
         MEDIA_INFO("recorder options: %s\n", options);
 
+#ifdef CONFIG_MEDIA_TRIGGER_DUMP
+        media_trigger_parse_audio_format(ctx, options);
+#endif
+
         ret = media_trigger_start_recorder(ctx, options);
         if (ret < 0)
             goto outside;
@@ -405,7 +507,6 @@ outside:
         free(response);
 }
 
-
 static int media_trigger_handle_tran_fd(MediaTriggerContext* ctx)
 {
     media_parcel ack;
@@ -464,6 +565,9 @@ static int media_trigger_handle_recorder_fd(MediaTriggerContext* ctx)
     if (ret > 0) {
         MEDIA_DEBUG("received %d bytes\n", ret);
 
+#ifdef CONFIG_MEDIA_TRIGGER_DUMP
+        media_trigger_dump_audio(ctx, ctx->buffer, ret);
+#endif
         detected = media_trigger_model_detect_hotword(ctx->context, ctx->buffer, ret);
         if (detected) {
             MEDIA_INFO("hotword detected\n");
@@ -481,7 +585,7 @@ static int media_trigger_handle_recorder_fd(MediaTriggerContext* ctx)
 }
 
 static int media_trigger_setup_poll_fds(MediaTriggerContext* ctx, struct pollfd* fds,
-                                        int* tran_idx, int* recorder_idx, int* model_idx)
+    int* tran_idx, int* recorder_idx, int* model_idx)
 {
     int model_poll_fd = -1;
     int nfds = 0;
