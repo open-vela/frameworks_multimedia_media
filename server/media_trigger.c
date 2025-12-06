@@ -312,10 +312,34 @@ static void media_trigger_onreceive(MediaTriggerContext* ctx, media_parcel* in, 
             goto outside;
         }
 
+        /* Stop recorder first if still running */
+        if (ctx->state == SOUND_TRIGGER_STATE_STARTED) {
+            ret = media_trigger_stop_recorder(ctx);
+            if (ret < 0) {
+                MEDIA_ERR("unload: auto stop recorder failed:%d\n", ret);
+                goto outside;
+            }
+            ctx->state = SOUND_TRIGGER_STATE_STOPPED;
+        }
+
         media_trigger_model_unload(ctx->context);
         ctx->context = NULL;
         ctx->state = SOUND_TRIGGER_STATE_UNLOADED;
     } else if (!strcmp(cmd, "close")) {
+        /* Stop recorder first if still running */
+        if (ctx->state == SOUND_TRIGGER_STATE_STARTED) {
+            ret = media_trigger_stop_recorder(ctx);
+            if (ret < 0) {
+                MEDIA_ERR("close: stop recorder failed:%d\n", ret);
+            }
+        }
+
+        /* Unload model if still loaded */
+        if (ctx->state >= SOUND_TRIGGER_STATE_LOADED && ctx->state < SOUND_TRIGGER_STATE_UNLOADED) {
+            media_trigger_model_unload(ctx->context);
+            ctx->context = NULL;
+        }
+
         ctx->state = SOUND_TRIGGER_STATE_NOP;
         media_trigger_notify_finalize(ctx);
         ctx->exit = true;
