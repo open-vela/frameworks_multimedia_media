@@ -31,6 +31,7 @@
 #include <media_recorder.h>
 #include <media_utils.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/queue.h>
 #include <uv.h>
 
@@ -108,6 +109,8 @@ typedef struct MediaTakePicPriv {
 
 typedef struct MediaTriggerPriv {
     MEDIA_STREAM_FIELDS
+    char cpuname_list[128];
+    char* next_cpu;
 } MediaTriggerPriv;
 
 /****************************************************************************
@@ -1435,20 +1438,37 @@ out:
 static void media_uv_trigger_connect_cb(void* cookie, int ret)
 {
     MediaTriggerPriv* priv = cookie;
+    char* saveptr = priv->next_cpu;
+    char* cpu;
 
-    if (ret >= 0)
+    if (ret >= 0) {
         ret = media_uv_trigger_send_with_payload(priv, "open", priv->name,
             priv->name ? strlen(priv->name) : 0, 0,
             media_uv_stream_receive_cb, media_uv_stream_open_cb, priv);
+        if (ret >= 0)
+            return;
+    }
 
-    if (ret < 0 && priv->on_open)
-        priv->on_open(priv->cookie, ret);
+    while ((cpu = strtok_r(NULL, " ,;|", &saveptr)) != NULL) {
+        priv->next_cpu = saveptr;
+        priv->proxy = media_uv_connect(priv->loop, cpu,
+            media_uv_trigger_connect_cb, priv);
+        if (priv->proxy) {
+            MEDIA_INFO("trigger connection initiated to %s\n", cpu);
+            return;
+        }
+    }
+
+    if (priv->on_open)
+        priv->on_open(priv->cookie, -ENOENT);
 }
 
 void* media_uv_trigger_open(void* loop, const char* params,
     media_uv_callback on_open, void* cookie)
 {
     MediaTriggerPriv* priv;
+    char *cpu, *saveptr;
+    const char* cpuname;
 
     if (params && params[0] != '\0') {
         priv = zalloc(sizeof(MediaTriggerPriv) + strlen(params) + 1);
@@ -1467,10 +1487,28 @@ void* media_uv_trigger_open(void* loop, const char* params,
     priv->cookie = cookie;
     priv->on_open = on_open;
     priv->id = MEDIA_ID_TRIGGER;
-    priv->proxy = media_uv_connect(loop, media_get_cpuname(),
+
+    /* Save CPU list and try to connect to first CPU */
+    cpuname = media_get_cpuname();
+    strlcpy(priv->cpuname_list, cpuname, sizeof(priv->cpuname_list));
+    
+    cpu = strtok_r(priv->cpuname_list, " ,;|", &saveptr);
+    if (!cpu) {
+        MEDIA_ERR("trigger no CPU available\n");
+        if (on_open)
+            on_open(cookie, -ENOENT);
+        free(priv);
+        return NULL;
+    }
+
+    priv->next_cpu = saveptr;
+    priv->proxy = media_uv_connect(loop, cpu,
         media_uv_trigger_connect_cb, priv);
     if (!priv->proxy) {
-        media_uv_stream_disconnect_cb(priv, 0);
+        MEDIA_ERR("trigger failed to initiate connection\n");
+        if (on_open)
+            on_open(cookie, -ENOENT);
+        free(priv);
         return NULL;
     }
 
