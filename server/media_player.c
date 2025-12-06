@@ -1105,6 +1105,13 @@ static int media_player_pause(MediaPlayerContext* ctx)
         ret = 0;
     }
 
+    pthread_mutex_lock(&ctx->mutex);
+    if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_STARTING) {
+        ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_STARTING;
+        ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
+    }
+    pthread_mutex_unlock(&ctx->mutex);
+
     if (ctx->audio_output)
         audio_graph_pause(ctx->audio_output);
 
