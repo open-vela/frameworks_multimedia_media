@@ -61,6 +61,8 @@ enum {
  * Private Types
  ****************************************************************************/
 
+typedef struct MediaTriggerPluginPriv MediaTriggerPluginPriv;
+
 typedef struct MediaTriggerContext {
     void* context;
     void* handle;
@@ -72,7 +74,12 @@ typedef struct MediaTriggerContext {
     char* buffer;
     size_t buffer_size;
     media_parcel parcel;
+    MediaTriggerPluginPriv* priv;
 } MediaTriggerContext;
+
+struct MediaTriggerPluginPriv {
+    MediaTriggerContext* instance;
+};
 
 /****************************************************************************
  * Private Functions
@@ -190,6 +197,7 @@ static MediaTriggerContext* media_trigger_ctx_init(void)
     ctx->tran_fd = -1;
     ctx->offset = 0;
     ctx->exit = false;
+    ctx->priv = NULL;
     media_parcel_init(&ctx->parcel);
 
     return ctx;
@@ -343,6 +351,11 @@ static void media_trigger_onreceive(MediaTriggerContext* ctx, media_parcel* in, 
         ctx->state = SOUND_TRIGGER_STATE_NOP;
         media_trigger_notify_finalize(ctx);
         ctx->exit = true;
+
+        /* Clear plugin instance pointer when closing */
+        if (ctx->priv) {
+            ctx->priv->instance = NULL;
+        }
     } else if (!strcmp(cmd, "get_property")) {
         if (resp > 0)
             response = zalloc(resp);
@@ -502,9 +515,34 @@ static int media_trigger_open(MediaTriggerContext* ctx)
     return 0;
 }
 
+static int media_trigger_plugin_init(struct MediadPlugin* pctx)
+{
+    MediaTriggerPluginPriv* priv = (MediaTriggerPluginPriv*)pctx->priv;
+
+    priv->instance = NULL;
+    MEDIA_INFO("media trigger plugin initialized\n");
+
+    return 0;
+}
+
+static int media_trigger_plugin_uninit(struct MediadPlugin* pctx)
+{
+    MediaTriggerPluginPriv* priv = (MediaTriggerPluginPriv*)pctx->priv;
+
+    if (priv->instance) {
+        MEDIA_WARN("media trigger plugin uninit: instance still exists, forcing cleanup\n");
+        priv->instance = NULL;
+    }
+
+    MEDIA_INFO("media trigger plugin uninitialized\n");
+
+    return 0;
+}
+
 static int media_trigger_handler(struct MediadPlugin* pctx, struct media_server_conn* conn,
     const char* target, const char* cmd, const char* arg, int flags, char* res, int res_len)
 {
+    MediaTriggerPluginPriv* priv = (MediaTriggerPluginPriv*)pctx->priv;
     MediaTriggerContext* ctx = NULL;
     int ret = 0;
 
@@ -512,6 +550,12 @@ static int media_trigger_handler(struct MediadPlugin* pctx, struct media_server_
         cmd, arg ? arg : "_", flags, res ? res : "_", res_len);
 
     if (!strcmp(cmd, "open")) {
+        /* Check if an instance already exists (single instance mode) */
+        if (priv->instance != NULL) {
+            MEDIA_ERR("media trigger already opened, only one instance allowed\n");
+            return -EBUSY;
+        }
+
         ctx = media_trigger_ctx_init();
         if (!ctx)
             return -ENOMEM;
@@ -530,6 +574,10 @@ static int media_trigger_handler(struct MediadPlugin* pctx, struct media_server_
             return ret;
         }
 
+        /* Store instance in plugin priv and set back pointer */
+        ctx->priv = priv;
+        priv->instance = ctx;
+
         MEDIA_INFO("media trigger open success\n");
     }
 
@@ -538,12 +586,12 @@ static int media_trigger_handler(struct MediadPlugin* pctx, struct media_server_
 
 MediadPlugin media_trigger_plugin = {
     .name = "media_trigger",
-    .priv_size = sizeof(MediaTriggerContext),
+    .priv_size = sizeof(MediaTriggerPluginPriv),
     .priv = NULL,
-    .init = NULL,
+    .init = media_trigger_plugin_init,
     .get = NULL,
     .available = NULL,
     .run_once = NULL,
-    .uninit = NULL,
+    .uninit = media_trigger_plugin_uninit,
     .process_command = media_trigger_handler,
 };
