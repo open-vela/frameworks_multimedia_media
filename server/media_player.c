@@ -1200,13 +1200,15 @@ static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_
     if (ctx->state != MEDIA_PLAYER_STATE_STARTED || !ctx->audio_stream)
         return AVERROR(EINVAL);
 
-    nb_frames = media_player_queue_cnt(ctx, AVMEDIA_TYPE_AUDIO);
+    pthread_mutex_lock(&ctx->mutex);
+    nb_frames = ff_framequeue_queued_frames(&ctx->audio_stream->queue);
     for (i = 0; i < nb_frames; i++) {
         AVFrame* frame = ff_framequeue_peek(&ctx->audio_stream->queue, i);
         if (frame) {
             latency += av_rescale_q(frame->duration, ctx->audio_stream->time_base, AV_TIME_BASE_Q);
         }
     }
+    pthread_mutex_unlock(&ctx->mutex);
 
     snprintf(res, res_len, "%" PRId64, latency);
 
