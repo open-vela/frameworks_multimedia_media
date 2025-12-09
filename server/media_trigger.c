@@ -240,7 +240,7 @@ static int media_trigger_start_recorder(MediaTriggerContext* ctx, const char* op
 {
     int ret;
 
-    ctx->handle = media_recorder_open("Capture");
+    ctx->handle = media_recorder_open(MEDIA_SOURCE_HOTWORD);
     if (!ctx->handle) {
         MEDIA_ERR("recorder open failed\n");
         return -EINVAL;
