@@ -601,18 +601,23 @@ static int audio_graph_poll_available(MediadPlugin* ctx, struct pollfd* fd, void
 {
     MediaGraphPriv* priv = ctx->priv;
     eventfd_t unuse;
+    int ret = 0;
 
     if (!fd)
         return -EINVAL;
 
     if (cookie)
-        audio_graph_queue_command(priv, cookie, "poll_available", NULL,
+        ret = audio_graph_queue_command(priv, cookie, "poll_available", NULL,
             (char*)fd, sizeof(struct pollfd),
             AV_OPT_SEARCH_CHILDREN);
     else
         eventfd_read(priv->fd, &unuse);
 
-    return 0;
+    if (ret < 0)
+        MEDIA_ERR("audio_graph_poll_available failed: %d:%s\n",
+            ret, av_err2str(ret));
+
+    return ret;
 }
 
 static int audio_graph_run_all(AVFilterGraph* graph)
