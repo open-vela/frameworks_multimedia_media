@@ -1365,9 +1365,6 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
     if (!ctx)
         return -EINVAL;
 
-    MEDIA_INFO("ctx %p cmd: %s, arg %s, target %s.\n", ctx, cmd, arg ? arg : "NULL",
-        target ? target : "NULL");
-
     if (!strcmp(cmd, "set_event")) {
         ctx->event = true;
         return 0;
@@ -1422,6 +1419,9 @@ int media_player_process_cmd(MediaPlayerContext* ctx, const char* target, const 
         MEDIA_ERR("unknown cmd: %s.\n", cmd);
         return AVERROR(EINVAL);
     }
+
+    MEDIA_INFO("ctx %p cmd: %s, arg %s, target %s. ret %d\n", ctx, cmd, arg ? arg : "NULL",
+        target ? target : "NULL", ret);
 
     return ret;
 }
