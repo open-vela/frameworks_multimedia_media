@@ -513,14 +513,16 @@ static int media_player_resume_audio(MediaPlayerContext* ctx, bool xrun)
 
 static int media_player_queue_push(MediaPlayerContext* ctx, int idx, AVFrame* frame)
 {
-    int ret;
-
-    pthread_mutex_lock(&ctx->mutex);
+    int audio_state;
+    int queued_cnt;
+    int ret = 0;
 
     if (ctx->streams[idx]->type == AVMEDIA_TYPE_AUDIO)
         ctx->aframe_cnt++;
     else
         ctx->vframe_cnt++;
+
+    pthread_mutex_lock(&ctx->mutex);
 
     ret = ff_framequeue_add(&ctx->streams[idx]->queue, frame);
     if (ret < 0) {
@@ -529,19 +531,26 @@ static int media_player_queue_push(MediaPlayerContext* ctx, int idx, AVFrame* fr
         return ret;
     }
 
-    if (ff_framequeue_queued_frames(&ctx->streams[idx]->queue) == ctx->streams[idx]->nb_queue_max) {
-        if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_STARTING)
+    queued_cnt = ff_framequeue_queued_frames(&ctx->streams[idx]->queue);
+    audio_state = ctx->audio_output_state;
+    pthread_mutex_unlock(&ctx->mutex);
+
+    if (queued_cnt == ctx->streams[idx]->nb_queue_max) {
+
+        if (audio_state & MEDIA_AUDIO_OUTPUT_STARTING)
             ret = media_player_start_audio(ctx);
-        else if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN)
+        else if (audio_state & MEDIA_AUDIO_OUTPUT_XRUN)
             ret = media_player_resume_audio(ctx, true);
 
         if (ret < 0)
             MEDIA_ERR("Failed to start/resume audio output: %s\n", av_err2str(ret));
 
+        pthread_mutex_lock(&ctx->mutex);
         ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
+        pthread_mutex_unlock(&ctx->mutex);
     }
-    pthread_mutex_unlock(&ctx->mutex);
-    return 0;
+
+    return ret;
 }
 
 static void media_player_clear_queue(MediaPlayerContext* ctx, int what)
