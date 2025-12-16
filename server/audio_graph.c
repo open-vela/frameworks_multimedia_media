@@ -455,7 +455,7 @@ static int audio_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filt
 
     if (audio_graph_immediate_cmd(cmd)) {
         if (!strcmp(cmd, "volume")) {
-            snprintf(msg, sizeof(msg), "volume=%s", arg);
+            snprintf(msg, sizeof(msg), "volume=%.*s", (int)(sizeof(msg) - 8), arg ? arg : "");
             return avfilter_process_command(filter, "set_parameter", msg, res, res_len, 0);
         }
 

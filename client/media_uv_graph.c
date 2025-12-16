@@ -1491,7 +1491,7 @@ void* media_uv_trigger_open(void* loop, const char* params,
     /* Save CPU list and try to connect to first CPU */
     cpuname = media_get_cpuname();
     strlcpy(priv->cpuname_list, cpuname, sizeof(priv->cpuname_list));
-    
+
     cpu = strtok_r(priv->cpuname_list, " ,;|", &saveptr);
     if (!cpu) {
         MEDIA_ERR("trigger no CPU available\n");

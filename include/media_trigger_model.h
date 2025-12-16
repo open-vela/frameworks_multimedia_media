@@ -41,7 +41,7 @@ extern "C" {
  ****************************************************************************/
 
 typedef void (*hotword_detection_callback_t)(void* user_data, int event,
-                                             int result, const char* extra);
+    int result, const char* extra);
 
 /****************************************************************************
  * Public Functions
