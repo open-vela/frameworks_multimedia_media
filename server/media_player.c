@@ -1219,7 +1219,7 @@ static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_
     ret = audio_graph_get_parameter(ctx->audio_output, "latency", res, res_len);
     if (ret == 0) {
         sscanf(res, "latency:%" PRId64, &audio_latency);
-        latency += audio_latency * 1000;
+        latency += audio_latency;
     }
 
     snprintf(res, res_len, "%" PRId64, latency);
