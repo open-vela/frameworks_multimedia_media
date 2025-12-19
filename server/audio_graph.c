@@ -73,7 +73,6 @@ typedef struct MediaCommand {
 
 typedef struct MediaGraphPriv {
     AVFilterGraph* graph;
-    struct file* filep;
     int fd;
     void* pollfts[MAX_POLL_FILTERS];
     int pollftn;
@@ -371,10 +370,6 @@ static int audio_graph_init(MediadPlugin* ctx)
         goto err;
     }
 
-    ret = file_get(priv->fd, &priv->filep);
-    if (ret < 0)
-        goto err;
-
     ret = audio_graph_load(priv, file);
     if (ret < 0)
         goto err;
@@ -443,7 +438,7 @@ static MediaCommand* audio_graph_create_command(const char* cmd, const char* arg
 static void audio_graph_try_touch(MediaGraphPriv* priv)
 {
     eventfd_t val = 1;
-    file_write(priv->filep, &val, sizeof(val));
+    write(priv->fd, &val, sizeof(val));
 }
 
 static int audio_graph_queue_command(MediaGraphPriv* priv, AVFilterContext* filter,
