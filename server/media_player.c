@@ -1224,7 +1224,7 @@ static int media_player_get_latency(MediaPlayerContext* ctx, char* res, int res_
 
     snprintf(res, res_len, "%" PRId64, latency);
 
-    return 0;
+    return ret;
 }
 
 static int media_player_volume(MediaPlayerContext* ctx, const char* args, char* res, int res_len)
