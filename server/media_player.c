@@ -894,7 +894,7 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
         goto out;
     }
 
-    MEDIA_INFO("ctx %p url %s open input done.\n", ctx, name);
+    MEDIA_INFO("ctx %p open input done.\n", ctx);
 
     ret = avformat_find_stream_info(ctx->format_ctx, NULL);
     if (ret < 0) {
@@ -902,13 +902,15 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
         goto out;
     }
 
-    MEDIA_INFO("ctx %p url %s find stream info done.\n", ctx, name);
+    MEDIA_INFO("ctx %p find stream info done.\n", ctx);
 
     ret = media_player_init_stream(ctx);
     if (ret < 0) {
         MEDIA_ERR("ctx %p failed to init movie stream, ret %d, %s.\n", ctx, ret, av_err2str(ret));
         goto out;
     }
+
+    MEDIA_INFO("ctx %p open decoder done.\n", ctx);
 
     if (ctx->format_ctx->duration == AV_NOPTS_VALUE)
         ctx->duration_ms = 0;
