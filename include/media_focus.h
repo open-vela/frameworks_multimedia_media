@@ -67,7 +67,7 @@ extern "C" {
  *
  */
 void* media_focus_request(int* initial_suggestion, const char* scenario,
-    media_focus_callback on_suggestion, void* cookie) __attribute__((deprecated("This function is deprecated. Use media_focus_request2() instead.")));
+    media_focus_callback on_suggestion, void* cookie);
 
 /**
  * @brief Request Audio Focus.
@@ -156,7 +156,7 @@ void media_focus_dump(const char* options);
  * @endcode
  */
 void* media_uv_focus_request(void* loop, const char* scenario,
-    media_focus_callback on_suggestion, void* cookie) __attribute__((deprecated("This function is deprecated. Use media_uv_focus_request2() instead.")));
+    media_focus_callback on_suggestion, void* cookie);
 
 /**
  * @brief Request audio focus.
