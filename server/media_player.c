@@ -963,9 +963,15 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
         return ret;
     else if (ret == AVERROR_EOF) {
         if (!media_player_is_queue_empty(ctx)) {
-            if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_STARTING)
+            int audio_state;
+
+            pthread_mutex_lock(&ctx->mutex);
+            audio_state = ctx->audio_output_state;
+            pthread_mutex_unlock(&ctx->mutex);
+
+            if (audio_state & MEDIA_AUDIO_OUTPUT_STARTING)
                 ret = media_player_start_audio(ctx);
-            else if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN)
+            else if (audio_state & MEDIA_AUDIO_OUTPUT_XRUN)
                 ret = media_player_resume_audio(ctx, true);
 
             if (ret < 0) {
