@@ -379,7 +379,7 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
     AVFilterContext* stack[MAX_LINKS];
     bool traverse_downstream;
     AVFilterContext* current;
-    int map[MAX_LINKS];
+    int map[MAX_LINKS] = { 0 };
     AVFilterLink* link;
     int stack_size = 0;
     int i, j, ret;
@@ -409,8 +409,12 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
             for (i = 0; i < current->nb_outputs; i++) {
                 link = current->outputs[i];
 
-                av_opt_get_array(current, "map_array", AV_OPT_SEARCH_CHILDREN,
-                    0, current->nb_outputs, AV_OPT_TYPE_INT, map);
+                memset(map, 0, sizeof(map));
+                if (av_opt_get_array(current, "map_array", AV_OPT_SEARCH_CHILDREN,
+                        0, current->nb_outputs, AV_OPT_TYPE_INT, map)
+                    < 0)
+                    MEDIA_WARN("Failed to get map array for %s\n", current->name);
+
                 if (map[i] != ROUTE_ON)
                     continue;
 
@@ -439,8 +443,11 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
                         break;
                 }
 
-                av_opt_get_array(link->src, "map_array", AV_OPT_SEARCH_CHILDREN,
-                    0, link->src->nb_outputs, AV_OPT_TYPE_INT, map);
+                memset(map, 0, sizeof(map));
+                if (av_opt_get_array(link->src, "map_array", AV_OPT_SEARCH_CHILDREN,
+                        0, link->src->nb_outputs, AV_OPT_TYPE_INT, map)
+                    < 0)
+                    MEDIA_WARN("Failed to get map array for %s\n", link->src->name);
 
                 if (map[j] != ROUTE_ON) {
                     MEDIA_INFO("Skipping query for input[%d] of '%s' (src output[%d] map=OFF)\n",
@@ -636,8 +643,11 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
 
     for (i = 0; i < enabled_count; i++) {
         if (enabled_outputs[i]->dst && enabled_outputs[i]->dst->nb_outputs > 0) {
-            av_opt_get_array(enabled_outputs[i]->dst, "map_array", AV_OPT_SEARCH_CHILDREN,
-                0, enabled_outputs[i]->dst->nb_outputs, AV_OPT_TYPE_INT, dst_map);
+            memset(dst_map, 0, sizeof(dst_map));
+            if (av_opt_get_array(enabled_outputs[i]->dst, "map_array", AV_OPT_SEARCH_CHILDREN,
+                    0, enabled_outputs[i]->dst->nb_outputs, AV_OPT_TYPE_INT, dst_map)
+                < 0)
+                MEDIA_WARN("Failed to get map array for %s.\n", enabled_outputs[i]->dst->name);
 
             for (j = 0; j < enabled_outputs[i]->dst->nb_outputs; j++) {
                 if (dst_map[j] != ROUTE_ON)
@@ -708,6 +718,7 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
         ds_rate, ds_ch);
 
     for (i = 0; i < enabled_count; i++) {
+        memset(dst_map, 0, sizeof(dst_map));
         av_opt_get_array(enabled_outputs[i]->dst, "map_array", AV_OPT_SEARCH_CHILDREN,
             0, enabled_outputs[i]->dst->nb_outputs, AV_OPT_TYPE_INT, dst_map);
 
@@ -716,10 +727,14 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
                 continue;
 
             sin_link = enabled_outputs[i]->dst->outputs[j];
-            audio_set_format_config(sin_link, ds_fmt, ds_rate, ds_ch);
+            ret = audio_set_format_config(sin_link, ds_fmt, ds_rate, ds_ch);
+            if (ret < 0)
+                MEDIA_WARN("Failed to set format for sin_link\n");
         }
 
-        audio_set_format_config(enabled_outputs[i], sr_fmt, sr_rate, sr_ch);
+        ret = audio_set_format_config(enabled_outputs[i], sr_fmt, sr_rate, sr_ch);
+        if (ret < 0)
+            MEDIA_WARN("Failed to set format for enabled_output\n");
     }
 
     return 0;
@@ -768,8 +783,11 @@ static void audio_negotiate_src(AVFilterContext* filter)
         if (!src->nb_outputs)
             continue;
 
-        av_opt_get_array(src, "map_array", AV_OPT_SEARCH_CHILDREN,
-            0, src->nb_outputs, AV_OPT_TYPE_INT, map);
+        memset(map, 0, sizeof(map));
+        if (av_opt_get_array(src, "map_array", AV_OPT_SEARCH_CHILDREN,
+                0, src->nb_outputs, AV_OPT_TYPE_INT, map)
+            < 0)
+            MEDIA_WARN("Failed to get map array for src %s\n", src->name);
 
         enabled_count = 0;
         for (i = 0; i < src->nb_outputs; i++) {
