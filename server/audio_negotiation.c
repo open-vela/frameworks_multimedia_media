@@ -452,6 +452,16 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
     return 0;
 }
 
+static void audio_reset_link_format(AVFilterLink* link)
+{
+    if (!link)
+        return;
+
+    link->format = -1;
+    link->sample_rate = -1;
+    link->ch_layout.nb_channels = -1;
+}
+
 static int audio_negotiate_link(
     AVFilterLink* isrc_link,
     AVFilterLink* isink_link,
@@ -606,6 +616,10 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
     AVFilterLink* sin_link = NULL;
     int i = 0, j = 0, ret = 0;
 
+    // Initialize formats to -1 to differentiate from AV_SAMPLE_FMT_U8 (0)
+    audio_reset_link_format(&osink_link);
+    audio_reset_link_format(&osrc_link);
+
     for (i = 0; i < enabled_count; i++) {
         if (enabled_outputs[i]->dst && enabled_outputs[i]->dst->nb_outputs > 0) {
             av_opt_get_array(enabled_outputs[i]->dst, "map_array", AV_OPT_SEARCH_CHILDREN,
@@ -644,7 +658,10 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
                     ds_ch = osink_link.ch_layout.nb_channels;
 
                 memset(&osrc_link, 0, sizeof(osrc_link));
+                audio_reset_link_format(&osrc_link);
+
                 memset(&osink_link, 0, sizeof(osink_link));
+                audio_reset_link_format(&osink_link);
             }
         } else {
 
@@ -665,6 +682,7 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
                 sr_ch = osrc_link.ch_layout.nb_channels;
 
             memset(&osrc_link, 0, sizeof(osrc_link));
+            audio_reset_link_format(&osrc_link);
         }
     }
 
