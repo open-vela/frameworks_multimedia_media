@@ -394,6 +394,10 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
         || (filter->nb_inputs == 0)
         || (filter->nb_inputs > 0 && filter->nb_outputs > 0);
 
+    if (stack_size >= MAX_LINKS) {
+        MEDIA_ERR("Stack overflow in formats init\n");
+        return AVERROR(ENOMEM);
+    }
     stack[stack_size++] = filter;
 
     while (stack_size > 0) {
@@ -414,8 +418,13 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
                 if (ret < 0)
                     return ret;
 
-                if (link->dst->nb_outputs > 0)
+                if (link->dst->nb_outputs > 0) {
+                    if (stack_size >= MAX_LINKS) {
+                        MEDIA_ERR("Stack overflow traversing downstream\n");
+                        return AVERROR(ENOMEM);
+                    }
                     stack[stack_size++] = link->dst;
+                }
             }
         } else {
 
@@ -443,8 +452,13 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
                 if (ret < 0)
                     return ret;
 
-                if (link->src->nb_inputs > 0)
+                if (link->src->nb_inputs > 0) {
+                    if (stack_size >= MAX_LINKS) {
+                        MEDIA_ERR("Stack overflow traversing upstream\n");
+                        return AVERROR(ENOMEM);
+                    }
                     stack[stack_size++] = link->src;
+                }
             }
         }
     }
@@ -721,15 +735,23 @@ static void audio_negotiate_src(AVFilterContext* filter)
     int i, s;
 
     // 1. collect all source filters (filters with no inputs)
-    if (filter->nb_inputs == 0 || (filter->nb_inputs && filter->nb_outputs))
-        srcs[src_count++] = filter;
-    else {
-        stack[stack_top++] = filter;
+    if (filter->nb_inputs == 0 || (filter->nb_inputs && filter->nb_outputs)) {
+        if (src_count < MAX_LINKS)
+            srcs[src_count++] = filter;
+        else
+            MEDIA_WARN("Max source filters reached\n");
+    } else {
+        if (stack_top < MAX_LINKS)
+            stack[stack_top++] = filter;
+        else
+            MEDIA_WARN("Stack overflow in src collection\n");
+
         while (stack_top > 0) {
             AVFilterContext* cur = stack[--stack_top];
 
             if (cur->nb_inputs == 0) {
-                srcs[src_count++] = cur;
+                if (src_count < MAX_LINKS)
+                    srcs[src_count++] = cur;
                 continue;
             }
 
@@ -754,7 +776,10 @@ static void audio_negotiate_src(AVFilterContext* filter)
             if (map[i] != ROUTE_ON)
                 continue;
 
-            enabled_outputs[enabled_count++] = src->outputs[i];
+            if (enabled_count < MAX_LINKS)
+                enabled_outputs[enabled_count++] = src->outputs[i];
+            else
+                MEDIA_WARN("Max enabled outputs reached\n");
         }
 
         if (enabled_count)
