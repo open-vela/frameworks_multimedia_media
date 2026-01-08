@@ -518,7 +518,7 @@ static int media_recorder_open_encoder(MediaRecorderContext* ctx, int idx)
         }
     } else {
         if (num_ch_layouts)
-            ch_layout = ch_layouts[i];
+            ch_layout = ch_layouts[0];
         else {
             av_channel_layout_default(&ch_layout, 1);
             MEDIA_WARN("no specify the channel layout, use default value %d\n",
@@ -831,6 +831,7 @@ static void media_recorder_ctx_init(MediaRecorderContext* ctx)
     ctx->video_idx = -1;
     ctx->exit = 0;
     ctx->aframe_cnt = 0;
+    ctx->audio_input_state = 0;
     SIMPLEQ_INIT(&ctx->cmd_queue);
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
@@ -861,7 +862,7 @@ static int media_recorder_pause(MediaRecorderContext* ctx)
     }
 
     if (ctx->audio_idx >= 0)
-        audio_graph_pause(ctx->audio_input);
+        ret = audio_graph_pause(ctx->audio_input);
 
     media_recorder_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
     return 0;
@@ -1225,9 +1226,10 @@ static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollf
     if (fd->fd == ctx->event_fd) {
         uint64_t cnt;
         ret = read(ctx->event_fd, &cnt, sizeof(cnt));
-        if (ret < 0) {
-            MEDIA_ERR("ctx %p read event fd failed %d\n", ctx, ret);
-            goto out;
+        if (ret < 0 && errno != EINTR && errno != EAGAIN) {
+            MEDIA_ERR("ctx %p read event fd failed %d, exit recorder\n", ctx, -errno);
+            ctx->exit = 1;
+            return ret;
         }
     } else if (fd->fd == ctx->tran_fd) {
         while (1) {
