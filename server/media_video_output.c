@@ -147,6 +147,10 @@ static int media_video_output_start(MediaVOutputContext* ctx, AVFrame* frame)
     st->codecpar->width = ctx->width;
     st->codecpar->height = ctx->height;
     pixdesc = av_pix_fmt_desc_get(ctx->pix_fmt);
+    if (!pixdesc) {
+        MEDIA_ERR("Invalid pixel format\n");
+        return AVERROR(EINVAL);
+    }
     st->codecpar->bits_per_coded_sample = av_get_bits_per_pixel(pixdesc);
 
     ret = avformat_write_header(ctx->fmt_ctx, NULL);
@@ -282,7 +286,8 @@ int media_video_output_open(MediaVOutputContext** pctx, AVDictionary* options)
             ret = -EINVAL;
             goto err;
         }
-    }
+    } else
+        ctx->pix_fmt = AV_PIX_FMT_NONE;
 
     ret = avformat_alloc_output_context2(&ctx->fmt_ctx, NULL, format, devname);
     if (ret < 0) {

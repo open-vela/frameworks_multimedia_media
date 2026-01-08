@@ -892,7 +892,7 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
 
     ctx->format_ctx = avformat_alloc_context();
     if (!ctx->format_ctx) {
-        av_freep(name);
+        av_freep(&name);
         return AVERROR(ENOMEM);
     }
 
@@ -1553,7 +1553,7 @@ static int media_player_create_notify(MediaPlayerContext* ctx, media_parcel* par
     key = media_parcel_read_string(parcel);
     cpu = media_parcel_read_string(parcel);
 
-    if (key == NULL)
+    if (key == NULL || cpu == NULL)
         return -EINVAL;
 
     if (strcmp(cpu, CONFIG_RPMSG_LOCAL_CPUNAME)) {
@@ -1588,7 +1588,7 @@ static int media_player_get_pollfd(MediaPlayerContext* ctx, struct pollfd* fds, 
 {
     int nfd = 0;
 
-    if (!fds || count < 1)
+    if (!fds || count < 2)
         return -EINVAL;
 
     fds[nfd].fd = ctx->tran_fd;
