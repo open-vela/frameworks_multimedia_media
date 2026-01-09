@@ -692,9 +692,13 @@ static void media_player_map_protocol(
             snprintf(dst, length, "%s:%s", tag->value, url);
             av_dict_free(&opts);
             return;
+        } else {
+            MEDIA_WARN("Protocol '%s' not found in map.\n", proto);
         }
 
         av_dict_free(&opts);
+    } else {
+        MEDIA_WARN("No protocol_map set or invalid proto.\n");
     }
 
     av_strlcpy(dst, url, length);
@@ -891,7 +895,12 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
 
     if (ctx->global_opts)
         av_dict_copy(&ctx->format_opt, ctx->global_opts, 0);
-
+    ctx->protocol_map = NULL;
+    if ((tag = av_dict_get(ctx->format_opt, "protocol_map", NULL, 0))) {
+        ctx->protocol_map = tag->value;
+    } else {
+        MEDIA_WARN("protocol_map NOT found in options!\n");
+    }
     media_player_map_protocol(ctx, filename, name, MAX_URL_SIZE);
 
     MEDIA_INFO("ctx %p url %s start open input.\n", ctx, name);
