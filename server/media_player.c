@@ -789,6 +789,9 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
             stream_out->type = AVMEDIA_TYPE_AUDIO;
         }
 
+        if (!stream_out)
+            continue;
+
         stream_out->type = stream->codecpar->codec_type;
         stream_out->index = i;
         stream_out->nb_queue_max = CONFIG_MEDIA_PLAYER_DATA_QUEUE_SIZE;
@@ -1190,7 +1193,7 @@ static int media_player_start(MediaPlayerContext* ctx)
 
     media_player_set_avsync_mode(ctx);
 
-    if (media_player_queue_cnt(ctx, AVMEDIA_TYPE_AUDIO) >= ctx->audio_stream->nb_queue_max) {
+    if (ctx->audio_stream && media_player_queue_cnt(ctx, AVMEDIA_TYPE_AUDIO) >= ctx->audio_stream->nb_queue_max) {
         if (ctx->state == MEDIA_PLAYER_STATE_PAUSED)
             ret = media_player_resume_audio(ctx, false);
         else
