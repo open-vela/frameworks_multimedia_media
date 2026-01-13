@@ -1,5 +1,5 @@
 ############################################################################
-# multimedia/media/scripts/gdb/utils.py
+# multimedia/media/scripts/gdb/mediagraph.py
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -20,7 +20,6 @@
 #
 ############################################################################
 
-import avfilter_function as avf
 import gdb
 from nxgdb import utils
 
@@ -51,185 +50,262 @@ class MediaGraphHander:
         if not isinstance(graph, gdb.Value):
             raise ValueError("hander must be gdb.Value")
         self.hander = graph
-        self.priv = graph.cast(gdb.lookup_type("MediaGraphPriv").pointer())
-        self.split_pipeline = []
-        self.worning = []
-        self.splite_graph()
+        # Try to get AVFilterGraph from MediaGraphPriv
+        try:
+            self.priv = graph.cast(gdb.lookup_type("MediaGraphPriv").pointer())
+            self.filter_graph = self.priv["graph"]
+        except:
+            # Direct AVFilterGraph
+            self.filter_graph = graph.cast(gdb.lookup_type("AVFilterGraph").pointer())
 
-    def splite_graph(self):
-        graph = self.priv["graph"]
-        if not self.priv:
-            raise gdb.GdbError("media_graph is not init")
+    def link_filter_dump(self, link: gdb.Value) -> str:
+        """Format link info like audio_graph_dump_link"""
+        if not link:
+            return 0, ""
 
-        for filter in utils.ArrayIterator(graph["filters"], graph["nb_filters"]):
-            if int(filter["nb_inputs"]) == 0:
-                pipe_line = []
-                filters = {}
-                self.splite_graph_in_link(filter, pipe_line, filters)
-                self.split_pipeline.append([pipe_line, filters])
+        # Get FilterLinkInternal for status info
+        try:
+            link_internal = link.cast(gdb.lookup_type("FilterLinkInternal").pointer())
+            status_out = int(link_internal["status_out"])
+            status_in = int(link_internal["status_in"])
 
-    def splite_graph_in_link(self, filter: gdb.Value, pipeline: list, filters: dict):
-        filters[filter["name"].string()] = filter
+            fifo = link_internal["fifo"]
+            fifo_queued = int(fifo["queued"])
 
-        for i in range(int(filter["nb_outputs"])):
-            output_link = filter["outputs"][i]
-            dst_filter = output_link["dst"]
-            link_status = self.link_filter_dump(output_link)
-            pipeline.append([output_link, link_status])
+            # Get frame_count_out from FilterLink inside FilterLinkInternal
+            filter_link = link_internal["l"]
+            frame_count_in = int(filter_link["frame_count_in"])
+            frame_count_out = int(filter_link["frame_count_out"])
+            frame_wanted_out = int(link_internal["frame_wanted_out"])
+        except:
+            # Fallback
+            status_out = 0
+            status_in = 0
+            fifo_queued = 0
+            frame_count_in = 0
+            frame_count_out = 0
+            frame_wanted_out = 0
 
-            if int(dst_filter["nb_outputs"]) != 0:
-                self.splite_graph_in_link(dst_filter, pipeline, filters)
+        # Media type
+        media_type = int(link["type"])
+        if media_type == 1:  # Audio
+            format_str = g_sample_fmt.get(int(link["format"]), "?")
+            sample_rate = int(link["sample_rate"])
+            nb_ch = int(link["ch_layout"]["nb_channels"])
+
+            if nb_ch == 2:
+                ch_str = "stereo"
+            elif nb_ch == 1:
+                ch_str = "mono"
             else:
-                filters[dst_filter["name"].string()] = dst_filter
-                pipeline.append("none")
+                ch_str = f"{nb_ch} channels"
 
-    def link_filter_dump(self, link: gdb.Value) -> dict:
-        link_stats = {}
-        link_stats["name"] = "linkfilter"
-        link_stats["src"] = link["src"]
-        link_stats["dst"] = link["dst"]
-        if link["type"] == 0:
-            link_stats["type"] = "video"
-        elif link["type"] == 1:
-            link_stats["type"] = "audio"
+            # Format like audio_graph.c
+            if sample_rate == 0 and status_in != 0:
+                fmt = f"[0Hz ?: status_in:{status_in} status_out: {status_out} fifo:{fifo_queued} wt:{frame_wanted_out} icnt:{frame_count_in} ocnt:{frame_count_out} {ch_str}]"
+            else:
+                fmt = f"[{sample_rate}Hz {format_str}: status_in:{status_in} status_out: {status_out} fifo:{fifo_queued} wt:{frame_wanted_out} icnt:{frame_count_in} ocnt:{frame_count_out} {ch_str}]"
+
+            return len(fmt), fmt
         else:
-            link_stats["type"] = "unknown"
-        link_stats["w"] = link["w"]
-        link_stats["h"] = link["h"]
-        link_stats["sample_aspect_ratio"] = link["sample_aspect_ratio"]
-        link_stats["format"] = g_sample_fmt.get(int(link["format"]))
-        link_stats["channels"] = link["ch_layout"]["nb_channels"]
-        link_stats["sample_rate"] = link["sample_rate"]
-        link_stats["codec"] = link["codec"]
-        link_stats["incfg"] = link["incfg"]
-        link_stats["outcfg"] = link["outcfg"]
-        link_stats["incfg-outcfg-st"] = (
-            ("1" if link["incfg"]["formats"] else "0")
-            + "-"
-            + ("1" if link["outcfg"]["formats"] else "0")
-        )
-        link_stats["frame_count_in"] = link["frame_count_in"]
-        link_stats["frame_wanted_out"] = link["frame_wanted_out"]
-        link_stats["time_base"] = link["time_base"]
-        link_stats["current_pts"] = link["current_pts"]
-        if link.type.has_key("status_out"):
-            link_stats["status_out"] = link["status_out"]
-            link_stats["status_in"] = link["status_in"]
-            link_stats["fifo_queued_frame"] = link["fifo"]["queued"] - 1
-            link_stats["fifo_queued_sample"] = int(
-                link["fifo"]["total_samples_head"] - link["fifo"]["total_samples_tail"]
-            )
-            link_stats["fifo_size"] = link["fifo"]["allocated"]
-        else:
-            priv_data = link["reserved"]
-            offset = (
-                utils.lookup_type("FFFrameQueue").sizeof
-                + utils.lookup_type("int").sizeof
-            )
-            link_stats["status_in"] = priv_data[offset].cast(gdb.lookup_type("int"))
-            offset += (
-                utils.lookup_type("int").sizeof + utils.lookup_type("int64_t").sizeof
-            )
-            link_stats["status_out"] = priv_data[offset].cast(gdb.lookup_type("int"))
-            fifo = (
-                gdb.Value(priv_data.address)
-                .cast(utils.lookup_type("FFFrameQueue").pointer())
-                .dereference()
-            )
-            link_stats["fifo_queued_frame"] = (
-                fifo["queued"] if fifo["queued"] == 0 else fifo["queued"] - 1
-            )
-            link_stats["fifo_queued_sample"] = int(
-                fifo["total_samples_head"] - fifo["total_samples_tail"]
-            )
-            link_stats["fifo_size"] = fifo["allocated"]
-        return link_stats
+            return 0, "[?]"
 
     def dump_graph(self) -> list:
-        if not self.split_pipeline:
+        if not self.filter_graph:
             return None
 
         dump_result = []
-        for pipeline in self.split_pipeline:
-            sub_pipeline = pipeline[0]
-            filters = pipeline[1]
-            pipeline_name = None
-            pre_link = None
-            for filter in filters.keys():
-                if "movie_async" in filter or "devsrc" in filter:
-                    pipeline_name = filter
-                    break
+        filters = utils.ArrayIterator(self.filter_graph["filters"], self.filter_graph["nb_filters"])
 
-            if not pipeline_name:
-                pipeline_name = "error pipeline"
+        for filter in filters:
+            filter_name = filter["name"].string()
+            filter_type = filter["filter"]["name"].string()
 
-            dump_result.append(f"Pipeline Name: {pipeline_name}")
+            # Show filter's priv pointer inside the box (if present)
+            filter_priv_str = ""
+            try:
+                filter_priv = filter["priv"]
+                if filter_priv:
+                    filter_priv_str = str(filter_priv)
+            except:
+                filter_priv_str = ""
 
-            for link in sub_pipeline:
-                if link == "none":
-                    if pre_link is None:
-                        gdb.write("WARNING: graph nodes with unknown structure\n")
-                        continue
+            # Calculate max widths for this filter
+            max_src_name = 0
+            max_dst_name = 0
+            max_in_name = 0
+            max_out_name = 0
+            max_in_fmt = 0
+            max_out_fmt = 0
 
-                    final_filter = pre_link[1]["dst"]
-                    if filter_func := avf.get_filter_func(
-                        filters.get(final_filter["name"].string())
-                    ):
-                        filter_status = []
-                        filter_func(hander=final_filter, dump=filter_status)
-                        dump_result.append(
-                            f"{final_filter['name'].string():<{25}} ex: {filter_status}\n"
-                        )
-                    else:
-                        dump_result.append(
-                            f"{final_filter['name'].string():<{25}} ex: unknown filter\n"
-                        )
+            # Process inputs
+            for j in range(int(filter["nb_inputs"])):
+                link = filter["inputs"][j]
+                if not link:
                     continue
 
-                src = link[1]["src"]["name"].string()
-                dst = link[1]["dst"]["name"].string()
-                f = link[1]["incfg-outcfg-st"]
-                fmt = link[1]["format"]
-                sr = int(link[1]["sample_rate"])
-                cl = int(link[1]["channels"])
-                st = (
-                    ("1" if int(link[1]["status_in"]) == 0 else "0")
-                    + "-"
-                    + ("1" if int(link[1]["status_out"]) == 0 else "0")
-                )
-                fwn = int(link[1]["frame_wanted_out"])
-                cnt = int(link[1]["frame_count_in"])
-                cur = f"{link[1]['fifo_queued_frame']}-{link[1]['fifo_queued_sample']}"
-                ex = ""
+                src_name = link["src"]["name"].string()
+                src_pad_name = link["srcpad"]["name"].string() if link["srcpad"] else "output0"
+                dst_pad_name = link["dstpad"]["name"].string() if link["dstpad"] else "input0"
 
-                if filter_func := avf.get_filter_func(filters.get(src)):
-                    filter_status = []
-                    filter_func(hander=link[1]["src"], dump=filter_status)
-                    for i in range(len(filter_status)):
-                        ex += filter_status[i] + " "
-                else:
-                    ex += "unknown filter"
+                src_name_len = len(src_name) + 1 + len(src_pad_name)
+                max_src_name = max(max_src_name, src_name_len)
+                max_in_name = max(max_in_name, len(dst_pad_name))
 
-                status = (
-                    f"{src:<{25}}"
-                    + "->"
-                    + f"{dst:<{25}}"
-                    + f" f:{f}"
-                    + " fmt:"
-                    + f"{fmt:<{5}}"
-                    + " sr:"
-                    + f"{sr:<{6}}"
-                    + " cls:"
-                    + f"{cl:<{2}}"
-                    + f" st:{st}"
-                    + f" wn:{fwn}"
-                    + " cnt:"
-                    + f"{cnt:<{7}}"
-                    + f" cur:{cur}"
-                    + f" ex:{ex}"
-                )
-                dump_result.append(status)
+                fmt_len, _ = self.link_filter_dump(link)
+                max_in_fmt = max(max_in_fmt, fmt_len)
 
-                pre_link = link
+            # Process outputs
+            for j in range(int(filter["nb_outputs"])):
+                link = filter["outputs"][j]
+                if not link:
+                    continue
+
+                dst_name = link["dst"]["name"].string()
+                src_pad_name = link["srcpad"]["name"].string() if link["srcpad"] else "output0"
+                dst_pad_name = link["dstpad"]["name"].string() if link["dstpad"] else "input0"
+
+                dst_name_len = len(dst_name) + 1 + len(dst_pad_name)
+                max_dst_name = max(max_dst_name, dst_name_len)
+                max_out_name = max(max_out_name, len(src_pad_name))
+
+                fmt_len, _ = self.link_filter_dump(link)
+                max_out_fmt = max(max_out_fmt, fmt_len)
+
+            # Calculate indent and width
+            in_indent = max_src_name + max_in_name + max_in_fmt
+            if in_indent > 0:
+                in_indent += 4
+
+            filter_name_len = len(filter_name)
+            filter_type_len = len(filter_type) + 2  # for parentheses
+            filter_priv_len = len(filter_priv_str) if filter_priv_str else 0
+            filter_width = max(filter_name_len + 2, filter_type_len + 4, filter_priv_len + 4)
+
+            box_text_lines = 2 + (1 if filter_priv_str else 0)
+            height = max(box_text_lines, int(filter["nb_inputs"]), int(filter["nb_outputs"]))
+
+            # Check if this is a sink filter (no outputs)
+            is_sink = int(filter["nb_outputs"]) == 0
+
+            if is_sink:
+                # Sink filter: left side has input info, right side has filter box
+                # Calculate total width for alignment
+                total_width = in_indent + filter_width
+
+                # Top border
+                dump_result.append(" " * in_indent + "+" + "-" * filter_width + "+")
+
+                # Process each row
+                for row in range(height):
+                    # Calculate which input to show
+                    in_no = row - (height - int(filter["nb_inputs"])) // 2
+
+                    # Input side (left)
+                    input_str = ""
+                    if in_no >= 0 and in_no < int(filter["nb_inputs"]):
+                        link = filter["inputs"][in_no]
+                        if link:
+                            src_name = link["src"]["name"].string()
+                            src_pad_name = link["srcpad"]["name"].string() if link["srcpad"] else "output0"
+                            dst_pad_name = link["dstpad"]["name"].string() if link["dstpad"] else "input0"
+
+                            src_str = f"{src_name}:{src_pad_name}"
+                            _, fmt_str = self.link_filter_dump(link)
+
+                            # Calculate padding
+                            e1 = max_src_name + 2
+                            e2 = max_in_fmt + 2 + max_in_name - len(dst_pad_name)
+
+                            input_str = src_str + "-" * (e1 - len(src_str)) + fmt_str + "-" * (e2 - len(fmt_str)) + dst_pad_name
+
+                    # Filter part
+                    filter_str = "|"
+
+                    text_start = (height - box_text_lines) // 2
+                    name_row = text_start
+                    type_row = text_start + 1
+                    priv_row = text_start + 2 if filter_priv_str else -1
+
+                    if row == name_row:
+                        x = (filter_width - filter_name_len) // 2
+                        filter_str += " " * x + filter_name + " " * (filter_width - x - filter_name_len)
+                    elif row == type_row:
+                        type_str = f"({filter_type})"
+                        x = (filter_width - len(type_str)) // 2
+                        filter_str += " " * x + type_str + " " * (filter_width - x - len(type_str))
+                    elif row == priv_row:
+                        x = (filter_width - len(filter_priv_str)) // 2
+                        filter_str += " " * x + filter_priv_str + " " * (filter_width - x - len(filter_priv_str))
+                    else:
+                        filter_str += " " * filter_width
+                    filter_str += "|"
+
+                    # Combine: input + filter
+                    # Ensure the filter box keeps the same column even when this row has no input string.
+                    full_line = input_str.ljust(in_indent) + filter_str
+                    dump_result.append(full_line)
+
+                # Bottom border
+                dump_result.append(" " * in_indent + "+" + "-" * filter_width + "+")
+                dump_result.append("")
+
+            else:
+                # Source filter: filter box on left, outputs on right
+                # Top border
+                dump_result.append("+" + "-" * filter_width + "+")
+
+                # Process each row
+                for row in range(height):
+                    # Calculate which output to show
+                    out_no = row - (height - int(filter["nb_outputs"])) // 2
+
+                    # Filter part
+                    filter_str = "|"
+
+                    text_start = (height - box_text_lines) // 2
+                    name_row = text_start
+                    type_row = text_start + 1
+                    priv_row = text_start + 2 if filter_priv_str else -1
+
+                    if row == name_row:
+                        x = (filter_width - filter_name_len) // 2
+                        filter_str += " " * x + filter_name + " " * (filter_width - x - filter_name_len)
+                    elif row == type_row:
+                        type_str = f"({filter_type})"
+                        x = (filter_width - len(type_str)) // 2
+                        filter_str += " " * x + type_str + " " * (filter_width - x - len(type_str))
+                    elif row == priv_row:
+                        x = (filter_width - len(filter_priv_str)) // 2
+                        filter_str += " " * x + filter_priv_str + " " * (filter_width - x - len(filter_priv_str))
+                    else:
+                        filter_str += " " * filter_width
+                    filter_str += "|"
+
+                    # Output side (right)
+                    output_str = ""
+                    if out_no >= 0 and out_no < int(filter["nb_outputs"]):
+                        link = filter["outputs"][out_no]
+                        if link:
+                            dst_name = link["dst"]["name"].string()
+                            src_pad_name = link["srcpad"]["name"].string() if link["srcpad"] else "output0"
+                            dst_pad_name = link["dstpad"]["name"].string() if link["dstpad"] else "input0"
+
+                            _, fmt_str = self.link_filter_dump(link)
+                            dst_str = f"{dst_name}:{dst_pad_name}"
+
+                            # Calculate padding
+                            e1 = max_out_name + 2
+                            e2 = max_out_fmt + 2 + max_dst_name - len(dst_str)
+
+                            output_str = src_pad_name + "-" * (e1 - len(src_pad_name)) + fmt_str + "-" * (e2 - len(fmt_str)) + dst_str
+
+                    # Combine
+                    full_line = filter_str + output_str
+                    dump_result.append(full_line)
+
+                # Bottom border
+                dump_result.append("+" + "-" * filter_width + "+")
+                dump_result.append("")
 
         return dump_result

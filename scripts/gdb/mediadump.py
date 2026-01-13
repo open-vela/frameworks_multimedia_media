@@ -29,22 +29,24 @@ from nxgdb import utils
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-import mediagraph as MediaGraph  # noqa: E402
+import mediagraph as MediaGraph
+import mediapolicy as MediaPolicy
+import mediaplayer as MediaPlayer
+import mediarecorder as MediaRecorder
 
 
 class MediaDump(gdb.Command):
     """This GDB command dumps MediaPoll and its handle to MediaGraphPriv
     when the provided argument matches the node's name."""
 
-    ALL_MODULES = ["graph", "policy", "focus", "session", "server", "all"]
+    ALL_MODULES = ["policy", "graph", "player", "recorder", "all"]
 
     def __init__(self):
         super(MediaDump, self).__init__("mediadump", gdb.COMMAND_USER)
         self.graph = None
         self.policy = None
-        self.focus = None
-        self.session = None
-        self.server = None
+        self.player = None
+        self.recorder = None
 
     def invoke(self, arg, from_tty):
         parser = argparse.ArgumentParser(description="MediaDump command options.")
@@ -68,47 +70,61 @@ class MediaDump(gdb.Command):
             gdb.write(f"Error accessing g_media: {e}\n")
             return
 
-        handle = None
+        # Mapping from CLI argument to plugin name in g_media
+        plugin_map = {
+            "policy": "media_policy",
+            "graph": "audio_graph",
+            "player": "media_player",
+            "recorder": "media_recorder",
+        }
 
+        target_plugins = []
         if args.name == "all":
-            for i in range(array_size):
-                if g_media[i].type.has_key("handle"):
-                    self.media_dump_func(
-                        g_media[i]["handle"], g_media[i]["name"].string()
-                    )
-                else:
-                    self.media_dump_func(
-                        g_media[i]["priv"], g_media[i]["name"].string()
-                    )
-            return
+            # Order matters here: policy -> graph -> player -> recorder
+            target_plugins = ["media_policy", "audio_graph", "media_player", "media_recorder"]
+        elif args.name in plugin_map:
+            target_plugins = [plugin_map[args.name]]
         else:
-            name = f"media_{args.name}"
-            for i in range(array_size):
-                if g_media[i]["name"].string() == name:
-                    handle = g_media[i]["handle"]
-                    try:
-                        self.media_dump_func(handle, name)
-                    except gdb.error as e:
-                        gdb.write(f"dump {name} failed: {e}\n")
-                        pass
-                    break
+            # Should be covered by argparse choices, but safe fallback
+            gdb.write(f"Unknown module: {args.name}\n")
+            return
 
-        if not handle:
-            gdb.write(f"Error: No media node found with the name '{arg}'.\n")
+        # Collect all matching nodes first
+        found_nodes = {}
+        for i in range(array_size):
+            try:
+                name_val = g_media[i]["name"]
+                if not name_val:
+                    continue
+                plugin_name = name_val.string()
+
+                if plugin_name in target_plugins:
+                    found_nodes[plugin_name] = g_media[i]["priv"]
+            except gdb.error:
+                continue
+
+        if not found_nodes:
+            gdb.write(f"No matching media nodes found for '{args.name}'.\n")
+            return
+
+        # Dump in the order specified in target_plugins
+        for plugin_name in target_plugins:
+            if plugin_name in found_nodes:
+                try:
+                    self.media_dump_func(found_nodes[plugin_name], plugin_name)
+                except gdb.error as e:
+                    gdb.write(f"dump {plugin_name} failed: {e}\n")
 
     def media_dump_func(self, handle, name):
         dump_functions = {
-            "media_graph": self.dump_media_graph,
             "media_policy": self.dump_media_policy,
-            "media_focus": self.dump_media_focus,
-            "media_session": self.dump_media_session,
-            "media_server": self.dump_media_server,
+            "audio_graph": self.dump_media_graph,
+            "media_player": self.dump_media_player,
+            "media_recorder": self.dump_media_recorder,
         }
         dump_func = dump_functions.get(name)
         if dump_func:
             dump_func(handle)
-        else:
-            raise gdb.GdbError(f"Error: '{name}' does not matched any dump_fuction.")
 
     def dump_media_graph(self, handle):
         gdb.write("\n")
@@ -122,26 +138,69 @@ class MediaDump(gdb.Command):
 
         result = self.graph.dump_graph()
         if not result:
-            raise gdb.GdbError("dump graph failed.")
+            gdb.write("dump graph failed.\n")
+            return
+
         gdb.write("Media Graph Dump:\n")
         for line in result:
-            gdb.write(f"  {line}\n")
+            gdb.write(f"{line}\n")
 
     def dump_media_policy(self, handle):
         gdb.write("\n")
         gdb.write(f"Node policy handle: {handle}\n")
 
-    def dump_media_session(self, handle):
-        gdb.write("\n")
-        gdb.write(f"Node session handle: {handle}\n")
+        try:
+            self.policy = MediaPolicy.MediaPolicyHandler(handle)
+        except (gdb.error, gdb.GdbError) as e:
+            gdb.write(f"Error analyze media_policy: {e}\n")
+            return
 
-    def dump_media_server(self, handle):
-        gdb.write("\n")
-        gdb.write(f"Node server handle: {handle}\n")
+        result = self.policy.dump_policy()
+        if not result:
+            gdb.write("Media Policy Dump failed.\n")
+            return
 
-    def dump_media_focus(self, handle):
+        gdb.write("Media Policy Dump:\n")
+        for line in result:
+            gdb.write(f"{line}\n")
+
+    def dump_media_player(self, handle):
         gdb.write("\n")
-        gdb.write(f"Node focus handle: {handle}\n")
+        gdb.write(f"Node player handle: {handle}\n")
+
+        try:
+            self.player = MediaPlayer.MediaPlayerHandler(handle)
+        except (gdb.error, gdb.GdbError) as e:
+            gdb.write(f"Error analyze media_player: {e}\n")
+            return
+
+        result = self.player.dump_player()
+        if not result:
+            gdb.write("Media Player Dump failed.\n")
+            return
+
+        gdb.write("Media Player Dump:\n")
+        for line in result:
+            gdb.write(f"{line}\n")
+
+    def dump_media_recorder(self, handle):
+        gdb.write("\n")
+        gdb.write(f"Node recorder handle: {handle}\n")
+
+        try:
+            self.recorder = MediaRecorder.MediaRecorderHandler(handle)
+        except (gdb.error, gdb.GdbError) as e:
+            gdb.write(f"Error analyze media_recorder: {e}\n")
+            return
+
+        result = self.recorder.dump_recorder()
+        if not result:
+            gdb.write("Media Recorder Dump failed.\n")
+            return
+
+        gdb.write("Media Recorder Dump:\n")
+        for line in result:
+            gdb.write(f"{line}\n")
 
 
 MediaDump()
