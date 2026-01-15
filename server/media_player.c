@@ -1361,7 +1361,8 @@ static void media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
         break;
 
     case MEDIA_PLAYER_CMD_SET_OPTIONS:
-        av_dict_parse_string(&ctx->format_opt, msg->data, "=", ":", 0);
+        if (av_dict_parse_string(&ctx->format_opt, msg->data, "=", ":", 0) < 0)
+            MEDIA_ERR("ctx %p av_dict_parse_string (%s) failed.\n", ctx, msg->data);
         break;
 
     case MEDIA_PLAYER_CMD_SET_LOOP:
