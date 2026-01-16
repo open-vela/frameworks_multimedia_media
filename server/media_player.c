@@ -153,6 +153,7 @@ typedef struct MediaPlayerContext {
     char* protocol_map;
     struct PlayerCmdQueue cmd_queue;
     float volume;
+    int interrupt;
 
     AVDictionary* format_opt;
     AVDictionary* global_opts;
@@ -667,6 +668,8 @@ static int media_player_interrupt(void* opaque)
     if (pending_stop)
         interrupt = 0;
     write(ctx->event_fd, &cnt, sizeof(cnt));
+    if (interrupt)
+        ctx->interrupt = interrupt;
     return interrupt;
 }
 
@@ -1062,6 +1065,7 @@ static void media_player_ctx_init(MediaPlayerContext* ctx)
     ctx->ts_base = AV_NOPTS_VALUE;
     ctx->lat_base = AV_NOPTS_VALUE;
     ctx->volume = 1.0;
+    ctx->interrupt = 0;
     SIMPLEQ_INIT(&ctx->cmd_queue);
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
@@ -1222,6 +1226,8 @@ static int media_player_prepare(MediaPlayerContext* ctx, const char* filename)
     if (ctx->state != MEDIA_PLAYER_STATE_STOPPED)
         goto out;
 
+    ctx->interrupt = 0;
+
     ret = media_player_open_demuxer(ctx, filename);
     if (ret < 0) {
         MEDIA_ERR("media_player_open_demuxer failed %d.\n", ret);
@@ -1230,6 +1236,9 @@ static int media_player_prepare(MediaPlayerContext* ctx, const char* filename)
     ctx->state = MEDIA_PLAYER_STATE_PREPARED;
 
 out:
+    if (ret < 0 && ctx->interrupt)
+        ret = AVERROR(ECANCELED);
+
     media_player_event_cb(ctx, MEDIA_EVENT_PREPARED, ret, NULL);
     return 0;
 }
