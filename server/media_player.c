@@ -769,6 +769,7 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
     for (i = 0; i < ctx->format_ctx->nb_streams; i++) {
         OutputStream* stream_out = NULL;
         AVStream* stream = NULL;
+        AVDictionaryEntry* tag;
 
         stream = ctx->format_ctx->streams[i];
 
@@ -790,7 +791,13 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
 
         stream_out->type = stream->codecpar->codec_type;
         stream_out->index = i;
-        stream_out->nb_queue_max = CONFIG_MEDIA_PLAYER_DATA_QUEUE_SIZE;
+
+        if ((tag = av_dict_get(ctx->format_opt, "datqmax", NULL, 0))) {
+            stream_out->nb_queue_max = strtol(tag->value, NULL, 0);
+        } else {
+            stream_out->nb_queue_max = CONFIG_MEDIA_PLAYER_DATA_QUEUE_SIZE;
+        }
+
         ff_framequeue_init(&stream_out->queue, NULL);
 
         /* Use specify ch_layout if possible, follow guess_input_channel_layout() in ffmpeg.c */
@@ -1053,8 +1060,15 @@ end:
 
 static void media_player_ctx_init(MediaPlayerContext* ctx)
 {
+    AVDictionaryEntry* tag;
+
+    if ((tag = av_dict_get(ctx->global_opts, "cmdqmax", NULL, 0))) {
+        ctx->cmd_max = strtol(tag->value, NULL, 0);
+    } else {
+        ctx->cmd_max = CONFIG_MEDIA_RECORDER_DATA_QUEUE_SIZE;
+    }
+
     ctx->state = MEDIA_PLAYER_STATE_STOPPED;
-    ctx->cmd_max = CONFIG_MEDIA_PLAYER_CMD_QUEUE_SIZE;
     ctx->aframe_cnt = 0;
     ctx->vframe_cnt = 0;
     ctx->audio_stream = NULL;
