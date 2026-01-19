@@ -658,7 +658,7 @@ static int audio_graph_run_once(MediadPlugin* ctx)
     return ret == -EAGAIN ? 0 : ret;
 }
 
-static int audio_graph_dump_link(AVBPrint* buf, AVFilterLink* link)
+static int audio_graph_dump_link(AVBPrint* buf, AVFilterLink* link, const char* filter_ext_info)
 {
     const char* format;
     AVBPrint dummy_buffer;
@@ -683,6 +683,9 @@ static int audio_graph_dump_link(AVBPrint* buf, AVFilterLink* link)
             (int)link->sample_rate, format, li->status_in, li->status_out, (int)ff_framequeue_queued_frames(&li->fifo),
             li->frame_wanted_out, li->l.frame_count_in, li->l.frame_count_out);
         av_channel_layout_describe_bprint(&link->ch_layout, buf);
+        if (filter_ext_info && filter_ext_info[0]) {
+            av_bprintf(buf, " ext:%s", filter_ext_info);
+        }
         av_bprint_chars(buf, ']', 1);
         break;
 
@@ -705,20 +708,30 @@ static void audio_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
         unsigned width, height, in_indent;
         unsigned lname = strlen(filter->name);
         unsigned ltype = strlen(filter->filter->name);
+        char filter_ext_info[256] = { 0 };
+        int ret;
+
+        /* Send dump command to filter to get extra info */
+        if (filter->filter->process_command) {
+            ret = avfilter_process_command(filter, "dump", NULL, filter_ext_info, sizeof(filter_ext_info), 0);
+            if (ret < 0) {
+                filter_ext_info[0] = '\0';
+            }
+        }
 
         for (j = 0; j < filter->nb_inputs; j++) {
             AVFilterLink* l = filter->inputs[j];
             unsigned ln = strlen(l->src->name) + 1 + strlen(l->srcpad->name);
             max_src_name = FFMAX(max_src_name, ln);
             max_in_name = FFMAX(max_in_name, strlen(l->dstpad->name));
-            max_in_fmt = FFMAX(max_in_fmt, audio_graph_dump_link(NULL, l));
+            max_in_fmt = FFMAX(max_in_fmt, audio_graph_dump_link(NULL, l, filter_ext_info));
         }
         for (j = 0; j < filter->nb_outputs; j++) {
             AVFilterLink* l = filter->outputs[j];
             unsigned ln = strlen(l->dst->name) + 1 + strlen(l->dstpad->name);
             max_dst_name = FFMAX(max_dst_name, ln);
             max_out_name = FFMAX(max_out_name, strlen(l->srcpad->name));
-            max_out_fmt = FFMAX(max_out_fmt, audio_graph_dump_link(NULL, l));
+            max_out_fmt = FFMAX(max_out_fmt, audio_graph_dump_link(NULL, l, filter_ext_info));
         }
         in_indent = max_src_name + max_in_name + max_in_fmt;
         in_indent += in_indent ? 4 : 0;
@@ -739,7 +752,7 @@ static void audio_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
                 av_bprintf(buf, "%s:%s", l->src->name, l->srcpad->name);
                 av_bprint_chars(buf, '-', e - buf->len);
                 e = buf->len + max_in_fmt + 2 + max_in_name - strlen(l->dstpad->name);
-                audio_graph_dump_link(buf, l);
+                audio_graph_dump_link(buf, l, filter_ext_info);
                 av_bprint_chars(buf, '-', e - buf->len);
                 av_bprintf(buf, "%s", l->dstpad->name);
             } else {
@@ -768,7 +781,7 @@ static void audio_graph_dump_to_buf(AVBPrint* buf, AVFilterGraph* graph)
                 av_bprintf(buf, "%s", l->srcpad->name);
                 av_bprint_chars(buf, '-', e - buf->len);
                 e = buf->len + max_out_fmt + 2 + max_dst_name - ln;
-                audio_graph_dump_link(buf, l);
+                audio_graph_dump_link(buf, l, filter_ext_info);
                 av_bprint_chars(buf, '-', e - buf->len);
                 av_bprintf(buf, "%s:%s", l->dst->name, l->dstpad->name);
             }
