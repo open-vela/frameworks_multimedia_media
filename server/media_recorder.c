@@ -125,6 +125,7 @@ typedef struct MediaRecorderContext {
     pthread_mutex_t mutex;
     OutputStream* streams; /* output stream */
     AVDictionary* format_opt; /* format options */
+    AVDictionary* global_opts;
     AVFormatContext* format_ctx; /* output format context */
     const AVOutputFormat* format; /* output format */
     struct RecorderCmdQueue cmd_queue;
@@ -593,6 +594,7 @@ static void media_recorder_release_stream(MediaRecorderContext* ctx)
 
 static int media_recorder_init_stream(MediaRecorderContext* ctx)
 {
+    AVDictionaryEntry* tag;
     int stream_cnt;
     int types[2];
     int i;
@@ -625,7 +627,12 @@ static int media_recorder_init_stream(MediaRecorderContext* ctx)
         ctx->streams[i].index = i;
         ctx->streams[i].type = types[i];
         ff_framequeue_init(&ctx->streams[i].queue, NULL);
-        ctx->streams[i].nb_queue_max = CONFIG_MEDIA_RECORDER_DATA_QUEUE_SIZE;
+
+        if ((tag = av_dict_get(ctx->format_opt, "datqmax", NULL, 0))) {
+            ctx->streams[i].nb_queue_max = strtol(tag->value, NULL, 0);
+        } else {
+            ctx->streams[i].nb_queue_max = CONFIG_MEDIA_RECORDER_DATA_QUEUE_SIZE;
+        }
     }
 
     ctx->nb_streams = stream_cnt;
@@ -811,8 +818,15 @@ out:
 
 static void media_recorder_ctx_init(MediaRecorderContext* ctx)
 {
+    AVDictionaryEntry* tag;
+
+    if ((tag = av_dict_get(ctx->global_opts, "cmdqmax", NULL, 0))) {
+        ctx->cmd_max = strtol(tag->value, NULL, 0);
+    } else {
+        ctx->cmd_max = CONFIG_MEDIA_RECORDER_DATA_QUEUE_SIZE;
+    }
+
     ctx->state = MEDIA_RECORDER_STATE_STOPPED;
-    ctx->cmd_max = CONFIG_MEDIA_RECORDER_CMD_QUEUE_SIZE;
     ctx->audio_idx = -1;
     ctx->video_idx = -1;
     ctx->exit = 0;
@@ -1411,6 +1425,8 @@ static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn
     int flags, char* res, int res_len)
 {
     MediaRecorderPriv* priv = handle->priv;
+    char option_name[64] = { 0 };
+    char options[256] = { 0 };
     int ret;
 
     MEDIA_INFO("cmd: %s, arg %s, target %s.\n",
@@ -1436,6 +1452,17 @@ static int media_recorder_handler(MediadPlugin* handle, struct media_server_conn
         }
 
         media_server_clean_conn(conn);
+
+        // get global options in criteria.txt
+        snprintf(option_name, sizeof(option_name), "%sParams", arg);
+        ret = media_stub_get_stream_name(option_name, options, sizeof(options));
+        if (ret == 0 && strlen(options) != 0) {
+            ret = av_dict_parse_string(&ctx->global_opts, options, "=", ":", 0);
+            if (ret < 0) {
+                MEDIA_ERR("parse global options failed %d\n", ret);
+                return ret;
+            }
+        }
 
         ret = media_recorder_open(ctx, arg);
         if (ret < 0)
