@@ -208,13 +208,14 @@ int media_video_output_poll_available(MediaVOutputContext* ctx, struct pollfd* f
 
 int media_video_output_write_frame(MediaVOutputContext* ctx, AVFrame* frame)
 {
-    AVFrame* dst_frame;
+    AVFrame* dst_frame = NULL;
     int ret;
 
     if (ctx->started == 0) {
         ret = media_video_output_start(ctx, frame);
         if (ret < 0) {
             MEDIA_ERR("Failed to start: %s\n", av_err2str(ret));
+            av_frame_free(&frame);
             return ret;
         }
     }
@@ -223,33 +224,24 @@ int media_video_output_write_frame(MediaVOutputContext* ctx, AVFrame* frame)
         dst_frame = av_frame_alloc();
         if (!dst_frame) {
             MEDIA_ERR("Failed to allocate dst frame\n");
-            ret = AVERROR(ENOMEM);
-            goto err;
+            av_frame_free(&frame);
+            return AVERROR(ENOMEM);
         }
 #if CONFIG_SWSCALE
         ret = media_video_output_scale(ctx, frame, dst_frame);
         if (ret < 0) {
             MEDIA_ERR("Failed to scale frame: %s\n", av_err2str(ret));
-            goto err;
+            av_frame_free(&dst_frame);
+            av_frame_free(&frame);
+            return ret;
         }
 #endif
-    } else {
-        dst_frame = frame;
-    }
-
-    ret = av_write_uncoded_frame(ctx->fmt_ctx, 0, dst_frame);
-    if (ret < 0) {
-        MEDIA_ERR("Failed to write frame: %s\n", av_err2str(ret));
+        ret = av_write_uncoded_frame(ctx->fmt_ctx, 0, dst_frame);
+        av_frame_free(&frame);
         return ret;
     }
 
-    av_frame_free(&frame);
-    return 0;
-
-err:
-    av_frame_free(&frame);
-    av_frame_free(&dst_frame);
-    return ret;
+    return av_write_uncoded_frame(ctx->fmt_ctx, 0, frame);
 }
 
 int media_video_output_open(MediaVOutputContext** pctx, AVDictionary* options)
