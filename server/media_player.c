@@ -898,6 +898,7 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
 
     ctx->format_ctx->interrupt_callback.callback = media_player_interrupt;
     ctx->format_ctx->interrupt_callback.opaque = ctx;
+    ctx->format_ctx->flags |= AVFMT_FLAG_FAST_SEEK;
 
     if (ctx->global_opts)
         av_dict_copy(&ctx->format_opt, ctx->global_opts, 0);
