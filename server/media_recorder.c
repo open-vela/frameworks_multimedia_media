@@ -854,18 +854,24 @@ static void media_recorder_ctx_release(MediaRecorderContext* ctx)
 
 static int media_recorder_pause(MediaRecorderContext* ctx)
 {
-    int ret = AVERROR(EPERM);
+    int ret = 0;
 
-    if (ctx->state == MEDIA_RECORDER_STATE_STARTED) {
-        ctx->state = MEDIA_RECORDER_STATE_PAUSED;
-        ret = 0;
+    if (ctx->state != MEDIA_RECORDER_STATE_STARTED) {
+        ret = AVERROR(EPERM);
+        goto out;
     }
 
-    if (ctx->audio_idx >= 0)
+    if (ctx->audio_idx >= 0) {
         ret = audio_graph_pause(ctx->audio_input);
+        if (ret < 0)
+            goto out;
+    }
 
+    ctx->state = MEDIA_RECORDER_STATE_PAUSED;
+
+out:
     media_recorder_event_cb(ctx, MEDIA_EVENT_PAUSED, ret, NULL);
-    return 0;
+    return ret;
 }
 
 static int media_recorder_stop(MediaRecorderContext* ctx)
