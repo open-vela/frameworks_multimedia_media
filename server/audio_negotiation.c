@@ -39,6 +39,17 @@
  * Private Functions
  ****************************************************************************/
 
+static bool audio_filter_is_started(AVFilterContext* ctx)
+{
+    int64_t state = 0;
+
+    if (av_opt_get_int(ctx, "state", AV_OPT_SEARCH_CHILDREN, &state) < 0)
+        return true;
+
+    /* started if state is RUNNING(1) or PAUSED(2) */
+    return state != 0;
+}
+
 static int audio_query_formats(AVFilterContext* ctx)
 {
     AVFilterFormatsConfig **cfg_in_dyn = NULL, **cfg_out_dyn = NULL;
@@ -384,10 +395,12 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
     int stack_size = 0;
     int i, j, ret;
 
-    // query the starting node first
-    ret = audio_query_formats(filter);
-    if (ret < 0)
-        return ret;
+    if (audio_filter_is_started(filter)) {
+        // query the starting node first
+        ret = audio_query_formats(filter);
+        if (ret < 0)
+            return ret;
+    }
 
     // decide traversal direction
     traverse_downstream = (filter->nb_outputs > 0)
@@ -417,6 +430,12 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
 
                 if (map[i] != ROUTE_ON)
                     continue;
+
+                if (!audio_filter_is_started(link->dst)) {
+                    MEDIA_INFO("Skipping format negotiation for sink '%s' (started=false)\n",
+                        link->dst->name);
+                    continue;
+                }
 
                 ret = audio_query_formats(link->dst);
                 if (ret < 0)
@@ -452,6 +471,12 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
                 if (map[j] != ROUTE_ON) {
                     MEDIA_INFO("Skipping query for input[%d] of '%s' (src output[%d] map=OFF)\n",
                         i, current->name, j);
+                    continue;
+                }
+
+                if (!audio_filter_is_started(link->src)) {
+                    MEDIA_INFO("Skipping format negotiation for sink '%s' (started=false)\n",
+                        link->dst->name);
                     continue;
                 }
 
@@ -655,6 +680,12 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
 
                 sin_link = enabled_outputs[i]->dst->outputs[j];
 
+                if (!audio_filter_is_started(sin_link->dst)) {
+                    MEDIA_INFO("Skipping format setting for sink '%s' (started=false)\n",
+                        sin_link->dst->name);
+                    continue;
+                }
+
                 ret = audio_negotiate_link(enabled_outputs[i], sin_link, &osrc_link, &osink_link);
                 if (ret < 0) {
                     MEDIA_WARN("Downstream negotiation failed for output %d, sin_link %d", i, j);
@@ -688,6 +719,12 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
                 audio_reset_link_format(&osink_link);
             }
         } else {
+
+            if (!audio_filter_is_started(enabled_outputs[i]->dst)) {
+                MEDIA_INFO("Skipping format setting for sink '%s' (started=false)\n",
+                    enabled_outputs[i]->dst->name);
+                continue;
+            }
 
             ret = audio_negotiate_link(enabled_outputs[i], NULL, &osrc_link, NULL);
             if (ret < 0) {
@@ -727,9 +764,22 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
                 continue;
 
             sin_link = enabled_outputs[i]->dst->outputs[j];
+
+            if (!audio_filter_is_started(sin_link->dst)) {
+                MEDIA_INFO("Skipping format config for sink '%s' (started=false)\n",
+                    sin_link->dst->name);
+                continue;
+            }
+
             ret = audio_set_format_config(sin_link, ds_fmt, ds_rate, ds_ch);
             if (ret < 0)
                 MEDIA_WARN("Failed to set format for sin_link\n");
+        }
+
+        if (!audio_filter_is_started(enabled_outputs[i]->dst)) {
+            MEDIA_INFO("Skipping format config for sink '%s' (started=false)\n",
+                enabled_outputs[i]->dst->name);
+            continue;
         }
 
         ret = audio_set_format_config(enabled_outputs[i], sr_fmt, sr_rate, sr_ch);
