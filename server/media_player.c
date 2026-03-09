@@ -1025,17 +1025,34 @@ static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush)
 {
     int64_t timestamp = ms * 1000LL;
     int i, ret = AVERROR(EPERM);
+    int64_t max_ts;
 
     if (!ctx->format_ctx)
         goto end;
 
-    if (ctx->format_ctx->start_time != AV_NOPTS_VALUE)
+    max_ts = ctx->format_ctx->duration;
+
+    if (max_ts != AV_NOPTS_VALUE && max_ts <= 0) {
+        MEDIA_ERR("Cannot seek in empty file (max_ts %" PRId64 ")\n", max_ts);
+        ret = AVERROR(EINVAL);
+        goto end;
+    }
+
+    if (max_ts != AV_NOPTS_VALUE && timestamp > max_ts) {
+        MEDIA_WARN("Seek position %" PRId64 " exceeds max_ts %" PRId64 ", seeking to end\n",
+            timestamp, max_ts);
+        timestamp = max_ts;
+    }
+
+    if (ctx->format_ctx->start_time != AV_NOPTS_VALUE) {
         timestamp += ctx->format_ctx->start_time;
+        max_ts += ctx->format_ctx->start_time;
+    }
 
     if (flush)
         media_player_clear_queue(ctx, MEDIA_PLAYER_DATA_QUEUE_IDX);
 
-    ret = avformat_seek_file(ctx->format_ctx, -1, INT64_MIN, timestamp, INT64_MAX, AVSEEK_FLAG_ANY);
+    ret = avformat_seek_file(ctx->format_ctx, -1, INT64_MIN, timestamp, max_ts, AVSEEK_FLAG_ANY);
     if (ret < 0)
         goto end;
 

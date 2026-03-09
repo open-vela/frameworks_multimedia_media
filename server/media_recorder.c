@@ -780,7 +780,20 @@ static int media_recorder_proc_dat(MediaRecorderContext* ctx)
         if (!frame)
             continue;
 
-        frame->pts -= ctx->streams[i].sync_pts;
+        if (frame->pts == AV_NOPTS_VALUE || frame->pts == INT64_MIN || frame->pts < 0) {
+            MEDIA_WARN("Invalid PTS detected: %" PRId64 ", resetting to sync_pts: %" PRId64 "\n",
+                frame->pts, ctx->streams[i].sync_pts);
+            frame->pts = ctx->streams[i].sync_pts;
+        }
+
+        if (frame->pts >= ctx->streams[i].sync_pts) {
+            frame->pts -= ctx->streams[i].sync_pts;
+        } else {
+            MEDIA_WARN("PTS (%" PRId64 ") < sync_pts (%" PRId64 "), clamping to 0\n",
+                frame->pts, ctx->streams[i].sync_pts);
+            frame->pts = 0;
+        }
+
         frame->pict_type = AV_PICTURE_TYPE_NONE;
 
         /* user request stop, flush code which data = 0 */
