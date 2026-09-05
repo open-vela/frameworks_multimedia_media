@@ -152,4 +152,9 @@ int media_uv_listen(void* handle, media_uv_callback on_listen,
 int media_uv_send(void* handle, media_uv_parcel_callback on_receive,
     void* cookie0, void* cookie1, const media_parcel* parcel);
 
+/**
+ * @brief Flush queued parcels once the connection is ready.
+ */
+void media_uv_flush_pending(void* handle);
+
 #endif /* FRAMEWORKS_MEDIA_CLIENT_MEDIA_UV_H */

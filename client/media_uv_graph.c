@@ -206,6 +206,8 @@ static void media_uv_stream_open_cb(MediaStreamPriv* priv, int ret)
     if (ret < 0)
         media_uv_reconnect(priv->proxy);
     else {
+        MEDIA_INFO("open cb:%s ret:%d proxy:%p\n", priv->name, ret, priv->proxy);
+        media_uv_flush_pending(priv->proxy);
         MEDIA_INFO("open:%s result:%d handle:%p\n", priv->name, ret, priv);
         if (priv->on_open)
             priv->on_open(priv->cookie, ret);
@@ -216,6 +218,7 @@ static void media_uv_stream_connect_cb(void* cookie, int ret)
 {
     MediaStreamPriv* priv = cookie;
 
+    MEDIA_INFO("connect cb:%s ret:%d proxy:%p\n", priv->name, ret, priv->proxy);
     if (ret >= 0)
         ret = media_uv_stream_send(priv, NULL, "open", priv->name, 0,
             media_uv_stream_receive_cb, media_uv_stream_open_cb, priv);
@@ -326,16 +329,18 @@ static int media_uv_stream_send(MediaStreamPriv* priv, const char* target,
     media_uv_parcel_callback parser, void* cb, void* cookie)
 {
     media_parcel parcel;
+    const char* safe_target = target ? target : "";
+    const char* safe_arg = arg ? arg : "";
     int ret;
 
     media_parcel_init(&parcel);
     ret = media_parcel_append_printf(&parcel, "%i%s%s%s%i",
-        priv->id, target, cmd, arg, res_len);
+        priv->id, safe_target, cmd, safe_arg, res_len);
     if (ret < 0)
         return ret;
 
     MEDIA_INFO("%s:%p %p %s %s %s",
-        priv->name, priv, priv->proxy, target ? target : "_", cmd, arg ? arg : "_");
+        priv->name, priv, priv->proxy, safe_target[0] ? safe_target : "_", cmd, safe_arg[0] ? safe_arg : "_");
 
     ret = media_uv_send(priv->proxy, parser, cb, cookie, &parcel);
     media_parcel_deinit(&parcel);

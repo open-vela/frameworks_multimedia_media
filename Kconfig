@@ -89,7 +89,7 @@ config MEDIA_SERVER_PORT
 
 config MEDIA_PLAYER_MAX_CNT
 	int "Media player max count"
-	default 10
+	default 4
 
 config MEDIA_PLAYER_CMD_QUEUE_SIZE
 	int "Media player cmd queue size"
@@ -113,7 +113,7 @@ config MEDIA_PLAYER_PRIORITY
 
 config MEDIA_RECORDER_MAX_CNT
 	int "Media recorder max count"
-	default 10
+	default 4
 
 config MEDIA_RECORDER_CMD_QUEUE_SIZE
 	int "Media recorder cmd queue size"
@@ -121,7 +121,7 @@ config MEDIA_RECORDER_CMD_QUEUE_SIZE
 
 config MEDIA_RECORDER_DATA_QUEUE_SIZE
 	int "Media recorder data queue size"
-	default 4
+	default 512
 
 config MEDIA_RECORDER_STACKSIZE
 	int "Media recorder stack size"

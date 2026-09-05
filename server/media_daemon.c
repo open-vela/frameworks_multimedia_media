@@ -27,6 +27,7 @@
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include "media_common.h"

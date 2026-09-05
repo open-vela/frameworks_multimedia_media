@@ -60,6 +60,10 @@
 #define MEDIA_RECORDER_CMD_QUEUE_IDX (1 << 0)
 #define MEDIA_RECORDER_DATA_QUEUE_IDX (1 << 1)
 
+#ifndef CONFIG_MEDIA_RECORDER_RAW_CACHE_MAXSIZE
+#  define CONFIG_MEDIA_RECORDER_RAW_CACHE_MAXSIZE (2 * 1024 * 1024)
+#endif
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -122,6 +126,9 @@ typedef struct MediaRecorderContext {
     uint32_t aframe_cnt;
     uint32_t nb_streams; /* total stream count */
     uint32_t current_ms;
+    uint8_t* raw_cache;
+    size_t raw_cache_size;
+    size_t raw_cache_capacity;
     pthread_mutex_t mutex;
     OutputStream* streams; /* output stream */
     AVDictionary* format_opt; /* format options */
@@ -166,6 +173,7 @@ static const CodecSpecificOptions codec_specific_map[] = {
  * Function declaration
  ****************************************************************************/
 static int media_recorder_poll_available(MediaRecorderContext* ctx, struct pollfd* fd);
+static void media_recorder_poll(MediaRecorderContext* ctx, int timeout);
 
 /****************************************************************************
  * Private Functions
@@ -209,7 +217,7 @@ static void media_recorder_event_cb(MediaRecorderContext* ctx, int event,
 
 static int media_recorder_queue_cnt(MediaRecorderContext* ctx, int idx)
 {
-    int count = 0;
+    size_t count = 0;
 
     if (idx < 0)
         return 0;
@@ -218,7 +226,7 @@ static int media_recorder_queue_cnt(MediaRecorderContext* ctx, int idx)
     count = ff_framequeue_queued_frames(&ctx->streams[idx].queue);
     pthread_mutex_unlock(&ctx->mutex);
 
-    return count;
+    return (int)count;
 }
 
 static bool media_recorder_dat_valid(MediaRecorderContext* ctx)
@@ -234,6 +242,11 @@ static bool media_recorder_dat_valid(MediaRecorderContext* ctx)
     }
 
     return false;
+}
+
+static bool media_recorder_cmd_valid(MediaRecorderContext* ctx)
+{
+    return SIMPLEQ_FIRST(&ctx->cmd_queue) != NULL;
 }
 
 static void media_recorder_clear_queue(MediaRecorderContext* ctx, int what)
@@ -279,6 +292,7 @@ static AVFrame* media_recorder_queue_pop(MediaRecorderContext* ctx, int idx)
 
 static int media_recorder_queue_push(MediaRecorderContext* ctx, int idx, AVFrame* frame)
 {
+    size_t queued;
     int ret;
 
     if (idx < 0)
@@ -286,8 +300,13 @@ static int media_recorder_queue_push(MediaRecorderContext* ctx, int idx, AVFrame
 
     pthread_mutex_lock(&ctx->mutex);
     ctx->aframe_cnt++;
-    if (ff_framequeue_queued_frames(&ctx->streams[idx].queue) > ctx->streams[idx].nb_queue_max) {
-        MEDIA_WARN("data queue is more than max count(%d).\n", ctx->streams[idx].nb_queue_max);
+    queued = ff_framequeue_queued_frames(&ctx->streams[idx].queue);
+    if (queued >= (size_t)ctx->streams[idx].nb_queue_max) {
+        if ((ctx->aframe_cnt & 0xff) == 0) {
+            MEDIA_WARN("data queue is more than max count(%d), idx=%d queued=%zu total=%" PRIu32 ".\n",
+                ctx->streams[idx].nb_queue_max, idx, queued, ctx->aframe_cnt);
+        }
+
         AVFrame* last_frame = ff_framequeue_take(&ctx->streams[idx].queue);
         av_frame_free(&last_frame);
     }
@@ -296,6 +315,75 @@ static int media_recorder_queue_push(MediaRecorderContext* ctx, int idx, AVFrame
     pthread_mutex_unlock(&ctx->mutex);
 
     return ret;
+}
+
+static void media_recorder_free_raw_cache(MediaRecorderContext* ctx)
+{
+    free(ctx->raw_cache);
+    ctx->raw_cache = NULL;
+    ctx->raw_cache_size = 0;
+    ctx->raw_cache_capacity = 0;
+}
+
+static int media_recorder_alloc_raw_cache(MediaRecorderContext* ctx)
+{
+    media_recorder_free_raw_cache(ctx);
+
+    ctx->raw_cache = malloc(CONFIG_MEDIA_RECORDER_RAW_CACHE_MAXSIZE);
+    if (ctx->raw_cache == NULL)
+        return -ENOMEM;
+
+    ctx->raw_cache_capacity = CONFIG_MEDIA_RECORDER_RAW_CACHE_MAXSIZE;
+    MEDIA_INFO("ctx %p raw PCM cache enabled size=%zu\n",
+        ctx, ctx->raw_cache_capacity);
+    return OK;
+}
+
+static int media_recorder_flush_raw_cache(MediaRecorderContext* ctx)
+{
+    if (ctx->raw_cache == NULL || ctx->raw_cache_size == 0)
+        return OK;
+
+    avio_write(ctx->format_ctx->pb, ctx->raw_cache, ctx->raw_cache_size);
+    avio_flush(ctx->format_ctx->pb);
+
+    if (ctx->format_ctx->pb->error < 0)
+        return ctx->format_ctx->pb->error;
+
+    ctx->raw_cache_size = 0;
+    return OK;
+}
+
+static int media_recorder_write_raw_pcm(MediaRecorderContext* ctx,
+    const uint8_t* data, size_t size)
+{
+    int ret;
+
+    if (ctx->raw_cache == NULL || ctx->raw_cache_capacity == 0) {
+        avio_write(ctx->format_ctx->pb, data, size);
+        avio_flush(ctx->format_ctx->pb);
+        return ctx->format_ctx->pb->error;
+    }
+
+    if (size > ctx->raw_cache_capacity) {
+        ret = media_recorder_flush_raw_cache(ctx);
+        if (ret < 0)
+            return ret;
+
+        avio_write(ctx->format_ctx->pb, data, size);
+        avio_flush(ctx->format_ctx->pb);
+        return ctx->format_ctx->pb->error;
+    }
+
+    if (size > ctx->raw_cache_capacity - ctx->raw_cache_size) {
+        ret = media_recorder_flush_raw_cache(ctx);
+        if (ret < 0)
+            return ret;
+    }
+
+    memcpy(ctx->raw_cache + ctx->raw_cache_size, data, size);
+    ctx->raw_cache_size += size;
+    return 0;
 }
 
 static int media_recorder_send_empty_frame(MediaRecorderContext* ctx)
@@ -323,6 +411,23 @@ static int media_recorder_encode_frame(MediaRecorderContext* ctx, int idx, AVFra
     AVPacket* pkt;
     int ret = 0;
 
+    if (ctx->streams[idx].type == AVMEDIA_TYPE_AUDIO &&
+        ctx->format_ctx->oformat->audio_codec == AV_CODEC_ID_PCM_S16LE &&
+        ctx->streams[idx].enc_ctx->sample_fmt == AV_SAMPLE_FMT_S16) {
+        int size = av_samples_get_buffer_size(NULL,
+            ctx->streams[idx].enc_ctx->ch_layout.nb_channels,
+            frame->nb_samples, ctx->streams[idx].enc_ctx->sample_fmt, 1);
+        if (size < 0)
+            return size;
+
+        ret = media_recorder_write_raw_pcm(ctx, frame->data[0], size);
+        if (ret < 0)
+            return ret;
+
+        ctx->current_ms = frame->pts / 1000;
+        return 0;
+    }
+
     pkt = av_packet_alloc();
     if (!pkt)
         return AVERROR(ENOMEM);
@@ -349,6 +454,11 @@ static int media_recorder_encode_frame(MediaRecorderContext* ctx, int idx, AVFra
         ret = av_write_frame(ctx->format_ctx, pkt);
         if (ret < 0)
             break;
+
+        if ((ctx->aframe_cnt & 0xff) == 0) {
+            MEDIA_INFO("ctx %p write packet stream=%d size=%d pts=%" PRId64 " current_ms=%" PRIu32 "\n",
+                ctx, idx, pkt->size, pkt->pts, ctx->current_ms);
+        }
     }
 
 out:
@@ -673,6 +783,7 @@ static void media_recorder_close_muxer(MediaRecorderContext* ctx)
     }
 
     if (ctx->format_ctx) {
+        av_write_trailer(ctx->format_ctx);
         if (ctx->format_ctx->pb)
             avio_close(ctx->format_ctx->pb);
 
@@ -698,6 +809,12 @@ static void media_recorder_conn_close(MediaRecorderContext* ctx)
 static void media_recorder_clean(MediaRecorderContext* ctx)
 {
     if (ctx->state != MEDIA_RECORDER_STATE_STOPPED) {
+        if (ctx->raw_cache != NULL) {
+            int ret = media_recorder_flush_raw_cache(ctx);
+            if (ret < 0)
+                MEDIA_ERR("ctx %p flush raw PCM cache failed %d\n", ctx, ret);
+        }
+
         media_recorder_close_muxer(ctx);
         ctx->state = MEDIA_RECORDER_STATE_STOPPED;
         media_recorder_event_cb(ctx, MEDIA_EVENT_STOPPED, 0, NULL);
@@ -720,7 +837,7 @@ static int media_recorder_interrupt(void* opaque)
 
     SIMPLEQ_FOREACH(msg, &ctx->cmd_queue, entry)
     {
-        if (msg->cmd >= MEDIA_RECORDER_CMD_STOP) {
+        if (msg->cmd > MEDIA_RECORDER_CMD_STOP) {
             interrupt = 1;
             break;
         }
@@ -800,6 +917,8 @@ static int media_recorder_proc_dat(MediaRecorderContext* ctx)
         if (!frame->data[0]) {
             MEDIA_INFO("ctx %p received empty frame\n", ctx);
             av_frame_free(&frame);
+            ret = AVERROR_EOF;
+            goto out;
         } else if (ctx->state == MEDIA_RECORDER_STATE_PAUSED) {
             if (ctx->streams[i].type == AVMEDIA_TYPE_AUDIO)
                 ctx->streams[i].sync_pts += frame->nb_samples;
@@ -845,6 +964,9 @@ static void media_recorder_ctx_init(MediaRecorderContext* ctx)
     ctx->exit = 0;
     ctx->aframe_cnt = 0;
     ctx->audio_input_state = 0;
+    ctx->raw_cache = NULL;
+    ctx->raw_cache_size = 0;
+    ctx->raw_cache_capacity = 0;
     SIMPLEQ_INIT(&ctx->cmd_queue);
     media_parcel_init(&ctx->parcel);
     pthread_mutex_init(&ctx->mutex, NULL);
@@ -860,6 +982,7 @@ static void media_recorder_ctx_release(MediaRecorderContext* ctx)
     ctx->event = 0;
     media_recorder_notify_finalize(ctx);
     media_parcel_deinit(&ctx->parcel);
+    media_recorder_free_raw_cache(ctx);
     pthread_mutex_destroy(&ctx->mutex);
     close(ctx->event_fd);
     ctx->event_fd = -1;
@@ -890,11 +1013,30 @@ out:
 static int media_recorder_stop(MediaRecorderContext* ctx)
 {
     int ret;
+    int wait_count = 0;
+
     if (ctx->state == MEDIA_RECORDER_STATE_STOPPED)
         return 0;
 
-    if (ctx->audio_idx >= 0)
-        audio_graph_stop(ctx->audio_input);
+    if (ctx->audio_idx >= 0 && ctx->audio_input_state) {
+        ret = audio_graph_stop(ctx->audio_input);
+        if (ret < 0)
+            return ret;
+
+        MEDIA_INFO("ctx %p waiting for audio input unlink\n", ctx);
+        while (ctx->audio_input_state && wait_count++ < 20) {
+            media_recorder_poll(ctx, 100);
+            usleep(10000);
+        }
+
+        if (ctx->audio_input_state) {
+            MEDIA_WARN("ctx %p audio input unlink timeout\n", ctx);
+            ctx->audio_input_state = 0;
+        }
+
+        MEDIA_INFO("ctx %p audio input unlinked, queued=%d\n",
+            ctx, media_recorder_queue_cnt(ctx, ctx->audio_idx));
+    }
 
     if (ctx->state == MEDIA_RECORDER_STATE_PREPARED || ctx->state == MEDIA_RECORDER_STATE_COMPLETED)
         goto out;
@@ -937,6 +1079,17 @@ static int media_recorder_start(MediaRecorderContext* ctx)
             ret = audio_graph_set_parameter(ctx->audio_input, "frame_size", buf);
             if (ret < 0) {
                 MEDIA_ERR("ctx %p audio_graph_set_parameter failed.\n", ctx);
+                goto out;
+            }
+        }
+        if (ctx->state == MEDIA_RECORDER_STATE_PREPARED &&
+            ctx->format_ctx != NULL &&
+            ctx->format_ctx->oformat != NULL &&
+            ctx->format_ctx->oformat->audio_codec == AV_CODEC_ID_PCM_S16LE &&
+            ctx->streams[ctx->audio_idx].enc_ctx->sample_fmt == AV_SAMPLE_FMT_S16) {
+            ret = media_recorder_alloc_raw_cache(ctx);
+            if (ret < 0) {
+                MEDIA_ERR("ctx %p raw PCM cache alloc failed %d\n", ctx, ret);
                 goto out;
             }
         }
@@ -989,6 +1142,9 @@ static int media_recorder_prepare(MediaRecorderContext* ctx, const char* filenam
     if (ctx->state != MEDIA_RECORDER_STATE_STOPPED)
         goto out;
 
+    if (ctx->global_opts)
+        av_dict_copy(&ctx->format_opt, ctx->global_opts, AV_DICT_DONT_OVERWRITE);
+
     if ((tag = av_dict_get(ctx->format_opt, "format", NULL, 0)))
         format = tag->value;
 
@@ -1013,6 +1169,7 @@ out:
 static int media_recorder_send_cmd(MediaRecorderContext* ctx, const int cmd, const void* data, size_t size)
 {
     RecorderCmd *msg, *tmp;
+    uint64_t wakeup = 1;
     int cnt = 0;
 
     msg = av_malloc(sizeof(RecorderCmd) + size);
@@ -1032,6 +1189,7 @@ static int media_recorder_send_cmd(MediaRecorderContext* ctx, const int cmd, con
     }
 
     SIMPLEQ_INSERT_TAIL(&ctx->cmd_queue, msg, entry);
+    write(ctx->event_fd, &wakeup, sizeof(wakeup));
 
     return 0;
 }
@@ -1344,7 +1502,7 @@ static void media_recorder_dump(MediaRecorderPriv* priv)
     av_bprint_finalize(&buf, NULL);
 }
 
-static void media_recorder_poll(MediaRecorderContext* ctx)
+static void media_recorder_poll(MediaRecorderContext* ctx, int timeout)
 {
     struct pollfd fds[2];
     fds[0].fd = ctx->tran_fd;
@@ -1355,7 +1513,7 @@ static void media_recorder_poll(MediaRecorderContext* ctx)
     fds[1].revents = 0;
     int ret;
 
-    ret = poll(fds, 2, -1);
+    ret = poll(fds, 2, timeout);
     if (ret == -1) {
         MEDIA_ERR("ctx %p poll failed err=%d\n", ctx, -errno);
     } else if (ret == 0)
@@ -1381,15 +1539,29 @@ static void* media_recorder_thread(void* arg)
         if (media_recorder_is_exit(ctx))
             break;
 
-        media_recorder_poll(ctx);
+        while ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
+            SIMPLEQ_REMOVE_HEAD(&ctx->cmd_queue, entry);
+            media_recorder_proc_cmd(ctx, msg);
+        }
+
+        media_recorder_poll(ctx,
+            media_recorder_dat_valid(ctx) || media_recorder_cmd_valid(ctx) ? 0 : -1);
 
         while ((msg = SIMPLEQ_FIRST(&ctx->cmd_queue)) != NULL) {
             SIMPLEQ_REMOVE_HEAD(&ctx->cmd_queue, entry);
             media_recorder_proc_cmd(ctx, msg);
         }
 
-        if (media_recorder_dat_valid(ctx) && media_recorder_proc_dat(ctx) == AVERROR_EOF) {
-            ctx->exit = 1;
+        while (media_recorder_dat_valid(ctx)) {
+            if (media_recorder_cmd_valid(ctx))
+                break;
+
+            if (media_recorder_proc_dat(ctx) == AVERROR_EOF) {
+                ctx->exit = 1;
+                break;
+            }
+
+            media_recorder_poll(ctx, 0);
         }
     }
 
@@ -1421,6 +1593,8 @@ static int media_recorder_open(MediaRecorderContext* ctx, const char* name)
 
     pthread_attr_init(&attr);
     pthread_attr_setstacksize(&attr, CONFIG_MEDIA_RECORDER_STACKSIZE);
+    pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+    pthread_attr_setschedpolicy(&attr, SCHED_RR);
     param.sched_priority = CONFIG_MEDIA_RECORDER_PRIORITY;
     pthread_attr_setschedparam(&attr, &param);
     ret = pthread_create(&thread, &attr, media_recorder_thread, ctx);

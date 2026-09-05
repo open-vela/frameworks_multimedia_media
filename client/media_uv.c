@@ -596,6 +596,14 @@ static void media_uv_delivery_writing(MediaProxyPriv* proxy)
     }
 }
 
+void media_uv_flush_pending(void* handle)
+{
+    MediaProxyPriv* proxy = handle;
+
+    if (proxy)
+        media_uv_delivery_writing(proxy);
+}
+
 /**
  * @brief Enqueue writing to pendq or directly write.
  */

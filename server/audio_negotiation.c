@@ -385,6 +385,24 @@ static void audio_debug_print_formats_config(AVFilterFormatsConfig* config, cons
 }
 #endif
 
+
+static int audio_get_route_map(AVFilterContext* ctx, int* map, int map_count)
+{
+    int ret;
+
+    if (!ctx || !map || map_count <= 0)
+        return AVERROR(EINVAL);
+
+    ret = av_opt_get_array(ctx, "map_array", AV_OPT_SEARCH_CHILDREN,
+        0, map_count, AV_OPT_TYPE_INT, map);
+    if (ret < 0 && ctx->nb_outputs == 1) {
+        map[0] = ROUTE_ON;
+        return 0;
+    }
+
+    return ret;
+}
+
 static int audio_negotiate_formats_init(AVFilterContext* filter)
 {
     AVFilterContext* stack[MAX_LINKS];
@@ -423,9 +441,7 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
                 link = current->outputs[i];
 
                 memset(map, 0, sizeof(map));
-                if (av_opt_get_array(current, "map_array", AV_OPT_SEARCH_CHILDREN,
-                        0, current->nb_outputs, AV_OPT_TYPE_INT, map)
-                    < 0)
+                if (audio_get_route_map(current, map, current->nb_outputs) < 0)
                     MEDIA_WARN("Failed to get map array for %s\n", current->name);
 
                 if (map[i] != ROUTE_ON)
@@ -463,9 +479,7 @@ static int audio_negotiate_formats_init(AVFilterContext* filter)
                 }
 
                 memset(map, 0, sizeof(map));
-                if (av_opt_get_array(link->src, "map_array", AV_OPT_SEARCH_CHILDREN,
-                        0, link->src->nb_outputs, AV_OPT_TYPE_INT, map)
-                    < 0)
+                if (audio_get_route_map(link->src, map, link->src->nb_outputs) < 0)
                     MEDIA_WARN("Failed to get map array for %s\n", link->src->name);
 
                 if (map[j] != ROUTE_ON) {
@@ -669,9 +683,8 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
     for (i = 0; i < enabled_count; i++) {
         if (enabled_outputs[i]->dst && enabled_outputs[i]->dst->nb_outputs > 0) {
             memset(dst_map, 0, sizeof(dst_map));
-            if (av_opt_get_array(enabled_outputs[i]->dst, "map_array", AV_OPT_SEARCH_CHILDREN,
-                    0, enabled_outputs[i]->dst->nb_outputs, AV_OPT_TYPE_INT, dst_map)
-                < 0)
+            if (audio_get_route_map(enabled_outputs[i]->dst, dst_map,
+                    enabled_outputs[i]->dst->nb_outputs) < 0)
                 MEDIA_WARN("Failed to get map array for %s.\n", enabled_outputs[i]->dst->name);
 
             for (j = 0; j < enabled_outputs[i]->dst->nb_outputs; j++) {
@@ -754,10 +767,34 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
         ds_fmt != -1 ? av_get_sample_fmt_name(ds_fmt) : "any",
         ds_rate, ds_ch);
 
+    if (sr_ch <= 0 || sr_ch > 8) {
+        MEDIA_WARN("Invalid negotiated source channels %d, fallback to 1\n",
+            sr_ch);
+        sr_ch = 1;
+    }
+
+    if (ds_ch <= 0 || ds_ch > 8) {
+        MEDIA_WARN("Invalid negotiated sink channels %d, fallback to 1\n",
+            ds_ch);
+        ds_ch = 1;
+    }
+
     for (i = 0; i < enabled_count; i++) {
+        if (!audio_filter_is_started(enabled_outputs[i]->dst)) {
+            MEDIA_INFO("Skipping format config for sink '%s' (started=false)\n",
+                enabled_outputs[i]->dst->name);
+            continue;
+        }
+
+        ret = audio_set_format_config(enabled_outputs[i], sr_fmt, sr_rate, sr_ch);
+        if (ret < 0) {
+            MEDIA_WARN("Failed to set format for enabled_output\n");
+            continue;
+        }
+
         memset(dst_map, 0, sizeof(dst_map));
-        av_opt_get_array(enabled_outputs[i]->dst, "map_array", AV_OPT_SEARCH_CHILDREN,
-            0, enabled_outputs[i]->dst->nb_outputs, AV_OPT_TYPE_INT, dst_map);
+        audio_get_route_map(enabled_outputs[i]->dst, dst_map,
+            enabled_outputs[i]->dst->nb_outputs);
 
         for (j = 0; j < enabled_outputs[i]->dst->nb_outputs; j++) {
             if (dst_map[j] != ROUTE_ON)
@@ -775,16 +812,6 @@ static int audio_negotiation_enabled_outputs(int enabled_count, AVFilterLink** e
             if (ret < 0)
                 MEDIA_WARN("Failed to set format for sin_link\n");
         }
-
-        if (!audio_filter_is_started(enabled_outputs[i]->dst)) {
-            MEDIA_INFO("Skipping format config for sink '%s' (started=false)\n",
-                enabled_outputs[i]->dst->name);
-            continue;
-        }
-
-        ret = audio_set_format_config(enabled_outputs[i], sr_fmt, sr_rate, sr_ch);
-        if (ret < 0)
-            MEDIA_WARN("Failed to set format for enabled_output\n");
     }
 
     return 0;
@@ -834,9 +861,7 @@ static void audio_negotiate_src(AVFilterContext* filter)
             continue;
 
         memset(map, 0, sizeof(map));
-        if (av_opt_get_array(src, "map_array", AV_OPT_SEARCH_CHILDREN,
-                0, src->nb_outputs, AV_OPT_TYPE_INT, map)
-            < 0)
+        if (audio_get_route_map(src, map, src->nb_outputs) < 0)
             MEDIA_WARN("Failed to get map array for src %s\n", src->name);
 
         enabled_count = 0;

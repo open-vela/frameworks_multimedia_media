@@ -48,6 +48,7 @@
 #define MEDIATOOL_MAX_CHAIN 16
 #define MEDIATOOL_MAX_ARGC 16
 #define MEDIATOOL_MAX_SIZE 2048
+#define MEDIATOOL_FILE_BUFFER_SIZE 8192
 #define MEDIATOOL_PLAYER 1
 #define MEDIATOOL_RECORDER 2
 #define MEDIATOOL_CONTROLLER 3
@@ -621,6 +622,9 @@ static void mediatool_uv_take_picture_complete_cb(void* cookie, int ret)
 
 static void mediatool_uv_common_close_handler(mediatool_chain_t* chain)
 {
+    chain->direct = false;
+    chain->direct_connect = false;
+
     if (chain->fd > 0) {
         close(chain->fd);
         chain->fd = -1;
@@ -783,11 +787,14 @@ static void mediatool_common_stop_thread(mediatool_chain_t* chain)
 {
     if (chain->thread) {
         pthread_join(chain->thread, NULL);
-        free(chain->buf);
-
-        chain->thread = 0;
-        chain->buf = NULL;
     }
+
+    free(chain->buf);
+    chain->thread = 0;
+    chain->buf = NULL;
+
+    chain->direct = false;
+    chain->direct_connect = false;
 
     if (chain->fd > 0) {
         close(chain->fd);
@@ -812,10 +819,12 @@ static int mediatool_common_stop_inner(mediatool_chain_t* chain)
 
     case MEDIATOOL_RECORDER:
         if (chain->direct) {
-            chain->direct_connect = false;
+            ret = media_recorder_stop(chain->handle);
+            media_recorder_close_socket(chain->handle);
             pthread_kill(chain->thread, SIGUSR1);
-            pthread_join(chain->thread, NULL);
+            break;
         }
+
         ret = media_recorder_stop(chain->handle);
         break;
 
@@ -855,6 +864,7 @@ CMD1(player_open, string_t, stream_type)
         return -ENOMEM;
 
     mediatool->chain[i].id = i;
+    mediatool->chain[i].fd = -1;
     mediatool->chain[i].handle = media_player_open(stream_type);
     if (!mediatool->chain[i].handle) {
         printf("media_player_open error\n");
@@ -891,6 +901,7 @@ CMD1(recorder_open, string_t, stream_type)
         return -ENOMEM;
 
     mediatool->chain[i].id = i;
+    mediatool->chain[i].fd = -1;
     mediatool->chain[i].handle = media_recorder_open(stream_type);
     if (!mediatool->chain[i].handle) {
         printf("media_recorder_open error\n");
@@ -923,6 +934,7 @@ CMD1(session_open, string_t, stream_type)
         return -ENOMEM;
 
     mediatool->chain[i].id = i;
+    mediatool->chain[i].fd = -1;
     mediatool->chain[i].handle = media_session_open(stream_type);
     if (!mediatool->chain[i].handle) {
         printf("media_session_open error\n");
@@ -1178,10 +1190,14 @@ static ssize_t mediatool_process_data(int fd, bool player,
 static void* mediatool_buffer_thread(void* arg)
 {
     mediatool_chain_t* chain = arg;
+    struct sched_param param;
     int act, ret, fd = 0;
     char* tmp;
 
     printf("%s, start, line %d\n", __func__, __LINE__);
+
+    param.sched_priority = CONFIG_MEDIA_TOOL_PRIORITY;
+    pthread_setschedparam(pthread_self(), SCHED_RR, &param);
 
     if (chain->direct) {
         if (chain->type == MEDIATOOL_PLAYER)
@@ -1246,8 +1262,21 @@ static void* mediatool_buffer_thread(void* arg)
             if (ret <= 0)
                 goto out;
 
-            act = write(chain->fd, chain->buf, ret);
-            assert(act == ret);
+            tmp = chain->buf;
+            while (ret > 0) {
+                act = write(chain->fd, tmp, ret);
+                if (act < 0) {
+                    if (errno == EINTR || errno == EAGAIN)
+                        continue;
+
+                    printf("%s, file write error ret %d errno %d, line %d\n",
+                        __func__, act, errno, __LINE__);
+                    goto out;
+                }
+
+                tmp += act;
+                ret -= act;
+            }
         }
     }
 
@@ -1292,6 +1321,12 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
             printf("buffer mode, file can't open\n");
             return -EINVAL;
         }
+
+        mediatool->chain[id].direct = direct;
+        mediatool->chain[id].direct_connect = direct;
+        mediatool->chain[id].size = MEDIATOOL_FILE_BUFFER_SIZE;
+        mediatool->chain[id].buf = malloc(mediatool->chain[id].size);
+        assert(mediatool->chain[id].buf);
     }
 
     switch (mediatool->chain[id].type) {
@@ -1330,7 +1365,7 @@ CMD4(prepare, int, id, string_t, mode, string_t, path, string_t, options)
 
     if (!async_mode && !url_mode) {
         mediatool->chain[id].direct = direct;
-        mediatool->chain[id].size = 512;
+        mediatool->chain[id].size = MEDIATOOL_FILE_BUFFER_SIZE;
         mediatool->chain[id].buf = malloc(mediatool->chain[id].size);
         assert(mediatool->chain[id].buf);
 
@@ -1351,6 +1386,8 @@ err:
         close(mediatool->chain[id].fd);
         mediatool->chain[id].fd = -1;
     }
+    free(mediatool->chain[id].buf);
+    mediatool->chain[id].buf = NULL;
     return ret;
 }
 
@@ -1760,6 +1797,10 @@ CMD3(playdtmf, int, id, string_t, mode, string_t, dial_number)
     if (ret < 0)
         goto out;
 
+    ret = media_player_start(mediatool->chain[id].handle);
+    if (ret < 0)
+        goto out;
+
     if (direct) {
         fd = media_player_get_socket(mediatool->chain[id].handle);
         if (fd < 0)
@@ -2077,6 +2118,7 @@ static int mediatool_cmd_help(const mediatool_cmd_t cmds[])
 CMD1(uv_player_open, string_t, stream_type)
 {
     long int i;
+    void* handle;
 
     for (i = 0; i < MEDIATOOL_MAX_CHAIN; i++) {
         if (!mediatool->chain[i].handle)
@@ -2087,8 +2129,9 @@ CMD1(uv_player_open, string_t, stream_type)
         return -ENOMEM;
 
     mediatool->chain[i].id = i;
-    mediatool->chain[i].handle = media_uv_player_open(&mediatool->loop, stream_type,
+    handle = media_uv_player_open(&mediatool->loop, stream_type,
         mediatool_uv_common_open_cb, &mediatool->chain[i]);
+    mediatool->chain[i].handle = handle;
     if (!mediatool->chain[i].handle)
         goto err;
 
@@ -2551,7 +2594,6 @@ static void* mediatool_uvloop_thread(void* arg)
     if (ret < 0)
         goto out;
 
-    printf("[%s][%d] running\n", __func__, __LINE__);
     while (1) {
         ret = uv_run(&mediatool->loop, UV_RUN_DEFAULT);
         if (ret == 0)
@@ -2560,26 +2602,30 @@ static void* mediatool_uvloop_thread(void* arg)
 
 out:
     ret = uv_loop_close(&mediatool->loop);
-    printf("[%s][%d] out:%d\n", __func__, __LINE__, ret);
     return NULL;
 }
 
-int main(int argc, char* argv[])
+int mediatool_main(int argc, char* argv[])
 {
-    mediatool_t mediatool;
+    mediatool_t* mediatool;
     pthread_attr_t attr;
     char* buffer = NULL;
     pthread_t thread;
     size_t len = 0;
     ssize_t n;
     int ret;
+    int thread_started = 0;
 
-    memset(&mediatool, 0, sizeof(mediatool));
+    mediatool = calloc(1, sizeof(*mediatool));
+    if (!mediatool) {
+        return -ENOMEM;
+    }
     pthread_attr_init(&attr);
     pthread_attr_setstacksize(&attr, CONFIG_MEDIA_TOOL_STACKSIZE);
-    ret = pthread_create(&thread, &attr, mediatool_uvloop_thread, &mediatool);
-    if (ret < 0)
+    ret = pthread_create(&thread, &attr, mediatool_uvloop_thread, mediatool);
+    if (ret != 0)
         goto out;
+    thread_started = 1;
 
     usleep(1000); /* let uvloop run. */
     while (1) {
@@ -2603,7 +2649,7 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        uv_async_queue_send(&mediatool.asyncq, buffer);
+        uv_async_queue_send(&mediatool->asyncq, buffer);
         if (!strcmp(buffer, "q"))
             break;
 
@@ -2611,13 +2657,15 @@ int main(int argc, char* argv[])
     }
 
 out:
-    pthread_join(thread, NULL);
+    if (thread_started)
+        pthread_join(thread, NULL);
+    free(mediatool);
     return 0;
 }
 #else /* CONFIG_LIBUV_EXTENSION */
-int main(int argc, char* argv[])
+int mediatool_main(int argc, char* argv[])
 {
-    mediatool_t mediatool;
+    mediatool_t* mediatool;
     char* buffer = NULL;
     size_t len = 0;
     ssize_t n;
@@ -2625,7 +2673,10 @@ int main(int argc, char* argv[])
 
     (void)argc;
     (void)argv;
-    memset(&mediatool, 0, sizeof(mediatool));
+    mediatool = calloc(1, sizeof(*mediatool));
+    if (!mediatool) {
+        return -ENOMEM;
+    }
 
     while (1) {
         printf("mediatool> ");
@@ -2648,7 +2699,7 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        ret = mediatool_execute(&mediatool, buffer);
+        ret = mediatool_execute(mediatool, buffer);
 
         if (ret < 0) {
             printf("Bye-Bye!\n");
@@ -2657,6 +2708,7 @@ int main(int argc, char* argv[])
     }
 
     free(buffer);
+    free(mediatool);
     return 0;
 }
 
