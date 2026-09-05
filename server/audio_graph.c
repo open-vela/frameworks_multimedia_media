@@ -48,9 +48,22 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+#ifndef CONFIG_MEDIA_GRAPH_SIZE_MAX
+#  define CONFIG_MEDIA_GRAPH_SIZE_MAX 1024
+#endif
+
+#ifndef CONFIG_MEDIA_SERVER_CONFIG_PATH
+#  define CONFIG_MEDIA_SERVER_CONFIG_PATH "/etc/media/"
+#endif
+
 #define MAX_GRAPH_SIZE CONFIG_MEDIA_GRAPH_SIZE_MAX
 #define MAX_POLL_FILTERS 32
 #define MAX_LINKS 10
+#ifndef CONFIG_MEDIA_AUDIO_GRAPH_RUN_MAX
+#  define CONFIG_MEDIA_AUDIO_GRAPH_RUN_MAX 8
+#endif
+
+#define AUDIO_GRAPH_RUN_MAX CONFIG_MEDIA_AUDIO_GRAPH_RUN_MAX
 
 #define ROUTE_OFF 0
 #define ROUTE_ON 1
@@ -254,6 +267,9 @@ static int audio_graph_load(MediaGraphPriv* priv, char* conf)
     priv->graph = avfilter_graph_alloc();
     if (!priv->graph)
         return -ENOMEM;
+
+    priv->graph->thread_type = 0;
+    priv->graph->nb_threads = 1;
 
     ret = avfilter_graph_parse2(priv->graph, graph_desc, &input, &output);
     if (ret < 0) {
@@ -525,6 +541,21 @@ static int audio_graph_dequeue_command(MediaGraphPriv* priv, bool process)
                 MEDIA_ERR("Media graph link error after command '%s': %d:%s\n",
                     cmd->cmd, ret, av_err2str(ret));
         }
+
+        if (ret >= 0 && cmd->filter->nb_inputs > 0) {
+            for (i = 0; i < cmd->filter->nb_inputs; i++) {
+                AVFilterLink* inlink = cmd->filter->inputs[i];
+                if (!inlink || !inlink->src)
+                    continue;
+
+                ret = avfilter_process_command(inlink->src, cmd->cmd, cmd->arg, NULL, 0, 0);
+                if (ret < 0) {
+                    MEDIA_ERR("upstream %s command '%s' failed: %d:%s\n",
+                        inlink->src->name, cmd->cmd, ret, av_err2str(ret));
+                    break;
+                }
+            }
+        }
     } else
         ret = avfilter_process_command(cmd->filter, cmd->cmd, cmd->arg,
             cmd->res, 0, 0);
@@ -618,6 +649,7 @@ static int audio_graph_run_all(AVFilterGraph* graph)
 {
     FFFilterContext* ctxi;
     unsigned i;
+    int run_count = 0;
     int ret;
 
     while (1) {
@@ -637,6 +669,11 @@ static int audio_graph_run_all(AVFilterGraph* graph)
             av_log(graph, AV_LOG_ERROR, "%s %s activate failed, ret %d.\n", __func__, ctxi->p.name, ret);
             break;
         }
+
+        if (++run_count >= AUDIO_GRAPH_RUN_MAX) {
+            ret = 1;
+            break;
+        }
     }
 
     return ret;
@@ -650,6 +687,9 @@ static int audio_graph_run_once(MediadPlugin* ctx)
     ret = audio_graph_run_all(priv->graph);
     if (ret < 0)
         return ret;
+
+    if (ret > 0)
+        audio_graph_try_touch(priv);
 
     do {
         ret = audio_graph_dequeue_command(priv, true);
@@ -880,10 +920,14 @@ int audio_graph_open(AVFilterContext** src, const char* stream)
     char stream_name[64] = { 0 };
     int ret;
 
+    MEDIA_INFO("audio_graph_open request stream=%s\n", stream ? stream : "_");
     ret = media_stub_get_stream_name(stream, stream_name, sizeof(stream_name));
-    if (ret >= 0)
+    if (ret >= 0) {
+        MEDIA_INFO("audio_graph_open resolved stream=%s => %s\n", stream, stream_name);
         stream = stream_name;
-    else {
+    } else {
+        MEDIA_ERR("audio_graph_open stream resolve failed stream=%s ret=%d\n",
+            stream ? stream : "_", ret);
         goto fail;
     }
 
@@ -923,6 +967,9 @@ int audio_graph_start(AVFilterContext* src, int format, int sample_rate, int cha
         MEDIA_ERR("%s link failed ret:%d\n", src->name, ret);
         return ret;
     }
+
+    MEDIA_INFO("graph start src=%s fmt=%d rate=%d ch=%d\n",
+               src->name, format, sample_rate, channels);
 
     return 0;
 }

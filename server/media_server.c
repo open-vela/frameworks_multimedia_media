@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -293,7 +294,22 @@ static int media_server_listen(struct media_server_priv* priv, int family)
     }
 
     if (bind(fd, addr, len) < 0)
+    {
+        MEDIA_ERR("media_server bind failed family=%d path=%s cpu=%s errno=%d\n",
+            family,
+            family == PF_LOCAL ? local_addr.sun_path :
+            (family == AF_INET ? "inet" : rpmsg_addr.rp_name),
+            CONFIG_RPMSG_LOCAL_CPUNAME, errno);
         return -errno;
+    }
+
+    if (family == PF_LOCAL)
+        MEDIA_INFO("media_server listen local path=%s\n", local_addr.sun_path);
+    else if (family == AF_INET)
+        MEDIA_INFO("media_server listen inet port=%d\n", CONFIG_MEDIA_SERVER_PORT);
+    else
+        MEDIA_INFO("media_server listen rpmsg name=%s cpu=%s\n",
+            rpmsg_addr.rp_name, rpmsg_addr.rp_cpu);
 
     if (listen(fd, MEDIA_SERVER_MAXCONN) < 0)
         return -errno;
@@ -309,14 +325,29 @@ static int media_server_init(MediadPlugin* ctx)
     struct media_server_priv* priv = ctx->priv;
     int ret1 = -1, ret2 = -1, ret3 = -1;
 
+#ifdef CONFIG_NET_LOCAL
+    mkdir("/var", 0755);
+    if (mkdir(CONFIG_NET_LOCAL_VFS_PATH, 0755) < 0 && errno != EEXIST)
+        MEDIA_ERR("media_server ensure local socket dir %s failed errno=%d\n",
+            CONFIG_NET_LOCAL_VFS_PATH, errno);
+#endif
+
+#ifdef CONFIG_NET_LOCAL
     ret1 = media_server_listen(priv, PF_LOCAL);
+#endif
+#ifdef CONFIG_NET_RPMSG
     ret2 = media_server_listen(priv, AF_RPMSG);
+#endif
 #if CONFIG_MEDIA_SERVER_PORT >= 0
     ret3 = media_server_listen(priv, AF_INET);
 #endif
 
-    if (ret1 < 0 && ret2 < 0 && ret3 < 0)
+    if (ret1 < 0 && ret2 < 0 && ret3 < 0) {
+        MEDIA_ERR("listen init failed local=%d rpmsg=%d inet=%d\n", ret1, ret2, ret3);
         return -EINVAL;
+    }
+
+    MEDIA_INFO("listen init result local=%d rpmsg=%d inet=%d\n", ret1, ret2, ret3);
 
     return 0;
 }

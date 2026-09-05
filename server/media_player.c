@@ -27,6 +27,7 @@
 #include <netpacket/rpmsg.h>
 #include <poll.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,6 +67,8 @@
 #define MEDIA_AUDIO_OUTPUT_XRUN (1 << 2)
 
 #define STREAMS_MAX 2
+#define MEDIA_PLAYER_REFILL_BATCH 128
+#define MEDIA_PLAYER_AUDIO_XRUN_RESUME_MIN 64
 
 /****************************************************************************
  * Private Types
@@ -180,6 +183,8 @@ typedef struct MediaPlayerContext {
     AVFilterContext* audio_output;
     MediaVOutputContext* video_output;
 } MediaPlayerContext;
+
+static int media_player_refill_dat_limit(MediaPlayerContext* ctx, int limit);
 
 typedef struct MediaPlayerPriv {
     MediaPlayerContext ctxs[CONFIG_MEDIA_PLAYER_MAX_CNT];
@@ -302,11 +307,13 @@ static int media_player_on_event_cb(void* udata, int evt, int64_t args)
         }
 
         ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_XRUN;
+        ctx->poll_timeout = 2;
 
         if (ctx->audio_output) {
-            MEDIA_INFO("player %s xrun, pause audio output.", ctx->name);
             audio_graph_pause(ctx->audio_output);
         }
+
+        write(ctx->event_fd, &cnt, sizeof(cnt));
 
         pthread_mutex_unlock(&ctx->mutex);
 
@@ -389,6 +396,14 @@ static AVFrame* media_player_queue_pop(MediaPlayerContext* ctx, int type)
     }
     pthread_mutex_unlock(&ctx->mutex);
     return frame;
+}
+
+static int media_player_audio_xrun_resume_threshold(OutputStream* stream)
+{
+    if (!stream)
+        return 0;
+
+    return FFMIN(stream->nb_queue_max, MEDIA_PLAYER_AUDIO_XRUN_RESUME_MIN);
 }
 
 static AVFrame* media_player_queue_peek(MediaPlayerContext* ctx, int type)
@@ -533,19 +548,30 @@ static int media_player_queue_push(MediaPlayerContext* ctx, int idx, AVFrame* fr
     }
 
     queued_cnt = ff_framequeue_queued_frames(&ctx->streams[idx]->queue);
-
     if (queued_cnt == ctx->streams[idx]->nb_queue_max) {
         if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_STARTING) {
-            ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_STARTING;
+            ctx->audio_output_state &= ~(MEDIA_AUDIO_OUTPUT_STARTING | MEDIA_AUDIO_OUTPUT_XRUN);
             ret = media_player_start_audio(ctx);
         } else if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN) {
             ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_XRUN;
+            MEDIA_INFO("player %s resume, q:%d/%d aframe:%" PRIu32 ".",
+                ctx->name, queued_cnt, ctx->streams[idx]->nb_queue_max,
+                ctx->aframe_cnt);
             ret = media_player_resume_audio(ctx, true);
         }
-
-        if (ret >= 0)
-            ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
+    } else if (ctx->streams[idx]->type == AVMEDIA_TYPE_AUDIO &&
+        queued_cnt >= media_player_audio_xrun_resume_threshold(ctx->audio_stream)) {
+        if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_XRUN) {
+            ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_XRUN;
+            MEDIA_INFO("player %s resume, q:%d/%d aframe:%" PRIu32 ".",
+                ctx->name, queued_cnt, ctx->streams[idx]->nb_queue_max,
+                ctx->aframe_cnt);
+            ret = media_player_resume_audio(ctx, true);
+        }
     }
+
+    if (ret >= 0 && !(ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_STARTING))
+        ctx->audio_output_state |= MEDIA_AUDIO_OUTPUT_STARTED;
 
     pthread_mutex_unlock(&ctx->mutex);
     if (ret < 0)
@@ -590,6 +616,18 @@ static int media_player_dec_frame(MediaPlayerContext* ctx, int idx, AVFrame** of
 
     ret = avcodec_receive_frame(ctx->streams[idx]->codec_ctx, frame);
     if (ret < 0) {
+        if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF &&
+            ctx->streams[idx]->type == AVMEDIA_TYPE_AUDIO) {
+            MEDIA_ERR("audio receive_frame ret=%d codec=%s fmt=%s rate=%d ch=%d max_samples=%" PRId64 " thread=%d frame_size=%d\n",
+                      ret,
+                      avcodec_get_name(ctx->streams[idx]->codec_ctx->codec_id),
+                      av_get_sample_fmt_name(ctx->streams[idx]->codec_ctx->sample_fmt),
+                      ctx->streams[idx]->codec_ctx->sample_rate,
+                      ctx->streams[idx]->codec_ctx->ch_layout.nb_channels,
+                      ctx->streams[idx]->codec_ctx->max_samples,
+                      ctx->streams[idx]->codec_ctx->thread_count,
+                      ctx->streams[idx]->codec_ctx->frame_size);
+        }
         av_frame_free(&frame);
         return ret;
     }
@@ -628,12 +666,15 @@ static int media_player_dec_frames(MediaPlayerContext* ctx)
         ret = media_player_dec_frame(ctx, i, &frame);
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
             continue;
-        else if (ret < 0)
+        else if (ret < 0) {
+            MEDIA_ERR("dec_frames stream=%d fatal ret=%d\n", i, ret);
             return ret;
+        }
 
         ret = media_player_queue_push(ctx, i, frame);
         if (ret < 0) {
             av_frame_free(&frame);
+            MEDIA_ERR("dec_frames stream=%d queue_push ret=%d\n", i, ret);
             return ret;
         }
 
@@ -777,11 +818,11 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
             MEDIA_INFO("Skip stream %d, type %d, disposition %d.\n", i, stream->codecpar->codec_type, stream->disposition);
             continue;
         } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && !strncmp(ctx->name, "Video", 5)) {
-            av_log(NULL, AV_LOG_ERROR, "%s:%d stream %d, type %d.\n", __func__, __LINE__, i, stream->codecpar->codec_type);
+            MEDIA_INFO("%s stream %d, type %d.\n", __func__, i, stream->codecpar->codec_type);
             ctx->streams[AVMEDIA_TYPE_VIDEO] = stream_out = ctx->video_stream = av_calloc(1, sizeof(OutputStream));
             stream_out->type = AVMEDIA_TYPE_VIDEO;
         } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-            av_log(NULL, AV_LOG_ERROR, "%s:%d stream %d, type %d.\n", __func__, __LINE__, i, stream->codecpar->codec_type);
+            MEDIA_INFO("%s stream %d, type %d.\n", __func__, i, stream->codecpar->codec_type);
             ctx->streams[AVMEDIA_TYPE_AUDIO] = stream_out = ctx->audio_stream = av_calloc(1, sizeof(OutputStream));
             stream_out->type = AVMEDIA_TYPE_AUDIO;
         }
@@ -792,7 +833,8 @@ static int media_player_init_stream(MediaPlayerContext* ctx)
         stream_out->type = stream->codecpar->codec_type;
         stream_out->index = i;
 
-        if ((tag = av_dict_get(ctx->format_opt, "datqmax", NULL, 0))) {
+        if ((tag = av_dict_get(ctx->format_opt, "datqmax", NULL, 0)) ||
+            (tag = av_dict_get(ctx->global_opts, "datqmax", NULL, 0))) {
             stream_out->nb_queue_max = strtol(tag->value, NULL, 0);
         } else {
             stream_out->nb_queue_max = CONFIG_MEDIA_PLAYER_DATA_QUEUE_SIZE;
@@ -877,8 +919,26 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
     const AVInputFormat* iformat = NULL;
     uint32_t seek_point = 0;
     AVDictionaryEntry* tag;
+    bool explicit_format;
+    bool is_pcm;
+    const char* ext;
     char* name;
     int ret;
+
+    ext = filename ? strrchr(filename, '.') : NULL;
+    is_pcm = ext && !av_strcasecmp(ext, ".pcm");
+    explicit_format = av_dict_get(ctx->format_opt, "format", NULL, 0) != NULL;
+
+    MEDIA_INFO("ctx %p open_demuxer filename=%s\n", ctx, filename ? filename : "(null)");
+    if (ctx->global_opts && (is_pcm || explicit_format))
+        av_dict_copy(&ctx->format_opt, ctx->global_opts, AV_DICT_DONT_OVERWRITE);
+
+    if (!is_pcm && !explicit_format) {
+        av_dict_set(&ctx->format_opt, "format", NULL, 0);
+        av_dict_set(&ctx->format_opt, "ch_layout", NULL, 0);
+        av_dict_set(&ctx->format_opt, "sample_rate", NULL, 0);
+        av_dict_set(&ctx->format_opt, "datqmax", NULL, 0);
+    }
 
     if ((tag = av_dict_get(ctx->format_opt, "format", NULL, 0))) {
         iformat = av_find_input_format(tag->value);
@@ -900,8 +960,6 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
     ctx->format_ctx->interrupt_callback.opaque = ctx;
     ctx->format_ctx->flags |= AVFMT_FLAG_FAST_SEEK;
 
-    if (ctx->global_opts)
-        av_dict_copy(&ctx->format_opt, ctx->global_opts, 0);
     ctx->protocol_map = NULL;
     if ((tag = av_dict_get(ctx->format_opt, "protocol_map", NULL, 0))) {
         ctx->protocol_map = tag->value;
@@ -910,18 +968,20 @@ static int media_player_open_demuxer(MediaPlayerContext* ctx, const char* filena
     }
     media_player_map_protocol(ctx, filename, name, MAX_URL_SIZE);
 
+    MEDIA_INFO("ctx %p mapped url %s -> %s.\n", ctx, filename, name);
     MEDIA_INFO("ctx %p url %s start open input.\n", ctx, name);
     ret = avformat_open_input(&ctx->format_ctx, name, iformat, &ctx->format_opt);
     if (ret < 0) {
-        MEDIA_ERR("Failed to avformat_open_input ret %d, %s.\n", ret, av_err2str(ret));
+        MEDIA_ERR("Failed to avformat_open_input ret %d, %s url=%s.\n",
+            ret, av_err2str(ret), name);
         goto out;
     }
 
     MEDIA_INFO("ctx %p open input done.\n", ctx);
-
     ret = avformat_find_stream_info(ctx->format_ctx, NULL);
     if (ret < 0) {
-        MEDIA_ERR("Failed to find stream info ret %d, %s.\n", ret, av_err2str(ret));
+        MEDIA_ERR("Failed to find stream info ret %d, %s url=%s.\n",
+            ret, av_err2str(ret), name);
         goto out;
     }
 
@@ -969,6 +1029,7 @@ static void media_player_notify_finalize(MediaPlayerContext* ctx)
 static int media_player_proc_dat(MediaPlayerContext* ctx)
 {
     int ret;
+
     ret = media_player_dec_frames(ctx);
     if (ret == AVERROR(EAGAIN)) {
         ret = media_player_read_frame(ctx);
@@ -986,7 +1047,6 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
         return ret;
     else if (ret == AVERROR_EOF) {
         if (!media_player_is_queue_empty(ctx)) {
-
             pthread_mutex_lock(&ctx->mutex);
             if (ctx->audio_output_state & MEDIA_AUDIO_OUTPUT_STARTING) {
                 ctx->audio_output_state &= ~MEDIA_AUDIO_OUTPUT_STARTING;
@@ -1019,6 +1079,32 @@ static int media_player_proc_dat(MediaPlayerContext* ctx)
         return ret;
 
     return media_player_stop(ctx);
+}
+
+static int media_player_refill_dat_limit(MediaPlayerContext* ctx, int limit)
+{
+    uint64_t cnt = 1;
+    int refill_count;
+    int ret = 0;
+
+    for (refill_count = 0; refill_count < limit; refill_count++) {
+        if (!media_player_dat_available(ctx))
+            break;
+
+        ret = media_player_proc_dat(ctx);
+        if (ret < 0)
+            break;
+    }
+
+    if (refill_count > 0)
+        write(ctx->event_fd, &cnt, sizeof(cnt));
+
+    return ret;
+}
+
+static int media_player_refill_dat(MediaPlayerContext* ctx)
+{
+    return media_player_refill_dat_limit(ctx, MEDIA_PLAYER_REFILL_BATCH);
 }
 
 static int media_player_seek(MediaPlayerContext* ctx, uint32_t ms, int flush)
@@ -1192,6 +1278,7 @@ static int media_player_stop(MediaPlayerContext* ctx)
     ctx->audio_output_state = 0;
     pthread_mutex_unlock(&ctx->mutex);
 
+    ctx->poll_timeout = -1;
     ctx->pending_stop = 0;
     ctx->state = MEDIA_PLAYER_STATE_STOPPED;
 
@@ -1238,6 +1325,8 @@ static int media_player_start(MediaPlayerContext* ctx)
         MEDIA_ERR("audio play/resume failed: %s\n", av_err2str(ret));
         goto err;
     }
+
+    ctx->poll_timeout = 2;
 
     snprintf(volume_str, sizeof(volume_str), "%f", ctx->volume);
     ret = audio_graph_set_parameter(ctx->audio_output, "player_volume", volume_str);
@@ -1360,42 +1449,12 @@ static int media_player_send_cmd(MediaPlayerContext* ctx, const int cmd, const v
     return 0;
 }
 
-static const char* media_player_cmd_to_string(int cmd)
-{
-    switch (cmd) {
-    case MEDIA_PLAYER_CMD_OPEN:
-        return "OPEN";
-    case MEDIA_PLAYER_CMD_SET_EVENT:
-        return "SET_EVENT";
-    case MEDIA_PLAYER_CMD_SET_OPTIONS:
-        return "SET_OPTIONS";
-    case MEDIA_PLAYER_CMD_SET_LOOP:
-        return "SET_LOOP";
-    case MEDIA_PLAYER_CMD_PREPARE:
-        return "PREPARE";
-    case MEDIA_PLAYER_CMD_START:
-        return "START";
-    case MEDIA_PLAYER_CMD_PAUSE:
-        return "PAUSE";
-    case MEDIA_PLAYER_CMD_SEEK:
-        return "SEEK";
-    case MEDIA_PLAYER_CMD_STOP:
-        return "STOP";
-    case MEDIA_PLAYER_CMD_RESET:
-        return "RESET";
-    case MEDIA_PLAYER_CMD_CLOSE:
-        return "CLOSE";
-    default:
-        return "UNKNOWN";
-    }
-}
-
 static void media_player_proc_cmd(MediaPlayerContext* ctx, PlayerCmd* msg)
 {
     uint32_t time, pending_stop;
 
-    MEDIA_INFO("ctx %p name %s proc cmd %s (ID:%d)\n",
-        ctx, ctx->name, media_player_cmd_to_string(msg->cmd), msg->cmd);
+    MEDIA_INFO("ctx %p name %s proc cmd ID:%d\n",
+        ctx, ctx->name, msg->cmd);
 
     switch (msg->cmd) {
     case MEDIA_PLAYER_CMD_SET_EVENT:
@@ -1857,11 +1916,12 @@ static void* media_player_thread(void* arg)
     MediaPlayerContext* ctx = (MediaPlayerContext*)arg;
     MEDIA_INFO("ctx %p create player thread.\n", ctx);
     PlayerCmd* msg;
-    uint64_t cnt = 1;
 
     while (1) {
         if (media_player_is_exit(ctx))
             break;
+
+        media_player_refill_dat(ctx);
 
         media_player_poll(ctx);
 
@@ -1870,9 +1930,7 @@ static void* media_player_thread(void* arg)
             media_player_proc_cmd(ctx, msg);
         }
 
-        if (media_player_dat_available(ctx) && media_player_proc_dat(ctx) >= 0) {
-            write(ctx->event_fd, &cnt, sizeof(cnt));
-        }
+        media_player_refill_dat(ctx);
 
         media_player_proc_avsync(ctx);
     }
@@ -1907,6 +1965,8 @@ static int media_player_open(MediaPlayerContext* ctx, const char* name)
 
     pthread_attr_init(&attr);
     pthread_attr_setstacksize(&attr, CONFIG_MEDIA_PLAYER_STACKSIZE);
+    pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+    pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
     param.sched_priority = CONFIG_MEDIA_PLAYER_PRIORITY;
     pthread_attr_setschedparam(&attr, &param);
     ret = pthread_create(&thread, &attr, media_player_thread, ctx);

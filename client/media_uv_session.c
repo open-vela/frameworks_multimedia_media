@@ -132,11 +132,13 @@ static int media_uv_session_send(void* handle, const char* target,
 {
     MediaSessionPriv* priv = handle;
     media_parcel parcel;
+    const char* safe_target = target ? target : "";
+    const char* safe_arg = arg ? arg : "";
     int ret;
 
     media_parcel_init(&parcel);
     ret = media_parcel_append_printf(&parcel, "%i%s%s%s%i",
-        MEDIA_ID_SESSION, target, cmd, arg, res_len);
+        MEDIA_ID_SESSION, safe_target, cmd, safe_arg, res_len);
     if (ret < 0)
         return ret;
 
@@ -178,6 +180,8 @@ static void media_uv_controller_open_cb(void* cookie, int ret)
     if (ret < 0)
         media_uv_reconnect(priv->proxy);
     else {
+        MEDIA_INFO("open cb:session ret:%d proxy:%p\n", ret, priv->proxy);
+        media_uv_flush_pending(priv->proxy);
         MEDIA_INFO("result:%d handle:%p\n", ret, priv);
         if (priv->on_open)
             priv->on_open(priv->cookie, ret);
@@ -188,6 +192,7 @@ static void media_uv_controller_connect_cb(void* cookie, int ret)
 {
     MediaSessionPriv* priv = cookie;
 
+    MEDIA_INFO("connect cb:session ret:%d proxy:%p\n", ret, priv->proxy);
     if (ret >= 0)
         ret = media_uv_session_send(priv, NULL, "open", NULL, 0,
             media_uv_session_receive_cb, media_uv_controller_open_cb, priv);

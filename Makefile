@@ -32,6 +32,10 @@ endif
 
 CSRCS += $(wildcard utils/*.c)
 
+ifneq ($(CONFIG_LIB_FFMPEG),)
+  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/ffmpeg/ffmpeg
+endif
+
 ifeq ($(CONFIG_FEATURE_FRAMEWORK),y)
 depend::
 	$(APPDIR)/../prebuilts/tools/rust/bin/jidl/jidl_gen_cpp \
@@ -76,7 +80,6 @@ ifneq ($(CONFIG_MEDIA_GRAPH),)
   CSRCS  += server/media_recorder.c
   CSRCS  += server/media_video_output.c
   CSRCS  += server/audio_negotiation.c
-  CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/ffmpeg/ffmpeg
 endif
 
 ifneq ($(CONFIG_MEDIA_POLICY),)
